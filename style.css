@@ -1,0 +1,52 @@
+:root{--bg:#fff;--fg:#1d1d1f;--mut:#5c5c63;--card:#f4f4f6;--line:#d9d9de;--acc:#b3282d;--acc-fg:#fff;--ok:#1b6e3a;--warn:#8a5a00;--ko:#b3282d}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#121214;--fg:#f2f2f4;--mut:#a7a7b0;--card:#1e1e22;--line:#36363d;--acc:#e0575c;--acc-fg:#101012;--ok:#58c77f;--warn:#e6b24d;--ko:#ff7b80}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding-bottom:calc(64px + env(safe-area-inset-bottom))}
+.barre{position:sticky;top:0;z-index:5;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px 16px;background:var(--acc);color:var(--acc-fg);font-size:18px}
+.etat{font-size:13px;opacity:.95}
+main{padding:12px 16px;max-width:720px;margin:0 auto}
+h2{font-size:16px;margin:20px 0 8px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
+.onglets{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:5}
+.onglets a{flex:1;text-align:center;padding:14px 4px;min-height:48px;color:var(--mut);text-decoration:none;font-weight:600}
+.onglets a.on{color:var(--acc);box-shadow:inset 0 3px 0 var(--acc)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:48px;padding:10px 16px;border:0;border-radius:10px;background:var(--acc);color:var(--acc-fg);font:inherit;font-weight:700;cursor:pointer;text-decoration:none}
+.btn.sec{background:transparent;color:var(--acc);border:2px solid var(--acc)}
+.btn.gros{width:100%;min-height:64px;font-size:20px}
+.btn.danger{background:transparent;color:var(--ko);border:2px solid var(--ko)}
+.btn[disabled]{opacity:.5}
+input,select,textarea{font:inherit;color:var(--fg);background:var(--bg);border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;min-height:48px;width:100%}
+input:focus,select:focus,button:focus-visible,a:focus-visible{outline:3px solid var(--acc);outline-offset:1px}
+label{display:block;font-size:14px;color:var(--mut);margin:10px 0 4px}
+.carte{background:var(--card);border-radius:12px;padding:12px 14px;margin:10px 0}
+.ligne{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.ligne:last-child{border-bottom:0}
+.ligne .g{flex:1;min-width:0}
+.ligne small,.mut{color:var(--mut);font-size:13px}
+.ligne strong{overflow-wrap:anywhere}
+.qte{width:84px;text-align:right;min-height:44px}
+.rapide{display:flex;gap:8px;align-items:center;flex-shrink:0}
+.prix{font-weight:700;white-space:nowrap;text-align:right}
+.tot{font-size:18px}
+.tot p{display:flex;justify-content:space-between;margin:4px 0}
+.tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px;font-weight:700;border:1.5px solid currentColor}
+.tag.ok{color:var(--ok)}.tag.warn{color:var(--warn)}.tag.ko{color:var(--ko)}
+.alerte{border-left:5px solid var(--warn)}
+.erreur{border-left:5px solid var(--ko)}
+.reussi{border-left:5px solid var(--ok)}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.actions .btn{flex:1 1 140px}
+.toast{position:fixed;left:16px;right:16px;bottom:calc(76px + env(safe-area-inset-bottom));z-index:9;padding:12px 14px;border-radius:10px;background:var(--fg);color:var(--bg);font-weight:600;opacity:0;transform:translateY(8px);pointer-events:none;transition:.2s}
+.toast.on{opacity:1;transform:none}
+.vide{color:var(--mut);padding:12px 0}
+.liste-rapport{max-height:260px;overflow:auto;font-size:14px;padding-left:18px;margin:6px 0}
+.feuille{display:none}
+@media print{
+ body{background:#fff;color:#000;padding:0;font-size:12pt}
+ .noprint,.ecran,.onglets,.barre,.toast{display:none!important}
+ .feuille{display:block}
+ .feuille table{width:100%;border-collapse:collapse;margin:12px 0}
+ .feuille th,.feuille td{border:1px solid #888;padding:4px 6px;text-align:left;font-size:10.5pt}
+ .feuille td.n,.feuille th.n{text-align:right}
+ .feuille h1{font-size:18pt;margin:0 0 4px}
+}
