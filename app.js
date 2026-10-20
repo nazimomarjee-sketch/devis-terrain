@@ -1,6 +1,6 @@
 'use strict';
 /* Devis terrain : tout reste sur le téléphone (IndexedDB). Seule exception : le bouton « Fiche officielle » d'un client envoie son NOM au registre public (recherche-entreprises.api.gouv.fr), à la demande. */
-const VERSION = 'v4';
+const VERSION = 'v5';
 
 // ---------- utilitaires ----------
 const $ = (s, r = document) => r.querySelector(s);
@@ -271,6 +271,7 @@ async function route() {
     else if (p[0] === 'tournee') await pageTournee();
     else if (p[0] === 'clients') await pageClients();
     else if (p[0] === 'client' && /^\d+$/.test(p[1] || '')) await pageClient(Number(p[1]));
+    else if (p[0] === 'article' && p[1]) await pageArticle(p.slice(1).join('/'));
     else if (p[0] === 'catalogue') await pageCatalogue();
     else if (p[0] === 'reglages') await pageReglages();
     else nonTrouve();
@@ -572,6 +573,21 @@ function rapportNode(titre, rep) {
     rep.avertissements.length ? h('details', {}, h('summary', {}, 'Avertissements (' + rep.avertissements.length + ')'),
       h('ul', { class: 'liste-rapport' }, rep.avertissements.slice(0, 100).map(a => h('li', {}, a)))) : null);
 }
+async function pageArticle(codeBrut) {
+  let code; try { code = decodeURIComponent(codeBrut); } catch (e) { return nonTrouve(); }
+  const a = CAT.find(x => x.code === code);
+  if (!a) return nonTrouve();
+  const ttc = ht => ht + hup(BigInt(ht) * BigInt(S.tva100), 10000n);
+  const rems = [0, 10, 20, 30, 40, 50, 55, 60].filter(r => r * 100 <= S.remiseMax100);
+  montrer('Article',
+    h('div', { class: 'carte' }, h('strong', {}, a.des), h('br'), h('small', {}, 'Code ' + a.code)),
+    h('div', { class: 'carte' }, h('div', { class: 'ligne' }, h('span', { class: 'g' }, 'Prix HT'), h('span', { class: 'prix' }, eur(a.pu))),
+      h('div', { class: 'ligne' }, h('span', { class: 'g' }, 'Prix TTC (TVA ' + pct(S.tva100) + ' %)'), h('span', { class: 'prix' }, eur(ttc(a.pu))))),
+    h('h2', {}, 'Prix après remise (1 unité)'),
+    rems.map(r => { const ht = r ? ligneTotal({ q: 100, pu: a.pu, r: r * 100 }) : a.pu; return h('div', { class: 'ligne' }, h('span', { class: 'g' }, r ? '- ' + r + ' %' : 'Sans remise'), h('span', { class: 'prix' }, eur(ht) + ' HT')); }),
+    h('p', { class: 'mut' }, 'Calcul : arrondi au centime, TVA réglable dans Réglages. Pas de prix d’achat ni de marge sur ce téléphone.'),
+    h('div', { class: 'actions' }, h('a', { class: 'btn', href: '#/nouveau' }, 'Nouveau devis'), h('button', { class: 'btn sec', onclick: () => history.back() }, 'Retour')));
+}
 async function pageCatalogue() {
   const rapport = await get('meta', 'rapport_articles');
   const zone = h('div');
@@ -579,7 +595,7 @@ async function pageCatalogue() {
   const q = h('input', { type: 'search', placeholder: 'Chercher : code ou désignation…', 'aria-label': 'Chercher dans le catalogue', autocomplete: 'off' });
   q.addEventListener('input', () => {
     const r = chercher(q.value, 30);
-    res.replaceChildren(...(q.value.trim() ? (r.length ? r.map(a => h('div', { class: 'ligne' }, h('span', { class: 'g' }, h('strong', {}, a.des), h('br'), h('small', {}, a.code)), h('span', { class: 'prix' }, eur(a.pu)))) : [h('p', { class: 'vide' }, 'Aucun article trouvé.')]) : []));
+    res.replaceChildren(...(q.value.trim() ? (r.length ? r.map(a => h('a', { class: 'ligne', href: '#/article/' + encodeURIComponent(a.code), style: 'color:inherit;text-decoration:none' }, h('span', { class: 'g' }, h('strong', {}, a.des), h('br'), h('small', {}, a.code)), h('span', { class: 'prix' }, eur(a.pu)))) : [h('p', { class: 'vide' }, 'Aucun article trouvé.')]) : []));
   });
   montrer('Catalogue',
     h('p', { class: 'mut' }, CAT.length + ' article(s). Pas de gestion de stock. Pas de prix d’achat ni de marge sur ce téléphone.'),
