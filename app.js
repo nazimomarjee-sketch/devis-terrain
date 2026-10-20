@@ -1,6 +1,6 @@
 'use strict';
 /* Devis terrain : tout reste sur le téléphone (IndexedDB). Seule exception : le bouton « Fiche officielle » d'un client envoie son NOM au registre public (recherche-entreprises.api.gouv.fr), à la demande. */
-const VERSION = 'v3';
+const VERSION = 'v4';
 
 // ---------- utilitaires ----------
 const $ = (s, r = document) => r.querySelector(s);
@@ -268,6 +268,7 @@ async function route() {
     if (p[0] === '' || p[0] === undefined) await pageAccueil();
     else if (p[0] === 'nouveau') await pageChoixClient();
     else if (p[0] === 'devis' && /^\d+$/.test(p[1] || '')) await pageDevis(Number(p[1]));
+    else if (p[0] === 'tournee') await pageTournee();
     else if (p[0] === 'clients') await pageClients();
     else if (p[0] === 'client' && /^\d+$/.test(p[1] || '')) await pageClient(Number(p[1]));
     else if (p[0] === 'catalogue') await pageCatalogue();
@@ -334,6 +335,7 @@ async function pageChoixClient() {
 const TRANCHES = { '00': '0 salarié', '01': '1-2', '02': '3-5', '03': '6-9', '11': '10-19', '12': '20-49', '21': '50-99', '22': '100-199', '31': '200-249', '32': '250-499', '41': '500-999', '42': '1000-1999', '51': '2000-4999', '52': '5000-9999', '53': '10000+' };
 const NAF_PEINTURE = { '45.20B': 'carrosserie (probable peinture)', '45.20A': 'mécanique / entretien (peinture à vérifier)', '45.11Z': 'vente de voitures (peinture à vérifier)', '45.19Z': 'vente d’autres véhicules (peinture à vérifier)' };
 const nb = v => (typeof v === 'number' && isFinite(v)) ? v : null;
+const coord = (v, max) => { const x = parseFloat(v); return isFinite(x) && Math.abs(x) <= max ? x : null; };
 const tx = (v, n) => (typeof v === 'string' ? v : '').slice(0, n);
 function lireEntreprise(r) {
   const s = r.siege || {};
@@ -344,6 +346,7 @@ function lireEntreprise(r) {
     siren: tx(r.siren, 9), nom: tx(r.nom_complet, 120), adresse: tx(s.adresse, 160), naf: tx(r.activite_principale, 8),
     tranche: tx(r.tranche_effectif_salarie, 2), anneeEff: nb(r.annee_tranche_effectif_salarie), etat: tx(r.etat_administratif, 1),
     creation: tx(r.date_creation, 10), ouverts: nb(r.nombre_etablissements_ouverts), annee: ans ? tx(ans, 4) : '', ca: nb(f.ca), resultat: nb(f.resultat_net),
+    lat: coord(s.latitude, 90), lng: coord(s.longitude, 180),
     dirigeant: d ? (tx(d.prenoms, 40).split(' ')[0] + ' ' + tx(d.nom, 60) + (d.qualite ? ' (' + tx(d.qualite, 40) + ')' : '')).trim() : '', lu: new Date().toISOString()
   };
 }
@@ -382,6 +385,87 @@ function avisProspect(c) {
   if (warn) return { n: 'warn', titre: 'À vérifier avant de se déplacer', raisons: raisons.concat(manque.length ? ['À demander : ' + manque.join(', ') + '.'] : []) };
   return { n: '?', titre: 'Pas assez d’infos', raisons: raisons.concat(['À demander : ' + manque.join(', ') + '.']) };
 }
+// ---------- plan d'action : rythme de visite, échéance, tournée du jour ----------
+const RYTHMES = { A: 14, B: 30, C: 90 };
+const JOUR = 864e5;
+const aujourdhui = () => new Date().toISOString().slice(0, 10);
+const rythmeJours = c => (Number(c.rythme) > 0 ? Math.min(365, Math.round(Number(c.rythme))) : (RYTHMES[c.priorite] || 0));
+const derniereVisite = c => (Array.isArray(c.visites) ? c.visites : []).reduce((m, v) => (v && v.res === 'vu' && typeof v.date === 'string' && v.date > m ? v.date : m), '');
+// pct = jours écoulés depuis la dernière visite / rythme. Jamais visité = 999 (à faire en premier).
+function echeance(c, now = Date.now()) {
+  const r = rythmeJours(c);
+  if (!r) return null;
+  const dv = derniereVisite(c);
+  const rappel = typeof c.rappel === 'string' && /^\d{4}-\d\d-\d\d$/.test(c.rappel) && c.rappel <= new Date(now).toISOString().slice(0, 10);
+  const jours = dv ? Math.floor((now - new Date(dv).getTime()) / JOUR) : null;
+  const pct = dv ? Math.round(jours / r * 100) : 999;
+  return { r, jours, pct, rappel, du: rappel || pct >= 100 };
+}
+const km = (a, b) => {
+  const R = 6371, rad = x => x * Math.PI / 180, dLa = rad(b.lat - a.lat), dLo = rad(b.lng - a.lng);
+  const x = Math.sin(dLa / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLo / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(x));
+};
+const posClient = c => (c.ent && c.ent.lat != null && c.ent.lng != null) ? { lat: c.ent.lat, lng: c.ent.lng } : null;
+// Plus proche voisin depuis l'origine : simple, pas optimal, mais lisible. Sans position : à la fin.
+function ordonner(liste, origine) {
+  const avec = liste.filter(posClient), sans = liste.filter(c => !posClient(c)), out = [];
+  let cur = origine || (avec[0] && posClient(avec[0]));
+  const reste = avec.slice();
+  while (reste.length) {
+    let bi = 0, bd = Infinity;
+    reste.forEach((c, i) => { const d = km(cur, posClient(c)); if (d < bd) { bd = d; bi = i; } });
+    const c = reste.splice(bi, 1)[0]; out.push(c); cur = posClient(c);
+  }
+  return out.concat(sans);
+}
+function urlItineraire(liste) {
+  const pts = liste.map(posClient).filter(Boolean).slice(0, 10);
+  if (!pts.length) return null;
+  const f = p => p.lat.toFixed(6) + ',' + p.lng.toFixed(6);
+  const dest = pts[pts.length - 1], via = pts.slice(0, -1);
+  return 'https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=' + f(dest) + (via.length ? '&waypoints=' + via.map(f).join('%7C') : '');
+}
+async function pageTournee() {
+  const cl = await getAll('clients');
+  const dues = cl.map(c => ({ c, e: echeance(c) })).filter(x => x.e && x.e.du).sort((a, b) => (b.e.rappel - a.e.rappel) || (b.e.pct - a.e.pct));
+  const sansRythme = cl.filter(c => !rythmeJours(c)).length;
+  let ordre = dues.map(x => x.c), coches = new Set(ordre.slice(0, 8).map(c => c.id)), origine = null;
+  const zone = h('div'), itin = h('div');
+  const dessiner = () => {
+    zone.replaceChildren(...ordre.map(c => {
+      const e = echeance(c), pos = !!posClient(c);
+      const cb = h('input', { type: 'checkbox', checked: coches.has(c.id), 'aria-label': 'Visiter ' + c.nom, style: 'width:28px;min-height:28px;flex:none', onchange: () => { cb.checked ? coches.add(c.id) : coches.delete(c.id); majItin(); } });
+      return h('label', { class: 'ligne', style: 'display:flex;gap:12px;align-items:center;margin:0;color:inherit;font-size:inherit' }, cb,
+        h('span', { class: 'g' }, h('strong', {}, c.nom), h('br'),
+          h('small', {}, (e.rappel ? 'À rappeler · ' : '') + (e.jours == null ? 'jamais visité' : 'dernière visite il y a ' + e.jours + ' j') + ' · échéance ' + (e.pct >= 999 ? '—' : e.pct + ' %') + (pos ? '' : ' · sans position')),
+        ), h('a', { href: '#/client/' + c.id, class: 'btn sec', 'aria-label': 'Fiche de ' + c.nom }, 'Fiche'));
+    }));
+    majItin();
+  };
+  const majItin = () => {
+    const sel = ordre.filter(c => coches.has(c.id));
+    const u = urlItineraire(sel), sans = sel.filter(c => !posClient(c)).length;
+    itin.replaceChildren(
+      sel.length > 10 ? h('p', { class: 'mut' }, 'Google Maps accepte 10 arrêts maximum : seuls les 10 premiers partent dans l’itinéraire.') : null,
+      sans ? h('p', { class: 'mut' }, sans + ' garage(s) coché(s) sans position : ils ne sont pas dans l’itinéraire. Ouvre leur fiche et appuie sur « Fiche officielle ».') : null,
+      u ? h('a', { class: 'btn gros', href: u, target: '_blank', rel: 'noopener' }, '🗺 Ouvrir l’itinéraire (' + Math.min(10, sel.filter(posClient).length) + ' arrêts)') : h('p', { class: 'mut' }, sel.length ? 'Aucun garage coché n’a de position.' : 'Coche au moins un garage.'));
+  };
+  const bPos = h('button', { class: 'btn sec', onclick: () => {
+    if (!navigator.geolocation) { toast('Position indisponible sur ce navigateur.', true); return; }
+    bPos.disabled = true;
+    navigator.geolocation.getCurrentPosition(p => {
+      origine = { lat: p.coords.latitude, lng: p.coords.longitude };
+      ordre = ordonner(ordre, origine); coches = new Set(ordre.slice(0, 8).map(c => c.id)); dessiner(); bPos.disabled = false; toast('Rangés du plus proche au plus loin.');
+    }, () => { bPos.disabled = false; toast('Position refusée : ordre par urgence conservé.', true); }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 });
+  } }, '📍 Ranger depuis ma position');
+  montrer('Tournée',
+    h('p', { class: 'mut' }, dues.length ? dues.length + ' à visiter ou à relancer. Les 8 plus urgents sont cochés.' : 'Rien à faire aujourd’hui.'),
+    sansRythme ? h('div', { class: 'carte alerte' }, sansRythme + ' client(s) sans priorité A/B/C : ils n’apparaissent jamais ici. Ouvre leur fiche pour fixer le rythme.') : null,
+    dues.length ? h('div', { class: 'actions' }, bPos) : null, zone, itin,
+    h('p', { class: 'mut' }, 'Rythme par défaut : A = 14 jours, B = 30 jours, C = 90 jours (à toi de les ajuster). Ta position n’est pas enregistrée ni envoyée : elle sert seulement à classer la liste. L’itinéraire s’ouvre dans Google Maps.'));
+  dessiner();
+}
 async function pageClient(id) {
   const c = await get('clients', id);
   if (!c) return nonTrouve();
@@ -391,8 +475,27 @@ async function pageClient(id) {
   const fourn = h('input', { value: c.fournisseur || '', placeholder: 'Ex. Roberlo, Sherwin, autre…', maxlength: 60, 'aria-label': 'Fournisseur actuel' });
   const vol = h('input', { type: 'number', inputmode: 'numeric', min: 0, max: 1000000, value: c.volume || '', placeholder: 'Estimation, en € par mois', 'aria-label': 'Achat de peinture par mois' });
   const stat = h('select', { 'aria-label': 'Statut' }, [['prospect', 'Prospect'], ['client', 'Client']].map(([v, l]) => h('option', { value: v, selected: (c.statutCrm || 'prospect') === v }, l)));
+  const prio = h('select', { 'aria-label': 'Priorité' }, [['', 'Pas de plan'], ['A', 'A : à voir souvent'], ['B', 'B : mensuel'], ['C', 'C : trimestriel']].map(([v, l]) => h('option', { value: v, selected: (c.priorite || '') === v }, l)));
+  const rythme = h('input', { type: 'number', inputmode: 'numeric', min: 0, max: 365, value: c.rythme || '', placeholder: 'Facultatif : tous les … jours', 'aria-label': 'Rythme en jours' });
+  const bloc = h('div');
+  const dessinerVisites = () => {
+    const e = echeance(c), vs = (Array.isArray(c.visites) ? c.visites : []).slice(-5).reverse();
+    bloc.replaceChildren(h('div', { class: 'carte' }, e ? h('div', {}, h('strong', {}, 'Rythme ' + e.r + ' j'), ' · ', e.jours == null ? 'jamais visité' : 'vu il y a ' + e.jours + ' j (' + e.pct + ' %)', e.du ? h('span', { class: 'tag warn', style: 'margin-left:8px' }, 'À faire') : null) : h('small', { class: 'mut' }, 'Pas de plan : choisis une priorité pour qu’il apparaisse dans la Tournée.'),
+      c.rappel ? h('div', {}, h('small', {}, 'Rappel prévu : ' + dateFr(c.rappel))) : null,
+      vs.length ? vs.map(v => h('div', {}, h('small', {}, dateFr(v.date) + ' · ' + ({ vu: 'Vu', absent: 'Absent', rappeler: 'À rappeler' }[v.res] || '?') + (v.note ? ' · ' + v.note : '')))) : null));
+  };
+  const noterVisite = async (res) => {
+    lire(); if (!Array.isArray(c.visites)) c.visites = [];
+    const note = clean(notes.value).slice(0, 80);
+    const jour = aujourdhui();
+    c.visites.push({ date: jour, res, note });
+    if (c.visites.length > 100) c.visites = c.visites.slice(-100);
+    if (res === 'vu') c.rappel = '';
+    else { const d = new Date(Date.now() + (res === 'absent' ? 2 : 7) * JOUR); c.rappel = d.toISOString().slice(0, 10); }
+    await putMany('clients', [c]); dessinerVisites(); toast(res === 'vu' ? 'Visite notée.' : 'Noté. Rappel le ' + dateFr(c.rappel) + '.');
+  };
   const notes = h('textarea', { rows: 3, maxlength: 500, placeholder: 'Contact, visite, ce qu’il a dit…', 'aria-label': 'Notes' }, c.notes || '');
-  const lire = () => { c.cabine = cabine.value; c.fournisseur = clean(fourn.value).slice(0, 60); c.volume = Math.max(0, Math.min(1e6, Number(vol.value) || 0)) || ''; c.statutCrm = stat.value; c.notes = notes.value.slice(0, 500); };
+  const lire = () => { c.cabine = cabine.value; c.fournisseur = clean(fourn.value).slice(0, 60); c.volume = Math.max(0, Math.min(1e6, Number(vol.value) || 0)) || ''; c.statutCrm = stat.value; c.priorite = prio.value; c.rythme = Math.max(0, Math.min(365, Math.round(Number(rythme.value) || 0))) || ''; c.notes = notes.value.slice(0, 500); };
   const dessinerVerdict = () => {
     lire(); const a = avisProspect(c);
     verdict.replaceChildren(h('div', { class: 'carte ' + (a.n === 'ko' ? 'erreur' : a.n === 'ok' ? 'reussi' : 'alerte'), role: 'status' },
@@ -419,6 +522,7 @@ async function pageClient(id) {
     btn.disabled = false;
   };
   [cabine, fourn, vol, stat].forEach(x => x.addEventListener('input', dessinerVerdict));
+  [prio, rythme].forEach(x => x.addEventListener('input', () => { lire(); dessinerVisites(); }));
   const bRech = h('button', { class: 'btn', onclick: () => rechercher(bRech) }, c.ent ? '🔎 Relire le registre' : '🔎 Fiche officielle (réseau)');
   montrer(c.nom,
     h('p', { class: 'mut' }, c.tel || 'Pas de téléphone'),
@@ -429,11 +533,19 @@ async function pageClient(id) {
     h('label', {}, 'Fournisseur actuel'), fourn,
     h('label', {}, 'Achat de peinture par mois (€)'), vol,
     h('label', {}, 'Statut'), stat,
+    h('h2', {}, 'Plan d’action'),
+    h('label', {}, 'Priorité (fixe le rythme de visite)'), prio,
+    h('label', {}, 'Rythme personnalisé en jours'), rythme,
+    bloc,
+    h('div', { class: 'actions' },
+      h('button', { class: 'btn', onclick: () => noterVisite('vu') }, '✅ Vu aujourd’hui'),
+      h('button', { class: 'btn sec', onclick: () => noterVisite('absent') }, 'Absent (rappel 2 j)'),
+      h('button', { class: 'btn sec', onclick: () => noterVisite('rappeler') }, 'À rappeler (7 j)')),
     h('label', {}, 'Notes'), notes,
     h('div', { style: 'height:10px' }),
     h('button', { class: 'btn gros', onclick: async () => { lire(); await putMany('clients', [c]); toast('Enregistré.'); } }, 'Enregistrer'),
     h('p', { class: 'mut' }, 'Seul le nom du client est envoyé au registre public quand tu appuies sur « Fiche officielle ». Rien d’autre ne quitte le téléphone.'));
-  dessinerFiche(); dessinerVerdict();
+  dessinerFiche(); dessinerVerdict(); dessinerVisites();
 }
 async function pageClients() {
   const cl = (await getAll('clients')).sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
