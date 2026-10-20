@@ -134,7 +134,7 @@ function chercher(q, max = 15) {
 const MAX_OCTETS = 10 * 1024 * 1024, MAX_LIGNES = 50000;
 function chargerXlsx() {
   if (window.XLSX) return Promise.resolve();
-  return new Promise((res, rej) => { const s = h('script', { src: 'lib/xlsx.mini.min.js' }); s.onload = res; s.onerror = () => rej(new Error('Lecteur Excel introuvable')); document.head.append(s); });
+  return new Promise((res, rej) => { const s = h('script', { src: 'xlsx.mini.min.js' }); s.onload = res; s.onerror = () => rej(new Error('Lecteur Excel introuvable')); document.head.append(s); });
 }
 function parseCSV(text) {
   const first = text.split(/\r?\n/, 1)[0];
