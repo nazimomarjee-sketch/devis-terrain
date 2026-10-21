@@ -1,6 +1,6 @@
 'use strict';
 /* Devis terrain : tout reste sur le téléphone (IndexedDB). Seule exception : le bouton « Fiche officielle » d'un client envoie son NOM au registre public (recherche-entreprises.api.gouv.fr), à la demande. */
-const VERSION = 'v13';
+const VERSION = 'v16';
 
 // ---------- utilitaires ----------
 const $ = (s, r = document) => r.querySelector(s);
@@ -259,7 +259,15 @@ function importerClients(rows, debut, map, existants) {
 
 // ---------- routage ----------
 const app = $('#app');
-function montrer(titre, ...nodes) { $('#titre').textContent = titre; { const sv = $('#sous'); if (sv) sv.textContent = ''; } app.replaceChildren(...nodes.flat(Infinity).filter(Boolean)); window.scrollTo(0, 0); }
+function montrer(titre, ...nodes) { $('#titre').textContent = titre; { const t2 = $('#titre2'); if (t2) t2.textContent = titre; } { const sv = $('#sous'); if (sv) sv.textContent = ''; } app.replaceChildren(...nodes.flat(Infinity).filter(Boolean)); window.scrollTo(0, 0); apparition(); }
+const calmes = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+let obsApparition = null;
+function apparition() {
+  if (calmes() || !('IntersectionObserver' in window)) return;
+  obsApparition = obsApparition || new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('vu'); obsApparition.unobserve(e.target); } }), { rootMargin: '0px 0px -20px 0px' });
+  app.querySelectorAll(':scope > .carte, :scope > .kpis, :scope > h2, :scope > .actions').forEach((el, i) => { if (el.getBoundingClientRect().top > innerHeight) { el.classList.add('apparait'); obsApparition.observe(el); } });
+}
+addEventListener('scroll', () => { const on = scrollY > 110; document.body.classList.toggle('defile', on); }, { passive: true });
 function nonTrouve() { montrer('Introuvable', h('p', { class: 'vide' }, 'Cette page n’existe pas. '), h('a', { class: 'btn', href: '#/' }, 'Retour')); }
 async function route() {
   const p = (location.hash || '#/').slice(2).split('/');
@@ -348,7 +356,7 @@ function serie(m, now = new Date()) {
 }
 function fete() {
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) { toast('Défi du jour réussi !'); return; }
-  const box = h('div', { class: 'confettis', 'aria-hidden': 'true' }), cols = ['#b3282d', '#1d1d1f', '#e6b24d', '#58c77f', '#ffffff'];
+  const box = h('div', { class: 'confettis', 'aria-hidden': 'true' }), cols = ['#D41F2B', '#1d1d1f', '#e6b24d', '#58c77f', '#ffffff'];
   for (let i = 0; i < 36; i++) box.append(h('i', { style: 'left:' + (Math.random() * 100).toFixed(1) + '%;background:' + cols[i % 5] + ';animation-delay:' + (Math.random() * .6).toFixed(2) + 's;animation-duration:' + (1.6 + Math.random() * 1.2).toFixed(2) + 's' }));
   document.body.append(box); toast('Défi du jour réussi ! 🎉'); setTimeout(() => box.remove(), 3400);
 }
@@ -501,9 +509,10 @@ async function pageAccueil() {
   const [dv, cl, sigs] = [await getAll('devis'), await getAll('clients'), await lireSig()];
   const ext = { point: await get('meta', 'point'), appels: await lireAppels(), tournees: await lireTournees(), sigs };
   dv.sort((a, b) => b.id - a.id);
-  const prenom = (S.vendeur || '').split(' ')[0], JN = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+  const prenom = (S.vendeur || '').trim().split(' ')[0], JN = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
   montrer(prenom ? 'Bonjour, ' + prenom : 'Bonjour',
     CAT.length ? null : h('div', { class: 'carte alerte' }, h('strong', {}, 'Catalogue vide. '), 'Importe ton fichier de tarifs pour pouvoir faire des devis. ', h('a', { href: '#/catalogue' }, 'Aller au catalogue')),
+    prenom ? null : (() => { const i = h('input', { placeholder: 'Ton prénom', maxlength: 40, autocomplete: 'given-name', 'aria-label': 'Ton prénom' }); return h('div', { class: 'carte' }, h('strong', {}, 'Comment t’appelles-tu ?'), h('p', { class: 'mut' }, 'Pour que l’accueil te dise bonjour (il sert aussi de signature sur les devis).'), h('div', { class: 'actions' }, i, h('button', { class: 'btn', onclick: async () => { const v = clean(i.value).slice(0, 40); if (!v) return; S = { ...S, vendeur: v }; await put('meta', S, 'settings'); pageAccueil(); } }, 'OK'))); })(),
     tableauDeBord(dv, cl, sigs, ext),
     h('div', { class: 'actions' }, h('a', { class: 'btn sec', href: '#/signaler' }, 'Signaler un problème'), h('a', { class: 'btn sec', href: '#/point' }, 'Préparer le Point')),
     h('div', { class: 'fab noprint' }, h('a', { class: 'btn gros noir', href: '#/nouveau' }, '+ Nouveau devis')), h('div', { style: 'height:84px' }),
