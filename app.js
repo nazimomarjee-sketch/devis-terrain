@@ -1,6 +1,6 @@
 'use strict';
 /* Devis terrain : tout reste sur le téléphone (IndexedDB). Seule exception : le bouton « Fiche officielle » d'un client envoie son NOM au registre public (recherche-entreprises.api.gouv.fr), à la demande. */
-const VERSION = 'v5';
+const VERSION = 'v9';
 
 // ---------- utilitaires ----------
 const $ = (s, r = document) => r.querySelector(s);
@@ -113,7 +113,7 @@ function openDB() {
   });
 }
 
-const SET_DEF = { tva100: 850, remiseMax100: 6000, indicatif: '262', societe: 'Odicolor', vendeur: '' };
+const SET_DEF = { tva100: 850, remiseMax100: 6000, indicatif: '33', societe: 'Odicolor', vendeur: '', objDepart: '', objectifs: [0, 0, 0], respNom: 'Mohamed', respTel: '', relanceJours: 3, delaiUrgentH: 4, delaiNormalH: 48, depart: {} };
 const nouvelUid = () => (crypto.randomUUID ? crypto.randomUUID() : 'u-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10));
 let S = { ...SET_DEF };
 let CAT = [];
@@ -263,7 +263,7 @@ function montrer(titre, ...nodes) { $('#titre').textContent = titre; app.replace
 function nonTrouve() { montrer('Introuvable', h('p', { class: 'vide' }, 'Cette page n’existe pas. '), h('a', { class: 'btn', href: '#/' }, 'Retour')); }
 async function route() {
   const p = (location.hash || '#/').slice(2).split('/');
-  document.querySelectorAll('.onglets a').forEach(a => a.classList.toggle('on', a.dataset.p === (p[0] || 'accueil') || (p[0] === 'devis' || p[0] === 'nouveau') && a.dataset.p === 'accueil'));
+  document.querySelectorAll('.onglets a').forEach(a => a.classList.toggle('on', a.dataset.p === (p[0] || 'accueil') || (p[0] === 'devis' || p[0] === 'nouveau') && a.dataset.p === 'accueil' || ['point', 'signalements', 'signaler', 'comparateur', 'reglages'].includes(p[0]) && a.dataset.p === 'plus'));
   try {
     if (p[0] === '' || p[0] === undefined) await pageAccueil();
     else if (p[0] === 'nouveau') await pageChoixClient();
@@ -274,6 +274,11 @@ async function route() {
     else if (p[0] === 'article' && p[1]) await pageArticle(p.slice(1).join('/'));
     else if (p[0] === 'catalogue') await pageCatalogue();
     else if (p[0] === 'reglages') await pageReglages();
+    else if (p[0] === 'plus') pagePlus();
+    else if (p[0] === 'signaler') await pageSignaler(/^\d+$/.test(p[1] || '') ? Number(p[1]) : null);
+    else if (p[0] === 'signalements') await pageSignalements();
+    else if (p[0] === 'point') await pagePoint(p[1]);
+    else if (p[0] === 'comparateur') await pageComparateur();
     else nonTrouve();
   } catch (e) { console.error(e); toast('Erreur : ' + e.message, true); }
 }
@@ -288,20 +293,469 @@ function statsDevis(dv) {
   const med = ok.length ? ok[Math.floor((ok.length - 1) / 2)].min : null;
   return { n: dv.length, mesures: mesures.length, exclus: mesures.length - ok.length, med, semaine: dv.filter(d => Date.now() - new Date(d.creeLe).getTime() < 7 * 864e5).length };
 }
+
+// ---------- tableau de bord (accueil) : uniquement des données du téléphone ----------
+// ---------- LOT v8 : tableau de bord, élan, essais, signalements, point, comparateur ----------
+const cleMois = d => { const x = new Date(d); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0'); };
+const jourLocal = d => { const x = new Date(d); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
+const joursDepuis = (iso, now = Date.now()) => Math.floor((now - new Date(iso).getTime()) / JOUR);
+const ST_DEVIS = { brouillon: ['Brouillon', 'warn'], envoye: ['Envoyé', 'ok'], accepte: ['Accepté', 'ok'], refuse: ['Refusé', 'ko'] };
+const etiquetteDevis = d => ST_DEVIS[d.statut] || ST_DEVIS.brouillon;
+const envoiDe = d => d.t2 || d.creeLe;
+const relanceDue = (d, now = Date.now()) => {
+  if (d.statut !== 'envoye' || !d.lignes.length) return null;
+  const j = joursDepuis(d.relanceLe || envoiDe(d), now);
+  return j >= (S.relanceJours || 3) ? j : null;
+};
+const AVIS = [['', 'Inconnu'], ['pour', 'Favorable à Carsystem'], ['neutre', 'Neutre'], ['contre', 'Réticent']];
+const CONV = [['', 'Pas défini'], ['cible', 'À contacter'], ['contacte', 'Contacté'], ['essai', 'En essai'], ['converti', 'Converti'], ['refus', 'Refus']];
+const ESSAI_ST = [['encours', 'En cours'], ['concluant', 'Concluant'], ['non', 'Non concluant'], ['commande', 'Commande passée']];
+const SIGNAL_TYPES = [['produit', 'Produit défectueux'], ['teinte', 'Teinte qui ne correspond pas'], ['livraison', 'Livraison (retard, erreur)'], ['objection', 'Objection ou refus du garagiste'], ['prix', 'Prix'], ['demande', 'Demande particulière'], ['concurrent', 'Concurrent']];
+const SIGNAL_ST = { nouveau: ['Non envoyé', 'warn'], envoye: ['Envoyé', 'warn'], pris: ['Pris en charge', 'ok'], resolu: ['Résolu', 'ok'] };
+const libelle = (liste, v) => ((liste.find(x => x[0] === v) || [])[1]) || '';
+const lireSig = async () => { const v = await get('meta', 'signalements'); return Array.isArray(v) ? v : []; };
+const ecrireSig = async arr => { arr.forEach((s, i) => { if (i >= 60) delete s.photo; }); await put('meta', arr, 'signalements'); };
+const sigEnRetard = (s, now = Date.now()) => s.statut === 'envoye' && s.envoyeLe && (now - new Date(s.envoyeLe).getTime()) / 36e5 >= (s.urgence === 'urgente' ? (S.delaiUrgentH || 4) : (S.delaiNormalH || 48));
+
+// ----- points d'activité (visites, devis, essais) -----
+const PTS = { vu: 10, absent: 3, rappeler: 3 }, PTS_DEVIS = 20, PTS_ACCEPTE = 40, PTS_ESSAI = 15, DEFI = 50, PALIER = 200;
+function activite(dv, cl) {
+  const m = {}, add = (j, p, k) => { (m[j] = m[j] || { pts: 0, vu: 0, devis: 0, effort: 0 }); m[j].pts += p; m[j][k]++; };
+  cl.forEach(c => {
+    (Array.isArray(c.visites) ? c.visites : []).forEach(v => {
+      if (v && typeof v.date === 'string' && /^\d{4}-\d\d-\d\d$/.test(v.date) && Object.prototype.hasOwnProperty.call(PTS, v.res)) add(v.date, PTS[v.res], v.res === 'vu' ? 'vu' : 'effort');
+    });
+    (Array.isArray(c.essais) ? c.essais : []).forEach(e => { if (e && typeof e.date === 'string' && /^\d{4}-\d\d-\d\d$/.test(e.date)) add(e.date, PTS_ESSAI, 'effort'); });
+  });
+  dv.filter(d => d.lignes.length && d.statut !== 'brouillon').forEach(d => add(jourLocal(envoiDe(d)), PTS_DEVIS, 'devis'));
+  dv.filter(d => d.statut === 'accepte' && d.reponseLe).forEach(d => add(jourLocal(d.reponseLe), PTS_ACCEPTE, 'devis'));
+  return m;
+}
+// Jours ouvrés d'affilée avec au moins une action. Le week-end ne casse pas la série. Aujourd'hui sans action ne la casse pas encore.
+function serie(m, now = new Date()) {
+  const d = new Date(now); d.setHours(12, 0, 0, 0);
+  const actif = j => m[j] && m[j].pts > 0;
+  if (!actif(jourLocal(d))) d.setDate(d.getDate() - 1);
+  let n = 0;
+  for (let i = 0; i < 400; i++) {
+    const w = d.getDay(), a = actif(jourLocal(d));
+    if (a) n++;
+    else if (w !== 0 && w !== 6) break;
+    d.setDate(d.getDate() - 1);
+  }
+  return n;
+}
+function fete() {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) { toast('Défi du jour réussi !'); return; }
+  const box = h('div', { class: 'confettis', 'aria-hidden': 'true' }), cols = ['#b3282d', '#1d1d1f', '#e6b24d', '#58c77f', '#ffffff'];
+  for (let i = 0; i < 36; i++) box.append(h('i', { style: 'left:' + (Math.random() * 100).toFixed(1) + '%;background:' + cols[i % 5] + ';animation-delay:' + (Math.random() * .6).toFixed(2) + 's;animation-duration:' + (1.6 + Math.random() * 1.2).toFixed(2) + 's' }));
+  document.body.append(box); toast('Défi du jour réussi ! 🎉'); setTimeout(() => box.remove(), 3400);
+}
+
+// ----- objectifs -----
+function objectifDuMois(now = new Date()) {
+  const o = Array.isArray(S.objectifs) ? S.objectifs : [];
+  if (!/^\d{4}-\d\d$/.test(S.objDepart || '') || !o.some(v => v > 0)) return null;
+  const [y, m] = S.objDepart.split('-').map(Number);
+  const idx = (now.getFullYear() - y) * 12 + (now.getMonth() + 1 - m);
+  if (idx < 0) return null;
+  const k = Math.min(idx, o.length - 1);
+  return o[k] > 0 ? { cents: o[k], rang: k + 1 } : null;
+}
+function joursOuvres(from, to) { let n = 0; const d = new Date(from); d.setHours(12); while (d <= to) { const w = d.getDay(); if (w && w !== 6) n++; d.setDate(d.getDate() + 1); } return n; }
+
+// ----- les 4 mesures du test réel -----
+function mesures(dv, cl, now = new Date()) {
+  const mk = cleMois(now);
+  const essais = cl.flatMap(c => (Array.isArray(c.essais) ? c.essais : []));
+  const repondus = dv.filter(d => (d.statut === 'accepte' || d.statut === 'refuse') && d.reponseLe);
+  const delais = repondus.map(d => Math.max(0, (new Date(d.reponseLe) - new Date(envoiDe(d))) / JOUR));
+  return {
+    essaisMois: essais.filter(e => typeof e.date === 'string' && e.date.slice(0, 7) === mk).length, essaisTotal: essais.length,
+    transf: essais.filter(e => e.statut === 'commande').length,
+    delaiMoy: delais.length ? delais.reduce((a, b) => a + b, 0) / delais.length : null, nbRep: repondus.length,
+    sansRelance: dv.filter(d => d.statut === 'envoye' && d.lignes.length && !d.relanceLe && joursDepuis(envoiDe(d)) >= (S.relanceJours || 3)).length
+  };
+}
+
+// ----- v9 : semaine, appels vers le responsable -----
+const lundiDe = d => { const x = new Date(d); x.setHours(12, 0, 0, 0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return jourLocal(x); };
+const MOTIFS = [['prix', 'Prix'], ['stock', 'Stock'], ['suivi', 'Suivi de commande'], ['teinte', 'Teinte'], ['autre', 'Autre']];
+const lireAppels = async () => { const v = await get('meta', 'appels'); return Array.isArray(v) ? v : []; };
+const appelsSemaine = (ap, now = new Date()) => { const l = lundiDe(now); return ap.filter(a => a && typeof a.date === 'string' && a.date.slice(0, 10) >= l); };
+function semaineObj(dv, now = new Date()) {
+  const l = lundiDe(now), j = Math.min(5, Math.max(1, ((now.getDay() + 6) % 7) + 1 > 5 ? 5 : ((now.getDay() + 6) % 7) + 1));
+  const ca = dv.filter(d => d.statut === 'accepte' && d.reponseLe && jourLocal(d.reponseLe) >= l).reduce((a, d) => a + totaux(d).ht, 0);
+  let cible = S.objSemaine > 0 ? S.objSemaine : 0, derive = false;
+  if (!cible) { const o = objectifDuMois(now), n = joursOuvres(new Date(now.getFullYear(), now.getMonth(), 1), new Date(now.getFullYear(), now.getMonth() + 1, 0, 23)); if (o && n) { cible = Math.round(o.cents * 5 / n); derive = true; } }
+  return { ca, cible, derive, j, attendu: Math.round(cible * j / 5), l };
+}
+// ----- ce qu'il y a à faire, par ordre de priorité (l'argent en jeu d'abord) -----
+function taches(dv, cl, sigs, now = Date.now(), ext = {}) {
+  const T = [];
+  { const nd = new Date(now), pd = ((nd.getDay() + 6) % 7); if (pd <= 1 && nd.getDay() !== 0) { const prec = new Date(nd); prec.setDate(prec.getDate() - 7); const k = lundiDe(prec); if (!((ext.point && ext.point.faits) || {})[k]) T.push({ p: 0, o: 0, t: 'Faire le Point de la semaine écoulée', d: 'Lundi matin : 15 minutes, un seul changement à décider', href: '#/point', tag: 'Point' }); } }
+  dv.forEach(d => { const j = relanceDue(d, now); if (j != null) T.push({ p: 1, o: j, t: 'Relancer le devis de ' + d.clientNom, d: eur(totaux(d).ht) + ' HT, sans réponse depuis ' + j + ' j', href: '#/devis/' + d.id, tag: 'Relance' }); });
+  cl.forEach(c => (Array.isArray(c.essais) ? c.essais : []).forEach(e => {
+    if (!e || e.statut !== 'encours') return;
+    const j = Math.floor((now - Date.parse(e.date + 'T12:00:00')) / JOUR), sv = Array.isArray(e.suivis) ? e.suivis : [];
+    if (j >= 7 && !sv.includes('J7')) T.push({ p: 2, o: j, t: 'Faire le point sur l’essai chez ' + c.nom, d: 'Essai de ' + (e.produit || 'produit') + ' depuis ' + j + ' j (J+7)', href: '#/client/' + c.id, tag: 'Essai' });
+    else if (j >= 2 && !sv.includes('J2')) T.push({ p: 2, o: j, t: 'Appeler pour l’essai chez ' + c.nom, d: 'Essai de ' + (e.produit || 'produit') + ' depuis ' + j + ' j (J+2)', href: '#/client/' + c.id, tag: 'Essai' });
+  }));
+  sigs.forEach(s => {
+    if (sigEnRetard(s, now)) T.push({ p: 3, o: 0, t: 'Relancer ' + (S.respNom || 'ton responsable') + ' : ' + libelle(SIGNAL_TYPES, s.type), d: (s.clientNom ? s.clientNom + ' · ' : '') + 'sans prise en charge', href: '#/signalements', tag: 'Signalement' });
+    if (s.statut === 'resolu' && !s.clientPrevenu) T.push({ p: 3, o: 0, t: 'Prévenir le client : problème résolu', d: (s.clientNom || 'Client') + ' · ' + libelle(SIGNAL_TYPES, s.type), href: '#/signalements', tag: 'Client' });
+  });
+  cl.map(c => ({ c, e: echeance(c, now) })).filter(x => x.e && x.e.du).sort((a, b) => (b.e.rappel - a.e.rappel) || (b.e.pct - a.e.pct)).forEach(({ c, e }) =>
+    T.push({ p: 4, o: e.pct, t: 'Visiter ' + c.nom, d: e.rappel ? 'Tu avais prévu de le rappeler.' : e.jours == null ? 'Jamais visité : premier contact.' : 'Dernière visite il y a ' + e.jours + ' j (rythme ' + e.r + ' j)', href: '#/client/' + c.id, tag: 'Visite' }));
+  dv.filter(d => d.statut === 'brouillon' && d.lignes.length).forEach(d => T.push({ p: 5, o: 0, t: 'Finir le devis de ' + d.clientNom, d: eur(totaux(d).ht) + ' HT en attente d’envoi', href: '#/devis/' + d.id, tag: 'Brouillon' }));
+  return T.sort((a, b) => a.p - b.p || b.o - a.o);
+}
+
+function carteElan(dv, cl, T) {
+  const m = activite(dv, cl), auj = jourLocal(new Date()), t = m[auj] || { pts: 0, vu: 0, devis: 0, effort: 0 };
+  const total = Object.values(m).reduce((a, x) => a + x.pts, 0), niv = Math.floor(total / PALIER) + 1, reste = PALIER - total % PALIER;
+  const record = Math.max(0, ...Object.entries(m).filter(([j]) => j !== auj).map(([, x]) => x.pts));
+  const sr = serie(m), pc = Math.min(100, Math.round(t.pts / DEFI * 100)), fait = t.pts >= DEFI;
+  if (fait && S.fete !== auj) { S.fete = auj; put('meta', S, 'settings').catch(() => {}); fete(); }
+  const x = T[0], proch = x ? { t: x.t, d: x.d, href: x.href, b: 'Ouvrir' } : { t: 'Rien d’urgent', d: 'Bonne occasion de repérer un garage à convertir.', href: '#/clients', b: 'Voir les clients' };
+  const msg = fait ? 'Défi du jour réussi. Le reste est du bonus.' : t.pts > 0 ? 'Encore ' + (DEFI - t.pts) + ' points pour réussir le défi du jour.' : 'Une seule action suffit pour lancer la journée.';
+  return [
+    h('div', { class: 'carte prochaine' }, h('small', { class: 'mut' }, 'TA PROCHAINE ACTION'), h('div', { class: 'gros-chiffre' }, proch.t), h('p', { class: 'mut' }, proch.d), h('a', { class: 'btn gros', href: proch.href }, proch.b)),
+    h('div', { class: 'carte elan' },
+      h('div', { class: 'elan-tete' }, h('strong', {}, '🔥 Série : ' + sr + ' jour' + (sr > 1 ? 's' : '')), h('span', { class: 'tag ok' }, 'Niveau ' + niv)),
+      h('p', { class: 'mut' }, 'Défi du jour : ' + DEFI + ' points (par exemple 3 visites + 1 devis envoyé)'),
+      h('div', { class: 'piste', role: 'img', 'aria-label': t.pts + ' points sur ' + DEFI }, h('div', { class: 'rempli' + (fait ? ' ok' : ''), style: 'width:' + pc + '%' })),
+      h('p', {}, h('strong', {}, t.pts + ' pts'), ' aujourd’hui. ' + msg),
+      h('p', { class: 'mut' }, (record ? (t.pts > record ? 'Nouveau record du jour ! Ancien : ' + record + ' pts. ' : 'Meilleur jour : ' + record + ' pts. ') : '') + 'Prochain niveau dans ' + reste + ' points.'),
+      h('details', {}, h('summary', {}, 'Comment ça compte'), h('p', { class: 'mut' }, 'Visite faite : 10 points. Garage absent ou à rappeler : 3. Essai lancé : 15. Devis envoyé : 20. Devis accepté : 40. La série compte les jours ouvrés d’affilée avec au moins une action ; le week-end ne la casse pas. Un niveau tous les ' + PALIER + ' points. Ces points mesurent ton activité, pas tes ventes : seules les ventes comptent vraiment.')))
+  ];
+}
+
+function tableauDeBord(dv, cl, sigs, ext = {}) {
+  const now = new Date(), mk = cleMois(now), T = taches(dv, cl, sigs, now.getTime(), ext), SW = semaineObj(dv, now), apS = appelsSemaine(ext.appels || [], now);
+  const envoyes = dv.filter(d => d.lignes.length && d.statut !== 'brouillon');
+  const duMois = envoyes.filter(d => cleMois(envoiDe(d)) === mk);
+  const acceptesMois = dv.filter(d => d.statut === 'accepte' && d.reponseLe && cleMois(d.reponseLe) === mk);
+  const ca = acceptesMois.reduce((a, d) => a + totaux(d).ht, 0);
+  const attente = dv.filter(d => d.statut === 'envoye' && d.lignes.length), attHt = attente.reduce((a, d) => a + totaux(d).ht, 0);
+  const visitesMois = cl.reduce((a, c) => a + (Array.isArray(c.visites) ? c.visites : []).filter(v => v && v.res === 'vu' && typeof v.date === 'string' && v.date.slice(0, 7) === mk).length, 0);
+  const obj = objectifDuMois(now), jr = joursOuvres(now, new Date(now.getFullYear(), now.getMonth() + 1, 0, 23));
+  const carteObj = obj ? (() => {
+    const p = Math.round(ca / obj.cents * 100), reste = Math.max(0, obj.cents - ca);
+    return h('div', { class: 'carte obj' },
+      h('small', { class: 'mut' }, 'Objectif du mois ' + obj.rang + ' / ' + S.objectifs.length + ' · devis acceptés'),
+      h('div', { class: 'gros-chiffre' }, eur(ca), h('span', {}, ' / ' + eur(obj.cents))),
+      h('div', { class: 'piste', role: 'img', 'aria-label': p + ' % de l’objectif' }, h('div', { class: 'rempli', style: 'width:' + Math.min(100, p) + '%' })),
+      h('p', { class: 'mut' }, p + ' % · reste ' + eur(reste) + (reste && jr ? ' · soit ' + eur(Math.ceil(reste / jr)) + ' par jour ouvré (' + jr + ' restants, aujourd’hui compris, fériés non déduits)' : '')),
+      h('p', { class: 'mut' }, 'En attente de réponse : ' + eur(attHt) + ' (' + attente.length + ' devis). Ce sont des devis acceptés (HT), pas le CA facturé : EBP n’est pas encore branché.'));
+  })() : h('div', { class: 'carte' }, h('strong', {}, 'Pas d’objectif réglé. '), 'Entre ton objectif mensuel dans ', h('a', { href: '#/reglages' }, 'Réglages'), '.');
+  const kpi = (v, l) => h('div', { class: 'kpi' }, h('div', { class: 'v' }, v), h('div', { class: 'l' }, l));
+  const lien = x => h('a', { class: 'ligne', href: x.href, style: 'color:inherit;text-decoration:none' }, h('span', { class: 'g' }, h('strong', {}, x.t), h('br'), h('small', {}, x.d)), h('span', { class: 'tag warn' }, x.tag));
+  const lundi = d => { const x = new Date(d); x.setHours(12, 0, 0, 0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x.toISOString().slice(0, 10); };
+  const semaines = []; { const x = new Date(now); x.setDate(x.getDate() - 49); for (let i = 0; i < 8; i++) { semaines.push(lundi(x)); x.setDate(x.getDate() + 7); } }
+  const parSem = semaines.map(w => dv.filter(d => d.statut === 'accepte' && d.reponseLe && lundi(d.reponseLe) === w).reduce((a, d) => a + totaux(d).ht, 0));
+  const mx = Math.max(...parSem, 1), M = mesures(dv, cl, now);
+  const conv = {}; cl.forEach(c => { if (c.conv) conv[c.conv] = (conv[c.conv] || 0) + 1; });
+  const dep = S.depart || {};
+  return [
+    carteElan(dv, cl, T),
+    carteObj,
+    SW.cible ? h('div', { class: 'carte obj' }, h('small', { class: 'mut' }, 'Objectif de la semaine · à atteindre vendredi après-midi'), h('div', { class: 'gros-chiffre' }, eur(SW.ca), h('span', {}, ' / ' + eur(SW.cible))),
+      h('div', { class: 'piste', role: 'img', 'aria-label': Math.round(SW.ca / SW.cible * 100) + ' % de l’objectif de la semaine' }, h('div', { class: 'rempli' + (SW.ca >= SW.attendu ? ' ok' : ''), style: 'width:' + Math.min(100, Math.round(SW.ca / SW.cible * 100)) + '%' })),
+      h('p', {}, SW.ca >= SW.cible ? 'Objectif de la semaine atteint.' : SW.ca >= SW.attendu ? 'Dans le rythme : ' + eur(SW.attendu) + ' attendus à ce jour (jour ' + SW.j + ' sur 5).' : 'En retard de ' + eur(SW.attendu - SW.ca) + ' sur le rythme (jour ' + SW.j + ' sur 5). Reste ' + eur(SW.cible - SW.ca) + '.'),
+      SW.derive ? h('p', { class: 'mut' }, 'Objectif de la semaine déduit de l’objectif mensuel (5 jours sur les jours ouvrés du mois). Fixe-le dans Réglages si tu préfères.') : null) : null,
+    h('div', { class: 'kpis' }, kpi(duMois.length, 'devis envoyés ce mois'), kpi(acceptesMois.length, 'devis acceptés ce mois'), kpi(visitesMois, 'visites faites ce mois')),
+    h('h2', {}, 'À faire aujourd’hui'),
+    T.length ? h('div', { class: 'carte' }, T.slice(0, 6).map(lien), (T.length > 6 ? h('p', { class: 'mut' }, '+ ' + (T.length - 6) + ' autre(s) : Tournée, Signalements, Clients') : null)) : h('p', { class: 'vide' }, 'Rien d’urgent.'),
+    h('h2', {}, 'Appels vers ' + (S.respNom || 'ton responsable')),
+    h('div', { class: 'carte' }, h('p', {}, h('strong', {}, apS.length), ' cette semaine' + (apS.length ? ' · ' + MOTIFS.map(([k, l]) => [l, apS.filter(a => a.motif === k).length]).filter(x => x[1]).map(x => x[0] + ' ' + x[1]).join(', ') : '') + ((S.depart || {}).appels ? ' · départ : ' + S.depart.appels + ' par semaine' : '')),
+      h('div', { class: 'actions' }, MOTIFS.map(([k, l]) => h('button', { class: 'btn sec', onclick: async () => { const a = await lireAppels(); a.push({ date: new Date().toISOString(), motif: k }); await put('meta', a.slice(-500), 'appels'); toast('Noté : ' + l + '.'); pageAccueil(); } }, '+ ' + l))),
+      h('p', { class: 'mut' }, 'Un appui à chaque appel ou message à ' + (S.respNom || 'ton responsable') + ', avec le motif : c’est le chiffre qui dira si l’appli l’allège.')),
+    h('h2', {}, 'Conversion vers Carsystem'),
+    Object.keys(conv).length ? h('div', { class: 'carte' }, h('div', { class: 'entonnoir' }, CONV.filter(x => x[0]).map(([k, l]) => h('div', { class: 'etape' }, h('div', { class: 'v' }, conv[k] || 0), h('small', {}, l)))), h('p', { class: 'mut' }, 'Réglé sur la fiche de chaque garage (Clients).')) : h('p', { class: 'vide' }, 'Sur la fiche d’un garage, règle « Conversion Carsystem » pour suivre la progression.'),
+    h('h2', {}, 'Mes 4 mesures (test réel)'),
+    h('div', { class: 'carte' },
+      h('div', { class: 'ligne' }, h('span', { class: 'g' }, 'Essais lancés ce mois'), h('span', { class: 'prix' }, M.essaisMois)),
+      h('div', { class: 'ligne' }, h('span', { class: 'g' }, 'Essais transformés en commande'), h('span', { class: 'prix' }, M.transf + ' / ' + M.essaisTotal + (M.essaisTotal ? ' (' + Math.round(M.transf / M.essaisTotal * 100) + ' %)' : ''))),
+      h('div', { class: 'ligne' }, h('span', { class: 'g' }, 'Délai moyen de réponse à un devis'), h('span', { class: 'prix' }, M.delaiMoy == null ? 'pas encore mesuré' : (M.delaiMoy < 1 ? 'moins d’1 jour' : M.delaiMoy.toFixed(1).replace('.', ',') + ' j') + ' (' + M.nbRep + ' devis)')),
+      h('div', { class: 'ligne' }, h('span', { class: 'g' }, 'Devis sans relance depuis ' + (S.relanceJours || 3) + ' j'), h('span', { class: 'prix' }, M.sansRelance)),
+      h('p', { class: 'mut' }, 'Point de départ noté dans Réglages : ' + (dep.essais || dep.relances || dep.commandes ? (dep.essais || '?') + ' essais, ' + (dep.relances || '?') + ' relances, ' + (dep.commandes || '?') + ' commandes par semaine.' : 'pas encore renseigné.') + ' « Anciens clients réactivés » demande l’historique d’achats EBP : plus tard.')),
+    h('h2', {}, 'Devis acceptés par semaine (HT)'),
+    dv.some(d => d.statut === 'accepte') ? h('div', { class: 'carte' }, h('div', { class: 'barres', role: 'img', 'aria-label': 'Montant HT des devis acceptés, 8 dernières semaines' }, parSem.map((v, i) => h('div', { class: 'bcol' }, h('div', { class: 'b', style: 'height:' + Math.round(v / mx * 90) + 'px' }), h('small', {}, semaines[i].slice(8) + '/' + semaines[i].slice(5, 7))))), h('p', { class: 'mut' }, 'Une barre = une semaine (date du lundi). Max : ' + eur(mx) + '.')) : h('p', { class: 'vide' }, 'Le graphique apparaît dès le premier devis accepté.')
+  ];
+}
+
 async function pageAccueil() {
-  const [dv, cl] = [await getAll('devis'), await getAll('clients')];
+  const [dv, cl, sigs] = [await getAll('devis'), await getAll('clients'), await lireSig()];
+  const ext = { point: await get('meta', 'point'), appels: await lireAppels() };
   dv.sort((a, b) => b.id - a.id);
-  montrer('Devis',
+  montrer('Accueil',
     CAT.length ? null : h('div', { class: 'carte alerte' }, h('strong', {}, 'Catalogue vide. '), 'Importe ton fichier de tarifs pour pouvoir faire des devis. ', h('a', { href: '#/catalogue' }, 'Aller au catalogue')),
     h('a', { class: 'btn gros', href: '#/nouveau' }, '➕ Nouveau devis'),
+    h('div', { class: 'actions' }, h('a', { class: 'btn sec', href: '#/signaler' }, '⚠ Signaler un problème'), h('a', { class: 'btn sec', href: '#/point' }, '📋 Préparer le Point')),
+    tableauDeBord(dv, cl, sigs, ext),
     (() => { const sem = dv.filter(d => d.lignes.length && Date.now() - new Date(d.creeLe).getTime() < 7 * 864e5); return sem.length ? h('div', { class: 'actions' }, h('button', { class: 'btn sec', onclick: () => envoyerDevis(sem, 'recap-devis-' + new Date().toISOString().slice(0, 10) + '.json') }, 'Envoyer le récap : ' + sem.length + ' devis de la semaine')) : null; })(),
     (() => { const x = statsDevis(dv); return x.n ? h('div', { class: 'carte', role: 'status' }, h('strong', {}, 'Mon poste'), h('br'), h('small', {}, x.semaine + ' devis cette semaine · ' + (x.med == null ? 'temps par devis : pas encore mesuré' : 'temps médian par devis : ' + (x.med < 1 ? 'moins d’1 min' : Math.round(x.med) + ' min') + ' (sur ' + (x.mesures - x.exclus) + ' devis' + (x.exclus ? ', ' + x.exclus + ' interrompu(s) exclu(s)' : '') + ')'))) : null; })(),
     h('h2', {}, 'Derniers devis'),
-    dv.length ? dv.slice(0, 30).map(d => h('a', { class: 'ligne', href: '#/devis/' + d.id, style: 'color:inherit;text-decoration:none' },
+    dv.length ? dv.slice(0, 30).map(d => { const [lib, cls] = etiquetteDevis(d); return h('a', { class: 'ligne', href: '#/devis/' + d.id, style: 'color:inherit;text-decoration:none' },
       h('span', { class: 'g' }, h('strong', {}, d.clientNom), h('br'), h('small', {}, numero(d) + ' · ' + dateFr(d.creeLe))),
-      h('span', { class: 'prix' }, eur(totaux(d).ht), h('br'), h('span', { class: 'tag ' + (d.statut === 'envoye' ? 'ok' : 'warn') }, d.statut === 'envoye' ? 'Envoyé' : 'Brouillon')))) : h('p', { class: 'vide' }, 'Aucun devis pour l’instant.'),
+      h('span', { class: 'prix' }, eur(totaux(d).ht), h('br'), h('span', { class: 'tag ' + cls }, lib))); }) : h('p', { class: 'vide' }, 'Aucun devis pour l’instant.'),
     cl.length ? null : h('p', { class: 'mut' }, 'Astuce : tu peux aussi importer ta liste de clients (onglet Clients).'));
 }
+
+// ----- commande pour le responsable (WhatsApp) -----
+function texteCommande(d, o = {}) {
+  const t = totaux(d);
+  const L = ['COMMANDE ' + (S.societe || 'Odicolor') + (o.urgence === 'urgente' ? ' — URGENT' : ''),
+    'Client : ' + d.clientNom + (o.tel ? ' · ' + o.tel : ''),
+    'Date : ' + dateFr(new Date().toISOString()) + ' · Devis ' + numero(d),
+    (o.mode === 'livraison' ? 'Livraison chez le client' : 'Retrait au magasin') + ' · ' + (o.urgence === 'urgente' ? 'Urgent' : 'Normal'), '---'];
+  d.lignes.forEach(l => L.push(l.code + ' — ' + l.des + ' × ' + qtxt(l.q) + (o.prix ? ' (' + eur(l.pu) + (l.r ? ' -' + pct(l.r) + ' %' : '') + ' → ' + eur(ligneTotal(l)) + ' HT)' : '')));
+  if (o.prix) L.push('---', 'Total HT : ' + eur(t.ht));
+  if (o.note) L.push('Note : ' + o.note);
+  if (o.tard && o.urgence !== 'urgente') L.push('Après l’heure limite : préparation pour demain');
+  L.push(o.stock ? 'Stock vérifié' : 'Stock à vérifier');
+  L.push('Vendeur : ' + (S.vendeur || '—'));
+  return L.join('\n');
+}
+function blocCommande(d, client, fini, sauver, apres) {
+  const mode = h('select', { 'aria-label': 'Livraison ou retrait' }, [['retrait', 'Retrait au magasin'], ['livraison', 'Livraison chez le client']].map(([v, l]) => h('option', { value: v, selected: (d.cmdMode || 'retrait') === v }, l)));
+  const urg = h('select', { 'aria-label': 'Urgence' }, [['normale', 'Normal'], ['urgente', 'Urgent']].map(([v, l]) => h('option', { value: v, selected: (d.cmdUrgence || 'normale') === v }, l)));
+  const note = h('textarea', { rows: 2, maxlength: 300, placeholder: 'Note pour la préparation (facultatif)', 'aria-label': 'Note pour la préparation' }, d.cmdNote || '');
+  const prix = h('input', { type: 'checkbox', style: 'width:24px;min-height:24px', 'aria-label': 'Joindre les prix' });
+  const stockOk = h('input', { type: 'checkbox', style: 'width:24px;min-height:24px', 'aria-label': 'Stock vérifié' });
+  const hl = /^\d\d:\d\d$/.test(S.heureLimite || '') ? S.heureLimite : '', tard = hl && new Date().toTimeString().slice(0, 5) > hl;
+  return h('div', { class: 'carte' }, h('strong', {}, 'Commande pour ' + (S.respNom || 'le responsable')),
+    h('label', {}, 'Mode'), mode, h('label', {}, 'Urgence'), urg, h('label', {}, 'Note'), note,
+    h('label', { style: 'display:flex;gap:10px;align-items:center' }, prix, 'Joindre les prix au message'),
+    h('label', { style: 'display:flex;gap:10px;align-items:center' }, stockOk, 'Stock vérifié avec ' + (S.respNom || 'le responsable')),
+    tard ? h('p', { class: 'mut' }, 'Il est après ' + hl + ' : cette commande sera préparée pour le lendemain, sauf si elle est urgente.') : null,
+    S.respTel ? null : h('p', { class: 'mut' }, 'Numéro du responsable non réglé : WhatsApp te laissera choisir le contact (Réglages).'),
+    h('div', { class: 'actions' }, h('button', { class: 'btn', onclick: async () => {
+      if (!d.lignes.length) { toast('Le devis est vide.', true); return; }
+      fini(); d.cmdMode = mode.value; d.cmdUrgence = urg.value; d.cmdNote = clean(note.value).slice(0, 300);
+      const texte = texteCommande(d, { mode: d.cmdMode, urgence: d.cmdUrgence, note: d.cmdNote, prix: prix.checked, tel: client && client.tel, stock: stockOk.checked, tard });
+      window.open('https://wa.me/' + tel2wa(S.respTel) + '?text=' + encodeURIComponent(texte), '_blank', 'noopener');
+      d.commandeLe = new Date().toISOString();
+      if (d.statut === 'brouillon' || d.statut === 'envoye') { d.statut = 'accepte'; d.reponseLe = d.reponseLe || d.commandeLe; if (client && client.conv && client.conv !== 'converti') { client.conv = 'converti'; await putMany('clients', [client]); } }
+      await sauver(); toast('Commande préparée. Le devis est marqué accepté.'); apres();
+    } }, 'Envoyer par WhatsApp')));
+}
+
+// ----- signalements (photo + note), envoyés au responsable -----
+function reduirePhoto(file) {
+  return new Promise((res, rej) => {
+    if (!file || !/^image\//.test(file.type)) return rej(new Error('Ce fichier n’est pas une image.'));
+    if (file.size > 30e6) return rej(new Error('Image trop lourde.'));
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, 1024 / Math.max(img.width, img.height)), cv = document.createElement('canvas');
+      cv.width = Math.max(1, Math.round(img.width * k)); cv.height = Math.max(1, Math.round(img.height * k));
+      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height); URL.revokeObjectURL(url);
+      res(cv.toDataURL('image/jpeg', 0.72));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('Image illisible.')); };
+    img.src = url;
+  });
+}
+function dataVersFile(data, nom) {
+  const [meta, b64] = data.split(','), bin = atob(b64), u = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+  return new File([u], nom, { type: (meta.match(/data:([^;]+)/) || [])[1] || 'image/jpeg' });
+}
+function texteSignalement(s) {
+  return ['SIGNALEMENT' + (s.urgence === 'urgente' ? ' — URGENT' : ''), 'Type : ' + libelle(SIGNAL_TYPES, s.type), 'Client : ' + (s.clientNom || '—'),
+    'Produit : ' + (s.produit || '—'), 'Date : ' + dateFr(s.date), 'Note : ' + (s.note || '—'), 'Vendeur : ' + (S.vendeur || '—')].join('\n');
+}
+async function envoyerSignalement(s) {
+  const texte = texteSignalement(s);
+  if (s.photo && navigator.canShare) {
+    const f = dataVersFile(s.photo, 'signalement-' + s.id.slice(0, 8) + '.jpg');
+    if (navigator.canShare({ files: [f] })) { try { await navigator.share({ files: [f], text: texte, title: 'Signalement' }); return true; } catch (e) { if (e && e.name === 'AbortError') return false; } }
+  }
+  window.open('https://wa.me/' + tel2wa(S.respTel) + '?text=' + encodeURIComponent(texte), '_blank', 'noopener');
+  if (s.photo) toast('La photo ne part pas toute seule : enregistre-la depuis « Signalements » et joins-la dans WhatsApp.');
+  return true;
+}
+async function pageSignaler(clientId) {
+  const cl = (await getAll('clients')).sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
+  const type = h('select', { 'aria-label': 'Type de problème' }, SIGNAL_TYPES.map(([v, l]) => h('option', { value: v }, l)));
+  const cli = h('select', { 'aria-label': 'Client' }, [h('option', { value: '' }, 'Pas de client précis'), ...cl.map(c => h('option', { value: String(c.id), selected: c.id === clientId }, c.nom))]);
+  const prod = h('input', { maxlength: 80, placeholder: 'Produit ou référence (facultatif)', 'aria-label': 'Produit' });
+  const urg = h('select', { 'aria-label': 'Urgence' }, [['normale', 'Normale'], ['urgente', 'Urgente']].map(([v, l]) => h('option', { value: v }, l)));
+  const note = h('textarea', { rows: 4, maxlength: 600, placeholder: 'Ce qui se passe, ce que dit le client… (le micro du clavier marche)', 'aria-label': 'Note' });
+  const photo = h('input', { type: 'file', accept: 'image/*', capture: 'environment', 'aria-label': 'Photo' });
+  const aper = h('div');
+  let data = '';
+  photo.addEventListener('change', async () => {
+    if (!photo.files[0]) return;
+    try { data = await reduirePhoto(photo.files[0]); aper.replaceChildren(h('img', { src: data, alt: 'Aperçu de la photo', style: 'max-width:100%;border-radius:10px' })); } catch (e) { data = ''; toast(e.message, true); }
+  });
+  const sauver = async (envoyer) => {
+    if (!clean(note.value) && !data) { toast('Ajoute une note ou une photo.', true); return; }
+    const c = cl.find(x => String(x.id) === cli.value);
+    const s = { id: nouvelUid(), date: new Date().toISOString(), type: type.value, clientId: c ? c.id : null, clientNom: c ? c.nom : '', produit: clean(prod.value).slice(0, 80), urgence: urg.value, note: clean(note.value).slice(0, 600), photo: data, statut: 'nouveau' };
+    if (envoyer) { const ok = await envoyerSignalement(s); if (!ok) return; s.statut = 'envoye'; s.envoyeLe = new Date().toISOString(); }
+    const arr = await lireSig(); arr.unshift(s); await ecrireSig(arr);
+    toast(envoyer ? 'Signalement envoyé et enregistré.' : 'Signalement enregistré.'); location.hash = '#/signalements';
+  };
+  montrer('Signaler',
+    h('p', { class: 'mut' }, 'Photo + note, envoyés à ' + (S.respNom || 'ton responsable') + ' par WhatsApp. Évite de cadrer les plaques d’immatriculation et les visages.'),
+    h('label', {}, 'Type'), type, h('label', {}, 'Client'), cli, h('label', {}, 'Produit'), prod, h('label', {}, 'Urgence'), urg,
+    h('label', {}, 'Photo'), photo, aper, h('label', {}, 'Note'), note,
+    h('div', { class: 'actions' }, h('button', { class: 'btn', onclick: () => sauver(true) }, 'Envoyer à ' + (S.respNom || 'mon responsable')), h('button', { class: 'btn sec', onclick: () => sauver(false) }, 'Enregistrer sans envoyer')));
+}
+async function pageSignalements() {
+  const sigs = await lireSig();
+  let ouverts = true;
+  const liste = h('div');
+  const dessiner = () => {
+    const vus = sigs.filter(s => !ouverts || s.statut !== 'resolu' || !s.clientPrevenu);
+    liste.replaceChildren(...(vus.length ? vus.map(s => {
+      const [lib, cls] = SIGNAL_ST[s.statut] || SIGNAL_ST.nouveau, retard = sigEnRetard(s);
+      const maj = async (fn) => { fn(); await ecrireSig(sigs); dessiner(); };
+      return h('div', { class: 'carte' },
+        h('div', { class: 'elan-tete' }, h('strong', {}, libelle(SIGNAL_TYPES, s.type)), h('span', { class: 'tag ' + cls }, lib)),
+        h('small', { class: 'mut' }, dateFr(s.date) + (s.clientNom ? ' · ' + s.clientNom : '') + (s.produit ? ' · ' + s.produit : '') + (s.urgence === 'urgente' ? ' · URGENT' : '')),
+        s.note ? h('p', {}, s.note) : null,
+        s.photo ? h('img', { src: s.photo, alt: 'Photo du signalement', style: 'max-width:100%;max-height:220px;border-radius:10px' }) : null,
+        retard ? h('p', { class: 'mut' }, '⏰ Pas de prise en charge dans le délai : relance ' + (S.respNom || 'ton responsable') + '.') : null,
+        s.statut === 'resolu' && !s.clientPrevenu ? h('p', { class: 'mut' }, 'Pense à prévenir le client que c’est résolu.') : null,
+        h('div', { class: 'actions' },
+          s.statut === 'nouveau' || retard ? h('button', { class: 'btn', onclick: async () => { if (await envoyerSignalement(s)) maj(() => { s.statut = 'envoye'; s.envoyeLe = new Date().toISOString(); }); } }, s.statut === 'nouveau' ? 'Envoyer' : 'Relancer') : null,
+          s.statut === 'envoye' ? h('button', { class: 'btn sec', onclick: () => maj(() => { s.statut = 'pris'; s.priseLe = new Date().toISOString(); }) }, 'Pris en charge') : null,
+          s.statut === 'envoye' || s.statut === 'pris' ? h('button', { class: 'btn sec', onclick: () => maj(() => { s.statut = 'resolu'; s.resoluLe = new Date().toISOString(); }) }, 'Résolu') : null,
+          s.statut === 'resolu' && !s.clientPrevenu ? h('button', { class: 'btn', onclick: () => maj(() => { s.clientPrevenu = true; }) }, 'Client prévenu') : null,
+          s.photo ? h('a', { class: 'btn sec', href: s.photo, download: 'signalement.jpg' }, 'Enregistrer la photo') : null,
+          h('button', { class: 'btn danger', 'aria-label': 'Supprimer', onclick: async () => { if (confirm('Supprimer ce signalement ?')) { sigs.splice(sigs.indexOf(s), 1); await ecrireSig(sigs); dessiner(); } } }, '🗑')));
+    }) : [h('p', { class: 'vide' }, 'Aucun signalement.')]));
+  };
+  const bascule = h('button', { class: 'btn sec', onclick: () => { ouverts = !ouverts; bascule.textContent = ouverts ? 'Voir aussi les clôturés' : 'Masquer les clôturés'; dessiner(); } }, 'Voir aussi les clôturés');
+  const lot = sigs.filter(x => x.statut === 'nouveau' && x.urgence !== 'urgente');
+  const grouper = lot.length > 1 ? h('button', { class: 'btn', onclick: async () => {
+    const texte = 'SIGNALEMENTS DU JOUR (' + lot.length + ') — ' + (S.vendeur || '') + '\n' + lot.map((x, i) => (i + 1) + '. ' + libelle(SIGNAL_TYPES, x.type) + ' · ' + (x.clientNom || '—') + (x.produit ? ' · ' + x.produit : '') + ' : ' + (x.note || '—') + (x.photo ? ' [photo]' : '')).join('\n');
+    window.open('https://wa.me/' + tel2wa(S.respTel) + '?text=' + encodeURIComponent(texte), '_blank', 'noopener');
+    lot.forEach(x => { x.statut = 'envoye'; x.envoyeLe = new Date().toISOString(); }); await ecrireSig(sigs); toast('Lot envoyé. Les photos restent à joindre à la main.'); dessiner();
+  } }, 'Envoyer le lot du jour (' + lot.length + ')') : null;
+  montrer('Signalements', h('div', { class: 'actions' }, h('a', { class: 'btn', href: '#/signaler' }, '⚠ Nouveau signalement'), grouper, bascule), liste,
+    h('p', { class: 'mut' }, 'Sans serveur, l’appli ne sait pas si ton responsable a lu le message : « Pris en charge » et « Résolu » se règlent à la main.'));
+  dessiner();
+}
+
+// ----- le Point avec le responsable -----
+function periodePoint(mode, now = new Date()) {
+  if (mode === 'mois') return { debut: now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-01', fin: jourLocal(now), lib: 'le mois en cours' };
+  const l = new Date(lundiDe(now) + 'T12:00:00'); l.setDate(l.getDate() - 7); const f = new Date(l); f.setDate(f.getDate() + 6);
+  return { debut: jourLocal(l), fin: jourLocal(f), lib: 'la semaine dernière (lundi au dimanche)' };
+}
+function calculPoint(dv, cl, sigs, per, appels = []) {
+  const dans = iso => { if (!iso) return false; const j = /^\d{4}-\d\d-\d\d$/.test(iso) ? iso : jourLocal(iso); return j >= per.debut && j <= per.fin; };
+  const sent = dv.filter(d => d.lignes.length && d.statut !== 'brouillon' && dans(envoiDe(d)));
+  const acc = dv.filter(d => d.statut === 'accepte' && dans(d.reponseLe)), ref = dv.filter(d => d.statut === 'refuse' && dans(d.reponseLe));
+  const essais = cl.flatMap(c => (Array.isArray(c.essais) ? c.essais : []).map(e => ({ ...e, nom: c.nom }))).filter(e => dans(e.date));
+  const visites = cl.reduce((a, c) => a + (Array.isArray(c.visites) ? c.visites : []).filter(v => v && v.res === 'vu' && dans(v.date)).length, 0);
+  const sig = sigs.filter(s => dans(s.date)), ouverts = sigs.filter(s => s.statut !== 'resolu');
+  const res = sigs.filter(s => s.resoluLe && s.envoyeLe).map(s => (new Date(s.resoluLe) - new Date(s.envoyeLe)) / 36e5);
+  const types = {}; sig.forEach(s => { types[s.type] = (types[s.type] || 0) + 1; });
+  return { sent, acc, ref, essais, visites, sig, ouverts, types, resolMoyH: res.length ? res.reduce((a, b) => a + b, 0) / res.length : null,
+    caAcc: acc.reduce((a, d) => a + totaux(d).ht, 0), attente: dv.filter(d => d.statut === 'envoye' && d.lignes.length),
+    objections: sig.filter(s => s.type === 'objection'), appels: appels.filter(a => a && typeof a.date === 'string' && a.date.slice(0, 10) >= per.debut && a.date.slice(0, 10) <= per.fin) };
+}
+function texteDuPoint(P, per, bloc, engagements) {
+  const L = ['POINT — ' + (S.vendeur || 'vendeur') + ' — ' + per.lib, '',
+    'Résultats : ' + P.visites + ' visites · ' + P.sent.length + ' devis envoyés · ' + P.acc.length + ' acceptés (' + eur(P.caAcc) + ' HT) · ' + P.ref.length + ' refusés',
+    'Essais : ' + P.essais.length + ' lancés, ' + P.essais.filter(e => e.statut === 'concluant' || e.statut === 'commande').length + ' concluants',
+    'En attente de réponse : ' + P.attente.length + ' devis (' + eur(P.attente.reduce((a, d) => a + totaux(d).ht, 0)) + ' HT)',
+    'Appels/messages vers ' + (S.respNom || 'le responsable') + ' : ' + P.appels.length + (P.appels.length ? ' (' + MOTIFS.map(([k, l]) => [l, P.appels.filter(a => a.motif === k).length]).filter(x => x[1]).map(x => x[0] + ' ' + x[1]).join(', ') + ')' : ''),
+    'Signalements : ' + P.sig.length + ' sur la période, ' + P.ouverts.length + ' encore ouverts' + (P.resolMoyH != null ? ', résolus en moyenne en ' + Math.round(P.resolMoyH) + ' h' : '')];
+  if (P.objections.length) L.push('Objections entendues : ' + P.objections.map(s => (s.clientNom || '?') + ' : ' + s.note).join(' | '));
+  if (bloc) L.push('', 'Blocages : ' + bloc);
+  const ouv = engagements.filter(e => !e.fait);
+  if (engagements.length) L.push('', 'Engagements : ' + engagements.map(e => (e.fait ? '[fait] ' : '[à faire] ') + e.txt).join(' ; '));
+  L.push('', 'Chiffres basés sur l’activité saisie dans l’appli, pas sur le CA facturé.');
+  return L.join('\n');
+}
+async function pagePoint(mode) {
+  mode = mode === 'mois' ? 'mois' : 'semaine';
+  const [dv, cl, sigs, pt, apl] = [await getAll('devis'), await getAll('clients'), await lireSig(), await get('meta', 'point'), await lireAppels()];
+  const donnees = pt && typeof pt === 'object' ? pt : {};
+  donnees.faits = donnees.faits || {}; donnees.blocages = donnees.blocages || {}; donnees.engagements = Array.isArray(donnees.engagements) ? donnees.engagements : [];
+  const per = periodePoint(mode), P = calculPoint(dv, cl, sigs, per, apl), cle = mode + ':' + per.fin.slice(0, mode === 'mois' ? 7 : 10);
+  const sauve = () => put('meta', donnees, 'point');
+  const bloc = h('textarea', { rows: 3, maxlength: 600, placeholder: 'Ce qui te freine : prix, stock, délais, prospect injoignable…', 'aria-label': 'Blocages' }, donnees.blocages[cle] || '');
+  bloc.addEventListener('change', async () => { donnees.blocages[cle] = bloc.value.slice(0, 600); await sauve(); });
+  const engBox = h('div');
+  const dessinerEng = () => engBox.replaceChildren(...(donnees.engagements.length ? donnees.engagements.slice(-12).reverse().map(e => h('label', { class: 'ligne', style: 'display:flex;gap:10px;align-items:center;margin:0;color:inherit;font-size:inherit' },
+    h('input', { type: 'checkbox', checked: e.fait, style: 'width:26px;min-height:26px;flex:none', 'aria-label': e.txt, onchange: async (ev) => { e.fait = ev.target.checked; await sauve(); } }), h('span', { class: 'g' }, e.txt, h('br'), h('small', {}, 'Pris le ' + dateFr(e.creeLe))))) : [h('p', { class: 'vide' }, 'Aucun engagement noté.')]));
+  const nouv = h('input', { maxlength: 120, placeholder: 'Nouvel engagement (ex. appeler 5 garages dormants)', 'aria-label': 'Nouvel engagement' });
+  const stat = (v, l) => h('div', { class: 'kpi' }, h('div', { class: 'v' }, v), h('div', { class: 'l' }, l));
+  const types = Object.entries(P.types).sort((a, b) => b[1] - a[1]);
+  const bascule = h('div', { class: 'actions' }, h('a', { class: 'btn ' + (mode === 'semaine' ? '' : 'sec'), href: '#/point' }, '7 jours'), h('a', { class: 'btn ' + (mode === 'mois' ? '' : 'sec'), href: '#/point/mois' }, 'Mois'));
+  montrer('Point',
+    bascule, h('p', { class: 'mut' }, 'Période : ' + per.lib + ' (' + dateFr(per.debut) + ' au ' + dateFr(per.fin) + ').'),
+    h('div', { class: 'kpis' }, stat(P.visites, 'visites'), stat(P.sent.length, 'devis envoyés'), stat(P.acc.length, 'devis acceptés')),
+    h('div', { class: 'carte' }, h('strong', {}, 'Résultats'), h('p', {}, eur(P.caAcc) + ' HT de devis acceptés · ' + P.ref.length + ' refusé(s) · ' + P.attente.length + ' en attente de réponse'),
+      h('p', {}, P.essais.length + ' essai(s) lancé(s), ' + P.essais.filter(e => e.statut === 'concluant' || e.statut === 'commande').length + ' concluant(s)')),
+    h('div', { class: 'carte' }, h('strong', {}, 'Victoires'), P.acc.length ? P.acc.slice(0, 3).map(d => h('p', {}, '✅ ' + d.clientNom + ' : ' + eur(totaux(d).ht) + ' HT')) : h('p', { class: 'mut' }, 'Aucun devis accepté sur la période.')),
+    h('div', { class: 'carte' }, h('strong', {}, 'Appels vers ' + (S.respNom || 'le responsable')), h('p', {}, P.appels.length + ' sur la période' + (S.depart && S.depart.appels ? ' (départ : ' + S.depart.appels + ' par semaine)' : ''))),
+    h('div', { class: 'carte' }, h('strong', {}, 'Signalements'), h('p', {}, P.sig.length + ' sur la période · ' + P.ouverts.length + ' ouvert(s)' + (P.resolMoyH != null ? ' · résolus en moyenne en ' + Math.round(P.resolMoyH) + ' h' : '')),
+      types.length ? h('p', { class: 'mut' }, 'Les plus fréquents : ' + types.slice(0, 3).map(([k, n]) => libelle(SIGNAL_TYPES, k) + ' (' + n + ')').join(', ')) : null,
+      P.objections.length ? h('div', {}, h('small', { class: 'mut' }, 'Objections entendues :'), P.objections.slice(0, 5).map(s => h('p', {}, '« ' + s.note + ' » ' + (s.clientNom ? '(' + s.clientNom + ')' : '')))) : null),
+    h('h2', {}, 'Blocages'), bloc,
+    h('p', { class: 'mut' }, 'Pour le lundi : décide UN seul changement pour la semaine et note-le dans Engagements.'),
+    h('h2', {}, 'Engagements'), engBox,
+    h('div', { class: 'actions' }, nouv, h('button', { class: 'btn', onclick: async () => { const t = clean(nouv.value); if (!t) return; donnees.engagements.push({ id: nouvelUid(), txt: t.slice(0, 120), fait: false, creeLe: new Date().toISOString() }); await sauve(); nouv.value = ''; dessinerEng(); } }, 'Ajouter')),
+    h('div', { class: 'actions' }, h('button', { class: 'btn gros', onclick: () => {
+      const texte = texteDuPoint(P, per, bloc.value, donnees.engagements.slice(-12));
+      window.open('https://wa.me/' + tel2wa(S.respTel) + '?text=' + encodeURIComponent(texte), '_blank', 'noopener');
+      donnees.faits[per.debut] = true; sauve(); toast('Point envoyé et noté comme fait.');
+    } }, 'Envoyer le Point par WhatsApp')),
+    h('p', { class: 'mut' }, 'Ces chiffres viennent de l’activité saisie dans l’appli, pas du chiffre d’affaires facturé.'));
+  dessinerEng();
+}
+
+// ----- comparateur de coût prêt à l'emploi (valeurs saisies à la main) -----
+function coutPae(o) { // o : { pPeint, kPeint, pDur, kDur, pDil, kDil, rend } en centimes/litre et parts ; -> { litre, m2 } en centimes
+  const parts = o.kPeint + o.kDur + o.kDil;
+  if (!(parts > 0) || !(o.rend > 0)) return null;
+  const litre = (o.pPeint * o.kPeint + o.pDur * o.kDur + o.pDil * o.kDil) / parts;
+  return { litre, m2: litre / o.rend };
+}
+function lireNb(v) { const s = String(v == null ? '' : v).replace(',', '.').replace(/\s/g, ''); if (!s) return 0; const n = Number(s); return isFinite(n) && n >= 0 && n < 1e6 ? n : NaN; }
+async function pageComparateur() {
+  const sauve = (await get('meta', 'comparateur')) || {};
+  const champs = [['nom', 'Nom du produit'], ['pPeint', 'Prix de la peinture (€/L)'], ['kPeint', 'Parts de peinture'], ['pDur', 'Prix du durcisseur (€/L)'], ['kDur', 'Parts de durcisseur'], ['pDil', 'Prix du diluant (€/L)'], ['kDil', 'Parts de diluant'], ['rend', 'Rendement prêt à l’emploi (m² par litre)'], ['seche', 'Temps de séchage (note)']];
+  const mk = (cote, titre) => {
+    const ins = {}; champs.forEach(([k, l]) => { ins[k] = h('input', { value: (sauve[cote] || {})[k] || '', inputmode: k === 'nom' || k === 'seche' ? 'text' : 'decimal', 'aria-label': titre + ' : ' + l, placeholder: l }); });
+    return { cote, ins, node: h('div', { class: 'carte' }, h('strong', {}, titre), ...champs.map(([k, l]) => [h('label', {}, l), ins[k]])) };
+  };
+  const A = mk('a', 'Produit actuel'), B = mk('b', 'Carsystem');
+  const res = h('div', { role: 'status' });
+  const val = X => { const g = k => lireNb(X.ins[k].value); return { pPeint: g('pPeint'), kPeint: g('kPeint'), pDur: g('pDur'), kDur: g('kDur'), pDil: g('pDil'), kDil: g('kDil'), rend: g('rend') }; };
+  const calc = async () => {
+    const a = val(A), b = val(B);
+    const sv = { a: {}, b: {} }; [A, B].forEach(X => champs.forEach(([k]) => { sv[X.cote][k] = X.ins[k].value; })); await put('meta', sv, 'comparateur');
+    if ([a, b].some(o => Object.values(o).some(Number.isNaN))) { res.replaceChildren(h('div', { class: 'carte erreur' }, 'Un nombre est invalide.')); return; }
+    const ca = coutPae(a), cb = coutPae(b);
+    if (!ca || !cb) { res.replaceChildren(h('p', { class: 'mut' }, 'Remplis les parts et le rendement des deux produits pour voir la comparaison.')); return; }
+    const ecart = (cb.m2 - ca.m2) / ca.m2 * 100, m = c => c.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+    res.replaceChildren(h('div', { class: 'carte ' + (ecart <= 0 ? 'reussi' : 'alerte') },
+      h('strong', {}, 'Coût au m² : ' + m(ca.m2) + ' (actuel) contre ' + m(cb.m2) + ' (Carsystem)'),
+      h('p', {}, 'Litre prêt à l’emploi : ' + m(ca.litre) + ' contre ' + m(cb.litre) + '.'),
+      h('p', {}, Math.abs(ecart) < 0.05 ? 'Même coût au m².' : 'Carsystem coûte ' + Math.abs(ecart).toFixed(1).replace('.', ',') + ' % ' + (ecart < 0 ? 'de moins' : 'de plus') + ' au m².'),
+      h('p', { class: 'mut' }, 'Pour 100 m² : ' + m(ca.m2 * 100) + ' contre ' + m(cb.m2 * 100) + '.')),
+      h('p', { class: 'mut' }, 'Chiffres saisis par toi : vérifie-les avec les fiches techniques. Le coût ne dit rien de la qualité de teinte ni du temps gagné : compare aussi ces points avec le garagiste.'));
+  };
+  [A, B].forEach(X => Object.values(X.ins).forEach(i => i.addEventListener('input', calc)));
+  montrer('Comparateur', h('p', { class: 'mut' }, 'Compare le coût réel au m² (peinture + durcisseur + diluant, rapporté au rendement), pas seulement la remise. Un exemple de mélange : 4 parts de peinture, 1 de durcisseur, 1 de diluant.'), A.node, B.node, res);
+  calc();
+}
+function pagePlus() {
+  const L = (href, t, d) => h('a', { class: 'ligne', href, style: 'color:inherit;text-decoration:none' }, h('span', { class: 'g' }, h('strong', {}, t), h('br'), h('small', {}, d)), h('span', {}, '›'));
+  montrer('Plus', L('#/point', 'Point', 'Résumé de la semaine ou du mois pour ton responsable, blocages, engagements'), L('#/signalements', 'Signalements', 'Problèmes remontés avec photo et leur suivi'), L('#/signaler', 'Signaler un problème', 'Photo + note envoyées à ton responsable'),
+    L('#/comparateur', 'Comparateur de coût', 'Coût réel au m² : produit actuel contre Carsystem'), L('#/reglages', 'Réglages', 'Objectifs, responsable, TVA, sauvegarde'));
+}
+
 
 // ---------- clients ----------
 async function creerDevis(client) {
@@ -478,7 +932,25 @@ async function pageClient(id) {
   const stat = h('select', { 'aria-label': 'Statut' }, [['prospect', 'Prospect'], ['client', 'Client']].map(([v, l]) => h('option', { value: v, selected: (c.statutCrm || 'prospect') === v }, l)));
   const prio = h('select', { 'aria-label': 'Priorité' }, [['', 'Pas de plan'], ['A', 'A : à voir souvent'], ['B', 'B : mensuel'], ['C', 'C : trimestriel']].map(([v, l]) => h('option', { value: v, selected: (c.priorite || '') === v }, l)));
   const rythme = h('input', { type: 'number', inputmode: 'numeric', min: 0, max: 365, value: c.rythme || '', placeholder: 'Facultatif : tous les … jours', 'aria-label': 'Rythme en jours' });
+  const cNom = h('input', { value: c.contactNom || '', maxlength: 60, placeholder: 'Gérant ou chef d’atelier', 'aria-label': 'Contact décideur' });
+  const pNom = h('input', { value: c.peintreNom || '', maxlength: 60, placeholder: 'Peintre qui utilisera le produit', 'aria-label': 'Contact peintre' });
+  const avis = h('select', { 'aria-label': 'Avis du peintre sur Carsystem' }, AVIS.map(([v, l]) => h('option', { value: v, selected: (c.avis || '') === v }, l)));
+  const conv = h('select', { 'aria-label': 'Conversion Carsystem' }, CONV.map(([v, l]) => h('option', { value: v, selected: (c.conv || '') === v }, l)));
+  const exRob = h('input', { type: 'checkbox', checked: !!c.exRoberlo, style: 'width:24px;min-height:24px', 'aria-label': 'Ancien client Roberlo' });
+  const forma = h('input', { type: 'checkbox', checked: !!c.formation, style: 'width:24px;min-height:24px', 'aria-label': 'Démo ou formation proposée' });
+  const essaisBox = h('div'), devisBox = h('div');
   const bloc = h('div');
+  const dessinerEssais = () => {
+    const es = Array.isArray(c.essais) ? c.essais : [];
+    essaisBox.replaceChildren(...(es.length ? es.slice().reverse().map(e => {
+      const st2 = h('select', { 'aria-label': 'Résultat de l’essai' }, ESSAI_ST.map(([v, l]) => h('option', { value: v, selected: e.statut === v }, l)));
+      st2.addEventListener('change', async () => { e.statut = st2.value; if (e.statut === 'commande') c.conv = 'converti'; await putMany('clients', [c]); toast('Essai mis à jour.'); });
+      const sv = Array.isArray(e.suivis) ? e.suivis : (e.suivis = []);
+      const suiv = k => h('button', { class: 'btn sec', disabled: sv.includes(k), onclick: async () => { sv.push(k); await putMany('clients', [c]); dessinerEssais(); } }, sv.includes(k) ? k + ' fait' : 'Appel ' + k + ' fait');
+      return h('div', { class: 'carte' }, h('strong', {}, (e.produit || 'Produit') + ' · ' + dateFr(e.date)), st2, h('div', { class: 'actions' }, suiv('J2'), suiv('J7')));
+    }) : [h('p', { class: 'vide' }, 'Aucun essai.')]));
+  };
+  const prodEssai = h('input', { maxlength: 60, placeholder: 'Produit testé (ex. vernis, apprêt)', 'aria-label': 'Produit de l’essai' });
   const dessinerVisites = () => {
     const e = echeance(c), vs = (Array.isArray(c.visites) ? c.visites : []).slice(-5).reverse();
     bloc.replaceChildren(h('div', { class: 'carte' }, e ? h('div', {}, h('strong', {}, 'Rythme ' + e.r + ' j'), ' · ', e.jours == null ? 'jamais visité' : 'vu il y a ' + e.jours + ' j (' + e.pct + ' %)', e.du ? h('span', { class: 'tag warn', style: 'margin-left:8px' }, 'À faire') : null) : h('small', { class: 'mut' }, 'Pas de plan : choisis une priorité pour qu’il apparaisse dans la Tournée.'),
@@ -496,7 +968,7 @@ async function pageClient(id) {
     await putMany('clients', [c]); dessinerVisites(); toast(res === 'vu' ? 'Visite notée.' : 'Noté. Rappel le ' + dateFr(c.rappel) + '.');
   };
   const notes = h('textarea', { rows: 3, maxlength: 500, placeholder: 'Contact, visite, ce qu’il a dit…', 'aria-label': 'Notes' }, c.notes || '');
-  const lire = () => { c.cabine = cabine.value; c.fournisseur = clean(fourn.value).slice(0, 60); c.volume = Math.max(0, Math.min(1e6, Number(vol.value) || 0)) || ''; c.statutCrm = stat.value; c.priorite = prio.value; c.rythme = Math.max(0, Math.min(365, Math.round(Number(rythme.value) || 0))) || ''; c.notes = notes.value.slice(0, 500); };
+  const lire = () => { c.cabine = cabine.value; c.fournisseur = clean(fourn.value).slice(0, 60); c.volume = Math.max(0, Math.min(1e6, Number(vol.value) || 0)) || ''; c.statutCrm = stat.value; c.priorite = prio.value; c.rythme = Math.max(0, Math.min(365, Math.round(Number(rythme.value) || 0))) || ''; c.notes = notes.value.slice(0, 500); c.contactNom = clean(cNom.value).slice(0, 60); c.peintreNom = clean(pNom.value).slice(0, 60); c.avis = avis.value; c.conv = conv.value; c.exRoberlo = exRob.checked; c.formation = forma.checked; };
   const dessinerVerdict = () => {
     lire(); const a = avisProspect(c);
     verdict.replaceChildren(h('div', { class: 'carte ' + (a.n === 'ko' ? 'erreur' : a.n === 'ok' ? 'reussi' : 'alerte'), role: 'status' },
@@ -523,17 +995,28 @@ async function pageClient(id) {
     btn.disabled = false;
   };
   [cabine, fourn, vol, stat].forEach(x => x.addEventListener('input', dessinerVerdict));
+  getAll('devis').then(ds => { const mine = ds.filter(d => d.clientId === c.id).sort((a, b) => b.id - a.id); devisBox.replaceChildren(...(mine.length ? mine.map(d => { const [lib, cls] = etiquetteDevis(d); return h('a', { class: 'ligne', href: '#/devis/' + d.id, style: 'color:inherit;text-decoration:none' }, h('span', { class: 'g' }, numero(d) + ' · ' + dateFr(d.creeLe)), h('span', { class: 'prix' }, eur(totaux(d).ht), h('br'), h('span', { class: 'tag ' + cls }, lib))); }) : [h('p', { class: 'vide' }, 'Aucun devis.')])); });
   [prio, rythme].forEach(x => x.addEventListener('input', () => { lire(); dessinerVisites(); }));
   const bRech = h('button', { class: 'btn', onclick: () => rechercher(bRech) }, c.ent ? '🔎 Relire le registre' : '🔎 Fiche officielle (réseau)');
   montrer(c.nom,
     h('p', { class: 'mut' }, c.tel || 'Pas de téléphone'),
-    h('div', { class: 'actions' }, bRech, h('button', { class: 'btn sec', onclick: () => creerDevis(c) }, 'Nouveau devis')),
+    h('div', { class: 'actions' }, bRech, h('button', { class: 'btn sec', onclick: () => creerDevis(c) }, 'Nouveau devis'), h('a', { class: 'btn sec', href: '#/signaler/' + c.id }, '⚠ Signaler')),
     zoneRech, fiche, verdict,
     h('h2', {}, 'Questions terrain'),
     h('label', {}, 'A-t-il une cabine de peinture ?'), cabine,
     h('label', {}, 'Fournisseur actuel'), fourn,
     h('label', {}, 'Achat de peinture par mois (€)'), vol,
     h('label', {}, 'Statut'), stat,
+    h('h2', {}, 'Contacts'),
+    h('label', {}, 'Décideur (gérant, chef d’atelier)'), cNom, h('label', {}, 'Peintre (celui qui décide en pratique)'), pNom, h('label', {}, 'Avis du peintre sur Carsystem'), avis,
+    h('label', { style: 'display:flex;gap:10px;align-items:center' }, forma, 'Démo ou formation proposée au peintre'),
+    h('h2', {}, 'Passage à Carsystem'),
+    h('label', { style: 'display:flex;gap:10px;align-items:center' }, exRob, 'Ancien client Roberlo'),
+    h('label', {}, 'Étape de conversion'), conv,
+    h('h2', {}, 'Essais'), essaisBox,
+    h('div', { class: 'actions' }, prodEssai, h('button', { class: 'btn', onclick: async () => { lire(); if (!Array.isArray(c.essais)) c.essais = []; c.essais.push({ id: nouvelUid(), date: aujourdhui(), produit: clean(prodEssai.value).slice(0, 60), statut: 'encours', suivis: [] }); if (!c.conv || c.conv === 'cible' || c.conv === 'contacte') c.conv = 'essai'; await putMany('clients', [c]); prodEssai.value = ''; conv.value = c.conv; dessinerEssais(); toast('Essai lancé. Rappels à J+2 et J+7.'); } }, 'Lancer un essai')),
+    h('p', { class: 'mut' }, 'Essai conseillé : une semaine environ, sur un vrai chantier, avec le peintre présent (hypothèse tirée de sources américaines, à vérifier sur le terrain).'),
+    h('h2', {}, 'Devis de ce garage'), devisBox,
     h('h2', {}, 'Plan d’action'),
     h('label', {}, 'Priorité (fixe le rythme de visite)'), prio,
     h('label', {}, 'Rythme personnalisé en jours'), rythme,
@@ -546,7 +1029,7 @@ async function pageClient(id) {
     h('div', { style: 'height:10px' }),
     h('button', { class: 'btn gros', onclick: async () => { lire(); await putMany('clients', [c]); toast('Enregistré.'); } }, 'Enregistrer'),
     h('p', { class: 'mut' }, 'Seul le nom du client est envoyé au registre public quand tu appuies sur « Fiche officielle ». Rien d’autre ne quitte le téléphone.'));
-  dessinerFiche(); dessinerVerdict(); dessinerVisites();
+  dessinerFiche(); dessinerVerdict(); dessinerVisites(); dessinerEssais();
 }
 async function pageClients() {
   const cl = (await getAll('clients')).sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
@@ -656,7 +1139,7 @@ async function lancer(kind, rows, debut, map, nomFichier) {
 }
 
 // ---------- devis ----------
-const tel2wa = t => { let d = String(t || '').replace(/\D/g, ''); if (d.startsWith('00')) d = d.slice(2); else if (d.startsWith('0') && d.length === 10) d = (S.indicatif || '262') + d.slice(1); return d; };
+const tel2wa = t => { let d = String(t || '').replace(/\D/g, ''); if (d.startsWith('00')) d = d.slice(2); else if (d.startsWith('0') && d.length === 10) d = (S.indicatif || '33') + d.slice(1); return d; };
 const csvSur = v => { v = v == null ? '' : String(v); return /^[=+\-@\t\r]/.test(v) ? "'" + v : v; };
 function texteDevis(d) {
   const t = totaux(d);
@@ -677,7 +1160,7 @@ async function envoyerDevis(liste, nomFichier) {
   for (const d of liste) if (!d.uid) { d.uid = nouvelUid(); await put('devis', d); }
   const clients = new Map((await getAll('clients')).map(c => [c.id, c]));
   const o = { appli: 'devis-terrain', type: 'envoi-devis', version: 1, vendeur: S.vendeur || '', date: new Date().toISOString(),
-    devis: liste.map(d => ({ uid: d.uid, date: d.creeLe, t1: d.t1 || null, t2: d.t2 || null, statut: d.statut, notes: d.notes || '', client: { nom: d.clientNom, tel: (clients.get(d.clientId) || {}).tel || '' },
+    devis: liste.map(d => ({ uid: d.uid, date: d.creeLe, t1: d.t1 || null, t2: d.t2 || null, statut: (d.statut === 'accepte' || d.statut === 'refuse') ? 'envoye' : d.statut, reponse: d.statut, notes: d.notes || '', client: { nom: d.clientNom, tel: (clients.get(d.clientId) || {}).tel || '' },
       lignes: d.lignes.map(l => ({ code: l.code, des: l.des, q: l.q, pu: l.pu, r: l.r })) })) };
   const contenu = JSON.stringify(o);
   const f = new File([contenu], nomFichier, { type: 'application/json' });
@@ -805,13 +1288,18 @@ async function pageDevis(id) {
       h('button', { class: 'btn sec', onclick: () => { fini(); telecharger(numero(d) + '.csv', csvDevis(d), 'text/csv;charset=utf-8'); } }, 'CSV pour EBP'),
       h('button', { class: 'btn', onclick: () => { fini(); envoyerDevis([d], 'devis-' + numero(d) + '.json'); } }, 'Envoyer à mon responsable')] : null,
     h('button', { class: 'btn sec', onclick: () => dupliquer(d) }, 'Dupliquer (prix du jour)'),
-    h('button', { class: 'btn ' + (verrou ? 'sec' : ''), onclick: async () => { if (!verrou) fini(); d.statut = verrou ? 'brouillon' : 'envoye'; await sauver(); pageDevis(id); } }, verrou ? 'Rouvrir pour modifier' : 'Marquer comme envoyé'),
+    d.statut === 'envoye' && d.lignes.length ? [
+      h('button', { class: 'btn', onclick: async () => { d.statut = 'accepte'; d.reponseLe = new Date().toISOString(); if (client && client.conv && client.conv !== 'converti') { client.conv = 'converti'; await putMany('clients', [client]); } await sauver(); toast('Devis accepté.'); pageDevis(id); } }, 'Accepté par le client'),
+      h('button', { class: 'btn sec', onclick: async () => { d.statut = 'refuse'; d.reponseLe = new Date().toISOString(); await sauver(); toast('Devis noté refusé.'); pageDevis(id); } }, 'Refusé'),
+      h('button', { class: 'btn sec', onclick: async () => { d.relanceLe = new Date().toISOString(); await sauver(); window.open('https://wa.me/' + tel + '?text=' + encodeURIComponent('Bonjour, avez-vous pu regarder le devis ' + numero(d) + ' (' + eur(totaux(d).ht) + ' HT) ? Je reste à votre disposition.'), '_blank', 'noopener'); pageDevis(id); } }, 'Relancer par WhatsApp')] : null,
+    h('button', { class: 'btn ' + (verrou ? 'sec' : ''), onclick: async () => { if (!verrou) fini(); if (verrou) { d.statut = 'brouillon'; delete d.reponseLe; } else d.statut = 'envoye'; await sauver(); pageDevis(id); } }, verrou ? 'Rouvrir pour modifier' : 'Marquer comme envoyé'),
     h('button', { class: 'btn danger', onclick: async () => { if (confirm('Supprimer ce devis ?')) { await del('devis', id); location.hash = '#/'; } } }, 'Supprimer'));
   montrer(numero(d),
     h('div', { class: 'ecran' },
-      h('div', { class: 'carte' }, h('strong', {}, d.clientNom), h('br'), h('small', {}, dateFr(d.creeLe) + ' · '), h('span', { class: 'tag ' + (verrou ? 'ok' : 'warn') }, verrou ? 'Envoyé' : 'Brouillon')),
+      h('div', { class: 'carte' }, h('strong', {}, d.clientNom), h('br'), h('small', {}, dateFr(d.creeLe) + ' · '), h('span', { class: 'tag ' + etiquetteDevis(d)[1] }, etiquetteDevis(d)[0])),
       verrou ? null : [rech, h('div', { class: 'actions' }, h('button', { class: 'btn sec', onclick: ouvrirDictee }, '🎤 Dicter / coller une liste')), dictee, resBox],
-      h('h2', {}, 'Lignes'), boite, totBox, notes, actBox),
+      h('h2', {}, 'Lignes'), boite, totBox, notes, actBox,
+      d.lignes.length && d.statut !== 'refuse' ? blocCommande(d, client, fini, sauver, () => pageDevis(id)) : null),
     feuille);
   dessiner(); totaliser(); lancerRech();
   if (!verrou && !d.lignes.length) setTimeout(() => rech.focus(), 50);
@@ -823,24 +1311,49 @@ async function pageReglages() {
     rem = h('input', { value: pct(S.remiseMax100), inputmode: 'decimal', 'aria-label': 'Remise maximale %' }),
     ind = h('input', { value: S.indicatif, inputmode: 'numeric', 'aria-label': 'Indicatif' }),
     soc = h('input', { value: S.societe, 'aria-label': 'Nom sur le devis' }),
-    ven = h('input', { value: S.vendeur, 'aria-label': 'Ton nom', autocomplete: 'name' });
+    ven = h('input', { value: S.vendeur, 'aria-label': 'Ton nom', autocomplete: 'name' }),
+    rNom = h('input', { value: S.respNom || '', maxlength: 60, 'aria-label': 'Nom du responsable' }),
+    rTel = h('input', { value: S.respTel || '', inputmode: 'tel', maxlength: 20, 'aria-label': 'Téléphone du responsable' }),
+    rel = h('input', { value: S.relanceJours || 3, inputmode: 'numeric', 'aria-label': 'Jours avant relance de devis' }),
+    dU = h('input', { value: S.delaiUrgentH || 4, inputmode: 'numeric', 'aria-label': 'Délai signalement urgent en heures' }),
+    dN = h('input', { value: S.delaiNormalH || 48, inputmode: 'numeric', 'aria-label': 'Délai signalement normal en heures' }),
+    bEs = h('input', { value: (S.depart || {}).essais || '', inputmode: 'numeric', 'aria-label': 'Essais par semaine avant' }),
+    bRe = h('input', { value: (S.depart || {}).relances || '', inputmode: 'numeric', 'aria-label': 'Relances par semaine avant' }),
+    bAp = h('input', { value: (S.depart || {}).appels || '', inputmode: 'numeric', 'aria-label': 'Appels vers le responsable par semaine avant' }),
+    oSem = h('input', { value: S.objSemaine ? String(S.objSemaine / 100) : '', inputmode: 'decimal', placeholder: 'Facultatif (€)', 'aria-label': 'Objectif de la semaine' }),
+    hLim = h('input', { type: 'time', value: S.heureLimite || '', 'aria-label': 'Heure limite des commandes' }),
+    bCo = h('input', { value: (S.depart || {}).commandes || '', inputmode: 'numeric', 'aria-label': 'Commandes par semaine avant' }),
+    objD = h('input', { type: 'month', value: S.objDepart || '', 'aria-label': 'Mois de départ des objectifs' }),
+    objs = [0, 1, 2].map(i => h('input', { value: (S.objectifs && S.objectifs[i]) ? String(S.objectifs[i] / 100) : '', inputmode: 'decimal', placeholder: 'Mois ' + (i + 1) + ' (€)', 'aria-label': 'Objectif du mois ' + (i + 1) }));
   const stock = h('p', { class: 'mut' }, 'Stockage : vérification…');
   if (navigator.storage && navigator.storage.persist) navigator.storage.persisted().then(p => { stock.textContent = p ? 'Stockage protégé : le navigateur ne l’effacera pas tout seul.' : 'Stockage non protégé : fais une sauvegarde régulièrement.'; });
   const fich = h('input', { type: 'file', accept: '.json', 'aria-label': 'Fichier de sauvegarde' });
   montrer('Réglages',
     h('div', { class: 'carte alerte' }, 'Valeurs par défaut non confirmées : TVA 8,5 % et remise maximale 60 % sont des hypothèses. Vérifie-les avant usage réel.'),
-    h('label', {}, 'TVA (%)'), tva, h('label', {}, 'Remise maximale (%)'), rem, h('label', {}, 'Indicatif WhatsApp (262 = La Réunion, 33 = France)'), ind, h('label', {}, 'Nom sur le devis'), soc, h('label', {}, 'Ton nom (joint aux devis envoyés)'), ven,
+    h('label', {}, 'TVA (%)'), tva, h('label', {}, 'Remise maximale (%)'), rem, h('label', {}, 'Indicatif WhatsApp (33 = France, 262 = La Réunion)'), ind, h('label', {}, 'Nom sur le devis'), soc, h('label', {}, 'Ton nom (joint aux devis envoyés)'), ven,
+    h('h2', {}, 'Responsable (commandes, signalements, Point)'), h('label', {}, 'Nom'), rNom, h('label', {}, 'Téléphone WhatsApp (ex. 06 12 34 56 78)'), rTel,
+    h('label', {}, 'Relancer un devis après … jours (hypothèse : 3)'), rel, h('label', {}, 'Délai de réponse attendu, signalement urgent (heures, hypothèse : 4)'), dU, h('label', {}, 'Idem, signalement normal (heures, hypothèse : 48)'), dN,
+    h('h2', {}, 'Point de départ (avant l’appli, par semaine)'), h('label', {}, 'Essais lancés'), bEs, h('label', {}, 'Relances de devis'), bRe, h('label', {}, 'Commandes passées'), bCo, h('label', {}, 'Appels ou messages vers le responsable'), bAp,
+    h('h2', {}, 'Semaine'), h('label', {}, 'Objectif de la semaine en € (atteint le vendredi après-midi ; vide = déduit du mois)'), oSem, h('label', {}, 'Heure limite des commandes à préparer le jour même (à fixer avec le responsable)'), hLim,
+    h('h2', {}, 'Objectifs mensuels'), h('label', {}, 'Premier mois'), objD, h('label', {}, 'Objectif du 1er, 2e et 3e mois (€). Au-delà : le dernier est repris.'), objs,
     h('div', { class: 'actions' }, h('button', { class: 'btn', onclick: async () => {
       let a, b;
       try { a = parseCents(tva.value); b = parseCents(rem.value); } catch (e) { a = b = null; }
       if (a == null || a < 0 || a > 10000 || b == null || b < 0 || b > 10000) { toast('TVA et remise doivent être entre 0 et 100.', true); return; }
-      S = { ...S, tva100: a, remiseMax100: b, indicatif: clean(ind.value).replace(/\D/g, '') || '262', societe: clean(soc.value).slice(0, 60) || 'Odicolor', vendeur: clean(ven.value).slice(0, 60) };
+      let ob;
+      try { ob = objs.map(i => (i.value.trim() ? parseCents(i.value) : 0)); } catch (e) { ob = null; }
+      if (!ob || ob.some(v => v < 0 || v > 1e9)) { toast('Objectifs : montants invalides.', true); return; }
+      const ent = (v, d0, mx) => { const n = Math.round(Number(String(v).replace(',', '.'))); return isFinite(n) && n > 0 && n <= mx ? n : d0; };
+      const dep = {}; [['essais', bEs], ['relances', bRe], ['commandes', bCo], ['appels', bAp]].forEach(([k, i]) => { const n = Math.round(Number(i.value)); if (isFinite(n) && n > 0 && n < 10000) dep[k] = n; });
+      let os = 0; try { os = oSem.value.trim() ? parseCents(oSem.value) : 0; } catch (e) { os = null; }
+      if (os == null || os < 0 || os > 1e9) { toast('Objectif de la semaine : montant invalide.', true); return; }
+      S = { ...S, objSemaine: os, heureLimite: /^\d\d:\d\d$/.test(hLim.value) ? hLim.value : '', respNom: clean(rNom.value).slice(0, 60), respTel: clean(rTel.value).slice(0, 20), relanceJours: ent(rel.value, 3, 60), delaiUrgentH: ent(dU.value, 4, 720), delaiNormalH: ent(dN.value, 48, 720), depart: dep, objDepart: /^\d{4}-\d\d$/.test(objD.value) ? objD.value : '', objectifs: ob, tva100: a, remiseMax100: b, indicatif: clean(ind.value).replace(/\D/g, '') || '33', societe: clean(soc.value).slice(0, 60) || 'Odicolor', vendeur: clean(ven.value).slice(0, 60) };
       await put('meta', S, 'settings'); toast('Réglages enregistrés.');
     } }, 'Enregistrer')),
     h('h2', {}, 'Sauvegarde'),
     h('p', { class: 'mut' }, 'Tes devis et clients ne sont QUE sur ce téléphone. Si tu perds le téléphone ou effaces les données du navigateur, ils sont perdus. Sauvegarde régulièrement, puis envoie le fichier où tu veux.'),
     h('div', { class: 'actions' }, h('button', { class: 'btn', onclick: async () => {
-      const o = { appli: 'devis-terrain', version: 1, date: new Date().toISOString(), reglages: S, clients: await getAll('clients'), devis: await getAll('devis') };
+      const o = { appli: 'devis-terrain', version: 1, date: new Date().toISOString(), reglages: S, clients: await getAll('clients'), devis: await getAll('devis'), signalements: await lireSig(), point: (await get('meta', 'point')) || null, comparateur: (await get('meta', 'comparateur')) || null, appels: await lireAppels() };
       telecharger('sauvegarde-devis-' + new Date().toISOString().slice(0, 10) + '.json', JSON.stringify(o), 'application/json'); toast('Sauvegarde téléchargée.');
     } }, 'Télécharger une sauvegarde')),
     h('label', {}, 'Restaurer une sauvegarde (remplace clients et devis actuels)'), fich,
@@ -852,6 +1365,10 @@ async function pageReglages() {
         if (!confirm('Remplacer tes ' + (await getAll('devis')).length + ' devis actuels par les ' + o.devis.length + ' de la sauvegarde ?')) return;
         await rq(st('clients', 'readwrite').clear()); await rq(st('devis', 'readwrite').clear());
         await putMany('clients', o.clients); await putMany('devis', o.devis);
+        if (Array.isArray(o.signalements)) await put('meta', o.signalements, 'signalements');
+        if (o.point && typeof o.point === 'object') await put('meta', o.point, 'point');
+        if (Array.isArray(o.appels)) await put('meta', o.appels, 'appels');
+        if (o.comparateur && typeof o.comparateur === 'object') await put('meta', o.comparateur, 'comparateur');
         if (o.reglages) { S = { ...SET_DEF, ...o.reglages }; await put('meta', S, 'settings'); }
         toast('Sauvegarde restaurée.'); pageReglages();
       } catch (e) { toast('Restauration impossible : ' + e.message, true); }
@@ -880,4 +1397,4 @@ async function pageReglages() {
   }
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
-window.__t = { analyserTexte, statsDevis, envoyerDevis, parseCents, parseQte, ligneTotal, totaux, importerArticles, importerClients, csvDevis, devinerColonnes, ligneEntete, tel2wa };
+window.__t = { semaineObj, lundiDe, appelsSemaine, mesures, taches, relanceDue, coutPae, calculPoint, periodePoint, texteCommande, texteSignalement, sigEnRetard, objectifDuMois, activite, serie, jourLocal, analyserTexte, statsDevis, envoyerDevis, parseCents, parseQte, ligneTotal, totaux, importerArticles, importerClients, csvDevis, devinerColonnes, ligneEntete, tel2wa };
