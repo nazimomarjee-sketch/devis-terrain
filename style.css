@@ -1,9 +1,11 @@
-:root{--bg:#fff;--fg:#1d1d1f;--mut:#5c5c63;--card:#f4f4f6;--line:#d9d9de;--acc:#b3282d;--acc-fg:#fff;--ok:#1b6e3a;--warn:#8a5a00;--ko:#b3282d}
+:root{--bg:#F5F3F1;--fg:#1d1d1f;--mut:#55555c;--card:#ffffff;--line:#E6E1DC;--acc:#b3282d;--acc-fg:#fff;--ok:#1b6e3a;--warn:#8a5a00;--ko:#b3282d}
 @media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#121214;--fg:#f2f2f4;--mut:#a7a7b0;--card:#1e1e22;--line:#36363d;--acc:#e0575c;--acc-fg:#101012;--ok:#58c77f;--warn:#e6b24d;--ko:#ff7b80}}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding-bottom:calc(64px + env(safe-area-inset-bottom))}
-.barre{position:sticky;top:0;z-index:5;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px 16px;background:var(--acc);color:var(--acc-fg);font-size:18px}
+.barre{position:relative;z-index:5;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:14px 16px;background:#b3282d;color:#fff;font-size:20px}
+.barre .bg{display:flex;flex-direction:column;gap:2px}
+.barre #titre{font-size:22px;line-height:1.2}
 .etat{font-size:13px;opacity:.95}
 main{padding:12px 16px;max-width:720px;margin:0 auto}
 h2{font-size:16px;margin:20px 0 8px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
@@ -78,3 +80,68 @@ details summary{cursor:pointer;color:var(--acc);font-weight:600;min-height:32px}
 .entonnoir small{font-size:11px;display:block}
 .actions input{flex:1 1 180px}
 .tag.ko{background:#f6d9da;color:#8a1f24}
+
+.deuxcol{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:10px 0}
+.colobj .gros-chiffre{font-size:26px;font-weight:800;color:var(--fg);line-height:1.15;margin:2px 0 8px}
+.obj .gros-chiffre{color:var(--fg)}
+.carte h2,.carte strong{color:var(--fg)}
+details.carte summary{cursor:pointer;font-weight:700;min-height:32px}
+
+/* v12 : look validé sur maquette (cartes blanches sur fond gris chaud, rouge en aplat) */
+.carte,.kpi{border:1px solid var(--line)}
+.carte{border-radius:16px;padding:16px}
+.kpi{border-radius:14px}
+.kpi .v{color:var(--fg)}
+.kpi .v small{font-size:15px;color:var(--mut);font-weight:700}
+input,select,textarea{background:var(--card)}
+.onglets{background:var(--card)}
+.barre{padding:14px 16px 16px;align-items:flex-end}
+.marque{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.marque .logo{width:36px;height:36px;border-radius:9px;background:#fff;color:#8a1c21;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px}
+.marque .nom{display:flex;flex-direction:column;font-weight:800;font-size:14px;letter-spacing:.06em;line-height:1.1}
+.marque .nom small{font-size:10px;letter-spacing:.24em;font-weight:500;opacity:.85}
+#sous{font-size:13px;opacity:.92;order:2}
+.barre .bg #titre{order:1}
+.tag{border:0;padding:4px 10px;background:#F6E3E3;color:#8a1c21}
+.tag.ok{background:#E3F2E8;color:#1b6e3a}.tag.warn{background:#FFF1D6;color:#5c3d00}.tag.ko{background:#F6D9DA;color:#8a1f24}
+.etiq{font-size:12px;font-weight:800;letter-spacing:.08em;color:#8a1c21}
+.prochaine{border-left:1px solid var(--line)}
+.prochaine .gros-chiffre{font-size:22px}
+.prochaine .elan-tete .btn{flex:none;min-height:52px}
+.pastille{display:inline-block;padding:4px 10px;border-radius:10px}
+.pastille.ok{background:#E3F2E8;color:#1b6e3a}.pastille.ko{background:#F6D9DA;color:#8a1f24}
+.fab{position:fixed;left:0;right:0;bottom:calc(49px + env(safe-area-inset-bottom));z-index:4;padding:10px 16px;background:var(--card);border-top:1px solid var(--line)}
+.fab .btn{max-width:688px;margin:0 auto;display:flex}
+.btn.noir{background:#1d1d1f;color:#fff}
+.btn.vert{background:#1b6e3a;color:#fff}
+.btn.ambre{background:transparent;color:#8a5a00;border:2px solid #8a5a00}
+.btn.gris{background:transparent;color:var(--fg);border:2px solid var(--mut)}
+.trio{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}
+.trio .btn{min-height:52px;padding:8px 4px}
+.rang{display:flex;gap:10px;align-items:center;margin:4px 0 0}
+.rang input{flex:1}
+.quatre{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));text-align:center;gap:6px;margin-top:10px}
+.quatre div{display:flex;flex-direction:column}
+.quatre strong{font-size:20px}.quatre strong.ok{color:#1b6e3a}.quatre strong.warn{color:#8a5a00}
+.puces{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.puce{min-height:44px;padding:0 14px;border-radius:99px;border:1.5px solid var(--line);background:var(--card);color:var(--mut);font:inherit;font-weight:600}
+.puce.on{background:#b3282d;border-color:#b3282d;color:#fff;font-weight:700}
+h3.etape{display:flex;align-items:center;gap:10px;font-size:18px;margin:22px 0 8px}
+h3.etape span{width:28px;height:28px;border-radius:99px;background:var(--fg);color:var(--bg);display:inline-flex;align-items:center;justify-content:center;font-size:14px}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#121214;--card:#1e1e22;--line:#36363d}
+ .tag,.pastille.ko{background:#3a1d1f;color:#ff9a9e}.tag.ok,.pastille.ok{background:#16301f;color:#7fdc9e}.tag.warn{background:#3a2e14;color:#f1c56b}
+ .etiq{color:#ff9a9e}.btn.ambre{color:#f1c56b;border-color:#f1c56b}.quatre strong.ok{color:#7fdc9e}.quatre strong.warn{color:#f1c56b}}
+/* v13 : indicateurs avec évolution, règlements */
+.ind{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.ind:last-child{border-bottom:0}
+.ind-g{display:flex;flex-direction:column;gap:2px;min-width:0}
+.ind-g strong{font-size:22px;line-height:1.15}
+.ind.compact .ind-g strong{font-size:19px}
+.tend{font-size:12px;font-weight:700;color:var(--mut)}
+.tend.ok,.ind-d.ok{color:#1b6e3a}.tend.ko,.ind-d.ko{color:#9e1f24}
+.ind-d{flex:none;color:var(--mut)}
+.bandeau-ko{background:#9e1f24;color:#fff;font-weight:800;padding:10px 14px;border-radius:12px;margin:10px 0}
+.facture{border-top:1px solid var(--line);padding:10px 0}
+.quatre.trois{grid-template-columns:repeat(3,minmax(0,1fr))}
+.quatre strong.ko{color:#9e1f24}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){.tend.ok,.ind-d.ok{color:#7fdc9e}.tend.ko,.ind-d.ko,.quatre strong.ko{color:#ff9a9e}}}

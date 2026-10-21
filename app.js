@@ -1,6 +1,6 @@
 'use strict';
 /* Devis terrain : tout reste sur le téléphone (IndexedDB). Seule exception : le bouton « Fiche officielle » d'un client envoie son NOM au registre public (recherche-entreprises.api.gouv.fr), à la demande. */
-const VERSION = 'v9';
+const VERSION = 'v13';
 
 // ---------- utilitaires ----------
 const $ = (s, r = document) => r.querySelector(s);
@@ -259,11 +259,11 @@ function importerClients(rows, debut, map, existants) {
 
 // ---------- routage ----------
 const app = $('#app');
-function montrer(titre, ...nodes) { $('#titre').textContent = titre; app.replaceChildren(...nodes.flat(Infinity).filter(Boolean)); window.scrollTo(0, 0); }
+function montrer(titre, ...nodes) { $('#titre').textContent = titre; { const sv = $('#sous'); if (sv) sv.textContent = ''; } app.replaceChildren(...nodes.flat(Infinity).filter(Boolean)); window.scrollTo(0, 0); }
 function nonTrouve() { montrer('Introuvable', h('p', { class: 'vide' }, 'Cette page n’existe pas. '), h('a', { class: 'btn', href: '#/' }, 'Retour')); }
 async function route() {
   const p = (location.hash || '#/').slice(2).split('/');
-  document.querySelectorAll('.onglets a').forEach(a => a.classList.toggle('on', a.dataset.p === (p[0] || 'accueil') || (p[0] === 'devis' || p[0] === 'nouveau') && a.dataset.p === 'accueil' || ['point', 'signalements', 'signaler', 'comparateur', 'reglages'].includes(p[0]) && a.dataset.p === 'plus'));
+  document.querySelectorAll('.onglets a').forEach(a => a.classList.toggle('on', a.dataset.p === (p[0] || 'accueil') || (p[0] === 'devis' || p[0] === 'nouveau') && a.dataset.p === 'accueil' || ['point', 'signalements', 'signaler', 'comparateur', 'reglages', 'evolution'].includes(p[0]) && a.dataset.p === 'plus' || p[0] === 'client' && a.dataset.p === 'clients'));
   try {
     if (p[0] === '' || p[0] === undefined) await pageAccueil();
     else if (p[0] === 'nouveau') await pageChoixClient();
@@ -279,6 +279,7 @@ async function route() {
     else if (p[0] === 'signalements') await pageSignalements();
     else if (p[0] === 'point') await pagePoint(p[1]);
     else if (p[0] === 'comparateur') await pageComparateur();
+    else if (p[0] === 'evolution') await pageEvolution();
     else nonTrouve();
   } catch (e) { console.error(e); toast('Erreur : ' + e.message, true); }
 }
@@ -291,7 +292,7 @@ function statsDevis(dv) {
   const mesures = dv.filter(d => d.t2).map(d => ({ min: (new Date(d.t2) - new Date(d.creeLe)) / 60000, lignes: d.lignes.length, taps: d.lignes.length }));
   const ok = mesures.filter(m => m.min >= 0 && m.min <= 120).sort((a, b) => a.min - b.min);
   const med = ok.length ? ok[Math.floor((ok.length - 1) / 2)].min : null;
-  return { n: dv.length, mesures: mesures.length, exclus: mesures.length - ok.length, med, semaine: dv.filter(d => Date.now() - new Date(d.creeLe).getTime() < 7 * 864e5).length };
+  return { n: dv.length, mesures: mesures.length, exclus: mesures.length - ok.length, med, semaine: dv.filter(d => jourLocal(d.creeLe) >= lundiDe(new Date())).length };
 }
 
 // ---------- tableau de bord (accueil) : uniquement des données du téléphone ----------
@@ -304,10 +305,10 @@ const etiquetteDevis = d => ST_DEVIS[d.statut] || ST_DEVIS.brouillon;
 const envoiDe = d => d.t2 || d.creeLe;
 const relanceDue = (d, now = Date.now()) => {
   if (d.statut !== 'envoye' || !d.lignes.length) return null;
-  const j = joursDepuis(d.relanceLe || envoiDe(d), now);
+  const j = ecartJours(jourLocal(d.relanceLe || envoiDe(d)), now);
   return j >= (S.relanceJours || 3) ? j : null;
 };
-const AVIS = [['', 'Inconnu'], ['pour', 'Favorable à Carsystem'], ['neutre', 'Neutre'], ['contre', 'Réticent']];
+const CRITERES = [['', 'À définir'], ['prix', 'Le prix'], ['service', 'Le service'], ['delai', 'Le délai de livraison'], ['teinte', 'La qualité de teinte'], ['credit', 'Les conditions de paiement'], ['relation', 'La confiance, la relation']];
 const CONV = [['', 'Pas défini'], ['cible', 'À contacter'], ['contacte', 'Contacté'], ['essai', 'En essai'], ['converti', 'Converti'], ['refus', 'Refus']];
 const ESSAI_ST = [['encours', 'En cours'], ['concluant', 'Concluant'], ['non', 'Non concluant'], ['commande', 'Commande passée']];
 const SIGNAL_TYPES = [['produit', 'Produit défectueux'], ['teinte', 'Teinte qui ne correspond pas'], ['livraison', 'Livraison (retard, erreur)'], ['objection', 'Objection ou refus du garagiste'], ['prix', 'Prix'], ['demande', 'Demande particulière'], ['concurrent', 'Concurrent']];
@@ -338,9 +339,9 @@ function serie(m, now = new Date()) {
   if (!actif(jourLocal(d))) d.setDate(d.getDate() - 1);
   let n = 0;
   for (let i = 0; i < 400; i++) {
-    const w = d.getDay(), a = actif(jourLocal(d));
+    const a = actif(jourLocal(d));
     if (a) n++;
-    else if (w !== 0 && w !== 6) break;
+    else if (estOuvre(d)) break;
     d.setDate(d.getDate() - 1);
   }
   return n;
@@ -362,7 +363,17 @@ function objectifDuMois(now = new Date()) {
   const k = Math.min(idx, o.length - 1);
   return o[k] > 0 ? { cents: o[k], rang: k + 1 } : null;
 }
-function joursOuvres(from, to) { let n = 0; const d = new Date(from); d.setHours(12); while (d <= to) { const w = d.getDay(); if (w && w !== 6) n++; d.setDate(d.getDate() + 1); } return n; }
+const FERIES = {};
+function feries(y) { // jours fériés nationaux (métropole) : fixes + Pâques (algorithme de Meeus)
+  if (FERIES[y]) return FERIES[y];
+  const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), hh = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - hh - k) % 7, m = Math.floor((a + 11 * hh + 22 * l) / 451);
+  const mois = Math.floor((hh + l - 7 * m + 114) / 31), jour = ((hh + l - 7 * m + 114) % 31) + 1, paques = new Date(y, mois - 1, jour, 12);
+  const plus = n => { const x = new Date(paques); x.setDate(x.getDate() + n); return jourLocal(x); };
+  return (FERIES[y] = new Set([y + '-01-01', plus(1), y + '-05-01', y + '-05-08', plus(39), plus(50), y + '-07-14', y + '-08-15', y + '-11-01', y + '-11-11', y + '-12-25']));
+}
+const estOuvre = d => { const x = new Date(d), w = x.getDay(); return w !== 0 && w !== 6 && !feries(x.getFullYear()).has(jourLocal(x)); };
+function joursOuvres(from, to) { let n = 0; const d = new Date(from); d.setHours(12, 0, 0, 0); while (d <= to) { if (estOuvre(d)) n++; d.setDate(d.getDate() + 1); } return n; }
+const ecartJours = (jour, now = Date.now()) => Math.round((Date.parse(jourLocal(now) + 'T12:00:00') - Date.parse(jour + 'T12:00:00')) / JOUR);
 
 // ----- les 4 mesures du test réel -----
 function mesures(dv, cl, now = new Date()) {
@@ -374,7 +385,7 @@ function mesures(dv, cl, now = new Date()) {
     essaisMois: essais.filter(e => typeof e.date === 'string' && e.date.slice(0, 7) === mk).length, essaisTotal: essais.length,
     transf: essais.filter(e => e.statut === 'commande').length,
     delaiMoy: delais.length ? delais.reduce((a, b) => a + b, 0) / delais.length : null, nbRep: repondus.length,
-    sansRelance: dv.filter(d => d.statut === 'envoye' && d.lignes.length && !d.relanceLe && joursDepuis(envoiDe(d)) >= (S.relanceJours || 3)).length
+    sansRelance: dv.filter(d => d.statut === 'envoye' && d.lignes.length && !d.relanceLe && ecartJours(jourLocal(envoiDe(d))) >= (S.relanceJours || 3)).length
   };
 }
 
@@ -384,20 +395,20 @@ const MOTIFS = [['prix', 'Prix'], ['stock', 'Stock'], ['suivi', 'Suivi de comman
 const lireAppels = async () => { const v = await get('meta', 'appels'); return Array.isArray(v) ? v : []; };
 const appelsSemaine = (ap, now = new Date()) => { const l = lundiDe(now); return ap.filter(a => a && typeof a.date === 'string' && a.date.slice(0, 10) >= l); };
 function semaineObj(dv, now = new Date()) {
-  const l = lundiDe(now), j = Math.min(5, Math.max(1, ((now.getDay() + 6) % 7) + 1 > 5 ? 5 : ((now.getDay() + 6) % 7) + 1));
+  const l = lundiDe(now), lun = new Date(l + 'T12:00:00'), ven = new Date(lun); ven.setDate(ven.getDate() + 4);
+  const ouv = Math.max(1, joursOuvres(lun, ven)), j = Math.max(1, Math.min(ouv, joursOuvres(lun, now)));
   const ca = dv.filter(d => d.statut === 'accepte' && d.reponseLe && jourLocal(d.reponseLe) >= l).reduce((a, d) => a + totaux(d).ht, 0);
-  let cible = S.objSemaine > 0 ? S.objSemaine : 0, derive = false;
-  if (!cible) { const o = objectifDuMois(now), n = joursOuvres(new Date(now.getFullYear(), now.getMonth(), 1), new Date(now.getFullYear(), now.getMonth() + 1, 0, 23)); if (o && n) { cible = Math.round(o.cents * 5 / n); derive = true; } }
-  return { ca, cible, derive, j, attendu: Math.round(cible * j / 5), l };
+  const c = cibleSemaineDe(now);
+  return { ca, cible: c.cible, derive: c.derive, j, ouv, attendu: Math.round(c.cible * j / ouv), l };
 }
 // ----- ce qu'il y a à faire, par ordre de priorité (l'argent en jeu d'abord) -----
 function taches(dv, cl, sigs, now = Date.now(), ext = {}) {
   const T = [];
   { const nd = new Date(now), pd = ((nd.getDay() + 6) % 7); if (pd <= 1 && nd.getDay() !== 0) { const prec = new Date(nd); prec.setDate(prec.getDate() - 7); const k = lundiDe(prec); if (!((ext.point && ext.point.faits) || {})[k]) T.push({ p: 0, o: 0, t: 'Faire le Point de la semaine écoulée', d: 'Lundi matin : 15 minutes, un seul changement à décider', href: '#/point', tag: 'Point' }); } }
-  dv.forEach(d => { const j = relanceDue(d, now); if (j != null) T.push({ p: 1, o: j, t: 'Relancer le devis de ' + d.clientNom, d: eur(totaux(d).ht) + ' HT, sans réponse depuis ' + j + ' j', href: '#/devis/' + d.id, tag: 'Relance' }); });
+  dv.forEach(d => { const j = relanceDue(d, now); if (j != null) T.push({ p: 1, o: j, t: 'Relancer le devis de ' + d.clientNom, titre: d.clientNom, m: totaux(d).ht, d: eur(totaux(d).ht) + ' HT, sans réponse depuis ' + j + ' j', d2: ' · sans réponse depuis ' + j + ' j', b: 'Ouvrir le devis', href: '#/devis/' + d.id, tag: 'Relance' }); });
   cl.forEach(c => (Array.isArray(c.essais) ? c.essais : []).forEach(e => {
     if (!e || e.statut !== 'encours') return;
-    const j = Math.floor((now - Date.parse(e.date + 'T12:00:00')) / JOUR), sv = Array.isArray(e.suivis) ? e.suivis : [];
+    const j = ecartJours(e.date, now), sv = Array.isArray(e.suivis) ? e.suivis : [];
     if (j >= 7 && !sv.includes('J7')) T.push({ p: 2, o: j, t: 'Faire le point sur l’essai chez ' + c.nom, d: 'Essai de ' + (e.produit || 'produit') + ' depuis ' + j + ' j (J+7)', href: '#/client/' + c.id, tag: 'Essai' });
     else if (j >= 2 && !sv.includes('J2')) T.push({ p: 2, o: j, t: 'Appeler pour l’essai chez ' + c.nom, d: 'Essai de ' + (e.produit || 'produit') + ' depuis ' + j + ' j (J+2)', href: '#/client/' + c.id, tag: 'Essai' });
   }));
@@ -405,6 +416,13 @@ function taches(dv, cl, sigs, now = Date.now(), ext = {}) {
     if (sigEnRetard(s, now)) T.push({ p: 3, o: 0, t: 'Relancer ' + (S.respNom || 'ton responsable') + ' : ' + libelle(SIGNAL_TYPES, s.type), d: (s.clientNom ? s.clientNom + ' · ' : '') + 'sans prise en charge', href: '#/signalements', tag: 'Signalement' });
     if (s.statut === 'resolu' && !s.clientPrevenu) T.push({ p: 3, o: 0, t: 'Prévenir le client : problème résolu', d: (s.clientNom || 'Client') + ' · ' + libelle(SIGNAL_TYPES, s.type), href: '#/signalements', tag: 'Client' });
   });
+  factures(cl).forEach(f => {
+    if (f.regleLe) return; const auj = jourLocal(now);
+    if (f.promesse && f.promesse === auj) T.push({ p: 1, o: 900, t: 'Promesse de paiement aujourd’hui · ' + f.client.nom, titre: f.client.nom, m: f.montant || 0, d: eur(f.montant || 0) + ' promis aujourd’hui', d2: ' promis aujourd’hui (facture ' + (f.num || '—') + ')', b: 'Ouvrir la fiche', href: '#/client/' + f.client.id, tag: 'Règlement' });
+    else if (enRetard(f, now) && !(f.promesse && f.promesse > auj)) { const j = ecartJours(f.echeance, now); T.push({ p: 1, o: 1000 + j, t: 'Relancer le règlement · ' + f.client.nom, titre: f.client.nom, m: f.montant || 0, d: eur(f.montant || 0) + ' en retard de ' + j + ' j', d2: ' en retard de ' + j + ' j (facture ' + (f.num || '—') + ')', b: 'Ouvrir la fiche', href: '#/client/' + f.client.id, tag: 'Règlement' }); }
+  });
+  cl.forEach(c => { if ((Number(c.reports) || 0) >= 3) T.push({ p: 3, o: Number(c.reports), t: 'Décider pour ' + c.nom, d: 'Reporté ' + c.reports + ' fois : visiter vraiment ou baisser la priorité', href: '#/client/' + c.id, tag: 'Reports' }); });
+  cl.forEach(c => { if (c.etape && /^\d{4}-\d\d-\d\d$/.test(c.etapeDate || '') && c.etapeDate <= jourLocal(now)) T.push({ p: 2, o: Math.floor((now - Date.parse(c.etapeDate + 'T12:00:00')) / JOUR), t: c.etape + ' · ' + c.nom, d: 'Prévu le ' + dateFr(c.etapeDate), href: '#/client/' + c.id, tag: 'Étape' }); });
   cl.map(c => ({ c, e: echeance(c, now) })).filter(x => x.e && x.e.du).sort((a, b) => (b.e.rappel - a.e.rappel) || (b.e.pct - a.e.pct)).forEach(({ c, e }) =>
     T.push({ p: 4, o: e.pct, t: 'Visiter ' + c.nom, d: e.rappel ? 'Tu avais prévu de le rappeler.' : e.jours == null ? 'Jamais visité : premier contact.' : 'Dernière visite il y a ' + e.jours + ' j (rythme ' + e.r + ' j)', href: '#/client/' + c.id, tag: 'Visite' }));
   dv.filter(d => d.statut === 'brouillon' && d.lignes.length).forEach(d => T.push({ p: 5, o: 0, t: 'Finir le devis de ' + d.clientNom, d: eur(totaux(d).ht) + ' HT en attente d’envoi', href: '#/devis/' + d.id, tag: 'Brouillon' }));
@@ -415,19 +433,21 @@ function carteElan(dv, cl, T) {
   const m = activite(dv, cl), auj = jourLocal(new Date()), t = m[auj] || { pts: 0, vu: 0, devis: 0, effort: 0 };
   const total = Object.values(m).reduce((a, x) => a + x.pts, 0), niv = Math.floor(total / PALIER) + 1, reste = PALIER - total % PALIER;
   const record = Math.max(0, ...Object.entries(m).filter(([j]) => j !== auj).map(([, x]) => x.pts));
-  const sr = serie(m), pc = Math.min(100, Math.round(t.pts / DEFI * 100)), fait = t.pts >= DEFI;
+  const sr = serie(m), fait = t.pts >= DEFI;
   if (fait && S.fete !== auj) { S.fete = auj; put('meta', S, 'settings').catch(() => {}); fete(); }
-  const x = T[0], proch = x ? { t: x.t, d: x.d, href: x.href, b: 'Ouvrir' } : { t: 'Rien d’urgent', d: 'Bonne occasion de repérer un garage à convertir.', href: '#/clients', b: 'Voir les clients' };
-  const msg = fait ? 'Défi du jour réussi. Le reste est du bonus.' : t.pts > 0 ? 'Encore ' + (DEFI - t.pts) + ' points pour réussir le défi du jour.' : 'Une seule action suffit pour lancer la journée.';
+  const x = T[0], proch = x ? { t: x.titre || x.t, d: x.m != null ? [x.tag === 'Règlement' ? 'Facture de ' : 'Devis de ', h('strong', {}, eur(x.m) + (x.tag === 'Règlement' ? '' : ' HT')), x.d2] : x.d, href: x.href, tag: x.tag, b: x.b || (x.href.startsWith('#/devis') ? 'Ouvrir le devis' : x.href.startsWith('#/client') ? 'Ouvrir la fiche' : x.href === '#/point' ? 'Faire le Point' : 'Ouvrir') } : { t: 'Rien d’urgent', d: 'Bonne occasion de repérer un garage à contacter.', href: '#/clients', b: 'Voir les clients' };
+  const tuile = (v, l, s) => h('div', { class: 'kpi' }, h('div', { class: 'v' }, v), h('div', { class: 'l' }, l), s ? h('div', { class: 'l' }, s) : null);
   return [
-    h('div', { class: 'carte prochaine' }, h('small', { class: 'mut' }, 'TA PROCHAINE ACTION'), h('div', { class: 'gros-chiffre' }, proch.t), h('p', { class: 'mut' }, proch.d), h('a', { class: 'btn gros', href: proch.href }, proch.b)),
-    h('div', { class: 'carte elan' },
-      h('div', { class: 'elan-tete' }, h('strong', {}, '🔥 Série : ' + sr + ' jour' + (sr > 1 ? 's' : '')), h('span', { class: 'tag ok' }, 'Niveau ' + niv)),
-      h('p', { class: 'mut' }, 'Défi du jour : ' + DEFI + ' points (par exemple 3 visites + 1 devis envoyé)'),
-      h('div', { class: 'piste', role: 'img', 'aria-label': t.pts + ' points sur ' + DEFI }, h('div', { class: 'rempli' + (fait ? ' ok' : ''), style: 'width:' + pc + '%' })),
-      h('p', {}, h('strong', {}, t.pts + ' pts'), ' aujourd’hui. ' + msg),
-      h('p', { class: 'mut' }, (record ? (t.pts > record ? 'Nouveau record du jour ! Ancien : ' + record + ' pts. ' : 'Meilleur jour : ' + record + ' pts. ') : '') + 'Prochain niveau dans ' + reste + ' points.'),
-      h('details', {}, h('summary', {}, 'Comment ça compte'), h('p', { class: 'mut' }, 'Visite faite : 10 points. Garage absent ou à rappeler : 3. Essai lancé : 15. Devis envoyé : 20. Devis accepté : 40. La série compte les jours ouvrés d’affilée avec au moins une action ; le week-end ne la casse pas. Un niveau tous les ' + PALIER + ' points. Ces points mesurent ton activité, pas tes ventes : seules les ventes comptent vraiment.')))
+    h('div', { class: 'carte prochaine' },
+      h('div', { class: 'elan-tete' }, h('small', { class: 'etiq' }, 'TA PROCHAINE ACTION'), proch.tag ? h('span', { class: 'tag' }, proch.tag) : null),
+      h('div', { class: 'gros-chiffre' }, proch.t), h('p', { class: 'mut', style: 'font-size:15px' }, proch.d),
+      h('div', { class: 'elan-tete' }, h('span', { class: 'mut' }, x ? 'À traiter en priorité' : ''), h('a', { class: 'btn', href: proch.href }, proch.b))),
+    h('div', { class: 'kpis' },
+      tuile(sr, sr > 1 ? 'jours ouvrés de suite' : 'jour ouvré de suite'),
+      tuile([String(t.pts), h('small', {}, '/' + DEFI)], 'défi du jour', fait ? 'réussi' : 'en cours'),
+      tuile('Niv. ' + niv, 'niveau', (total % PALIER) + '/' + PALIER + ' pts')),
+    h('details', { class: 'carte' }, h('summary', {}, 'Comment ça compte'),
+      h('p', { class: 'mut' }, (record ? (t.pts > record ? 'Nouveau record du jour (ancien : ' + record + ' pts). ' : 'Meilleur jour : ' + record + ' pts. ') : '') + 'Prochain niveau dans ' + reste + ' points. Visite faite : 10 points. Garage absent ou à rappeler : 3. Essai lancé : 15. Devis envoyé : 20. Devis accepté : 40. Défi du jour : ' + DEFI + ' points. La série compte les jours ouvrés d’affilée avec au moins une action ; le week-end ne la casse pas. Ces points mesurent ton activité, pas tes ventes : seules les ventes comptent vraiment.'))
   ];
 }
 
@@ -440,18 +460,22 @@ function tableauDeBord(dv, cl, sigs, ext = {}) {
   const attente = dv.filter(d => d.statut === 'envoye' && d.lignes.length), attHt = attente.reduce((a, d) => a + totaux(d).ht, 0);
   const visitesMois = cl.reduce((a, c) => a + (Array.isArray(c.visites) ? c.visites : []).filter(v => v && v.res === 'vu' && typeof v.date === 'string' && v.date.slice(0, 7) === mk).length, 0);
   const obj = objectifDuMois(now), jr = joursOuvres(now, new Date(now.getFullYear(), now.getMonth() + 1, 0, 23));
-  const carteObj = obj ? (() => {
-    const p = Math.round(ca / obj.cents * 100), reste = Math.max(0, obj.cents - ca);
-    return h('div', { class: 'carte obj' },
-      h('small', { class: 'mut' }, 'Objectif du mois ' + obj.rang + ' / ' + S.objectifs.length + ' · devis acceptés'),
-      h('div', { class: 'gros-chiffre' }, eur(ca), h('span', {}, ' / ' + eur(obj.cents))),
-      h('div', { class: 'piste', role: 'img', 'aria-label': p + ' % de l’objectif' }, h('div', { class: 'rempli', style: 'width:' + Math.min(100, p) + '%' })),
-      h('p', { class: 'mut' }, p + ' % · reste ' + eur(reste) + (reste && jr ? ' · soit ' + eur(Math.ceil(reste / jr)) + ' par jour ouvré (' + jr + ' restants, aujourd’hui compris, fériés non déduits)' : '')),
+  const bloc = (titre, ca, cible) => h('div', { class: 'colobj' }, h('div', { class: 'mut' }, titre), h('div', { class: 'gros-chiffre' }, eur(ca)),
+    h('div', { class: 'piste', role: 'img', 'aria-label': Math.round(ca / cible * 100) + ' % de l’objectif ' + titre }, h('div', { class: 'rempli', style: 'width:' + Math.min(100, Math.round(ca / cible * 100)) + '%' })),
+    h('div', { class: 'mut' }, 'sur ' + eur(cible) + ' · ' + Math.round(ca / cible * 100) + ' %'));
+  const JNOM = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+  const carteObj = (obj || SW.cible) ? (() => {
+    const reste = obj ? Math.max(0, obj.cents - ca) : 0;
+    return h('div', { class: 'carte obj' }, h('div', { class: 'elan-tete' }, h('strong', {}, 'Objectifs commerciaux'), h('small', { class: 'mut' }, 'Devis acceptés HT')),
+      h('div', { class: 'deuxcol' }, SW.cible ? bloc('Cette semaine', SW.ca, SW.cible) : null, obj ? bloc('Ce mois (' + obj.rang + '/' + S.objectifs.length + ')', ca, obj.cents) : null),
+      SW.cible ? h('p', {}, '📅 ' + JNOM[now.getDay()] + ' · jour ' + SW.j + '/' + SW.ouv + ' · cible ' + eur(SW.attendu) + ' · ', h('strong', { class: 'pastille ' + (SW.ca >= SW.attendu ? 'ok' : 'ko') }, (SW.ca >= SW.attendu ? '+' : '−') + eur(Math.abs(SW.ca - SW.attendu))), SW.ca >= SW.cible ? ' · objectif de la semaine atteint' : '') : null,
+      SW.derive ? h('p', { class: 'mut' }, 'Objectif de la semaine déduit de l’objectif mensuel (jours ouvrés de la semaine sur ceux du mois). Fixe-le dans Réglages si tu préfères.') : null,
+      obj && reste && jr ? h('p', { class: 'mut' }, 'Reste ' + eur(reste) + ' sur le mois, soit ' + eur(Math.ceil(reste / jr)) + ' par jour ouvré (' + jr + ' restants, aujourd’hui compris, jours fériés déduits).') : null,
       h('p', { class: 'mut' }, 'En attente de réponse : ' + eur(attHt) + ' (' + attente.length + ' devis). Ce sont des devis acceptés (HT), pas le CA facturé : EBP n’est pas encore branché.'));
   })() : h('div', { class: 'carte' }, h('strong', {}, 'Pas d’objectif réglé. '), 'Entre ton objectif mensuel dans ', h('a', { href: '#/reglages' }, 'Réglages'), '.');
   const kpi = (v, l) => h('div', { class: 'kpi' }, h('div', { class: 'v' }, v), h('div', { class: 'l' }, l));
   const lien = x => h('a', { class: 'ligne', href: x.href, style: 'color:inherit;text-decoration:none' }, h('span', { class: 'g' }, h('strong', {}, x.t), h('br'), h('small', {}, x.d)), h('span', { class: 'tag warn' }, x.tag));
-  const lundi = d => { const x = new Date(d); x.setHours(12, 0, 0, 0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x.toISOString().slice(0, 10); };
+  const lundi = lundiDe;
   const semaines = []; { const x = new Date(now); x.setDate(x.getDate() - 49); for (let i = 0; i < 8; i++) { semaines.push(lundi(x)); x.setDate(x.getDate() + 7); } }
   const parSem = semaines.map(w => dv.filter(d => d.statut === 'accepte' && d.reponseLe && lundi(d.reponseLe) === w).reduce((a, d) => a + totaux(d).ht, 0));
   const mx = Math.max(...parSem, 1), M = mesures(dv, cl, now);
@@ -460,47 +484,36 @@ function tableauDeBord(dv, cl, sigs, ext = {}) {
   return [
     carteElan(dv, cl, T),
     carteObj,
-    SW.cible ? h('div', { class: 'carte obj' }, h('small', { class: 'mut' }, 'Objectif de la semaine · à atteindre vendredi après-midi'), h('div', { class: 'gros-chiffre' }, eur(SW.ca), h('span', {}, ' / ' + eur(SW.cible))),
-      h('div', { class: 'piste', role: 'img', 'aria-label': Math.round(SW.ca / SW.cible * 100) + ' % de l’objectif de la semaine' }, h('div', { class: 'rempli' + (SW.ca >= SW.attendu ? ' ok' : ''), style: 'width:' + Math.min(100, Math.round(SW.ca / SW.cible * 100)) + '%' })),
-      h('p', {}, SW.ca >= SW.cible ? 'Objectif de la semaine atteint.' : SW.ca >= SW.attendu ? 'Dans le rythme : ' + eur(SW.attendu) + ' attendus à ce jour (jour ' + SW.j + ' sur 5).' : 'En retard de ' + eur(SW.attendu - SW.ca) + ' sur le rythme (jour ' + SW.j + ' sur 5). Reste ' + eur(SW.cible - SW.ca) + '.'),
-      SW.derive ? h('p', { class: 'mut' }, 'Objectif de la semaine déduit de l’objectif mensuel (5 jours sur les jours ouvrés du mois). Fixe-le dans Réglages si tu préfères.') : null) : null,
-    h('div', { class: 'kpis' }, kpi(duMois.length, 'devis envoyés ce mois'), kpi(acceptesMois.length, 'devis acceptés ce mois'), kpi(visitesMois, 'visites faites ce mois')),
+    carteCles(dv, cl, ext),
+    (() => { const t = (ext.tournees || {})[jourLocal(now)]; if (!t || !Array.isArray(t.ids) || !t.ids.length) return null; const x = statsTournee(t), pc = Math.round((x.prevus - x.restants) / x.prevus * 100);
+      return h('a', { class: 'carte', href: '#/tournee', style: 'display:block;color:inherit;text-decoration:none' }, h('div', { class: 'elan-tete' }, h('span', {}, h('strong', {}, 'Ma tournée'), h('br'), h('small', { class: 'mut' }, (x.prevus - x.restants) + '/' + x.prevus + ' garages traités · ' + x.restants + ' restant' + (x.restants > 1 ? 's' : ''))), h('span', { class: 'tag ' + (t.termine ? 'ok' : 'warn') }, t.termine ? 'Terminée' : 'En cours')), h('div', { class: 'piste', style: 'margin-top:8px' }, h('div', { class: 'rempli', style: 'width:' + pc + '%' }))); })(),
     h('h2', {}, 'À faire aujourd’hui'),
     T.length ? h('div', { class: 'carte' }, T.slice(0, 6).map(lien), (T.length > 6 ? h('p', { class: 'mut' }, '+ ' + (T.length - 6) + ' autre(s) : Tournée, Signalements, Clients') : null)) : h('p', { class: 'vide' }, 'Rien d’urgent.'),
     h('h2', {}, 'Appels vers ' + (S.respNom || 'ton responsable')),
     h('div', { class: 'carte' }, h('p', {}, h('strong', {}, apS.length), ' cette semaine' + (apS.length ? ' · ' + MOTIFS.map(([k, l]) => [l, apS.filter(a => a.motif === k).length]).filter(x => x[1]).map(x => x[0] + ' ' + x[1]).join(', ') : '') + ((S.depart || {}).appels ? ' · départ : ' + S.depart.appels + ' par semaine' : '')),
       h('div', { class: 'actions' }, MOTIFS.map(([k, l]) => h('button', { class: 'btn sec', onclick: async () => { const a = await lireAppels(); a.push({ date: new Date().toISOString(), motif: k }); await put('meta', a.slice(-500), 'appels'); toast('Noté : ' + l + '.'); pageAccueil(); } }, '+ ' + l))),
       h('p', { class: 'mut' }, 'Un appui à chaque appel ou message à ' + (S.respNom || 'ton responsable') + ', avec le motif : c’est le chiffre qui dira si l’appli l’allège.')),
-    h('h2', {}, 'Conversion vers Carsystem'),
-    Object.keys(conv).length ? h('div', { class: 'carte' }, h('div', { class: 'entonnoir' }, CONV.filter(x => x[0]).map(([k, l]) => h('div', { class: 'etape' }, h('div', { class: 'v' }, conv[k] || 0), h('small', {}, l)))), h('p', { class: 'mut' }, 'Réglé sur la fiche de chaque garage (Clients).')) : h('p', { class: 'vide' }, 'Sur la fiche d’un garage, règle « Conversion Carsystem » pour suivre la progression.'),
-    h('h2', {}, 'Mes 4 mesures (test réel)'),
-    h('div', { class: 'carte' },
-      h('div', { class: 'ligne' }, h('span', { class: 'g' }, 'Essais lancés ce mois'), h('span', { class: 'prix' }, M.essaisMois)),
-      h('div', { class: 'ligne' }, h('span', { class: 'g' }, 'Essais transformés en commande'), h('span', { class: 'prix' }, M.transf + ' / ' + M.essaisTotal + (M.essaisTotal ? ' (' + Math.round(M.transf / M.essaisTotal * 100) + ' %)' : ''))),
-      h('div', { class: 'ligne' }, h('span', { class: 'g' }, 'Délai moyen de réponse à un devis'), h('span', { class: 'prix' }, M.delaiMoy == null ? 'pas encore mesuré' : (M.delaiMoy < 1 ? 'moins d’1 jour' : M.delaiMoy.toFixed(1).replace('.', ',') + ' j') + ' (' + M.nbRep + ' devis)')),
-      h('div', { class: 'ligne' }, h('span', { class: 'g' }, 'Devis sans relance depuis ' + (S.relanceJours || 3) + ' j'), h('span', { class: 'prix' }, M.sansRelance)),
-      h('p', { class: 'mut' }, 'Point de départ noté dans Réglages : ' + (dep.essais || dep.relances || dep.commandes ? (dep.essais || '?') + ' essais, ' + (dep.relances || '?') + ' relances, ' + (dep.commandes || '?') + ' commandes par semaine.' : 'pas encore renseigné.') + ' « Anciens clients réactivés » demande l’historique d’achats EBP : plus tard.')),
-    h('h2', {}, 'Devis acceptés par semaine (HT)'),
-    dv.some(d => d.statut === 'accepte') ? h('div', { class: 'carte' }, h('div', { class: 'barres', role: 'img', 'aria-label': 'Montant HT des devis acceptés, 8 dernières semaines' }, parSem.map((v, i) => h('div', { class: 'bcol' }, h('div', { class: 'b', style: 'height:' + Math.round(v / mx * 90) + 'px' }), h('small', {}, semaines[i].slice(8) + '/' + semaines[i].slice(5, 7))))), h('p', { class: 'mut' }, 'Une barre = une semaine (date du lundi). Max : ' + eur(mx) + '.')) : h('p', { class: 'vide' }, 'Le graphique apparaît dès le premier devis accepté.')
+    h('div', { class: 'actions' }, h('a', { class: 'btn sec', href: '#/evolution' }, 'Voir toute l’évolution')),
   ];
 }
 
 async function pageAccueil() {
   const [dv, cl, sigs] = [await getAll('devis'), await getAll('clients'), await lireSig()];
-  const ext = { point: await get('meta', 'point'), appels: await lireAppels() };
+  const ext = { point: await get('meta', 'point'), appels: await lireAppels(), tournees: await lireTournees(), sigs };
   dv.sort((a, b) => b.id - a.id);
-  montrer('Accueil',
+  const prenom = (S.vendeur || '').split(' ')[0], JN = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+  montrer(prenom ? 'Bonjour, ' + prenom : 'Bonjour',
     CAT.length ? null : h('div', { class: 'carte alerte' }, h('strong', {}, 'Catalogue vide. '), 'Importe ton fichier de tarifs pour pouvoir faire des devis. ', h('a', { href: '#/catalogue' }, 'Aller au catalogue')),
-    h('a', { class: 'btn gros', href: '#/nouveau' }, '➕ Nouveau devis'),
-    h('div', { class: 'actions' }, h('a', { class: 'btn sec', href: '#/signaler' }, '⚠ Signaler un problème'), h('a', { class: 'btn sec', href: '#/point' }, '📋 Préparer le Point')),
     tableauDeBord(dv, cl, sigs, ext),
-    (() => { const sem = dv.filter(d => d.lignes.length && Date.now() - new Date(d.creeLe).getTime() < 7 * 864e5); return sem.length ? h('div', { class: 'actions' }, h('button', { class: 'btn sec', onclick: () => envoyerDevis(sem, 'recap-devis-' + new Date().toISOString().slice(0, 10) + '.json') }, 'Envoyer le récap : ' + sem.length + ' devis de la semaine')) : null; })(),
-    (() => { const x = statsDevis(dv); return x.n ? h('div', { class: 'carte', role: 'status' }, h('strong', {}, 'Mon poste'), h('br'), h('small', {}, x.semaine + ' devis cette semaine · ' + (x.med == null ? 'temps par devis : pas encore mesuré' : 'temps médian par devis : ' + (x.med < 1 ? 'moins d’1 min' : Math.round(x.med) + ' min') + ' (sur ' + (x.mesures - x.exclus) + ' devis' + (x.exclus ? ', ' + x.exclus + ' interrompu(s) exclu(s)' : '') + ')'))) : null; })(),
+    h('div', { class: 'actions' }, h('a', { class: 'btn sec', href: '#/signaler' }, 'Signaler un problème'), h('a', { class: 'btn sec', href: '#/point' }, 'Préparer le Point')),
+    h('div', { class: 'fab noprint' }, h('a', { class: 'btn gros noir', href: '#/nouveau' }, '+ Nouveau devis')), h('div', { style: 'height:84px' }),
+    (() => { const sem = dv.filter(d => d.lignes.length && Date.now() - new Date(d.creeLe).getTime() < 7 * 864e5); return sem.length ? h('div', { class: 'actions' }, h('button', { class: 'btn sec', onclick: () => envoyerDevis(sem, 'recap-devis-' + new Date().toISOString().slice(0, 10) + '.json') }, 'Envoyer le récap : ' + sem.length + ' devis des 7 derniers jours')) : null; })(),
     h('h2', {}, 'Derniers devis'),
     dv.length ? dv.slice(0, 30).map(d => { const [lib, cls] = etiquetteDevis(d); return h('a', { class: 'ligne', href: '#/devis/' + d.id, style: 'color:inherit;text-decoration:none' },
       h('span', { class: 'g' }, h('strong', {}, d.clientNom), h('br'), h('small', {}, numero(d) + ' · ' + dateFr(d.creeLe))),
       h('span', { class: 'prix' }, eur(totaux(d).ht), h('br'), h('span', { class: 'tag ' + cls }, lib))); }) : h('p', { class: 'vide' }, 'Aucun devis pour l’instant.'),
     cl.length ? null : h('p', { class: 'mut' }, 'Astuce : tu peux aussi importer ta liste de clients (onglet Clients).'));
+  { const n = new Date(); $('#sous').textContent = JN[n.getDay()] + ' ' + n.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) + ' · Accueil commercial'; }
 }
 
 // ----- commande pour le responsable (WhatsApp) -----
@@ -513,6 +526,7 @@ function texteCommande(d, o = {}) {
   d.lignes.forEach(l => L.push(l.code + ' — ' + l.des + ' × ' + qtxt(l.q) + (o.prix ? ' (' + eur(l.pu) + (l.r ? ' -' + pct(l.r) + ' %' : '') + ' → ' + eur(ligneTotal(l)) + ' HT)' : '')));
   if (o.prix) L.push('---', 'Total HT : ' + eur(t.ht));
   if (o.note) L.push('Note : ' + o.note);
+  if (o.bloque) L.push('COMPTE BLOQUÉ : réglé au comptant confirmé par le vendeur');
   if (o.tard && o.urgence !== 'urgente') L.push('Après l’heure limite : préparation pour demain');
   L.push(o.stock ? 'Stock vérifié' : 'Stock à vérifier');
   L.push('Vendeur : ' + (S.vendeur || '—'));
@@ -533,8 +547,10 @@ function blocCommande(d, client, fini, sauver, apres) {
     S.respTel ? null : h('p', { class: 'mut' }, 'Numéro du responsable non réglé : WhatsApp te laissera choisir le contact (Réglages).'),
     h('div', { class: 'actions' }, h('button', { class: 'btn', onclick: async () => {
       if (!d.lignes.length) { toast('Le devis est vide.', true); return; }
+      const bloque = client && client.compte && client.compte.statut === 'bloque';
+      if (bloque && !confirm('Compte BLOQUÉ. Le client règle-t-il au comptant ?')) return;
       fini(); d.cmdMode = mode.value; d.cmdUrgence = urg.value; d.cmdNote = clean(note.value).slice(0, 300);
-      const texte = texteCommande(d, { mode: d.cmdMode, urgence: d.cmdUrgence, note: d.cmdNote, prix: prix.checked, tel: client && client.tel, stock: stockOk.checked, tard });
+      const texte = texteCommande(d, { mode: d.cmdMode, urgence: d.cmdUrgence, note: d.cmdNote, prix: prix.checked, tel: client && client.tel, stock: stockOk.checked, tard, bloque: client && client.compte && client.compte.statut === 'bloque' });
       window.open('https://wa.me/' + tel2wa(S.respTel) + '?text=' + encodeURIComponent(texte), '_blank', 'noopener');
       d.commandeLe = new Date().toISOString();
       if (d.statut === 'brouillon' || d.statut === 'envoye') { d.statut = 'accepte'; d.reponseLe = d.reponseLe || d.commandeLe; if (client && client.conv && client.conv !== 'converti') { client.conv = 'converti'; await putMany('clients', [client]); } }
@@ -648,7 +664,8 @@ function periodePoint(mode, now = new Date()) {
   const l = new Date(lundiDe(now) + 'T12:00:00'); l.setDate(l.getDate() - 7); const f = new Date(l); f.setDate(f.getDate() + 6);
   return { debut: jourLocal(l), fin: jourLocal(f), lib: 'la semaine dernière (lundi au dimanche)' };
 }
-function calculPoint(dv, cl, sigs, per, appels = []) {
+function calculPoint(dv, cl, sigs, per, appels = [], tournees = {}) {
+  const tour = { prevus: 0, faits: 0, reportes: 0 }; Object.entries(tournees || {}).forEach(([j, t]) => { if (j >= per.debut && j <= per.fin) { const x = statsTournee(t); tour.prevus += x.prevus; tour.faits += x.faits; tour.reportes += x.reportes; } });
   const dans = iso => { if (!iso) return false; const j = /^\d{4}-\d\d-\d\d$/.test(iso) ? iso : jourLocal(iso); return j >= per.debut && j <= per.fin; };
   const sent = dv.filter(d => d.lignes.length && d.statut !== 'brouillon' && dans(envoiDe(d)));
   const acc = dv.filter(d => d.statut === 'accepte' && dans(d.reponseLe)), ref = dv.filter(d => d.statut === 'refuse' && dans(d.reponseLe));
@@ -659,59 +676,243 @@ function calculPoint(dv, cl, sigs, per, appels = []) {
   const types = {}; sig.forEach(s => { types[s.type] = (types[s.type] || 0) + 1; });
   return { sent, acc, ref, essais, visites, sig, ouverts, types, resolMoyH: res.length ? res.reduce((a, b) => a + b, 0) / res.length : null,
     caAcc: acc.reduce((a, d) => a + totaux(d).ht, 0), attente: dv.filter(d => d.statut === 'envoye' && d.lignes.length),
-    objections: sig.filter(s => s.type === 'objection'), appels: appels.filter(a => a && typeof a.date === 'string' && a.date.slice(0, 10) >= per.debut && a.date.slice(0, 10) <= per.fin) };
+    enc: factures(cl).length || cl.some(c => c.compte && c.compte.statut === 'bloque') ? (() => { const F = factures(cl), ouv = F.filter(f => !f.regleLe); return { aEnc: ouv.reduce((a, f) => a + (f.montant || 0), 0), retard: ouv.filter(f => f.echeance && f.echeance < per.fin).reduce((a, f) => a + (f.montant || 0), 0), encaisse: F.filter(f => f.regleLe && jourLocal(f.regleLe) >= per.debut && jourLocal(f.regleLe) <= per.fin).reduce((a, f) => a + (f.montant || 0), 0), bloques: cl.filter(c => c.compte && c.compte.statut === 'bloque').length }; })() : null,
+    tour, repetes: cl.filter(c => (Number(c.reports) || 0) >= 3), objections: sig.filter(s => s.type === 'objection'), appels: appels.filter(a => a && typeof a.date === 'string' && a.date.slice(0, 10) >= per.debut && a.date.slice(0, 10) <= per.fin) };
 }
-function texteDuPoint(P, per, bloc, engagements) {
-  const L = ['POINT — ' + (S.vendeur || 'vendeur') + ' — ' + per.lib, '',
-    'Résultats : ' + P.visites + ' visites · ' + P.sent.length + ' devis envoyés · ' + P.acc.length + ' acceptés (' + eur(P.caAcc) + ' HT) · ' + P.ref.length + ' refusés',
+const CHANGEMENTS = [
+  ['relance', 'Relancer chaque devis à J+3, sans exception'],
+  ['visites', 'Faire plus de visites par jour'],
+  ['mohamed', 'Regrouper mes demandes à ' + 'Mohamed'.replace('Mohamed', '{resp}') + ' pour moins le solliciter'],
+  ['essais', 'Lancer plus d’essais chez les garages'],
+  ['priorites', 'Baisser la priorité des garages reportés plusieurs fois'],
+  ['etapes', 'Noter une prochaine étape pour chaque garage visité'],
+  ['autre', 'Autre (je précise)']];
+const libChangement = k => (libelle(CHANGEMENTS, k) || '').replace('{resp}', S.respNom || 'mon responsable');
+function carteClesPoint(dv, cl, ext, per) {
+  const I = indicateurs(dv, cl, ext), sem = semainesJusqua(8, new Date(per.debut + 'T12:00:00')), ids = CLES(factures(cl).length > 0);
+  return h('div', { class: 'carte' }, h('strong', {}, 'Les 6 indicateurs de la semaine'), ids.map(id => { const ind = I.find(x => x.id === id); return ind ? ligneInd(ind, serieInd(ind, sem), { compact: true }) : null; }));
+}
+function cibleSemaineDe(d) {
+  if (S.objSemaine > 0) return { cible: S.objSemaine, derive: false };
+  const lun = new Date(lundiDe(d) + 'T12:00:00'), ven = new Date(lun); ven.setDate(ven.getDate() + 4);
+  const o = objectifDuMois(d), n = joursOuvres(new Date(d.getFullYear(), d.getMonth(), 1), new Date(d.getFullYear(), d.getMonth() + 1, 0, 23));
+  return o && n ? { cible: Math.round(o.cents * joursOuvres(lun, ven) / n), derive: true } : { cible: 0, derive: false };
+}
+function texteDuPoint(P, per, bloc, engagements, chg) {
+  const L = ['POINT — ' + (S.vendeur || 'vendeur') + ' — ' + per.lib + ' (' + dateFr(per.debut) + ' au ' + dateFr(per.fin) + ')', '',
+    '1. MESURER',
+    'Devis acceptés : ' + eur(P.caAcc) + ' HT' + (P.cible ? ' sur ' + eur(P.cible) + ' (' + Math.round(P.caAcc / P.cible * 100) + ' %, écart ' + (P.caAcc >= P.cible ? '+' : '−') + eur(Math.abs(P.caAcc - P.cible)) + ')' : ''),
+    P.visites + ' visites · ' + P.sent.length + ' devis envoyés · ' + P.acc.length + ' acceptés · ' + P.ref.length + ' refusés · ' + P.attente.length + ' en attente',
+    'Tournée : ' + (P.tour.prevus ? P.tour.faits + '/' + P.tour.prevus + ' garages traités (' + Math.round(P.tour.faits / P.tour.prevus * 100) + ' %), ' + P.tour.reportes + ' reportés' : 'pas de tournée démarrée'),
     'Essais : ' + P.essais.length + ' lancés, ' + P.essais.filter(e => e.statut === 'concluant' || e.statut === 'commande').length + ' concluants',
-    'En attente de réponse : ' + P.attente.length + ' devis (' + eur(P.attente.reduce((a, d) => a + totaux(d).ht, 0)) + ' HT)',
     'Appels/messages vers ' + (S.respNom || 'le responsable') + ' : ' + P.appels.length + (P.appels.length ? ' (' + MOTIFS.map(([k, l]) => [l, P.appels.filter(a => a.motif === k).length]).filter(x => x[1]).map(x => x[0] + ' ' + x[1]).join(', ') + ')' : ''),
-    'Signalements : ' + P.sig.length + ' sur la période, ' + P.ouverts.length + ' encore ouverts' + (P.resolMoyH != null ? ', résolus en moyenne en ' + Math.round(P.resolMoyH) + ' h' : '')];
-  if (P.objections.length) L.push('Objections entendues : ' + P.objections.map(s => (s.clientNom || '?') + ' : ' + s.note).join(' | '));
-  if (bloc) L.push('', 'Blocages : ' + bloc);
-  const ouv = engagements.filter(e => !e.fait);
-  if (engagements.length) L.push('', 'Engagements : ' + engagements.map(e => (e.fait ? '[fait] ' : '[à faire] ') + e.txt).join(' ; '));
+    'Signalements : ' + P.sig.length + ', dont ' + P.ouverts.length + ' encore ouverts'];
+  if (P.enc) L.push('Encaissement : ' + eur(P.enc.aEnc) + ' à encaisser, dont ' + eur(P.enc.retard) + ' en retard · ' + eur(P.enc.encaisse) + ' encaissés · ' + P.enc.bloques + ' compte(s) bloqué(s)');
+  if (P.objections.length) L.push('Objections : ' + P.objections.map(s => (s.clientNom || '?') + ' : ' + s.note).join(' | '));
+  L.push('', '2. LE CHANGEMENT DE LA SEMAINE', chg || 'non choisi');
+  L.push('', '3. ENGAGEMENTS');
+  if (bloc) L.push('Blocages : ' + bloc);
+  L.push(engagements.length ? engagements.map(e => (e.fait ? '[fait] ' : '[à faire] ') + e.txt).join(' ; ') : 'aucun');
   L.push('', 'Chiffres basés sur l’activité saisie dans l’appli, pas sur le CA facturé.');
   return L.join('\n');
 }
 async function pagePoint(mode) {
   mode = mode === 'mois' ? 'mois' : 'semaine';
-  const [dv, cl, sigs, pt, apl] = [await getAll('devis'), await getAll('clients'), await lireSig(), await get('meta', 'point'), await lireAppels()];
+  const [dv, cl, sigs, pt, apl, tr] = [await getAll('devis'), await getAll('clients'), await lireSig(), await get('meta', 'point'), await lireAppels(), await lireTournees()];
   const donnees = pt && typeof pt === 'object' ? pt : {};
-  donnees.faits = donnees.faits || {}; donnees.blocages = donnees.blocages || {}; donnees.engagements = Array.isArray(donnees.engagements) ? donnees.engagements : [];
-  const per = periodePoint(mode), P = calculPoint(dv, cl, sigs, per, apl), cle = mode + ':' + per.fin.slice(0, mode === 'mois' ? 7 : 10);
+  donnees.faits = donnees.faits || {}; donnees.blocages = donnees.blocages || {}; donnees.changements = donnees.changements || {}; donnees.engagements = Array.isArray(donnees.engagements) ? donnees.engagements : [];
+  const per = periodePoint(mode), P = calculPoint(dv, cl, sigs, per, apl, tr), cle = mode + ':' + per.fin.slice(0, mode === 'mois' ? 7 : 10);
+  if (mode === 'semaine') { const c = cibleSemaineDe(new Date(per.debut + 'T12:00:00')); P.cible = c.cible; P.derive = c.derive; }
+  else { const o = objectifDuMois(new Date(per.debut + 'T12:00:00')); P.cible = o ? o.cents : 0; }
   const sauve = () => put('meta', donnees, 'point');
+  const fait = !!donnees.faits[per.debut];
+  // 1. mesurer
+  const stat = (v, l) => h('div', { class: 'kpi' }, h('div', { class: 'v' }, v), h('div', { class: 'l' }, l));
+  const pc = P.cible ? Math.round(P.caAcc / P.cible * 100) : null;
+  const types = Object.entries(P.types).sort((a, b) => b[1] - a[1]);
+  // 2. choisir
+  const ch = donnees.changements[cle] || {};
+  const autre = h('input', { maxlength: 120, value: ch.autre || '', placeholder: 'Ton changement en une phrase', 'aria-label': 'Autre changement' });
+  const radios = CHANGEMENTS.map(([k]) => h('input', { type: 'radio', name: 'chg', value: k, checked: ch.k === k, style: 'width:24px;min-height:24px;flex:none', 'aria-label': libChangement(k) }));
+  const lireChg = () => { const r = radios.find(x => x.checked); return r ? { k: r.value, autre: clean(autre.value).slice(0, 120) } : {}; };
+  const texteChg = () => { const c = lireChg(); return c.k ? (c.k === 'autre' ? (c.autre || 'Autre') : libChangement(c.k)) : ''; };
+  const majAutre = () => { autre.style.display = (radios.find(x => x.checked) || {}).value === 'autre' ? '' : 'none'; };
+  [...radios, autre].forEach(x => x.addEventListener('change', async () => { donnees.changements[cle] = lireChg(); majAutre(); await sauve(); }));
+  // 3. s'engager
   const bloc = h('textarea', { rows: 3, maxlength: 600, placeholder: 'Ce qui te freine : prix, stock, délais, prospect injoignable…', 'aria-label': 'Blocages' }, donnees.blocages[cle] || '');
   bloc.addEventListener('change', async () => { donnees.blocages[cle] = bloc.value.slice(0, 600); await sauve(); });
   const engBox = h('div');
   const dessinerEng = () => engBox.replaceChildren(...(donnees.engagements.length ? donnees.engagements.slice(-12).reverse().map(e => h('label', { class: 'ligne', style: 'display:flex;gap:10px;align-items:center;margin:0;color:inherit;font-size:inherit' },
     h('input', { type: 'checkbox', checked: e.fait, style: 'width:26px;min-height:26px;flex:none', 'aria-label': e.txt, onchange: async (ev) => { e.fait = ev.target.checked; await sauve(); } }), h('span', { class: 'g' }, e.txt, h('br'), h('small', {}, 'Pris le ' + dateFr(e.creeLe))))) : [h('p', { class: 'vide' }, 'Aucun engagement noté.')]));
   const nouv = h('input', { maxlength: 120, placeholder: 'Nouvel engagement (ex. appeler 5 garages dormants)', 'aria-label': 'Nouvel engagement' });
-  const stat = (v, l) => h('div', { class: 'kpi' }, h('div', { class: 'v' }, v), h('div', { class: 'l' }, l));
-  const types = Object.entries(P.types).sort((a, b) => b[1] - a[1]);
-  const bascule = h('div', { class: 'actions' }, h('a', { class: 'btn ' + (mode === 'semaine' ? '' : 'sec'), href: '#/point' }, '7 jours'), h('a', { class: 'btn ' + (mode === 'mois' ? '' : 'sec'), href: '#/point/mois' }, 'Mois'));
-  montrer('Point',
-    bascule, h('p', { class: 'mut' }, 'Période : ' + per.lib + ' (' + dateFr(per.debut) + ' au ' + dateFr(per.fin) + ').'),
-    h('div', { class: 'kpis' }, stat(P.visites, 'visites'), stat(P.sent.length, 'devis envoyés'), stat(P.acc.length, 'devis acceptés')),
-    h('div', { class: 'carte' }, h('strong', {}, 'Résultats'), h('p', {}, eur(P.caAcc) + ' HT de devis acceptés · ' + P.ref.length + ' refusé(s) · ' + P.attente.length + ' en attente de réponse'),
-      h('p', {}, P.essais.length + ' essai(s) lancé(s), ' + P.essais.filter(e => e.statut === 'concluant' || e.statut === 'commande').length + ' concluant(s)')),
-    h('div', { class: 'carte' }, h('strong', {}, 'Victoires'), P.acc.length ? P.acc.slice(0, 3).map(d => h('p', {}, '✅ ' + d.clientNom + ' : ' + eur(totaux(d).ht) + ' HT')) : h('p', { class: 'mut' }, 'Aucun devis accepté sur la période.')),
-    h('div', { class: 'carte' }, h('strong', {}, 'Appels vers ' + (S.respNom || 'le responsable')), h('p', {}, P.appels.length + ' sur la période' + (S.depart && S.depart.appels ? ' (départ : ' + S.depart.appels + ' par semaine)' : ''))),
-    h('div', { class: 'carte' }, h('strong', {}, 'Signalements'), h('p', {}, P.sig.length + ' sur la période · ' + P.ouverts.length + ' ouvert(s)' + (P.resolMoyH != null ? ' · résolus en moyenne en ' + Math.round(P.resolMoyH) + ' h' : '')),
-      types.length ? h('p', { class: 'mut' }, 'Les plus fréquents : ' + types.slice(0, 3).map(([k, n]) => libelle(SIGNAL_TYPES, k) + ' (' + n + ')').join(', ')) : null,
-      P.objections.length ? h('div', {}, h('small', { class: 'mut' }, 'Objections entendues :'), P.objections.slice(0, 5).map(s => h('p', {}, '« ' + s.note + ' » ' + (s.clientNom ? '(' + s.clientNom + ')' : '')))) : null),
-    h('h2', {}, 'Blocages'), bloc,
-    h('p', { class: 'mut' }, 'Pour le lundi : décide UN seul changement pour la semaine et note-le dans Engagements.'),
-    h('h2', {}, 'Engagements'), engBox,
+  const bascule = h('div', { class: 'actions' }, h('a', { class: 'btn ' + (mode === 'semaine' ? '' : 'sec'), href: '#/point' }, 'Semaine'), h('a', { class: 'btn ' + (mode === 'mois' ? '' : 'sec'), href: '#/point/mois' }, 'Mois'));
+  montrer('Point du lundi',
+    h('div', { class: 'elan-tete' }, h('span', { class: 'mut' }, 'Bilan du ' + dateFr(per.debut) + ' au ' + dateFr(per.fin)), mode === 'semaine' ? h('span', { class: 'tag ' + (fait ? 'ok' : 'warn') }, fait ? 'Fait' : 'À effectuer') : null),
+    bascule,
+    h('h3', { class: 'etape' }, h('span', {}, '1'), 'Mesurer'),
+    h('div', { class: 'carte obj' }, h('div', { class: 'elan-tete' }, h('strong', {}, 'Résultats commerciaux'), h('small', { class: 'mut' }, 'Devis acceptés HT')),
+      h('div', { class: 'gros-chiffre' }, eur(P.caAcc), P.cible ? h('span', {}, ' / ' + eur(P.cible)) : null),
+      P.cible ? [h('div', { class: 'piste', role: 'img', 'aria-label': pc + ' % de l’objectif' }, h('div', { class: 'rempli' + (pc >= 100 ? ' ok' : ''), style: 'width:' + Math.min(100, pc) + '%' })),
+        h('p', {}, pc + ' % · écart ', h('strong', { style: 'color:' + (P.caAcc >= P.cible ? 'var(--ok)' : 'var(--ko)') }, (P.caAcc >= P.cible ? '+' : '−') + eur(Math.abs(P.caAcc - P.cible))))] : h('p', { class: 'mut' }, 'Pas d’objectif réglé pour cette période (Réglages).'),
+      P.derive ? h('p', { class: 'mut' }, 'Objectif de la semaine déduit de l’objectif mensuel.') : null,
+      h('p', { class: 'mut' }, 'Devis acceptés saisis dans l’appli, pas le CA facturé par EBP.')),
+    mode === 'semaine' ? carteClesPoint(dv, cl, { sigs, appels: apl, tournees: tr }, per) : h('div', { class: 'kpis' }, stat(P.visites, 'visites'), stat(P.sent.length, 'devis envoyés'), stat(P.acc.length, 'devis acceptés')),
+    h('div', { class: 'actions' }, h('a', { class: 'btn sec', href: '#/evolution' }, 'Voir toute l’évolution')),
+    h('div', { class: 'kpis' }, stat(P.tour.prevus ? Math.round(P.tour.faits / P.tour.prevus * 100) + ' %' : '—', 'tournée réalisée'), stat(P.tour.reportes, 'garages reportés'), stat(P.appels.length, 'appels vers ' + (S.respNom || 'le responsable'))),
+    h('div', { class: 'carte' },
+      h('p', {}, '✅ Victoires : ' + (P.acc.length ? P.acc.slice(0, 3).map(d => d.clientNom + ' (' + eur(totaux(d).ht) + ')').join(', ') : 'aucun devis accepté')),
+      h('p', {}, '🧪 Essais : ' + P.essais.length + ' lancé(s), ' + P.essais.filter(e => e.statut === 'concluant' || e.statut === 'commande').length + ' concluant(s)'),
+      h('p', {}, '⚠ Signalements : ' + P.sig.length + ' · ' + P.ouverts.length + ' ouvert(s)' + (types.length ? ' · surtout ' + types.slice(0, 2).map(([k, n]) => libelle(SIGNAL_TYPES, k) + ' (' + n + ')').join(', ') : '')),
+      P.enc ? h('p', {}, '💶 Encaissement : ' + eur(P.enc.aEnc) + ' à encaisser, dont ' + eur(P.enc.retard) + ' en retard · ' + eur(P.enc.encaisse) + ' encaissés · ' + P.enc.bloques + ' compte(s) bloqué(s)') : null,
+      P.repetes.length ? h('p', {}, '🔁 Reportés 3 fois ou plus : ' + P.repetes.map(c => c.nom).join(', ') + '. À visiter vraiment, ou à baisser en priorité.') : null,
+      P.objections.length ? h('p', {}, '💬 Objections : ' + P.objections.slice(0, 4).map(s => '« ' + s.note + ' »' + (s.clientNom ? ' (' + s.clientNom + ')' : '')).join(' · ')) : null),
+    h('h3', { class: 'etape' }, h('span', {}, '2'), 'Choisir UN changement'),
+    h('div', { class: 'carte' }, CHANGEMENTS.map(([k], i) => h('label', { class: 'ligne', style: 'display:flex;gap:10px;align-items:center;margin:0;color:inherit;font-size:inherit' }, radios[i], h('span', { class: 'g' }, libChangement(k)))), autre,
+      h('p', { class: 'mut' }, 'Un seul : sinon, la semaine prochaine, tu ne sauras pas ce qui a joué.')),
+    h('h3', { class: 'etape' }, h('span', {}, '3'), 'S’engager'),
+    h('label', {}, 'Blocages'), bloc,
+    h('label', {}, 'Engagements'), engBox,
     h('div', { class: 'actions' }, nouv, h('button', { class: 'btn', onclick: async () => { const t = clean(nouv.value); if (!t) return; donnees.engagements.push({ id: nouvelUid(), txt: t.slice(0, 120), fait: false, creeLe: new Date().toISOString() }); await sauve(); nouv.value = ''; dessinerEng(); } }, 'Ajouter')),
-    h('div', { class: 'actions' }, h('button', { class: 'btn gros', onclick: () => {
-      const texte = texteDuPoint(P, per, bloc.value, donnees.engagements.slice(-12));
+    h('div', { class: 'actions' }, h('button', { class: 'btn gros', onclick: async () => {
+      if (!texteChg()) { toast('Choisis d’abord UN changement (étape 2).', true); return; }
+      const texte = texteDuPoint(P, per, bloc.value, donnees.engagements.slice(-12), texteChg());
       window.open('https://wa.me/' + tel2wa(S.respTel) + '?text=' + encodeURIComponent(texte), '_blank', 'noopener');
-      donnees.faits[per.debut] = true; sauve(); toast('Point envoyé et noté comme fait.');
-    } }, 'Envoyer le Point par WhatsApp')),
-    h('p', { class: 'mut' }, 'Ces chiffres viennent de l’activité saisie dans l’appli, pas du chiffre d’affaires facturé.'));
-  dessinerEng();
+      donnees.faits[per.debut] = true; await sauve(); toast('Point envoyé et noté comme fait.'); pagePoint(mode);
+    } }, 'Envoyer le Point par WhatsApp')));
+  majAutre(); dessinerEng();
+}
+
+// ----- v13 : évolution des indicateurs (semaine par semaine) -----
+function semainesJusqua(n = 8, now = new Date()) { const out = []; const l = new Date(lundiDe(now) + 'T12:00:00'); for (let i = n - 1; i >= 0; i--) { const d = new Date(l); d.setDate(d.getDate() - 7 * i); const f = new Date(d); f.setDate(f.getDate() + 6); out.push({ debut: jourLocal(d), fin: jourLocal(f) }); } return out; }
+const dansSem = (iso, w) => { if (!iso) return false; const j = /^\d{4}-\d\d-\d\d$/.test(iso) ? iso : jourLocal(iso); return j >= w.debut && j <= w.fin; };
+const avantFin = (iso, w) => iso && (/^\d{4}-\d\d-\d\d$/.test(iso) ? iso : jourLocal(iso)) <= w.fin;
+const factures = cl => cl.flatMap(c => (Array.isArray(c.factures) ? c.factures : []).map(f => ({ ...f, client: c })));
+const COMPTE_ST = [['', 'Non renseigné'], ['ouvert', 'Ouvert'], ['encours', 'Dossier en cours'], ['comptant', 'Comptant uniquement'], ['bloque', 'Bloqué']];
+const MODES_PAI = [['', 'Non renseigné'], ['comptant', 'Comptant'], ['cheque', 'Chèque'], ['virement', 'Virement'], ['lcr', 'LCR'], ['prelevement', 'Prélèvement']];
+const MOTIFS_REFUS = [['', 'Motif non noté'], ['prix', 'Prix'], ['delai', 'Délai'], ['teinte', 'Teinte / qualité'], ['concurrent', 'Fidèle à un concurrent'], ['besoin', 'Pas de besoin'], ['autre', 'Autre']];
+// Indicateurs : id, angle, libellé, format, sens (+1 : plus c'est haut mieux c'est ; -1 : l'inverse), calcul(w) pour une semaine
+function indicateurs(dv, cl, ext = {}) {
+  const env = dv.filter(d => d.lignes.length && d.statut !== 'brouillon');
+  const acc = w => dv.filter(d => d.statut === 'accepte' && dansSem(d.reponseLe, w));
+  const ref = w => dv.filter(d => d.statut === 'refuse' && dansSem(d.reponseLe, w));
+  const essais = cl.flatMap(c => (Array.isArray(c.essais) ? c.essais : []));
+  const F = factures(cl), aFact = F.length > 0;
+  const nonRegleeA = (f, w) => avantFin(f.date || f.echeance, w) && !(f.regleLe && avantFin(f.regleLe, w));
+  const L = [
+    ['acc', 'Résultat', 'Devis acceptés HT', 'eur', 1, w => acc(w).reduce((a, d) => a + totaux(d).ht, 0)],
+    ['panier', 'Résultat', 'Panier moyen (devis accepté)', 'eur', 1, w => { const x = acc(w); return x.length ? Math.round(x.reduce((a, d) => a + totaux(d).ht, 0) / x.length) : null; }],
+    ['actifs', 'Résultat', 'Clients actifs (devis accepté sur 60 jours)', 'n', 1, w => { const f = Date.parse(w.fin + 'T23:59:59'); return new Set(dv.filter(d => d.statut === 'accepte' && d.reponseLe && Date.parse(d.reponseLe) <= f && f - Date.parse(d.reponseLe) <= 60 * JOUR).map(d => d.clientId || d.clientNom)).size; }],
+    ['attente', 'Portefeuille', 'Montant en attente de réponse (fin de semaine)', 'eur', 1, w => env.filter(d => avantFin(envoiDe(d), w) && (d.statut === 'envoye' || (d.reponseLe && !avantFin(d.reponseLe, w)))).reduce((a, d) => a + totaux(d).ht, 0)],
+    ['refus', 'Portefeuille', 'Devis refusés', 'n', -1, w => ref(w).length],
+    ['visites', 'Activité', 'Visites faites', 'n', 1, w => cl.reduce((a, c) => a + (Array.isArray(c.visites) ? c.visites : []).filter(v => v && v.res === 'vu' && dansSem(v.date, w)).length, 0)],
+    ['envoyes', 'Activité', 'Devis envoyés', 'n', 1, w => env.filter(d => dansSem(envoiDe(d), w)).length],
+    ['tournee', 'Activité', 'Tournée réalisée', 'pct', 1, w => { let p = 0, f = 0; Object.entries(ext.tournees || {}).forEach(([j, t]) => { if (j >= w.debut && j <= w.fin) { const x = statsTournee(t); p += x.prevus; f += x.faits; } }); return p ? Math.round(f / p * 100) : null; }],
+    ['taux', 'Conversion', 'Taux de transformation (acceptés sur devis répondus)', 'pct', 1, w => { const a = acc(w).length, r = ref(w).length; return a + r ? Math.round(a / (a + r) * 100) : null; }],
+    ['essais', 'Conversion', 'Essais lancés', 'n', 1, w => essais.filter(e => dansSem(e.date, w)).length],
+    ['essaisOk', 'Conversion', 'Essais transformés en commande', 'n', 1, w => essais.filter(e => e.statut === 'commande' && dansSem(e.commandeLe, w)).length],
+    ['delai', 'Conversion', 'Délai moyen de réponse à un devis (jours)', 'j', -1, w => { const x = [...acc(w), ...ref(w)].map(d => Math.max(0, (Date.parse(d.reponseLe) - Date.parse(envoiDe(d))) / JOUR)); return x.length ? Math.round(x.reduce((a, b) => a + b, 0) / x.length * 10) / 10 : null; }],
+    ['appels', 'Organisation', 'Appels et messages à ' + (S.respNom || 'ton responsable'), 'n', -1, w => (ext.appels || []).filter(a => a && dansSem(a.date, w)).length],
+    ['sig', 'Organisation', 'Signalements', 'n', -1, w => (ext.sigs || []).filter(s => dansSem(s.date, w)).length]];
+  if (aFact) L.push(
+    ['aEnc', 'Encaissement', 'À encaisser (fin de semaine)', 'eur', -1, w => F.filter(f => nonRegleeA(f, w)).reduce((a, f) => a + (f.montant || 0), 0)],
+    ['retard', 'Encaissement', 'En retard de paiement (fin de semaine)', 'eur', -1, w => F.filter(f => nonRegleeA(f, w) && f.echeance && f.echeance < w.fin).reduce((a, f) => a + (f.montant || 0), 0)],
+    ['encaisse', 'Encaissement', 'Encaissé dans la semaine', 'eur', 1, w => F.filter(f => f.regleLe && dansSem(f.regleLe, w)).reduce((a, f) => a + (f.montant || 0), 0)]);
+  return L.map(([id, angle, lib, fmt, sens, f]) => ({ id, angle, lib, fmt, sens, f }));
+}
+const CLES = dv_cl_has => ['acc', 'taux', 'panier', 'attente', 'essaisOk', dv_cl_has ? 'retard' : 'actifs'];
+const fmtInd = (v, fmt) => v == null ? '—' : fmt === 'eur' ? eur(v) : fmt === 'pct' ? v + ' %' : fmt === 'j' ? String(v).replace('.', ',') + ' j' : String(v);
+function serieInd(ind, sem) { return sem.map(w => ind.f(w)); }
+const SVGNS = 'http://www.w3.org/2000/svg';
+function sparkline(vals, sens) {
+  const W = 96, H = 28, pts = vals.map((v, i) => [i, v]).filter(p => p[1] != null);
+  const svg = document.createElementNS(SVGNS, 'svg'); svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H); svg.setAttribute('width', W); svg.setAttribute('height', H); svg.setAttribute('aria-hidden', 'true');
+  if (pts.length < 2) return svg;
+  const mx = Math.max(...pts.map(p => p[1])), mn = Math.min(...pts.map(p => p[1])), rg = mx - mn || 1;
+  const xy = pts.map(([i, v]) => [(i / (vals.length - 1)) * (W - 6) + 3, H - 4 - ((v - mn) / rg) * (H - 8)]);
+  const pl = document.createElementNS(SVGNS, 'polyline'); pl.setAttribute('points', xy.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ')); pl.setAttribute('fill', 'none'); pl.setAttribute('stroke', 'currentColor'); pl.setAttribute('stroke-width', '2'); pl.setAttribute('stroke-linejoin', 'round');
+  const dot = document.createElementNS(SVGNS, 'circle'); const last = xy[xy.length - 1]; dot.setAttribute('cx', last[0]); dot.setAttribute('cy', last[1]); dot.setAttribute('r', '3'); dot.setAttribute('fill', 'currentColor');
+  svg.append(pl, dot); return svg;
+}
+function tendance(cur, prev, sens) {
+  if (cur == null || prev == null) return { cls: '', txt: 'pas de comparaison' };
+  if (cur === prev) return { cls: '', txt: '= semaine dernière' };
+  const mieux = (cur > prev) === (sens > 0);
+  return { cls: mieux ? 'ok' : 'ko', txt: (cur > prev ? '▲ ' : '▼ ') + (prev ? Math.abs(Math.round((cur - prev) / Math.abs(prev) * 100)) + ' %' : 'nouveau') + ' vs semaine dernière' };
+}
+function ligneInd(ind, vals, opts = {}) {
+  const cur = vals[vals.length - 1], prev = vals[vals.length - 2], t = tendance(cur, prev, ind.sens);
+  return h('div', { class: 'ind' + (opts.compact ? ' compact' : '') },
+    h('div', { class: 'ind-g' }, h('small', { class: 'mut' }, ind.lib), h('strong', {}, fmtInd(cur, ind.fmt)), h('small', { class: 'tend ' + t.cls }, t.txt)),
+    h('div', { class: 'ind-d ' + t.cls, role: 'img', 'aria-label': ind.lib + ' sur 8 semaines : ' + vals.map(v => fmtInd(v, ind.fmt)).join(', ') }, sparkline(vals, ind.sens)));
+}
+function carteCles(dv, cl, ext, titre = 'Mes 6 indicateurs · cette semaine') {
+  const I = indicateurs(dv, cl, ext), sem = semainesJusqua(8), ids = CLES(factures(cl).length > 0);
+  return h('div', { class: 'carte' }, h('div', { class: 'elan-tete' }, h('strong', {}, titre), h('a', { href: '#/evolution', class: 'mut' }, 'Tout voir')),
+    ids.map(id => { const ind = I.find(x => x.id === id); return ind ? ligneInd(ind, serieInd(ind, sem), { compact: true }) : null; }));
+}
+async function pageEvolution() {
+  const [dv, cl, sigs, apl, tr] = [await getAll('devis'), await getAll('clients'), await lireSig(), await lireAppels(), await lireTournees()];
+  const ext = { sigs, appels: apl, tournees: tr }, I = indicateurs(dv, cl, ext), sem = semainesJusqua(8);
+  const angles = [...new Set(I.map(x => x.angle))];
+  const refus = {}; dv.filter(d => d.statut === 'refuse').forEach(d => { const k = d.motifRefus || ''; refus[k] = (refus[k] || 0) + 1; });
+  const conv = {}; cl.forEach(c => { if (c.conv) conv[c.conv] = (conv[c.conv] || 0) + 1; });
+  montrer('Évolution',
+    h('p', { class: 'mut' }, 'Semaine en cours (du ' + dateFr(sem[7].debut) + ') comparée à la semaine dernière ; courbe sur 8 semaines. L’historique commence quand tu utilises l’appli : il faut environ 4 semaines pour une vraie tendance.'),
+    angles.map(a => [h('h2', {}, a), h('div', { class: 'carte' }, I.filter(x => x.angle === a).map(ind => ligneInd(ind, serieInd(ind, sem))))]),
+    Object.keys(refus).length ? [h('h2', {}, 'Pourquoi on perd (devis refusés)'), h('div', { class: 'carte' }, Object.entries(refus).sort((x, y) => y[1] - x[1]).map(([k, n]) => h('div', { class: 'ligne' }, h('span', { class: 'g' }, libelle(MOTIFS_REFUS, k)), h('span', { class: 'prix' }, n))))] : null,
+    Object.keys(conv).length ? [h('h2', {}, 'Avancement des garages'), h('div', { class: 'carte' }, h('div', { class: 'entonnoir' }, CONV.filter(x => x[0]).map(([k, l]) => h('div', { class: 'etape' }, h('div', { class: 'v' }, conv[k] || 0), h('small', {}, l)))))] : null,
+    !factures(cl).length ? h('p', { class: 'mut' }, 'Encaissement : ajoute les factures à encaisser sur la fiche des garages pour suivre cet angle.') : null,
+    h('p', { class: 'mut' }, 'Chiffres tirés de ce que tu notes dans l’appli, pas d’EBP. Une semaine sans saisie ressemble à une semaine sans travail.'));
+}
+
+// ----- règlements : compte client et factures à encaisser -----
+const enRetard = (f, now = Date.now()) => !f.regleLe && f.echeance && f.echeance < jourLocal(now);
+function blocCompte(c, sauver) {
+  const co = c.compte || (c.compte = {});
+  if (!Array.isArray(c.factures)) c.factures = [];
+  const st = h('select', { 'aria-label': 'Statut du compte' }, COMPTE_ST.map(([v, l]) => h('option', { value: v, selected: (co.statut || '') === v }, l)));
+  const mo = h('select', { 'aria-label': 'Mode de paiement' }, MODES_PAI.map(([v, l]) => h('option', { value: v, selected: (co.mode || '') === v }, l)));
+  const de = h('input', { value: co.delai || '', maxlength: 40, placeholder: 'Ex. 30 jours fin de mois', 'aria-label': 'Délai de paiement' });
+  const pl = h('input', { value: co.plafond ? String(co.plafond / 100) : '', inputmode: 'decimal', placeholder: 'Facultatif (€)', 'aria-label': 'Plafond d’encours' });
+  const liste = h('div'), resume = h('div');
+  const majCompte = async () => { co.statut = st.value; co.mode = mo.value; co.delai = clean(de.value).slice(0, 40); let p = 0; try { p = pl.value.trim() ? parseCents(pl.value) : 0; } catch (e) { p = 0; } co.plafond = p > 0 && p < 1e10 ? p : 0; await sauver(); dessiner(); };
+  [st, mo, de, pl].forEach(x => x.addEventListener('change', majCompte));
+  const num = h('input', { maxlength: 30, placeholder: 'N° de facture', 'aria-label': 'Numéro de facture' });
+  const mt = h('input', { inputmode: 'decimal', placeholder: 'Montant TTC (€)', 'aria-label': 'Montant de la facture' });
+  const ech = h('input', { type: 'date', 'aria-label': 'Échéance de la facture' });
+  const dessiner = () => {
+    const ouvertes = c.factures.filter(f => !f.regleLe), du = ouvertes.reduce((a, f) => a + (f.montant || 0), 0), ret = ouvertes.filter(f => enRetard(f)).reduce((a, f) => a + (f.montant || 0), 0);
+    resume.replaceChildren(
+      co.statut === 'bloque' ? h('div', { class: 'bandeau-ko' }, 'COMPTE BLOQUÉ : pas de commande sans règlement au comptant.') : null,
+      co.statut === 'encours' ? h('p', { class: 'mut' }, 'Ouverture en cours : récupère Kbis, RIB et conditions signées.') : null,
+      h('div', { class: 'quatre trois' }, h('div', {}, h('strong', {}, eur(du)), h('small', { class: 'mut' }, 'à encaisser')), h('div', {}, h('strong', { class: ret ? 'ko' : '' }, eur(ret)), h('small', { class: 'mut' }, 'en retard')), h('div', {}, h('strong', {}, co.plafond ? Math.round(du / co.plafond * 100) + ' %' : '—'), h('small', { class: 'mut' }, 'du plafond'))));
+    liste.replaceChildren(...(c.factures.length ? c.factures.slice().sort((a, b) => (a.regleLe ? 1 : 0) - (b.regleLe ? 1 : 0) || String(a.echeance).localeCompare(String(b.echeance))).map(f => {
+      const r = enRetard(f), jr = r ? ecartJours(f.echeance) : 0;
+      const pr = h('input', { type: 'date', value: f.promesse || '', 'aria-label': 'Promesse de paiement le' });
+      pr.addEventListener('change', async () => { f.promesse = /^\d{4}-\d\d-\d\d$/.test(pr.value) ? pr.value : ''; await sauver(); toast('Promesse notée.'); });
+      return h('div', { class: 'facture' },
+        h('div', { class: 'elan-tete' }, h('span', {}, h('strong', {}, (f.num || 'Facture') + ' · ' + eur(f.montant || 0)), h('br'), h('small', { class: 'mut' }, 'Échéance ' + (f.echeance ? dateFr(f.echeance) : '—') + ((f.relances || []).length ? ' · ' + f.relances.length + ' relance(s)' : ''))),
+          h('span', { class: 'tag ' + (f.regleLe ? 'ok' : r ? 'ko' : 'warn') }, f.regleLe ? 'Réglée' : r ? 'Retard ' + jr + ' j' : 'À échoir')),
+        f.regleLe ? null : [h('label', { class: 'rang' }, h('span', { class: 'mut' }, 'Promesse le'), pr),
+          h('div', { class: 'trio' }, h('button', { class: 'btn sec', onclick: async () => { (f.relances = f.relances || []).push(jourLocal(new Date())); await sauver(); dessiner(); toast('Relance notée.'); } }, 'Relancé'),
+            h('button', { class: 'btn vert', onclick: async () => { f.regleLe = new Date().toISOString(); await sauver(); dessiner(); toast('Réglée : ' + eur(f.montant || 0) + '.'); } }, 'Réglée'),
+            h('button', { class: 'btn danger', 'aria-label': 'Supprimer la facture', onclick: async () => { if (confirm('Supprimer cette facture ?')) { c.factures.splice(c.factures.indexOf(f), 1); await sauver(); dessiner(); } } }, 'Suppr.'))]);
+    }) : [h('p', { class: 'vide' }, 'Aucune facture à suivre.')]));
+  };
+  const node = h('div', { class: 'carte' }, h('small', { class: 'etiq' }, 'COMPTE ET RÈGLEMENTS'), resume,
+    h('label', {}, 'Statut du compte'), st, h('label', {}, 'Mode de paiement'), mo, h('label', {}, 'Délai de paiement'), de, h('label', {}, 'Plafond d’encours (€)'), pl,
+    h('h3', { style: 'margin:16px 0 4px' }, 'Factures à encaisser'), liste,
+    h('label', {}, 'Ajouter une facture'), num, mt, ech,
+    h('div', { class: 'actions' }, h('button', { class: 'btn', onclick: async () => {
+      let m = null; try { m = parseCents(mt.value); } catch (e) { m = null; }
+      if (!m || m <= 0 || m > 1e10) { toast('Montant invalide.', true); return; }
+      if (!/^\d{4}-\d\d-\d\d$/.test(ech.value)) { toast('Indique la date d’échéance.', true); return; }
+      c.factures.push({ id: nouvelUid(), num: clean(num.value).slice(0, 30), montant: m, echeance: ech.value, date: jourLocal(new Date()), relances: [] });
+      await sauver(); num.value = mt.value = ech.value = ''; dessiner(); toast('Facture ajoutée.');
+    } }, 'Ajouter la facture')),
+    h('p', { class: 'mut' }, 'Saisie à la main en attendant l’export EBP des factures non réglées. Vérifie avec la comptabilité avant de relancer un client.'));
+  dessiner();
+  return node;
 }
 
 // ----- comparateur de coût prêt à l'emploi (valeurs saisies à la main) -----
@@ -729,7 +930,7 @@ async function pageComparateur() {
     const ins = {}; champs.forEach(([k, l]) => { ins[k] = h('input', { value: (sauve[cote] || {})[k] || '', inputmode: k === 'nom' || k === 'seche' ? 'text' : 'decimal', 'aria-label': titre + ' : ' + l, placeholder: l }); });
     return { cote, ins, node: h('div', { class: 'carte' }, h('strong', {}, titre), ...champs.map(([k, l]) => [h('label', {}, l), ins[k]])) };
   };
-  const A = mk('a', 'Produit actuel'), B = mk('b', 'Carsystem');
+  const A = mk('a', 'Produit actuel'), B = mk('b', 'Produit proposé');
   const res = h('div', { role: 'status' });
   const val = X => { const g = k => lireNb(X.ins[k].value); return { pPeint: g('pPeint'), kPeint: g('kPeint'), pDur: g('pDur'), kDur: g('kDur'), pDil: g('pDil'), kDil: g('kDil'), rend: g('rend') }; };
   const calc = async () => {
@@ -740,9 +941,9 @@ async function pageComparateur() {
     if (!ca || !cb) { res.replaceChildren(h('p', { class: 'mut' }, 'Remplis les parts et le rendement des deux produits pour voir la comparaison.')); return; }
     const ecart = (cb.m2 - ca.m2) / ca.m2 * 100, m = c => c.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
     res.replaceChildren(h('div', { class: 'carte ' + (ecart <= 0 ? 'reussi' : 'alerte') },
-      h('strong', {}, 'Coût au m² : ' + m(ca.m2) + ' (actuel) contre ' + m(cb.m2) + ' (Carsystem)'),
+      h('strong', {}, 'Coût au m² : ' + m(ca.m2) + ' (actuel) contre ' + m(cb.m2) + ' (proposé)'),
       h('p', {}, 'Litre prêt à l’emploi : ' + m(ca.litre) + ' contre ' + m(cb.litre) + '.'),
-      h('p', {}, Math.abs(ecart) < 0.05 ? 'Même coût au m².' : 'Carsystem coûte ' + Math.abs(ecart).toFixed(1).replace('.', ',') + ' % ' + (ecart < 0 ? 'de moins' : 'de plus') + ' au m².'),
+      h('p', {}, Math.abs(ecart) < 0.05 ? 'Même coût au m².' : 'Le produit proposé coûte ' + Math.abs(ecart).toFixed(1).replace('.', ',') + ' % ' + (ecart < 0 ? 'de moins' : 'de plus') + ' au m².'),
       h('p', { class: 'mut' }, 'Pour 100 m² : ' + m(ca.m2 * 100) + ' contre ' + m(cb.m2 * 100) + '.')),
       h('p', { class: 'mut' }, 'Chiffres saisis par toi : vérifie-les avec les fiches techniques. Le coût ne dit rien de la qualité de teinte ni du temps gagné : compare aussi ces points avec le garagiste.'));
   };
@@ -752,8 +953,8 @@ async function pageComparateur() {
 }
 function pagePlus() {
   const L = (href, t, d) => h('a', { class: 'ligne', href, style: 'color:inherit;text-decoration:none' }, h('span', { class: 'g' }, h('strong', {}, t), h('br'), h('small', {}, d)), h('span', {}, '›'));
-  montrer('Plus', L('#/point', 'Point', 'Résumé de la semaine ou du mois pour ton responsable, blocages, engagements'), L('#/signalements', 'Signalements', 'Problèmes remontés avec photo et leur suivi'), L('#/signaler', 'Signaler un problème', 'Photo + note envoyées à ton responsable'),
-    L('#/comparateur', 'Comparateur de coût', 'Coût réel au m² : produit actuel contre Carsystem'), L('#/reglages', 'Réglages', 'Objectifs, responsable, TVA, sauvegarde'));
+  montrer('Plus', L('#/evolution', 'Évolution', 'Tous les indicateurs, semaine par semaine, avec leur courbe'), L('#/point', 'Point', 'Résumé de la semaine ou du mois pour ton responsable, blocages, engagements'), L('#/signalements', 'Signalements', 'Problèmes remontés avec photo et leur suivi'), L('#/signaler', 'Signaler un problème', 'Photo + note envoyées à ton responsable'),
+    L('#/comparateur', 'Comparateur de coût', 'Coût réel au m² : produit actuel contre produit proposé'), L('#/reglages', 'Réglages', 'Objectifs, responsable, TVA, sauvegarde'));
 }
 
 
@@ -843,7 +1044,7 @@ function avisProspect(c) {
 // ---------- plan d'action : rythme de visite, échéance, tournée du jour ----------
 const RYTHMES = { A: 14, B: 30, C: 90 };
 const JOUR = 864e5;
-const aujourdhui = () => new Date().toISOString().slice(0, 10);
+const aujourdhui = () => jourLocal(new Date());
 const rythmeJours = c => (Number(c.rythme) > 0 ? Math.min(365, Math.round(Number(c.rythme))) : (RYTHMES[c.priorite] || 0));
 const derniereVisite = c => (Array.isArray(c.visites) ? c.visites : []).reduce((m, v) => (v && v.res === 'vu' && typeof v.date === 'string' && v.date > m ? v.date : m), '');
 // pct = jours écoulés depuis la dernière visite / rythme. Jamais visité = 999 (à faire en premier).
@@ -851,10 +1052,11 @@ function echeance(c, now = Date.now()) {
   const r = rythmeJours(c);
   if (!r) return null;
   const dv = derniereVisite(c);
-  const rappel = typeof c.rappel === 'string' && /^\d{4}-\d\d-\d\d$/.test(c.rappel) && c.rappel <= new Date(now).toISOString().slice(0, 10);
-  const jours = dv ? Math.floor((now - new Date(dv).getTime()) / JOUR) : null;
+  const rappel = typeof c.rappel === 'string' && /^\d{4}-\d\d-\d\d$/.test(c.rappel) && c.rappel <= jourLocal(now);
+  const jours = dv ? Math.max(0, ecartJours(dv, now)) : null;
   const pct = dv ? Math.round(jours / r * 100) : 999;
-  return { r, jours, pct, rappel, du: rappel || pct >= 100 };
+  const reporte = typeof c.reporteAu === 'string' && /^\d{4}-\d\d-\d\d$/.test(c.reporteAu) && c.reporteAu > jourLocal(now);
+  return { r, jours, pct, rappel, reporte, du: !reporte && (rappel || pct >= 100) };
 }
 const km = (a, b) => {
   const R = 6371, rad = x => x * Math.PI / 180, dLa = rad(b.lat - a.lat), dLo = rad(b.lng - a.lng);
@@ -881,8 +1083,62 @@ function urlItineraire(liste) {
   const dest = pts[pts.length - 1], via = pts.slice(0, -1);
   return 'https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=' + f(dest) + (via.length ? '&waypoints=' + via.map(f).join('%7C') : '');
 }
+// ----- tournée suivie : plan du jour, résultat par garage, reports -----
+const lireTournees = async () => { const v = await get('meta', 'tournees'); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; };
+const ecrireTournees = async t => { const k = Object.keys(t).sort(); k.slice(0, Math.max(0, k.length - 120)).forEach(x => delete t[x]); await put('meta', t, 'tournees'); };
+function prochainOuvre(d = new Date()) { const x = new Date(d); x.setHours(12, 0, 0, 0); do { x.setDate(x.getDate() + 1); } while (!estOuvre(x)); return jourLocal(x); }
+const statsTournee = t => { const ids = Array.isArray(t && t.ids) ? t.ids : [], r = (t && t.res) || {}; const n = k => ids.filter(i => r[i] === k).length;
+  return { prevus: ids.length, vus: n('vu'), absents: n('absent'), reportes: n('reporte') + n('auto'), faits: n('vu') + n('absent'), restants: ids.filter(i => !r[i]).length }; };
+async function marquerVisite(c, res, dateReport) {
+  if (!Array.isArray(c.visites)) c.visites = [];
+  const jour = aujourdhui();
+  if (res === 'vu' || res === 'absent') {
+    c.visites.push({ date: jour, res, note: '' }); if (c.visites.length > 100) c.visites = c.visites.slice(-100);
+    if (res === 'vu') { c.rappel = ''; c.reporteAu = ''; c.reports = 0; } else { c.rappel = jourLocal(Date.now() + 2 * JOUR); }
+  } else { c.reporteAu = dateReport || prochainOuvre(); c.reports = (Number(c.reports) || 0) + 1; }
+  await putMany('clients', [c]);
+}
 async function pageTournee() {
-  const cl = await getAll('clients');
+  const cl = await getAll('clients'), parId = new Map(cl.map(c => [c.id, c]));
+  const T = await lireTournees(), auj = jourLocal(new Date()), plan = T[auj];
+  const repetes = cl.filter(c => (Number(c.reports) || 0) >= 3);
+  const alerteRep = repetes.length ? h('div', { class: 'carte alerte' }, h('strong', {}, '🔁 Reportés 3 fois ou plus : '), repetes.map(c => c.nom).join(', '), h('br'), h('small', {}, 'Soit tu les vois vraiment, soit tu baisses leur priorité sur la fiche.')) : null;
+  if (plan && Array.isArray(plan.ids) && plan.ids.length) {
+    const st = statsTournee(plan), r = plan.res || (plan.res = {});
+    const sauver = async () => { T[auj] = plan; await ecrireTournees(T); };
+    const lignes = plan.ids.map(id => {
+      const c = parId.get(id); if (!c) return null;
+      const etat = r[id], tags = { vu: ['Vu', 'ok'], absent: ['Absent', 'warn'], reporte: ['Reporté', 'warn'], auto: ['Reporté (fin de journée)', 'warn'] };
+      const dateR = h('input', { type: 'date', value: prochainOuvre(), 'aria-label': 'Reporter ' + c.nom + ' au', style: 'flex:1 1 140px' });
+      const agir = async (res) => { await marquerVisite(c, res, res === 'reporte' ? dateR.value : ''); r[id] = res; await sauver(); toast(res === 'vu' ? 'Visite notée : ' + c.nom : res === 'absent' ? 'Absent : rappel dans 2 jours.' : 'Reporté au ' + dateFr(c.reporteAu) + '.'); pageTournee(); };
+      return h('div', { class: 'carte' },
+        h('div', { class: 'elan-tete' }, h('strong', {}, c.nom), etat ? h('span', { class: 'tag ' + tags[etat][1] }, tags[etat][0]) : null),
+        c.etape ? h('small', { class: 'mut' }, 'Étape prévue : ' + c.etape) : null,
+        etat ? null : h('div', { class: 'trio' }, h('button', { class: 'btn vert', onclick: () => agir('vu') }, 'Vu'), h('button', { class: 'btn ambre', onclick: () => agir('absent') }, 'Absent'), h('button', { class: 'btn gris', onclick: () => agir('reporte') }, 'Reporter')),
+        etat ? null : h('label', { class: 'rang' }, h('span', { class: 'mut' }, 'Reporter au'), dateR),
+        h('div', { class: 'actions' }, h('a', { class: 'btn sec', href: '#/client/' + c.id }, 'Fiche'), etat ? h('button', { class: 'btn sec', onclick: async () => { delete r[id]; await sauver(); pageTournee(); } }, 'Annuler') : null));
+    });
+    const restants = plan.ids.filter(i => !r[i]).map(i => parId.get(i)).filter(Boolean), u = urlItineraire(restants);
+    const pc = Math.round((st.prevus - st.restants) / st.prevus * 100);
+    montrer('Tournée',
+      h('div', { class: 'carte obj' }, h('div', { class: 'elan-tete' }, h('strong', {}, 'Tournée du ' + dateFr(auj)), h('span', { class: 'tag ' + (plan.termine ? 'ok' : 'warn') }, plan.termine ? 'Terminée' : 'En cours')),
+        h('div', { class: 'gros-chiffre' }, (st.prevus - st.restants) + '/' + st.prevus, h('span', {}, ' garages traités')),
+        h('div', { class: 'piste', role: 'img', 'aria-label': pc + ' % de la tournée traitée' }, h('div', { class: 'rempli' + (st.restants ? '' : ' ok'), style: 'width:' + pc + '%' })),
+        h('div', { class: 'quatre' }, [[st.vus, 'vus', 'ok'], [st.absents, 'absents', 'warn'], [st.reportes, 'reportés', 'warn'], [st.restants, 'restants', '']].map(([v, l, k]) => h('div', {}, h('strong', { class: k }, String(v)), h('small', { class: 'mut' }, l))))),
+      alerteRep,
+      u && restants.length ? h('a', { class: 'btn gros', href: u, target: '_blank', rel: 'noopener' }, '🗺 Itinéraire des ' + Math.min(10, restants.filter(posClient).length) + ' restants') : null,
+      lignes.filter((x, i) => x && !r[plan.ids[i]]),
+      lignes.some((x, i) => x && r[plan.ids[i]]) ? [h('h2', {}, 'Déjà traités'), lignes.filter((x, i) => x && r[plan.ids[i]])] : null,
+      plan.termine ? null : h('div', { class: 'actions' }, h('button', { class: 'btn gros noir', onclick: async () => {
+        const nd = prochainOuvre();
+        for (const id of plan.ids) if (!r[id]) { const c = parId.get(id); if (c) { await marquerVisite(c, 'reporte', nd); r[id] = 'auto'; } }
+        plan.termine = true; await sauver(); const s2 = statsTournee(plan);
+        toast('Journée terminée : ' + s2.vus + ' vus, ' + s2.absents + ' absents, ' + s2.reportes + ' reportés au ' + dateFr(nd) + '.'); pageTournee();
+      } }, 'Terminer la journée')),
+      st.restants === st.prevus ? h('div', { class: 'actions' }, h('button', { class: 'btn sec', onclick: async () => { delete T[auj]; await ecrireTournees(T); pageTournee(); } }, 'Refaire la sélection')) : null,
+      h('p', { class: 'mut' }, '« Terminer la journée » reporte au prochain jour ouvré les garages non traités. Un garage reporté disparaît de la liste jusqu’à sa date.'));
+    return;
+  }
   const dues = cl.map(c => ({ c, e: echeance(c) })).filter(x => x.e && x.e.du).sort((a, b) => (b.e.rappel - a.e.rappel) || (b.e.pct - a.e.pct));
   const sansRythme = cl.filter(c => !rythmeJours(c)).length;
   let ordre = dues.map(x => x.c), coches = new Set(ordre.slice(0, 8).map(c => c.id)), origine = null;
@@ -893,18 +1149,17 @@ async function pageTournee() {
       const cb = h('input', { type: 'checkbox', checked: coches.has(c.id), 'aria-label': 'Visiter ' + c.nom, style: 'width:28px;min-height:28px;flex:none', onchange: () => { cb.checked ? coches.add(c.id) : coches.delete(c.id); majItin(); } });
       return h('label', { class: 'ligne', style: 'display:flex;gap:12px;align-items:center;margin:0;color:inherit;font-size:inherit' }, cb,
         h('span', { class: 'g' }, h('strong', {}, c.nom), h('br'),
-          h('small', {}, (e.rappel ? 'À rappeler · ' : '') + (e.jours == null ? 'jamais visité' : 'dernière visite il y a ' + e.jours + ' j') + ' · échéance ' + (e.pct >= 999 ? '—' : e.pct + ' %') + (pos ? '' : ' · sans position')),
-        ), h('a', { href: '#/client/' + c.id, class: 'btn sec', 'aria-label': 'Fiche de ' + c.nom }, 'Fiche'));
+          h('small', {}, (e.rappel ? 'À rappeler · ' : '') + (e.jours == null ? 'jamais visité' : 'dernière visite il y a ' + e.jours + ' j') + ' · échéance ' + (e.pct >= 999 ? '—' : e.pct + ' %') + ((Number(c.reports) || 0) ? ' · reporté ' + c.reports + ' fois' : '') + (pos ? '' : ' · sans position'))),
+        h('a', { href: '#/client/' + c.id, class: 'btn sec', 'aria-label': 'Fiche de ' + c.nom }, 'Fiche'));
     }));
     majItin();
   };
   const majItin = () => {
     const sel = ordre.filter(c => coches.has(c.id));
-    const u = urlItineraire(sel), sans = sel.filter(c => !posClient(c)).length;
-    itin.replaceChildren(
-      sel.length > 10 ? h('p', { class: 'mut' }, 'Google Maps accepte 10 arrêts maximum : seuls les 10 premiers partent dans l’itinéraire.') : null,
-      sans ? h('p', { class: 'mut' }, sans + ' garage(s) coché(s) sans position : ils ne sont pas dans l’itinéraire. Ouvre leur fiche et appuie sur « Fiche officielle ».') : null,
-      u ? h('a', { class: 'btn gros', href: u, target: '_blank', rel: 'noopener' }, '🗺 Ouvrir l’itinéraire (' + Math.min(10, sel.filter(posClient).length) + ' arrêts)') : h('p', { class: 'mut' }, sel.length ? 'Aucun garage coché n’a de position.' : 'Coche au moins un garage.'));
+    itin.replaceChildren(sel.length ? h('button', { class: 'btn gros', onclick: async () => {
+      T[auj] = { ids: ordre.filter(c => coches.has(c.id)).map(c => c.id), res: {}, debut: new Date().toISOString(), termine: false }; await ecrireTournees(T); toast('Tournée démarrée : ' + T[auj].ids.length + ' garages.'); pageTournee();
+    } }, '▶ Démarrer ma tournée (' + sel.length + ')') : h('p', { class: 'mut' }, 'Coche au moins un garage.'),
+      sel.length > 10 ? h('p', { class: 'mut' }, 'Google Maps accepte 10 arrêts maximum : l’itinéraire prendra les 10 premiers.') : null);
   };
   const bPos = h('button', { class: 'btn sec', onclick: () => {
     if (!navigator.geolocation) { toast('Position indisponible sur ce navigateur.', true); return; }
@@ -914,11 +1169,14 @@ async function pageTournee() {
       ordre = ordonner(ordre, origine); coches = new Set(ordre.slice(0, 8).map(c => c.id)); dessiner(); bPos.disabled = false; toast('Rangés du plus proche au plus loin.');
     }, () => { bPos.disabled = false; toast('Position refusée : ordre par urgence conservé.', true); }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 });
   } }, '📍 Ranger depuis ma position');
+  const hier = Object.keys(T).filter(k => k < auj).sort().pop(), bilanHier = hier ? statsTournee(T[hier]) : null;
   montrer('Tournée',
-    h('p', { class: 'mut' }, dues.length ? dues.length + ' à visiter ou à relancer. Les 8 plus urgents sont cochés.' : 'Rien à faire aujourd’hui.'),
+    bilanHier ? h('p', { class: 'mut' }, 'Dernière tournée (' + dateFr(hier) + ') : ' + (bilanHier.faits) + '/' + bilanHier.prevus + ' traités, ' + bilanHier.reportes + ' reporté(s).') : null,
+    alerteRep,
+    h('p', { class: 'mut' }, dues.length ? dues.length + ' à visiter ou à relancer. Les 8 plus urgents sont cochés : ajuste, puis démarre.' : 'Rien à faire aujourd’hui.'),
     sansRythme ? h('div', { class: 'carte alerte' }, sansRythme + ' client(s) sans priorité A/B/C : ils n’apparaissent jamais ici. Ouvre leur fiche pour fixer le rythme.') : null,
     dues.length ? h('div', { class: 'actions' }, bPos) : null, zone, itin,
-    h('p', { class: 'mut' }, 'Rythme par défaut : A = 14 jours, B = 30 jours, C = 90 jours (à toi de les ajuster). Ta position n’est pas enregistrée ni envoyée : elle sert seulement à classer la liste. L’itinéraire s’ouvre dans Google Maps.'));
+    h('p', { class: 'mut' }, 'Rythme par défaut : A = 14 jours, B = 30 jours, C = 90 jours (hypothèses, à ajuster). Ta position n’est ni enregistrée ni envoyée : elle sert seulement à classer la liste.'));
   dessiner();
 }
 async function pageClient(id) {
@@ -934,8 +1192,12 @@ async function pageClient(id) {
   const rythme = h('input', { type: 'number', inputmode: 'numeric', min: 0, max: 365, value: c.rythme || '', placeholder: 'Facultatif : tous les … jours', 'aria-label': 'Rythme en jours' });
   const cNom = h('input', { value: c.contactNom || '', maxlength: 60, placeholder: 'Gérant ou chef d’atelier', 'aria-label': 'Contact décideur' });
   const pNom = h('input', { value: c.peintreNom || '', maxlength: 60, placeholder: 'Peintre qui utilisera le produit', 'aria-label': 'Contact peintre' });
-  const avis = h('select', { 'aria-label': 'Avis du peintre sur Carsystem' }, AVIS.map(([v, l]) => h('option', { value: v, selected: (c.avis || '') === v }, l)));
-  const conv = h('select', { 'aria-label': 'Conversion Carsystem' }, CONV.map(([v, l]) => h('option', { value: v, selected: (c.conv || '') === v }, l)));
+  const puces = h('div', { class: 'puces' });
+  const dessinerPuces = () => puces.replaceChildren(...CRITERES.filter(x => x[0]).map(([v, l]) => h('button', { class: 'puce' + (crit.value === v ? ' on' : ''), 'aria-pressed': crit.value === v ? 'true' : 'false', onclick: async () => { crit.value = crit.value === v ? '' : v; c.critere = crit.value; await putMany('clients', [c]); dessinerPuces(); } }, l.replace(/^(Le|La|Les) /, '').replace(/^./, m => m.toUpperCase()))));
+  const crit = h('select', { 'aria-label': 'Ce qui compte pour lui', style: 'display:none' }, CRITERES.map(([v, l]) => h('option', { value: v, selected: (c.critere || '') === v }, l)));
+  const etape = h('input', { value: c.etape || '', maxlength: 100, placeholder: 'Ex. rappeler vendredi, apporter un échantillon', 'aria-label': 'Prochaine étape' });
+  const etapeD = h('input', { type: 'date', value: /^\d{4}-\d\d-\d\d$/.test(c.etapeDate || '') ? c.etapeDate : '', 'aria-label': 'Date de la prochaine étape' });
+  const conv = h('select', { 'aria-label': 'Étape commerciale' }, CONV.map(([v, l]) => h('option', { value: v, selected: (c.conv || '') === v }, l)));
   const exRob = h('input', { type: 'checkbox', checked: !!c.exRoberlo, style: 'width:24px;min-height:24px', 'aria-label': 'Ancien client Roberlo' });
   const forma = h('input', { type: 'checkbox', checked: !!c.formation, style: 'width:24px;min-height:24px', 'aria-label': 'Démo ou formation proposée' });
   const essaisBox = h('div'), devisBox = h('div');
@@ -944,7 +1206,7 @@ async function pageClient(id) {
     const es = Array.isArray(c.essais) ? c.essais : [];
     essaisBox.replaceChildren(...(es.length ? es.slice().reverse().map(e => {
       const st2 = h('select', { 'aria-label': 'Résultat de l’essai' }, ESSAI_ST.map(([v, l]) => h('option', { value: v, selected: e.statut === v }, l)));
-      st2.addEventListener('change', async () => { e.statut = st2.value; if (e.statut === 'commande') c.conv = 'converti'; await putMany('clients', [c]); toast('Essai mis à jour.'); });
+      st2.addEventListener('change', async () => { e.statut = st2.value; if (e.statut === 'commande') { c.conv = 'converti'; e.commandeLe = e.commandeLe || new Date().toISOString(); } await putMany('clients', [c]); toast('Essai mis à jour.'); });
       const sv = Array.isArray(e.suivis) ? e.suivis : (e.suivis = []);
       const suiv = k => h('button', { class: 'btn sec', disabled: sv.includes(k), onclick: async () => { sv.push(k); await putMany('clients', [c]); dessinerEssais(); } }, sv.includes(k) ? k + ' fait' : 'Appel ' + k + ' fait');
       return h('div', { class: 'carte' }, h('strong', {}, (e.produit || 'Produit') + ' · ' + dateFr(e.date)), st2, h('div', { class: 'actions' }, suiv('J2'), suiv('J7')));
@@ -963,12 +1225,12 @@ async function pageClient(id) {
     const jour = aujourdhui();
     c.visites.push({ date: jour, res, note });
     if (c.visites.length > 100) c.visites = c.visites.slice(-100);
-    if (res === 'vu') c.rappel = '';
-    else { const d = new Date(Date.now() + (res === 'absent' ? 2 : 7) * JOUR); c.rappel = d.toISOString().slice(0, 10); }
+    if (res === 'vu') { c.rappel = ''; c.reporteAu = ''; c.reports = 0; }
+    else { const d = new Date(Date.now() + (res === 'absent' ? 2 : 7) * JOUR); c.rappel = jourLocal(d); }
     await putMany('clients', [c]); dessinerVisites(); toast(res === 'vu' ? 'Visite notée.' : 'Noté. Rappel le ' + dateFr(c.rappel) + '.');
   };
   const notes = h('textarea', { rows: 3, maxlength: 500, placeholder: 'Contact, visite, ce qu’il a dit…', 'aria-label': 'Notes' }, c.notes || '');
-  const lire = () => { c.cabine = cabine.value; c.fournisseur = clean(fourn.value).slice(0, 60); c.volume = Math.max(0, Math.min(1e6, Number(vol.value) || 0)) || ''; c.statutCrm = stat.value; c.priorite = prio.value; c.rythme = Math.max(0, Math.min(365, Math.round(Number(rythme.value) || 0))) || ''; c.notes = notes.value.slice(0, 500); c.contactNom = clean(cNom.value).slice(0, 60); c.peintreNom = clean(pNom.value).slice(0, 60); c.avis = avis.value; c.conv = conv.value; c.exRoberlo = exRob.checked; c.formation = forma.checked; };
+  const lire = () => { c.cabine = cabine.value; c.fournisseur = clean(fourn.value).slice(0, 60); c.volume = Math.max(0, Math.min(1e6, Number(vol.value) || 0)) || ''; c.statutCrm = stat.value; c.priorite = prio.value; c.rythme = Math.max(0, Math.min(365, Math.round(Number(rythme.value) || 0))) || ''; c.notes = notes.value.slice(0, 500); c.contactNom = clean(cNom.value).slice(0, 60); c.peintreNom = clean(pNom.value).slice(0, 60); c.critere = crit.value; c.etape = clean(etape.value).slice(0, 100); c.etapeDate = /^\d{4}-\d\d-\d\d$/.test(etapeD.value) ? etapeD.value : ''; c.conv = conv.value; c.exRoberlo = exRob.checked; c.formation = forma.checked; };
   const dessinerVerdict = () => {
     lire(); const a = avisProspect(c);
     verdict.replaceChildren(h('div', { class: 'carte ' + (a.n === 'ko' ? 'erreur' : a.n === 'ok' ? 'reussi' : 'alerte'), role: 'status' },
@@ -1000,17 +1262,22 @@ async function pageClient(id) {
   const bRech = h('button', { class: 'btn', onclick: () => rechercher(bRech) }, c.ent ? '🔎 Relire le registre' : '🔎 Fiche officielle (réseau)');
   montrer(c.nom,
     h('p', { class: 'mut' }, c.tel || 'Pas de téléphone'),
-    h('div', { class: 'actions' }, bRech, h('button', { class: 'btn sec', onclick: () => creerDevis(c) }, 'Nouveau devis'), h('a', { class: 'btn sec', href: '#/signaler/' + c.id }, '⚠ Signaler')),
-    zoneRech, fiche, verdict,
+    c.compte && c.compte.statut === 'bloque' ? h('div', { class: 'bandeau-ko' }, 'COMPTE BLOQUÉ') : null,
+    h('div', { class: 'trio' }, h('button', { class: 'btn', onclick: () => creerDevis(c) }, 'Devis'), c.tel ? h('a', { class: 'btn sec', href: 'tel:' + String(c.tel).replace(/[^0-9+]/g, '') }, 'Appeler') : h('button', { class: 'btn sec', disabled: true }, 'Appeler'), h('a', { class: 'btn sec', href: '#/signaler/' + c.id }, 'Signaler')),
+    h('div', { class: 'carte' }, h('small', { class: 'etiq' }, 'PROCHAINE ÉTAPE'), h('label', {}, 'Quoi'), etape, h('label', {}, 'Pour le (date)'), etapeD,
+      h('div', { class: 'actions' }, h('button', { class: 'btn vert', onclick: async () => { c.etape = ''; c.etapeDate = ''; etape.value = ''; etapeD.value = ''; await putMany('clients', [c]); toast('Étape faite.'); } }, 'Étape faite'))),
+    h('div', { class: 'carte' }, h('small', { class: 'etiq' }, 'CE QUI COMPTE POUR LUI'), puces, crit),
+    blocCompte(c, () => putMany('clients', [c])),
+    h('div', { class: 'actions' }, bRech), zoneRech, fiche, verdict,
     h('h2', {}, 'Questions terrain'),
     h('label', {}, 'A-t-il une cabine de peinture ?'), cabine,
     h('label', {}, 'Fournisseur actuel'), fourn,
     h('label', {}, 'Achat de peinture par mois (€)'), vol,
     h('label', {}, 'Statut'), stat,
     h('h2', {}, 'Contacts'),
-    h('label', {}, 'Décideur (gérant, chef d’atelier)'), cNom, h('label', {}, 'Peintre (celui qui décide en pratique)'), pNom, h('label', {}, 'Avis du peintre sur Carsystem'), avis,
+    h('label', {}, 'Décideur (gérant, chef d’atelier)'), cNom, h('label', {}, 'Peintre (celui qui décide en pratique)'), pNom, 
     h('label', { style: 'display:flex;gap:10px;align-items:center' }, forma, 'Démo ou formation proposée au peintre'),
-    h('h2', {}, 'Passage à Carsystem'),
+    h('h2', {}, 'Relation commerciale'),
     h('label', { style: 'display:flex;gap:10px;align-items:center' }, exRob, 'Ancien client Roberlo'),
     h('label', {}, 'Étape de conversion'), conv,
     h('h2', {}, 'Essais'), essaisBox,
@@ -1029,7 +1296,7 @@ async function pageClient(id) {
     h('div', { style: 'height:10px' }),
     h('button', { class: 'btn gros', onclick: async () => { lire(); await putMany('clients', [c]); toast('Enregistré.'); } }, 'Enregistrer'),
     h('p', { class: 'mut' }, 'Seul le nom du client est envoyé au registre public quand tu appuies sur « Fiche officielle ». Rien d’autre ne quitte le téléphone.'));
-  dessinerFiche(); dessinerVerdict(); dessinerVisites(); dessinerEssais();
+  dessinerFiche(); dessinerVerdict(); dessinerVisites(); dessinerEssais(); dessinerPuces();
 }
 async function pageClients() {
   const cl = (await getAll('clients')).sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
@@ -1296,6 +1563,8 @@ async function pageDevis(id) {
     h('button', { class: 'btn danger', onclick: async () => { if (confirm('Supprimer ce devis ?')) { await del('devis', id); location.hash = '#/'; } } }, 'Supprimer'));
   montrer(numero(d),
     h('div', { class: 'ecran' },
+      client && client.compte && client.compte.statut === 'bloque' ? h('div', { class: 'bandeau-ko' }, 'COMPTE BLOQUÉ : commande seulement contre règlement au comptant.') : null,
+      d.statut === 'refuse' ? (() => { const m = h('select', { 'aria-label': 'Motif du refus' }, MOTIFS_REFUS.map(([v, l]) => h('option', { value: v, selected: (d.motifRefus || '') === v }, l))); m.addEventListener('change', async () => { d.motifRefus = m.value; await sauver(); toast('Motif noté.'); }); return h('div', { class: 'carte' }, h('label', {}, 'Pourquoi le client a refusé ?'), m); })() : null,
       h('div', { class: 'carte' }, h('strong', {}, d.clientNom), h('br'), h('small', {}, dateFr(d.creeLe) + ' · '), h('span', { class: 'tag ' + etiquetteDevis(d)[1] }, etiquetteDevis(d)[0])),
       verrou ? null : [rech, h('div', { class: 'actions' }, h('button', { class: 'btn sec', onclick: ouvrirDictee }, '🎤 Dicter / coller une liste')), dictee, resBox],
       h('h2', {}, 'Lignes'), boite, totBox, notes, actBox,
@@ -1353,7 +1622,7 @@ async function pageReglages() {
     h('h2', {}, 'Sauvegarde'),
     h('p', { class: 'mut' }, 'Tes devis et clients ne sont QUE sur ce téléphone. Si tu perds le téléphone ou effaces les données du navigateur, ils sont perdus. Sauvegarde régulièrement, puis envoie le fichier où tu veux.'),
     h('div', { class: 'actions' }, h('button', { class: 'btn', onclick: async () => {
-      const o = { appli: 'devis-terrain', version: 1, date: new Date().toISOString(), reglages: S, clients: await getAll('clients'), devis: await getAll('devis'), signalements: await lireSig(), point: (await get('meta', 'point')) || null, comparateur: (await get('meta', 'comparateur')) || null, appels: await lireAppels() };
+      const o = { appli: 'devis-terrain', version: 1, date: new Date().toISOString(), reglages: S, clients: await getAll('clients'), devis: await getAll('devis'), signalements: await lireSig(), point: (await get('meta', 'point')) || null, comparateur: (await get('meta', 'comparateur')) || null, appels: await lireAppels(), tournees: await lireTournees() };
       telecharger('sauvegarde-devis-' + new Date().toISOString().slice(0, 10) + '.json', JSON.stringify(o), 'application/json'); toast('Sauvegarde téléchargée.');
     } }, 'Télécharger une sauvegarde')),
     h('label', {}, 'Restaurer une sauvegarde (remplace clients et devis actuels)'), fich,
@@ -1368,6 +1637,7 @@ async function pageReglages() {
         if (Array.isArray(o.signalements)) await put('meta', o.signalements, 'signalements');
         if (o.point && typeof o.point === 'object') await put('meta', o.point, 'point');
         if (Array.isArray(o.appels)) await put('meta', o.appels, 'appels');
+        if (o.tournees && typeof o.tournees === 'object' && !Array.isArray(o.tournees)) await put('meta', o.tournees, 'tournees');
         if (o.comparateur && typeof o.comparateur === 'object') await put('meta', o.comparateur, 'comparateur');
         if (o.reglages) { S = { ...SET_DEF, ...o.reglages }; await put('meta', S, 'settings'); }
         toast('Sauvegarde restaurée.'); pageReglages();
@@ -1397,4 +1667,4 @@ async function pageReglages() {
   }
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
-window.__t = { semaineObj, lundiDe, appelsSemaine, mesures, taches, relanceDue, coutPae, calculPoint, periodePoint, texteCommande, texteSignalement, sigEnRetard, objectifDuMois, activite, serie, jourLocal, analyserTexte, statsDevis, envoyerDevis, parseCents, parseQte, ligneTotal, totaux, importerArticles, importerClients, csvDevis, devinerColonnes, ligneEntete, tel2wa };
+window.__t = { indicateurs, semainesJusqua, tendance, factures, enRetard, feries, estOuvre, ecartJours, relanceDue, statsTournee, prochainOuvre, echeance, cibleSemaineDe, semaineObj, lundiDe, appelsSemaine, mesures, taches, relanceDue, coutPae, calculPoint, periodePoint, texteCommande, texteSignalement, sigEnRetard, objectifDuMois, activite, serie, jourLocal, analyserTexte, statsDevis, envoyerDevis, parseCents, parseQte, ligneTotal, totaux, importerArticles, importerClients, csvDevis, devinerColonnes, ligneEntete, tel2wa };
