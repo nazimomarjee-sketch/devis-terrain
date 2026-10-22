@@ -1,6 +1,6 @@
 'use strict';
 /* Devis terrain : cache d'abord, pour fonctionner sans réseau. Changer CACHE à chaque nouvelle version. */
-const CACHE = 'terrain-v16';
+const CACHE = 'terrain-v19';
 const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'manifest.webmanifest']; // indispensables : sans eux, pas d'installation
 const OPTION = ['icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'logo-96.png', 'xlsx.mini.min.js', 'barlow-condensed-latin-700-normal.woff2', 'barlow-condensed-latin-800-normal.woff2']; // le reste : si un fichier manque, l'appli s'installe quand même
 

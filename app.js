@@ -1,6 +1,6 @@
 'use strict';
 /* Devis terrain : tout reste sur le téléphone (IndexedDB). Seule exception : le bouton « Fiche officielle » d'un client envoie son NOM au registre public (recherche-entreprises.api.gouv.fr), à la demande. */
-const VERSION = 'v16';
+const VERSION = 'v19';
 
 // ---------- utilitaires ----------
 const $ = (s, r = document) => r.querySelector(s);
@@ -271,17 +271,20 @@ addEventListener('scroll', () => { const on = scrollY > 110; document.body.class
 function nonTrouve() { montrer('Introuvable', h('p', { class: 'vide' }, 'Cette page n’existe pas. '), h('a', { class: 'btn', href: '#/' }, 'Retour')); }
 async function route() {
   const p = (location.hash || '#/').slice(2).split('/');
-  document.querySelectorAll('.onglets a').forEach(a => a.classList.toggle('on', a.dataset.p === (p[0] || 'accueil') || (p[0] === 'devis' || p[0] === 'nouveau') && a.dataset.p === 'accueil' || ['point', 'signalements', 'signaler', 'comparateur', 'reglages', 'evolution'].includes(p[0]) && a.dataset.p === 'plus' || p[0] === 'client' && a.dataset.p === 'clients'));
+  { const q = p[0] || 'accueil', tab = q === 'accueil' ? 'accueil' : q === 'tournee' ? 'tournee' : (q === 'clients' || q === 'client') ? 'clients' : (q === 'devis' || q === 'nouveau') ? 'devis' : 'plus'; document.querySelectorAll('.onglets a').forEach(x => x.classList.toggle('on', x.dataset.p === tab)); }
   try {
     if (p[0] === '' || p[0] === undefined) await pageAccueil();
     else if (p[0] === 'nouveau') await pageChoixClient();
     else if (p[0] === 'devis' && /^\d+$/.test(p[1] || '')) await pageDevis(Number(p[1]));
+    else if (p[0] === 'devis') await pageDevisListe(p[1]);
+    else if (p[0] === 'feuille') await pageFeuille();
     else if (p[0] === 'tournee') await pageTournee();
     else if (p[0] === 'clients') await pageClients();
     else if (p[0] === 'client' && /^\d+$/.test(p[1] || '')) await pageClient(Number(p[1]));
     else if (p[0] === 'article' && p[1]) await pageArticle(p.slice(1).join('/'));
     else if (p[0] === 'catalogue') await pageCatalogue();
     else if (p[0] === 'reglages') await pageReglages();
+    else if (p[0] === 'pc') await pagePC();
     else if (p[0] === 'plus') pagePlus();
     else if (p[0] === 'signaler') await pageSignaler(/^\d+$/.test(p[1] || '') ? Number(p[1]) : null);
     else if (p[0] === 'signalements') await pageSignalements();
@@ -404,10 +407,11 @@ const lireAppels = async () => { const v = await get('meta', 'appels'); return A
 const appelsSemaine = (ap, now = new Date()) => { const l = lundiDe(now); return ap.filter(a => a && typeof a.date === 'string' && a.date.slice(0, 10) >= l); };
 function semaineObj(dv, now = new Date()) {
   const l = lundiDe(now), lun = new Date(l + 'T12:00:00'), ven = new Date(lun); ven.setDate(ven.getDate() + 4);
-  const ouv = Math.max(1, joursOuvres(lun, ven)), j = Math.max(1, Math.min(ouv, joursOuvres(lun, now)));
-  const ca = dv.filter(d => d.statut === 'accepte' && d.reponseLe && jourLocal(d.reponseLe) >= l).reduce((a, d) => a + totaux(d).ht, 0);
+  const ouv = Math.max(1, joursOuvres(lun, ven)), fin = new Date(now); fin.setHours(23, 59, 0, 0); const j = Math.max(1, Math.min(ouv, joursOuvres(lun, fin)));
+  const veille = new Date(now); veille.setDate(veille.getDate() - 1); veille.setHours(23, 59, 0, 0); const fait = Math.max(0, Math.min(ouv, joursOuvres(lun, veille))); // jours déjà terminés (aujourd'hui ne compte pas)
+  const ca = dv.filter(d => d.commandeLe && jourLocal(d.commandeLe) >= l && jourLocal(d.commandeLe) <= jourLocal(now)).reduce((a, d) => a + totaux(d).ht, 0);
   const c = cibleSemaineDe(now);
-  return { ca, cible: c.cible, derive: c.derive, j, ouv, attendu: Math.round(c.cible * j / ouv), l };
+  return { ca, cible: c.cible, derive: c.derive, j, ouv, fait, attendu: Math.round(c.cible * fait / ouv), l };
 }
 // ----- ce qu'il y a à faire, par ordre de priorité (l'argent en jeu d'abord) -----
 function taches(dv, cl, sigs, now = Date.now(), ext = {}) {
@@ -464,7 +468,7 @@ function tableauDeBord(dv, cl, sigs, ext = {}) {
   const envoyes = dv.filter(d => d.lignes.length && d.statut !== 'brouillon');
   const duMois = envoyes.filter(d => cleMois(envoiDe(d)) === mk);
   const acceptesMois = dv.filter(d => d.statut === 'accepte' && d.reponseLe && cleMois(d.reponseLe) === mk);
-  const ca = acceptesMois.reduce((a, d) => a + totaux(d).ht, 0);
+  const ca = dv.filter(d => d.commandeLe && cleMois(d.commandeLe) === mk).reduce((a, d) => a + totaux(d).ht, 0);
   const attente = dv.filter(d => d.statut === 'envoye' && d.lignes.length), attHt = attente.reduce((a, d) => a + totaux(d).ht, 0);
   const visitesMois = cl.reduce((a, c) => a + (Array.isArray(c.visites) ? c.visites : []).filter(v => v && v.res === 'vu' && typeof v.date === 'string' && v.date.slice(0, 7) === mk).length, 0);
   const obj = objectifDuMois(now), jr = joursOuvres(now, new Date(now.getFullYear(), now.getMonth() + 1, 0, 23));
@@ -473,26 +477,44 @@ function tableauDeBord(dv, cl, sigs, ext = {}) {
     h('div', { class: 'mut' }, 'sur ' + eur(cible) + ' · ' + Math.round(ca / cible * 100) + ' %'));
   const JNOM = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
   const carteObj = (obj || SW.cible) ? (() => {
-    const reste = obj ? Math.max(0, obj.cents - ca) : 0;
-    return h('div', { class: 'carte obj' }, h('div', { class: 'elan-tete' }, h('strong', {}, 'Objectifs commerciaux'), h('small', { class: 'mut' }, 'Devis acceptés HT')),
-      h('div', { class: 'deuxcol' }, SW.cible ? bloc('Cette semaine', SW.ca, SW.cible) : null, obj ? bloc('Ce mois (' + obj.rang + '/' + S.objectifs.length + ')', ca, obj.cents) : null),
-      SW.cible ? h('p', {}, '📅 ' + JNOM[now.getDay()] + ' · jour ' + SW.j + '/' + SW.ouv + ' · cible ' + eur(SW.attendu) + ' · ', h('strong', { class: 'pastille ' + (SW.ca >= SW.attendu ? 'ok' : 'ko') }, (SW.ca >= SW.attendu ? '+' : '−') + eur(Math.abs(SW.ca - SW.attendu))), SW.ca >= SW.cible ? ' · objectif de la semaine atteint' : '') : null,
-      SW.derive ? h('p', { class: 'mut' }, 'Objectif de la semaine déduit de l’objectif mensuel (jours ouvrés de la semaine sur ceux du mois). Fixe-le dans Réglages si tu préfères.') : null,
-      obj && reste && jr ? h('p', { class: 'mut' }, 'Reste ' + eur(reste) + ' sur le mois, soit ' + eur(Math.ceil(reste / jr)) + ' par jour ouvré (' + jr + ' restants, aujourd’hui compris, jours fériés déduits).') : null,
-      h('p', { class: 'mut' }, 'En attente de réponse : ' + eur(attHt) + ' (' + attente.length + ' devis). Ce sont des devis acceptés (HT), pas le CA facturé : EBP n’est pas encore branché.'));
+    const reste = obj ? Math.max(0, obj.cents - ca) : 0, pcM = obj ? Math.min(100, Math.round(ca / obj.cents * 100)) : 0, pcS = SW.cible ? Math.min(100, Math.round(SW.ca / SW.cible * 100)) : 0;
+    return h('div', { class: 'carte obj hero' }, h('div', { class: 'elan-tete' }, h('strong', {}, obj ? 'Objectif du mois (' + obj.rang + '/' + S.objectifs.length + ')' : 'Objectif de la semaine'), h('small', {}, 'Commandes envoyées HT')),
+      obj ? [h('div', { class: 'gros-chiffre' }, eur(ca), h('span', {}, ' sur ' + eur(obj.cents))),
+        h('div', { class: 'piste', role: 'img', 'aria-label': pcM + ' % de l’objectif du mois' }, h('div', { class: 'rempli', style: 'width:' + pcM + '%' })),
+        h('div', { class: 'lh' }, h('span', {}, pcM + ' %'), h('span', {}, reste ? 'reste ' + eur(reste) : 'objectif du mois atteint')),
+        reste && jr ? h('p', { class: 'mut' }, eur(Math.ceil(reste / jr)) + ' par jour ouvré (' + jr + ' restants, aujourd’hui compris, fériés déduits)') : null] : null,
+      SW.cible ? h('div', { class: 'semaine' },
+        h('div', { class: 'lh' }, h('strong', {}, 'Cette semaine : ' + eur(SW.ca) + ' sur ' + eur(SW.cible)), h('span', {}, pcS + ' %')),
+        h('p', { class: 'mut' }, JNOM[now.getDay()] + ' · jour ' + SW.j + '/' + SW.ouv + (SW.fait ? ' · attendu ce soir pour tenir le rythme : ' + eur(SW.attendu) + ' ' : ' · la semaine commence : rien à rattraper '), SW.fait ? h('strong', { class: 'pastille ' + (SW.ca >= SW.attendu ? 'ok' : 'ko') }, (SW.ca >= SW.attendu ? '+' : '−') + eur(Math.abs(SW.ca - SW.attendu))) : null, SW.ca >= SW.cible ? ' · objectif de la semaine atteint' : ''),
+        SW.derive ? h('p', { class: 'mut' }, 'Cible de la semaine déduite du mois (jours ouvrés), à valider : tu peux la fixer dans Réglages.') : null) : null,
+      h('p', { class: 'mut' }, 'En attente de réponse : ' + eur(attHt) + ' (' + attente.length + ' devis). Objectif : commandes envoyées HT sur ce téléphone, pas factures ni encaissements.'));
   })() : h('div', { class: 'carte' }, h('strong', {}, 'Pas d’objectif réglé. '), 'Entre ton objectif mensuel dans ', h('a', { href: '#/reglages' }, 'Réglages'), '.');
+  const nbBloques = cl.filter(c => c.compte && c.compte.statut === 'bloque').length, nbAccSansCmd = dv.filter(d => d.statut === 'accepte' && !d.commandeLe).length, nbRel = dv.filter(d => relanceDue(d, now.getTime()) != null).length, nbRep = cl.filter(c => (Number(c.reports) || 0) >= 3).length;
+  const tAl = (n, l, href, ko) => h('a', { class: 'alt' + (n && ko ? ' ko' : ''), href }, h('strong', {}, n), h('span', {}, l));
+  const carteAlertes = h('div', { class: 'carte alertes' }, h('div', { class: 'elan-tete' }, h('strong', {}, 'Alertes utiles'), h('small', { class: 'mut' }, 'saisies par toi')),
+    h('div', { class: 'grille-al' }, tAl(nbBloques, nbBloques > 1 ? 'comptes bloqués' : 'compte bloqué', '#/clients', true), tAl(nbAccSansCmd, 'devis acceptés non commandés', '#/devis/acceptes', true), tAl(nbRel, nbRel > 1 ? 'relances dues' : 'relance due', '#/devis/relancer', true), tAl(nbRep, '3 reports ou plus à traiter', '#/clients', true)));
   const kpi = (v, l) => h('div', { class: 'kpi' }, h('div', { class: 'v' }, v), h('div', { class: 'l' }, l));
   const lien = x => h('a', { class: 'ligne', href: x.href, style: 'color:inherit;text-decoration:none' }, h('span', { class: 'g' }, h('strong', {}, x.t), h('br'), h('small', {}, x.d)), h('span', { class: 'tag warn' }, x.tag));
   const lundi = lundiDe;
   const semaines = []; { const x = new Date(now); x.setDate(x.getDate() - 49); for (let i = 0; i < 8; i++) { semaines.push(lundi(x)); x.setDate(x.getDate() + 7); } }
-  const parSem = semaines.map(w => dv.filter(d => d.statut === 'accepte' && d.reponseLe && lundi(d.reponseLe) === w).reduce((a, d) => a + totaux(d).ht, 0));
+  const parSem = semaines.map(w => dv.filter(d => d.commandeLe && lundi(d.commandeLe) === w).reduce((a, d) => a + totaux(d).ht, 0));
   const mx = Math.max(...parSem, 1), M = mesures(dv, cl, now);
   const conv = {}; cl.forEach(c => { if (c.conv) conv[c.conv] = (conv[c.conv] || 0) + 1; });
   const dep = S.depart || {};
+  const EL = carteElan(dv, cl, T);
   return [
-    carteElan(dv, cl, T),
     carteObj,
-    carteCles(dv, cl, ext),
+    EL[0],
+    carteAlertes,
+    ext.pc ? (function(){const auj=jourLocal(now), actifs=ext.pc.actions.filter(a=>a.statut!=='fait');
+      const priorites=actifs.filter(a=>!a.jourPrevu||a.jourPrevu<=auj).sort((a,b)=>a.prio-b.prio);
+      const act=priorites[0]||actifs[0];
+      return act?h('a',{class:'carte prochaine',href:'#/pc',style:'display:block;color:inherit;text-decoration:none'},
+        h('small',{class:'etiq'},'PLAN PC · PROCHAINE ACTION'),h('div',{class:'gros-chiffre'},act.t),
+        h('p',{class:'mut'},(act.d||'')+' · P'+act.prio),h('span',{class:'btn'},'Gérer cette action')):cartePC(ext.pc)
+    })() : null,
+    h('details', { class: 'carte' }, h('summary', {}, 'Mon élan : série, défi, niveau'), EL[1], EL[2]),
+    h('details', { class: 'carte' }, h('summary', {}, 'Mes 6 indicateurs de la semaine'), carteCles(dv, cl, ext)),
     (() => { const t = (ext.tournees || {})[jourLocal(now)]; if (!t || !Array.isArray(t.ids) || !t.ids.length) return null; const x = statsTournee(t), pc = Math.round((x.prevus - x.restants) / x.prevus * 100);
       return h('a', { class: 'carte', href: '#/tournee', style: 'display:block;color:inherit;text-decoration:none' }, h('div', { class: 'elan-tete' }, h('span', {}, h('strong', {}, 'Ma tournée'), h('br'), h('small', { class: 'mut' }, (x.prevus - x.restants) + '/' + x.prevus + ' garages traités · ' + x.restants + ' restant' + (x.restants > 1 ? 's' : ''))), h('span', { class: 'tag ' + (t.termine ? 'ok' : 'warn') }, t.termine ? 'Terminée' : 'En cours')), h('div', { class: 'piste', style: 'margin-top:8px' }, h('div', { class: 'rempli', style: 'width:' + pc + '%' }))); })(),
     h('h2', {}, 'À faire aujourd’hui'),
@@ -507,14 +529,14 @@ function tableauDeBord(dv, cl, sigs, ext = {}) {
 
 async function pageAccueil() {
   const [dv, cl, sigs] = [await getAll('devis'), await getAll('clients'), await lireSig()];
-  const ext = { point: await get('meta', 'point'), appels: await lireAppels(), tournees: await lireTournees(), sigs };
+  const ext = { point: await get('meta', 'point'), appels: await lireAppels(), tournees: await lireTournees(), sigs, pc: await lirePC() };
   dv.sort((a, b) => b.id - a.id);
   const prenom = (S.vendeur || '').trim().split(' ')[0], JN = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
-  montrer(prenom ? 'Bonjour, ' + prenom : 'Bonjour',
+  montrer('Bonjour, ' + (S.accueilNom || 'Mr Omarjee'),
     CAT.length ? null : h('div', { class: 'carte alerte' }, h('strong', {}, 'Catalogue vide. '), 'Importe ton fichier de tarifs pour pouvoir faire des devis. ', h('a', { href: '#/catalogue' }, 'Aller au catalogue')),
-    prenom ? null : (() => { const i = h('input', { placeholder: 'Ton prénom', maxlength: 40, autocomplete: 'given-name', 'aria-label': 'Ton prénom' }); return h('div', { class: 'carte' }, h('strong', {}, 'Comment t’appelles-tu ?'), h('p', { class: 'mut' }, 'Pour que l’accueil te dise bonjour (il sert aussi de signature sur les devis).'), h('div', { class: 'actions' }, i, h('button', { class: 'btn', onclick: async () => { const v = clean(i.value).slice(0, 40); if (!v) return; S = { ...S, vendeur: v }; await put('meta', S, 'settings'); pageAccueil(); } }, 'OK'))); })(),
+    prenom ? null : (() => { const i = h('input', { placeholder: 'Ton prénom', maxlength: 40, autocomplete: 'given-name', 'aria-label': 'Ton prénom' }); return h('div', { class: 'carte' }, h('strong', {}, 'Comment t’appelles-tu ?'), h('p', { class: 'mut' }, 'Il sert de signature sur les devis et dans les messages.'), h('div', { class: 'actions' }, i, h('button', { class: 'btn', onclick: async () => { const v = clean(i.value).slice(0, 40); if (!v) return; S = { ...S, vendeur: v }; await put('meta', S, 'settings'); pageAccueil(); } }, 'OK'))); })(),
     tableauDeBord(dv, cl, sigs, ext),
-    h('div', { class: 'actions' }, h('a', { class: 'btn sec', href: '#/signaler' }, 'Signaler un problème'), h('a', { class: 'btn sec', href: '#/point' }, 'Préparer le Point')),
+    h('div', { class: 'actions' }, h('a', { class: 'btn sec', href: '#/point' }, 'Point du lundi'), h('a', { class: 'btn sec', href: '#/feuille' }, 'Feuille de route'), h('a', { class: 'btn sec', href: '#/signaler' }, 'Signaler un problème')),
     h('div', { class: 'fab noprint' }, h('a', { class: 'btn gros noir', href: '#/nouveau' }, '+ Nouveau devis')), h('div', { style: 'height:84px' }),
     (() => { const sem = dv.filter(d => d.lignes.length && Date.now() - new Date(d.creeLe).getTime() < 7 * 864e5); return sem.length ? h('div', { class: 'actions' }, h('button', { class: 'btn sec', onclick: () => envoyerDevis(sem, 'recap-devis-' + new Date().toISOString().slice(0, 10) + '.json') }, 'Envoyer le récap : ' + sem.length + ' devis des 7 derniers jours')) : null; })(),
     h('h2', {}, 'Derniers devis'),
@@ -535,7 +557,7 @@ function texteCommande(d, o = {}) {
   d.lignes.forEach(l => L.push(l.code + ' — ' + l.des + ' × ' + qtxt(l.q) + (o.prix ? ' (' + eur(l.pu) + (l.r ? ' -' + pct(l.r) + ' %' : '') + ' → ' + eur(ligneTotal(l)) + ' HT)' : '')));
   if (o.prix) L.push('---', 'Total HT : ' + eur(t.ht));
   if (o.note) L.push('Note : ' + o.note);
-  if (o.bloque) L.push('COMPTE BLOQUÉ : réglé au comptant confirmé par le vendeur');
+  L.push('Règlement : ' + (o.bloque ? 'COMPTE BLOQUÉ, réglé au comptant confirmé par le vendeur' : o.compte === 'ouvert' ? 'compte ouvert' : o.compte === 'comptant' ? 'comptant uniquement' : 'à vérifier'));
   if (o.tard && o.urgence !== 'urgente') L.push('Après l’heure limite : préparation pour demain');
   L.push(o.stock ? 'Stock vérifié' : 'Stock à vérifier');
   L.push('Vendeur : ' + (S.vendeur || '—'));
@@ -559,12 +581,12 @@ function blocCommande(d, client, fini, sauver, apres) {
       const bloque = client && client.compte && client.compte.statut === 'bloque';
       if (bloque && !confirm('Compte BLOQUÉ. Le client règle-t-il au comptant ?')) return;
       fini(); d.cmdMode = mode.value; d.cmdUrgence = urg.value; d.cmdNote = clean(note.value).slice(0, 300);
-      const texte = texteCommande(d, { mode: d.cmdMode, urgence: d.cmdUrgence, note: d.cmdNote, prix: prix.checked, tel: client && client.tel, stock: stockOk.checked, tard, bloque: client && client.compte && client.compte.statut === 'bloque' });
+      const texte = texteCommande(d, { mode: d.cmdMode, urgence: d.cmdUrgence, note: d.cmdNote, prix: prix.checked, tel: client && client.tel, stock: stockOk.checked, tard, bloque: client && client.compte && client.compte.statut === 'bloque', compte: client && client.compte && client.compte.statut });
       window.open('https://wa.me/' + tel2wa(S.respTel) + '?text=' + encodeURIComponent(texte), '_blank', 'noopener');
       d.commandeLe = new Date().toISOString();
       if (d.statut === 'brouillon' || d.statut === 'envoye') { d.statut = 'accepte'; d.reponseLe = d.reponseLe || d.commandeLe; if (client && client.conv && client.conv !== 'converti') { client.conv = 'converti'; await putMany('clients', [client]); } }
       await sauver(); toast('Commande préparée. Le devis est marqué accepté.'); apres();
-    } }, 'Envoyer par WhatsApp')));
+    } }, 'Envoyer la commande à ' + (S.respNom || 'le responsable'))));
 }
 
 // ----- signalements (photo + note), envoyés au responsable -----
@@ -684,7 +706,7 @@ function calculPoint(dv, cl, sigs, per, appels = [], tournees = {}) {
   const res = sigs.filter(s => s.resoluLe && s.envoyeLe).map(s => (new Date(s.resoluLe) - new Date(s.envoyeLe)) / 36e5);
   const types = {}; sig.forEach(s => { types[s.type] = (types[s.type] || 0) + 1; });
   return { sent, acc, ref, essais, visites, sig, ouverts, types, resolMoyH: res.length ? res.reduce((a, b) => a + b, 0) / res.length : null,
-    caAcc: acc.reduce((a, d) => a + totaux(d).ht, 0), attente: dv.filter(d => d.statut === 'envoye' && d.lignes.length),
+    caAcc: dv.filter(d => d.commandeLe && dans(d.commandeLe)).reduce((a, d) => a + totaux(d).ht, 0), attente: dv.filter(d => d.statut === 'envoye' && d.lignes.length),
     enc: factures(cl).length || cl.some(c => c.compte && c.compte.statut === 'bloque') ? (() => { const F = factures(cl), ouv = F.filter(f => !f.regleLe); return { aEnc: ouv.reduce((a, f) => a + (f.montant || 0), 0), retard: ouv.filter(f => f.echeance && f.echeance < per.fin).reduce((a, f) => a + (f.montant || 0), 0), encaisse: F.filter(f => f.regleLe && jourLocal(f.regleLe) >= per.debut && jourLocal(f.regleLe) <= per.fin).reduce((a, f) => a + (f.montant || 0), 0), bloques: cl.filter(c => c.compte && c.compte.statut === 'bloque').length }; })() : null,
     tour, repetes: cl.filter(c => (Number(c.reports) || 0) >= 3), objections: sig.filter(s => s.type === 'objection'), appels: appels.filter(a => a && typeof a.date === 'string' && a.date.slice(0, 10) >= per.debut && a.date.slice(0, 10) <= per.fin) };
 }
@@ -710,7 +732,7 @@ function cibleSemaineDe(d) {
 function texteDuPoint(P, per, bloc, engagements, chg) {
   const L = ['POINT — ' + (S.vendeur || 'vendeur') + ' — ' + per.lib + ' (' + dateFr(per.debut) + ' au ' + dateFr(per.fin) + ')', '',
     '1. MESURER',
-    'Devis acceptés : ' + eur(P.caAcc) + ' HT' + (P.cible ? ' sur ' + eur(P.cible) + ' (' + Math.round(P.caAcc / P.cible * 100) + ' %, écart ' + (P.caAcc >= P.cible ? '+' : '−') + eur(Math.abs(P.caAcc - P.cible)) + ')' : ''),
+    'Commandes envoyées : ' + eur(P.caAcc) + ' HT' + (P.cible ? ' sur ' + eur(P.cible) + ' (' + Math.round(P.caAcc / P.cible * 100) + ' %, écart ' + (P.caAcc >= P.cible ? '+' : '−') + eur(Math.abs(P.caAcc - P.cible)) + ')' : ''),
     P.visites + ' visites · ' + P.sent.length + ' devis envoyés · ' + P.acc.length + ' acceptés · ' + P.ref.length + ' refusés · ' + P.attente.length + ' en attente',
     'Tournée : ' + (P.tour.prevus ? P.tour.faits + '/' + P.tour.prevus + ' garages traités (' + Math.round(P.tour.faits / P.tour.prevus * 100) + ' %), ' + P.tour.reportes + ' reportés' : 'pas de tournée démarrée'),
     'Essais : ' + P.essais.length + ' lancés, ' + P.essais.filter(e => e.statut === 'concluant' || e.statut === 'commande').length + ' concluants',
@@ -962,10 +984,78 @@ async function pageComparateur() {
 }
 function pagePlus() {
   const L = (href, t, d) => h('a', { class: 'ligne', href, style: 'color:inherit;text-decoration:none' }, h('span', { class: 'g' }, h('strong', {}, t), h('br'), h('small', {}, d)), h('span', {}, '›'));
-  montrer('Plus', L('#/evolution', 'Évolution', 'Tous les indicateurs, semaine par semaine, avec leur courbe'), L('#/point', 'Point', 'Résumé de la semaine ou du mois pour ton responsable, blocages, engagements'), L('#/signalements', 'Signalements', 'Problèmes remontés avec photo et leur suivi'), L('#/signaler', 'Signaler un problème', 'Photo + note envoyées à ton responsable'),
+  montrer('Plus', L('#/point', 'Point du lundi', 'Le récap de la semaine écoulée : bilan, UN changement, engagements'), L('#/feuille', 'Feuille de route', 'Le plan de la semaine qui commence, jour par jour'), L('#/pc', 'Lien avec le PC', 'Envoyer ta sauvegarde au PC, recevoir le plan de la semaine'), L('#/catalogue', 'Catalogue', 'Articles et prix importés d’EBP'), L('#/evolution', 'Évolution', 'Tous les indicateurs, semaine par semaine, avec leur courbe'), L('#/signalements', 'Signalements', 'Problèmes remontés avec photo et leur suivi'), L('#/signaler', 'Signaler un problème', 'Photo + note envoyées à ton responsable'),
     L('#/comparateur', 'Comparateur de coût', 'Coût réel au m² : produit actuel contre produit proposé'), L('#/reglages', 'Réglages', 'Objectifs, responsable, TVA, sauvegarde'));
 }
 
+
+// ---------- liste des devis ----------
+async function pageDevisListe(filtre) {
+  const dv = (await getAll('devis')).sort((a, b) => b.id - a.id), now = Date.now();
+  const F = [['', 'Tous', () => true], ['relancer', 'À relancer', d => relanceDue(d, now) != null], ['acceptes', 'Acceptés', d => d.statut === 'accepte'], ['envoyes', 'Envoyés', d => d.statut === 'envoye'], ['refuses', 'Refusés', d => d.statut === 'refuse']];
+  const f = F.find(x => x[0] === (filtre || '')) || F[0], liste = dv.filter(d => d.lignes.length || d.statut === 'brouillon').filter(f[2]);
+  montrer('Devis', h('div', { class: 'puces' }, F.map(x => h('a', { class: 'puce' + (x[0] === f[0] ? ' on' : ''), href: '#/devis' + (x[0] ? '/' + x[0] : ''), style: 'display:inline-flex;align-items:center;text-decoration:none' }, x[1] + ' ' + dv.filter(x[2]).length))),
+    h('div', { class: 'actions' }, h('a', { class: 'btn', href: '#/nouveau' }, '+ Nouveau devis')),
+    liste.length ? h('div', { class: 'carte' }, liste.slice(0, 60).map(d => { const [lib, cls] = etiquetteDevis(d); return h('a', { class: 'ligne', href: '#/devis/' + d.id, style: 'color:inherit;text-decoration:none' },
+      h('span', { class: 'g' }, h('strong', {}, d.clientNom), h('br'), h('small', {}, numero(d) + ' · ' + dateFr(d.creeLe) + (d.statut === 'accepte' && !d.commandeLe ? ' · pas encore commandé' : ''))),
+      h('span', { class: 'prix' }, eur(totaux(d).ht), h('br'), h('span', { class: 'tag ' + cls }, lib))); })) : h('p', { class: 'vide' }, 'Aucun devis dans cette liste.'));
+}
+
+// ---------- feuille de route de la semaine ----------
+function planSemaine(dv, cl, now = new Date()) {
+  const lun = lundiDe(now), jours = [];
+  for (let i = 0; i < 5; i++) { const x = new Date(lun + 'T12:00:00'); x.setDate(x.getDate() + i); if (estOuvre(x)) jours.push(jourLocal(x)); }
+  const plan = {}; jours.forEach(j => { plan[j] = []; });
+  if (!jours.length) return { jours, plan, reserve: [] };
+  const premier = jours[0], dernier = jours[jours.length - 1], ms = now.getTime();
+  const place = (j, it) => { const k = j < premier ? premier : j; if (k > dernier) return false; const g = jours.find(x => x >= k) || dernier; plan[g].push(it); return true; };
+  const plus = (iso, n) => jourLocal(Date.parse(iso + 'T12:00:00') + n * JOUR);
+  dv.forEach(d => {
+    if (d.statut !== 'envoye' || !d.lignes.length) return;
+    if (relanceDue(d, ms) != null) place(premier, { t: 'Relancer le devis de ' + d.clientNom, d: eur(totaux(d).ht) + ' HT', href: '#/devis/' + d.id, tag: 'Relance' });
+    else if (!d.relanceLe) { const du = plus(jourLocal(envoiDe(d)), S.relanceJours || 3); if (du >= premier && du <= dernier) place(du, { t: 'Relancer le devis de ' + d.clientNom, d: eur(totaux(d).ht) + ' HT (3 jours après l’envoi : hypothèse)', href: '#/devis/' + d.id, tag: 'Relance' }); }
+  });
+  factures(cl).forEach(f => {
+    if (f.regleLe) return;
+    if (f.promesse && f.promesse >= premier && f.promesse <= dernier) place(f.promesse, { t: 'Paiement promis · ' + f.client.nom, d: eur(f.montant || 0) + ' à vérifier', href: '#/client/' + f.client.id, tag: 'Règlement' });
+    else if (enRetard(f, ms) && !(f.promesse && f.promesse > jourLocal(ms))) place(premier, { t: 'Relancer le règlement · ' + f.client.nom, d: eur(f.montant || 0) + ' en retard', href: '#/client/' + f.client.id, tag: 'Règlement' });
+  });
+  const vus = new Set();
+  cl.forEach(c => {
+    (Array.isArray(c.essais) ? c.essais : []).forEach(e => {
+      if (!e || e.statut !== 'encours' || !/^\d{4}-\d\d-\d\d$/.test(e.date || '')) return;
+      const sv = Array.isArray(e.suivis) ? e.suivis : [];
+      [['J2', 2, 'Appeler pour l’essai'], ['J7', 7, 'Faire le point sur l’essai']].forEach(([k, n, t]) => { if (!sv.includes(k) && place(plus(e.date, n), { t: t + ' chez ' + c.nom, d: (e.produit || 'produit') + ' · J+' + n, href: '#/client/' + c.id, tag: 'Essai' })) vus.add(c.id); });
+    });
+    if (c.etape && /^\d{4}-\d\d-\d\d$/.test(c.etapeDate || '') && place(c.etapeDate, { t: c.etape + ' · ' + c.nom, d: 'Étape prévue le ' + dateFr(c.etapeDate), href: '#/client/' + c.id, tag: 'Étape' })) vus.add(c.id);
+    if (typeof c.reporteAu === 'string' && /^\d{4}-\d\d-\d\d$/.test(c.reporteAu) && c.reporteAu > jourLocal(ms) && place(c.reporteAu, { t: 'Visite reportée · ' + c.nom, d: 'Reportée ' + (c.reports || 1) + ' fois', href: '#/client/' + c.id, tag: 'Visite' })) vus.add(c.id);
+  });
+  const dus = cl.filter(c => !vus.has(c.id)).map(c => ({ c, e: echeance(c, ms) })).filter(x => x.e && x.e.du).sort((a, b) => (b.e.rappel - a.e.rappel) || (b.e.pct - a.e.pct));
+  const PAR_JOUR = 4, reserve = [];
+  dus.forEach(({ c, e }) => {
+    const it = { t: 'Visiter ' + c.nom, d: e.rappel ? 'Tu avais prévu de le rappeler' : e.jours == null ? 'Jamais visité : premier contact' : 'Dernière visite il y a ' + e.jours + ' j', href: '#/client/' + c.id, tag: 'Visite' };
+    const g = jours.find(j => plan[j].filter(x => x.tag === 'Visite').length < PAR_JOUR); if (g) plan[g].push(it); else reserve.push(it);
+  });
+  return { jours, plan, reserve, nbPar: PAR_JOUR };
+}
+async function pageFeuille() {
+  const [dv, cl, pt] = [await getAll('devis'), await getAll('clients'), await get('meta', 'point')], now = new Date(), pc = await lirePC();
+  const P = planSemaine(dv, cl, now), SW = semaineObj(dv, now), obj = objectifDuMois(now), per = periodePoint('semaine', now);
+  const chg = pt && pt.changements && pt.changements['semaine:' + per.fin], libChg = chg && chg.k ? (chg.k === 'autre' ? (chg.autre || 'Autre') : libChangement(chg.k)) : '';
+  const NJ = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'], lab = j => { const x = new Date(j + 'T12:00:00'); return NJ[x.getDay()][0].toUpperCase() + NJ[x.getDay()].slice(1) + ' ' + String(x.getDate()).padStart(2, '0') + '/' + String(x.getMonth() + 1).padStart(2, '0'); };
+  const texte = () => ['FEUILLE DE ROUTE · semaine du ' + dateFr(P.jours[0] + 'T12:00:00'), SW.cible ? 'Objectif de la semaine : ' + eur(SW.cible) + (obj ? ' (mois : ' + eur(obj.cents) + ')' : '') : '', libChg ? 'Mon changement : ' + libChg : '', ...P.jours.flatMap(j => ['', lab(j).toUpperCase(), ...(P.plan[j].length ? P.plan[j].map(x => '- ' + x.t) : ['- (libre)'])]), P.reserve.length ? '\nEN RÉSERVE : ' + P.reserve.map(x => x.t.replace('Visiter ', '')).join(', ') : ''].filter(x => x !== '').join('\n');
+  montrer('Feuille de route', h('div', { class: 'carte obj hero' }, h('strong', {}, 'Semaine du ' + dateFr(P.jours[0] + 'T12:00:00')),
+      SW.cible ? h('div', { class: 'gros-chiffre' }, eur(SW.cible), h('span', {}, ' à faire cette semaine' + (SW.derive ? ' (déduit du mois)' : ''))) : h('p', {}, 'Aucune cible : règle ton objectif dans Réglages.'),
+      libChg ? h('p', {}, 'Mon changement de la semaine : ', h('strong', {}, libChg)) : h('p', { class: 'mut' }, 'Pas de changement choisi au Point. ', h('a', { href: '#/point' }, 'Faire le Point'))),
+    pc ? h('div', { class: 'carte' }, h('strong', {}, 'Envoyé par le PC (plan reçu le ' + dateFr(pc.recuLe || pc.date) + ')'), pc.changement ? h('p', {}, 'Changement proposé : ', h('strong', {}, pc.changement.texte)) : null,
+      pc.actions.length ? pc.actions.slice(0, 40).map(x => h('a', { class: 'ligne', href: x.client ? '#/clients' : '#/pc', style: 'color:inherit;text-decoration:none' }, h('span', { class: 'g' }, h('strong', {}, x.t), h('br'), h('small', {}, (/^\d{4}-\d\d-\d\d$/.test(x.jour || '') ? lab(x.jour) + ' · ' : '') + (x.d || ''))), h('span', { class: 'tag' }, x.tag || 'PC'))) : h('p', { class: 'mut' }, 'Aucune action.'),
+      h('p', { class: 'mut' }, 'Ce plan croise ta sauvegarde et l’export EBP du ' + (/^\d{4}-\d\d-\d\d$/.test(pc.arrete || '') ? dateFr(pc.arrete + 'T12:00:00') : '?') + '. Il n’est pas en direct.')) : null,
+    P.jours.map(j => h('div', { class: 'carte' }, h('strong', {}, lab(j) + (j === jourLocal(now) ? ' · aujourd’hui' : '')),
+      P.plan[j].length ? P.plan[j].map(x => h('a', { class: 'ligne', href: x.href, style: 'color:inherit;text-decoration:none' }, h('span', { class: 'g' }, h('strong', {}, x.t), h('br'), h('small', {}, x.d)), h('span', { class: 'tag' }, x.tag))) : h('p', { class: 'mut' }, 'Rien de prévu : place un garage à prospecter.'))),
+    P.reserve.length ? h('div', { class: 'carte' }, h('strong', {}, 'En réserve (' + P.reserve.length + ')'), h('p', { class: 'mut' }, 'Garages dus mais qui ne tiennent pas dans la semaine (' + P.nbPar + ' visites par jour max : hypothèse à valider).'), P.reserve.slice(0, 15).map(x => h('a', { class: 'ligne', href: x.href, style: 'color:inherit;text-decoration:none' }, h('span', { class: 'g' }, h('strong', {}, x.t.replace('Visiter ', ''))), h('span', {}, '›')))) : null,
+    h('p', { class: 'mut' }, 'À valider : le rythme de visite (14/30/90 jours) et le nombre de visites par jour sont des hypothèses. Le plan répartit par urgence, pas par trajet : l’appli ne connaît pas les distances.'),
+    h('div', { class: 'actions' }, h('a', { class: 'btn', href: 'https://wa.me/?text=' + encodeURIComponent(texte()), target: '_blank', rel: 'noopener' }, 'Envoyer par WhatsApp'), h('button', { class: 'btn sec', onclick: () => window.print() }, 'Imprimer')));
+}
 
 // ---------- clients ----------
 async function creerDevis(client) {
@@ -1269,9 +1359,11 @@ async function pageClient(id) {
   getAll('devis').then(ds => { const mine = ds.filter(d => d.clientId === c.id).sort((a, b) => b.id - a.id); devisBox.replaceChildren(...(mine.length ? mine.map(d => { const [lib, cls] = etiquetteDevis(d); return h('a', { class: 'ligne', href: '#/devis/' + d.id, style: 'color:inherit;text-decoration:none' }, h('span', { class: 'g' }, numero(d) + ' · ' + dateFr(d.creeLe)), h('span', { class: 'prix' }, eur(totaux(d).ht), h('br'), h('span', { class: 'tag ' + cls }, lib))); }) : [h('p', { class: 'vide' }, 'Aucun devis.')])); });
   [prio, rythme].forEach(x => x.addEventListener('input', () => { lire(); dessinerVisites(); }));
   const bRech = h('button', { class: 'btn', onclick: () => rechercher(bRech) }, c.ent ? '🔎 Relire le registre' : '🔎 Fiche officielle (réseau)');
+  const vuPC = await blocPCClient(c);
   montrer(c.nom,
     h('p', { class: 'mut' }, c.tel || 'Pas de téléphone'),
     c.compte && c.compte.statut === 'bloque' ? h('div', { class: 'bandeau-ko' }, 'COMPTE BLOQUÉ') : null,
+    vuPC,
     h('div', { class: 'trio' }, h('button', { class: 'btn', onclick: () => creerDevis(c) }, 'Devis'), c.tel ? h('a', { class: 'btn sec', href: 'tel:' + String(c.tel).replace(/[^0-9+]/g, '') }, 'Appeler') : h('button', { class: 'btn sec', disabled: true }, 'Appeler'), h('a', { class: 'btn sec', href: '#/signaler/' + c.id }, 'Signaler')),
     h('div', { class: 'carte' }, h('small', { class: 'etiq' }, 'PROCHAINE ÉTAPE'), h('label', {}, 'Quoi'), etape, h('label', {}, 'Pour le (date)'), etapeD,
       h('div', { class: 'actions' }, h('button', { class: 'btn vert', onclick: async () => { c.etape = ''; c.etapeDate = ''; etape.value = ''; etapeD.value = ''; await putMany('clients', [c]); toast('Étape faite.'); } }, 'Étape faite'))),
@@ -1564,10 +1656,10 @@ async function pageDevis(id) {
       h('button', { class: 'btn sec', onclick: () => { fini(); telecharger(numero(d) + '.csv', csvDevis(d), 'text/csv;charset=utf-8'); } }, 'CSV pour EBP'),
       h('button', { class: 'btn', onclick: () => { fini(); envoyerDevis([d], 'devis-' + numero(d) + '.json'); } }, 'Envoyer à mon responsable')] : null,
     h('button', { class: 'btn sec', onclick: () => dupliquer(d) }, 'Dupliquer (prix du jour)'),
-    d.statut === 'envoye' && d.lignes.length ? [
-      h('button', { class: 'btn', onclick: async () => { d.statut = 'accepte'; d.reponseLe = new Date().toISOString(); if (client && client.conv && client.conv !== 'converti') { client.conv = 'converti'; await putMany('clients', [client]); } await sauver(); toast('Devis accepté.'); pageDevis(id); } }, 'Accepté par le client'),
-      h('button', { class: 'btn sec', onclick: async () => { d.statut = 'refuse'; d.reponseLe = new Date().toISOString(); await sauver(); toast('Devis noté refusé.'); pageDevis(id); } }, 'Refusé'),
-      h('button', { class: 'btn sec', onclick: async () => { d.relanceLe = new Date().toISOString(); await sauver(); window.open('https://wa.me/' + tel + '?text=' + encodeURIComponent('Bonjour, avez-vous pu regarder le devis ' + numero(d) + ' (' + eur(totaux(d).ht) + ' HT) ? Je reste à votre disposition.'), '_blank', 'noopener'); pageDevis(id); } }, 'Relancer par WhatsApp')] : null,
+    d.statut === 'envoye' && d.lignes.length ? h('div', { class: 'trio' },
+      h('button', { class: 'btn vert', onclick: async () => { d.statut = 'accepte'; d.reponseLe = new Date().toISOString(); if (client && client.conv && client.conv !== 'converti') { client.conv = 'converti'; await putMany('clients', [client]); } await sauver(); toast('Devis accepté.'); pageDevis(id); } }, 'Accepté'),
+      h('button', { class: 'btn ambre', onclick: async () => { d.relanceLe = new Date().toISOString(); await sauver(); window.open('https://wa.me/' + tel + '?text=' + encodeURIComponent('Bonjour, avez-vous pu regarder le devis ' + numero(d) + ' (' + eur(totaux(d).ht) + ' HT) ? Je reste à votre disposition.'), '_blank', 'noopener'); pageDevis(id); } }, 'À relancer'),
+      h('button', { class: 'btn gris', onclick: async () => { d.statut = 'refuse'; d.reponseLe = new Date().toISOString(); await sauver(); toast('Devis noté refusé.'); pageDevis(id); } }, 'Refusé')) : null,
     h('button', { class: 'btn ' + (verrou ? 'sec' : ''), onclick: async () => { if (!verrou) fini(); if (verrou) { d.statut = 'brouillon'; delete d.reponseLe; } else d.statut = 'envoye'; await sauver(); pageDevis(id); } }, verrou ? 'Rouvrir pour modifier' : 'Marquer comme envoyé'),
     h('button', { class: 'btn danger', onclick: async () => { if (confirm('Supprimer ce devis ?')) { await del('devis', id); location.hash = '#/'; } } }, 'Supprimer'));
   montrer(numero(d),
@@ -1630,10 +1722,7 @@ async function pageReglages() {
     } }, 'Enregistrer')),
     h('h2', {}, 'Sauvegarde'),
     h('p', { class: 'mut' }, 'Tes devis et clients ne sont QUE sur ce téléphone. Si tu perds le téléphone ou effaces les données du navigateur, ils sont perdus. Sauvegarde régulièrement, puis envoie le fichier où tu veux.'),
-    h('div', { class: 'actions' }, h('button', { class: 'btn', onclick: async () => {
-      const o = { appli: 'devis-terrain', version: 1, date: new Date().toISOString(), reglages: S, clients: await getAll('clients'), devis: await getAll('devis'), signalements: await lireSig(), point: (await get('meta', 'point')) || null, comparateur: (await get('meta', 'comparateur')) || null, appels: await lireAppels(), tournees: await lireTournees() };
-      telecharger('sauvegarde-devis-' + new Date().toISOString().slice(0, 10) + '.json', JSON.stringify(o), 'application/json'); toast('Sauvegarde téléchargée.');
-    } }, 'Télécharger une sauvegarde')),
+    h('div', { class: 'actions' }, h('button', { class: 'btn', onclick: async () => { await exporterSauvegarde(); toast('Sauvegarde téléchargée.'); } }, 'Télécharger une sauvegarde')),
     h('label', {}, 'Restaurer une sauvegarde (remplace clients et devis actuels)'), fich,
     h('div', { class: 'actions' }, h('button', { class: 'btn sec', onclick: async () => {
       try {
@@ -1662,6 +1751,72 @@ async function pageReglages() {
     h('p', { class: 'mut' }, 'Version ' + VERSION + ' · Fonctionne sans réseau · Aucune donnée n’est envoyée.'));
 }
 
+
+// ---------- lien avec le PC (sauvegarde envoyée au PC, plan de la semaine reçu du PC) ----------
+async function exporterSauvegarde() {
+  const o = { appli: 'devis-terrain', version: 1, date: new Date().toISOString(), reglages: S, clients: await getAll('clients'), devis: await getAll('devis'), signalements: await lireSig(), point: (await get('meta', 'point')) || null, comparateur: (await get('meta', 'comparateur')) || null, appels: await lireAppels(), tournees: await lireTournees(), pcActions: (await get('meta', 'pcActions')) || [] };
+  telecharger('sauvegarde-devis-' + new Date().toISOString().slice(0, 10) + '.json', JSON.stringify(o), 'application/json');
+}
+const normNom = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+const lirePC = async () => { const v = await get('meta', 'pc'); return v && v.appli === 'plan-pc' && Array.isArray(v.actions) ? v : null; };
+function nettoyerPlan(o) {
+  const t = (v, n = 200) => clean(String(v == null ? '' : v)).slice(0, n), j = v => (/^\d{4}-\d\d-\d\d$/.test(v || '') ? v : '');
+  return { appli: 'plan-pc', version: 2, date: /^\d{4}-\d\d-\d\d/.test(o.date || '') ? String(o.date).slice(0, 30) : new Date().toISOString(), arrete: j(o.arrete), recuLe: new Date().toISOString(),
+    changement: o.changement && o.changement.texte ? { texte: t(o.changement.texte, 300), mesure: t(o.changement.mesure, 200) } : null,
+    indicateurs: (Array.isArray(o.indicateurs) ? o.indicateurs : []).slice(0, 12).map(x => ({ l: t(x && x.l, 60), v: t(x && x.v, 60), n: t(x && x.n, 100) })),
+    actions: (Array.isArray(o.actions) ? o.actions : []).slice(0, 200).map(x => ({ id:t(x&&x.id,150), prio:Math.max(1,Math.min(3,Number(x&&x.prio)||3)), statut:['a_faire','fait','reporte','bloque'].includes(x&&(x.statut||x.etat))?(x.statut||x.etat):'a_faire', note:t(x&&x.note,300), jourPrevu:j(x&&x.jourPrevu||x&&x.reportLe), modifieLe:t(x&&x.modifieLe,35), responsable:t(x&&x.responsable,50), jour: j(x && x.jour), t: t(x && x.t), d: t(x && x.d), tag: t(x && x.tag, 20), client: t(x && x.client, 80) })).filter(x => x.t),
+    clients: (Array.isArray(o.clients) ? o.clients : []).slice(0, 600).map(x => ({ nom: t(x && x.nom, 80), code: t(x && x.code, 20), niveau: ['ok', 'warn', 'bad'].includes(x && x.niveau) ? x.niveau : 'ok', lignes: (Array.isArray(x && x.lignes) ? x.lignes : []).slice(0, 8).map(l => t(l, 160)) })).filter(x => x.nom) };
+}
+function cartePC(pc) {
+  const age = pc.arrete ? Math.floor((Date.now() - new Date(pc.arrete + 'T12:00:00').getTime()) / 864e5) : Infinity, nb = pc.actions.length;
+  return h('a', { class: 'carte', href: '#/pc', style: 'display:block;color:inherit;text-decoration:none' }, h('div', { class: 'elan-tete' }, h('span', {}, h('strong', {}, 'Plan du PC'), h('br'), h('small', { class: 'mut' }, 'export EBP du ' + (pc.arrete?dateFr(pc.arrete+'T12:00:00'):'?') + ' · ' + nb + ' action' + (nb > 1 ? 's' : ''))), h('span', { class: 'tag ' + (age > 7 ? 'ko' : 'ok') }, !Number.isFinite(age) ? 'Date inconnue' : age > 7 ? 'Ancien' : 'Export récent')),
+    pc.changement ? h('p', { class: 'mut', style: 'margin:8px 0 0' }, 'Changement proposé : ' + pc.changement.texte) : null);
+}
+async function blocPCClient(c) {
+  const pc = await lirePC(); if (!pc) return null;
+  const k = normNom(c.nom), e = pc.clients.find(x => normNom(x.nom) === k);
+  if (!e || !e.lignes.length) return null;
+  return h('div', { class: 'carte ' + (e.niveau === 'bad' ? 'alerte' : '') }, h('small', { class: 'etiq' }, 'VU PAR LE PC (export EBP du ' + (pc.arrete?dateFr(pc.arrete+'T12:00:00'):'date inconnue') + ')'), e.lignes.map(l => h('p', { style: 'margin:6px 0 0' }, l)));
+}
+async function pagePC() {
+  const pc = await lirePC(), fich = h('input', { type: 'file', accept: '.json', 'aria-label': 'Plan du PC' });
+  montrer('Lien avec le PC',
+    h('div', { class: 'carte' }, h('strong', {}, '1. Envoyer ta sauvegarde au PC'), h('p', { class: 'mut' }, 'Devis, commandes envoyées, clients, visites, tournées. Passe le fichier au PC comme tu veux : partage Samsung, câble ou mail à toi-même. Rien ne part tout seul.'),
+      h('div', { class: 'actions' }, h('button', { class: 'btn', onclick: async () => { await exporterSauvegarde(); toast('Fichier prêt : envoie-le au PC.'); } }, 'Télécharger le fichier pour le PC'))),
+    h('div', { class: 'carte' }, h('strong', {}, '2. Recevoir le plan du PC'), h('p', { class: 'mut' }, 'Le PC croise ta sauvegarde et les exports EBP, puis produit le plan de la semaine : relances, impayés, commandes bloquées.'), fich,
+      h('div', { class: 'actions' }, h('button', { class: 'btn', onclick: async () => {
+        try {
+          const f = fich.files[0]; if (!f) { toast('Choisis le fichier du PC.', true); return; }
+          if (f.size > 5 * 1024 * 1024) throw new Error('Fichier trop gros.');
+          const o = JSON.parse(await f.text());
+          if (!o || o.appli !== 'plan-pc' || !Array.isArray(o.actions) || o.version !== 2 || !/^\d{4}-\d\d-\d\dT/.test(o.date||'')) throw new Error('Plan PC v19 invalide.');
+          if(o.chiffre&&o.chiffre.source==='demo')throw new Error('Plan fictif : import refusé.');
+          const p = nettoyerPlan(o), previous=await lirePC();
+          if(previous&&new Date(p.date).getTime()<=new Date(previous.date).getTime())throw new Error('Plan ancien ou déjà importé.');
+          if(!confirm('Importer '+p.actions.length+' actions ? Le plan précédent sera conservé.'))return;
+          if(previous){const archives=(await get('meta','pcArchives'))||[];archives.push(previous);await put('meta',archives.slice(-5),'pcArchives');await put('meta',previous,'pcPrecedent')}
+          const history=(await get('meta','pcActions'))||[];const by=new Map(history.map(x=>[x.id,x]));
+          p.actions.forEach(a=>{const old=by.get(a.id);if(old&&old.modifieLe&&(!a.modifieLe||old.modifieLe>=a.modifieLe))Object.assign(a,{statut:old.statut||old.etat,note:old.note,jourPrevu:old.jourPrevu||old.reportLe,modifieLe:old.modifieLe});by.set(a.id,a)});
+          await put('meta',Array.from(by.values()),'pcActions');
+          await put('meta', p, 'pc'); toast('Plan reçu : ' + p.actions.length + ' actions.'); pagePC();
+        } catch (e) { toast('Import impossible : ' + e.message, true); }
+      } }, 'Importer le plan'))),
+    pc ? h('div', { class: 'carte' }, h('strong', {}, 'Plan en cours'), h('p', { class: 'mut' }, 'Reçu le ' + dateFr(pc.recuLe || pc.date) + ' · export EBP du ' + (pc.arrete ? dateFr(pc.arrete + 'T12:00:00') : '?') + ' · pas en direct'),
+      pc.changement ? h('div', { class: 'carte' }, h('strong', {}, 'Changement proposé'), h('p', {}, pc.changement.texte), pc.changement.mesure ? h('small', { class: 'mut' }, pc.changement.mesure) : null) : null,
+      pc.indicateurs.length ? pc.indicateurs.map(x => h('div', { class: 'ligne' }, h('span', { class: 'g' }, h('strong', {}, x.l), x.n ? h('small', {}, ' · ' + x.n) : null), h('span', { class: 'prix' }, x.v))) : null,
+      h('div', { class: 'carte' }, h('strong', {}, 'Mes priorités · une action à la fois'),
+        pc.actions.filter(a=>a.statut!=='fait').slice(0,25).map(a=>h('div',{class:'ligne',style:'display:block'},
+          h('strong',{},'P'+a.prio+' · '+a.t),h('p',{class:'mut'},(a.jourPrevu||a.jour||'Non planifiée')+' · '+(a.statut==='bloque'?'Bloquée':a.statut==='reporte'?'Reportée':'À faire')),
+          h('div',{class:'actions'},...['fait','reporte','bloque'].map(et=>h('button',{class:'btn sec',onclick:async()=>{
+            const note=et==='fait'?'':prompt(et==='bloque'?'Qui bloque et pourquoi ?':'Motif du report et nouvelle date (AAAA-MM-JJ) ?','');if(et!=='fait'&&note===null)return;
+            const now=new Date().toISOString();a.statut=et;a.note=note||'';a.modifieLe=now;
+            if(et==='reporte'){const m=(note||'').match(/\d{4}-\d{2}-\d{2}/);if(!m){toast('Ajoute une date AAAA-MM-JJ.',true);return}a.jourPrevu=m[0]}
+            const all=(await get('meta','pcActions'))||[];const i=all.findIndex(x=>x.id===a.id);if(i>=0)all[i]={...a};else all.push({...a});
+            await put('meta',all,'pcActions');await put('meta',pc,'pc');pagePC();
+          }},et==='fait'?'Fait':et==='reporte'?'Reporter':'Bloqué')))) )),
+      h('div', { class: 'actions' }, h('a', { class: 'btn sec', href: '#/feuille' }, 'Voir la feuille de route'), h('button', { class: 'btn sec', onclick: async () => { await rq(st('meta', 'readwrite').delete('pc')); toast('Plan effacé.'); pagePC(); } }, 'Effacer le plan'))) : h('p', { class: 'vide' }, 'Aucun plan reçu pour l’instant.'));
+}
+
 // ---------- démarrage ----------
 (async () => {
   const etat = $('#etat');
@@ -1676,4 +1831,4 @@ async function pageReglages() {
   }
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
-window.__t = { indicateurs, semainesJusqua, tendance, factures, enRetard, feries, estOuvre, ecartJours, relanceDue, statsTournee, prochainOuvre, echeance, cibleSemaineDe, semaineObj, lundiDe, appelsSemaine, mesures, taches, relanceDue, coutPae, calculPoint, periodePoint, texteCommande, texteSignalement, sigEnRetard, objectifDuMois, activite, serie, jourLocal, analyserTexte, statsDevis, envoyerDevis, parseCents, parseQte, ligneTotal, totaux, importerArticles, importerClients, csvDevis, devinerColonnes, ligneEntete, tel2wa };
+window.__t = { nettoyerPlan, normNom, planSemaine, indicateurs, semainesJusqua, tendance, factures, enRetard, feries, estOuvre, ecartJours, relanceDue, statsTournee, prochainOuvre, echeance, cibleSemaineDe, semaineObj, lundiDe, appelsSemaine, mesures, taches, relanceDue, coutPae, calculPoint, periodePoint, texteCommande, texteSignalement, sigEnRetard, objectifDuMois, activite, serie, jourLocal, analyserTexte, statsDevis, envoyerDevis, parseCents, parseQte, ligneTotal, totaux, importerArticles, importerClients, csvDevis, devinerColonnes, ligneEntete, tel2wa };
