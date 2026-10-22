@@ -1,11 +1,11 @@
 'use strict';
 /* Devis terrain : cache d'abord, pour fonctionner sans réseau. Changer CACHE à chaque nouvelle version. */
-const CACHE = 'terrain-v20-1';
+const CACHE = 'terrain-v20-2';
 const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'manifest.webmanifest']; // indispensables : sans eux, pas d'installation
 const OPTION = ['icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'logo-96.png', 'xlsx.mini.min.js', 'barlow-condensed-latin-700-normal.woff2', 'barlow-condensed-latin-800-normal.woff2']; // le reste : si un fichier manque, l'appli s'installe quand même
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL).then(() => Promise.allSettled(OPTION.map(u => c.add(u))))).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then(c => Promise.all(SHELL.map(u => c.add(new Request(u, { cache: 'reload' })))).then(() => Promise.allSettled(OPTION.map(u => c.add(new Request(u, { cache: 'reload' })))))).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
