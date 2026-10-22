@@ -1,6 +1,6 @@
 'use strict';
 /* Devis terrain : tout reste sur le téléphone (IndexedDB). Seule exception : le bouton « Fiche officielle » d'un client envoie son NOM au registre public (recherche-entreprises.api.gouv.fr), à la demande. */
-const VERSION = 'v20.2';
+const VERSION = 'v21';
 
 // ---------- utilitaires ----------
 const $ = (s, r = document) => r.querySelector(s);
@@ -473,16 +473,7 @@ function carteProchaineTournee(pt) {
     h('p', { class: 'mut', style: 'margin:6px 0 0' }, 'Garage ' + pt.rang + ' sur ' + pt.total + ' aujourd’hui'));
 }
 
-function pcActionDuJour(pc, now) {
-  if (!pc || !Array.isArray(pc.actions)) return null; const auj = jourLocal(now);
-  return pc.actions.filter(a => a.statut !== 'fait' && a.statut !== 'bloque' && (!a.jourPrevu || a.jourPrevu <= auj)).sort((a, b) => a.prio - b.prio)[0] || null;
-}
-function carteActionPC(act) {
-  return h('div', { class: 'carte prochaine' }, h('div', { class: 'elan-tete' }, h('small', { class: 'etiq' }, 'MA PROCHAINE ACTION · PLAN DU PC'), h('span', { class: 'tag' }, 'P' + act.prio)),
-    h('div', { class: 'gros-chiffre' }, act.t), h('p', { class: 'mut', style: 'font-size:15px' }, act.d || ''),
-    h('div', { class: 'actions' }, h('a', { class: 'btn', href: '#/pc' }, 'Gérer cette action')));
-}
-function carteElan(dv, cl, T, pt, pcAct) {
+function carteElan(dv, cl, T, pt) {
   const m = activite(dv, cl), auj = jourLocal(new Date()), t = m[auj] || { pts: 0, vu: 0, devis: 0, effort: 0 };
   const total = Object.values(m).reduce((a, x) => a + x.pts, 0), niv = Math.floor(total / PALIER) + 1, reste = PALIER - total % PALIER;
   const record = Math.max(0, ...Object.entries(m).filter(([j]) => j !== auj).map(([, x]) => x.pts));
@@ -491,7 +482,7 @@ function carteElan(dv, cl, T, pt, pcAct) {
   const x = T[0], proch = x ? { t: x.titre || x.t, d: x.m != null ? [x.tag === 'Règlement' ? 'Facture de ' : 'Devis de ', h('strong', {}, eur(x.m) + (x.tag === 'Règlement' ? '' : ' HT')), x.d2] : x.d, href: x.href, tag: x.tag, b: x.b || (x.href.startsWith('#/devis') ? 'Ouvrir le devis' : x.href.startsWith('#/client') ? 'Ouvrir la fiche' : x.href === '#/point' ? 'Faire le Point' : 'Ouvrir') } : { t: 'Rien d’urgent', d: 'Bonne occasion de repérer un garage à contacter.', href: '#/clients', b: 'Voir les clients' };
   const tuile = (v, l, s) => h('div', { class: 'kpi' }, h('div', { class: 'v' }, v), h('div', { class: 'l' }, l), s ? h('div', { class: 'l' }, s) : null);
   return [
-    pt ? carteProchaineTournee(pt) : pcAct ? carteActionPC(pcAct) : h('div', { class: 'carte prochaine' },
+    pt ? carteProchaineTournee(pt) : h('div', { class: 'carte prochaine' },
       h('div', { class: 'elan-tete' }, h('small', { class: 'etiq' }, 'TA PROCHAINE ACTION'), proch.tag ? h('span', { class: 'tag' }, proch.tag) : null),
       h('div', { class: 'gros-chiffre' }, proch.t), h('p', { class: 'mut', style: 'font-size:15px' }, proch.d),
       h('div', { class: 'elan-tete' }, h('span', { class: 'mut' }, x ? 'À traiter en priorité' : ''), h('a', { class: 'btn', href: proch.href }, proch.b))),
@@ -542,13 +533,21 @@ function tableauDeBord(dv, cl, sigs, ext = {}) {
   const mx = Math.max(...parSem, 1), M = mesures(dv, cl, now);
   const conv = {}; cl.forEach(c => { if (c.conv) conv[c.conv] = (conv[c.conv] || 0) + 1; });
   const dep = S.depart || {};
-  const pt = prochaineTournee(cl, dv, ext, now.getTime()), pcAct = pcActionDuJour(ext.pc, now.getTime()), pcMain = !pt && !!pcAct && !(T[0] && T[0].p <= 1);
-  const EL = carteElan(dv, cl, T, pt, pcMain ? pcAct : null);
+  const EL = carteElan(dv, cl, T, prochaineTournee(cl, dv, ext, now.getTime()));
+  const auj = jourLocal(now), ageExport=ext.pc&&ext.pc.arrete?ecartJours(ext.pc.arrete,now.getTime()):Infinity;
+  const pcUtilisable=ageExport>=0&&ageExport<=7;
+  const actionsPC = pcUtilisable&&ext.pc&&Array.isArray(ext.pc.actions) ? ext.pc.actions : [];
+  const duesPC = actionsPC.filter(a=>a.statut!=='fait'&&a.statut!=='bloque'&&(!a.jourPrevu||a.jourPrevu<=auj)&&(!a.jour||a.jour<=auj||!!a.jourPrevu));
+  duesPC.sort((a,b)=>a.prio-b.prio||(a.jourPrevu||a.jour||'').localeCompare(b.jourPrevu||b.jour||''));
+  const actPC = duesPC[0]||null;
+  const prioriteUnique = actPC ? h('a',{class:'carte prochaine',href:'#/pc',style:'display:block;color:inherit;text-decoration:none'},
+    h('small',{class:'etiq'},'TA PROCHAINE ACTION · PLAN PC'),h('div',{class:'gros-chiffre'},actPC.t),
+    h('p',{class:'mut'},(actPC.d||'')+' · P'+actPC.prio+(actPC.statut==='bloque'?' · en attente d’un tiers':'')),h('span',{class:'btn'},'Gérer cette action')) : EL[0];
   return [
     carteObj,
-    EL[0],
+    prioriteUnique,
     carteAlertes,
-    (ext.pc && !pcMain) ? cartePC(ext.pc) : null,
+    ext.pc && !actPC ? cartePC(ext.pc) : null,
     h('details', { class: 'carte' }, h('summary', {}, 'Mon élan : série, défi, niveau'), EL[1], EL[2]),
     h('a', { class: 'carte', href: '#/travail', style: 'display:block;color:inherit;text-decoration:none' }, h('div', { class: 'elan-tete' }, h('span', {}, h('strong', {}, 'Mon travail'), h('br'), h('small', { class: 'mut' }, 'Clients visités, devis, commandes, factures, impayés : le point en un coup d’œil')), h('span', { class: 'btn sec' }, 'Ouvrir'))),
     (() => { const t = (ext.tournees || {})[jourLocal(now)]; if (!t || !Array.isArray(t.ids) || !t.ids.length) return null; const x = statsTournee(t), pc = Math.round((x.prevus - x.restants) / x.prevus * 100);
@@ -605,6 +604,11 @@ function blocCommande(d, client, fini, sauver, apres) {
   const stockOk = h('input', { type: 'checkbox', style: 'width:24px;min-height:24px', 'aria-label': 'Stock vérifié' });
   const hl = /^\d\d:\d\d$/.test(S.heureLimite || '') ? S.heureLimite : '', tard = hl && new Date().toTimeString().slice(0, 5) > hl;
   return h('div', { class: 'carte' }, h('strong', {}, 'Commande pour ' + (S.respNom || 'le responsable')),
+    d.cmdPrepaLe&&!d.commandeLe ? h('div',{class:'carte alerte'},h('strong',{},'Message préparé, envoi NON confirmé'),h('p',{class:'mut'},'Ouvrir WhatsApp ne prouve pas que Mohamed a reçu la commande.'),
+      h('button',{class:'btn',onclick:async()=>{if(!confirm('As-tu réellement envoyé la commande à Mohamed ? Cette validation reste ta déclaration, pas un accusé de réception.'))return;
+        d.commandeLe=new Date().toISOString();if(d.statut!=='accepte'){d.statut='accepte';d.reponseLe=d.reponseLe||d.commandeLe;}
+        if(client&&client.conv&&client.conv!=='converti'){client.conv='converti';await putMany('clients',[client]);}
+        await sauver();toast('Envoi déclaré par toi. Confirmation EBP à vérifier.');apres();}},'J’ai réellement envoyé la commande')):null,
     h('label', {}, 'Mode'), mode, h('label', {}, 'Urgence'), urg, h('label', {}, 'Note'), note,
     h('label', { style: 'display:flex;gap:10px;align-items:center' }, prix, 'Joindre les prix au message'),
     h('label', { style: 'display:flex;gap:10px;align-items:center' }, stockOk, 'Stock vérifié avec ' + (S.respNom || 'le responsable')),
@@ -617,10 +621,9 @@ function blocCommande(d, client, fini, sauver, apres) {
       fini(); d.cmdMode = mode.value; d.cmdUrgence = urg.value; d.cmdNote = clean(note.value).slice(0, 300);
       const texte = texteCommande(d, { mode: d.cmdMode, urgence: d.cmdUrgence, note: d.cmdNote, prix: prix.checked, tel: client && client.tel, stock: stockOk.checked, tard, bloque: client && client.compte && client.compte.statut === 'bloque', compte: client && client.compte && client.compte.statut });
       window.open('https://wa.me/' + tel2wa(S.respTel) + '?text=' + encodeURIComponent(texte), '_blank', 'noopener');
-      d.commandeLe = new Date().toISOString();
-      if (d.statut === 'brouillon' || d.statut === 'envoye') { d.statut = 'accepte'; d.reponseLe = d.reponseLe || d.commandeLe; if (client && client.conv && client.conv !== 'converti') { client.conv = 'converti'; await putMany('clients', [client]); } }
-      await sauver(); toast('Commande préparée. Le devis est marqué accepté.'); apres();
-    } }, 'Envoyer la commande à ' + (S.respNom || 'le responsable'))));
+      d.cmdPrepaLe = new Date().toISOString();
+      await sauver(); toast('Message ouvert : confirme l’envoi réel en revenant ici.'); apres();
+    } }, 'Préparer le message pour ' + (S.respNom || 'le responsable'))));
 }
 
 // ----- signalements (photo + note), envoyés au responsable -----
@@ -926,7 +929,7 @@ function periodeTravail(k, now = new Date()) {
 function mesuresMoi(dv, cl, w) {
   const vus = []; cl.forEach(c => (Array.isArray(c.visites) ? c.visites : []).forEach(v => { if (v && v.res === 'vu' && dansSem(v.date, w)) vus.push(c.id); }));
   const env = dv.filter(d => d.lignes.length && d.statut !== 'brouillon' && dansSem(envoiDe(d), w)), cmd = dv.filter(d => d.commandeLe && dansSem(d.commandeLe, w)), ht = a => a.reduce((s, d) => s + totaux(d).ht, 0);
-  return { visites: vus.length, clients: new Set(vus).size, devis: env.length, devisHt: ht(env), cmd: cmd.length, cmdHt: ht(cmd), devisCmd: env.filter(d => d.commandeLe).length };
+  return { visites: vus.length, clients: new Set(vus).size, devis: env.length, devisHt: ht(env), cmd: cmd.length, cmdHt: ht(cmd) };
 }
 function ebpTravail(pc, per) {
   const k = pc && pc.kpi && pc.kpi[per.kc]; if (!k || k.debut !== per.debut) return null;
@@ -957,7 +960,11 @@ async function pageTravail(k) {
   const nAct = tag => pc ? pc.actions.filter(a => a.tag === tag && a.statut !== 'fait' && (tag !== 'Commande' || a.responsable !== 'Toi')).length : 0;
   const manque = cible - M.cmdHt;
   const fil = [nb(M.clients, 'client visité', 'clients visités'), nb(M.devis, 'devis', 'devis'), nb(M.cmd, 'commande', 'commandes')].concat(E ? [nb(E.cur.facN, 'facture (EBP)', 'factures (EBP)')] : []).join('  →  ');
-  const taux = M.devis ? Math.round(M.devisCmd / M.devis * 100) : null;
+  // Conversion par cohorte : suivre les MÊMES devis, et non deux flux de semaines différentes.
+  const cohorte = dv.filter(d=>d.lignes&&d.lignes.length&&d.statut!=='brouillon'&&
+    jourLocal(envoiDe(d))>=per.debut&&jourLocal(envoiDe(d))<=per.fin);
+  const commandesCohorte = cohorte.filter(d=>!!d.commandeLe).length;
+  const taux = cohorte.length ? Math.round(commandesCohorte/cohorte.length*100) : null;
   const bascule = h('div', { class: 'actions' }, [['semaine', 'Cette semaine'], ['passee', 'Semaine passée'], ['mois', 'Ce mois']].map(([id, l]) => h('a', { class: 'btn ' + (per.k === id ? '' : 'sec'), href: '#/travail/' + id }, l)));
   montrer('Mon travail', bascule,
     h('p', { class: 'mut' }, per.lib + ' · du ' + dateFr(per.debut) + ' au ' + dateFr(per.fin) + '. MOI = ce que tu notes dans l’appli. EBP = export du PC (' + (pc ? 'export du ' + dateExp : 'aucun plan reçu') + ').'),
@@ -971,10 +978,10 @@ async function pageTravail(k) {
       nAct('Commande') ? h('a', { class: 'btn sec', href: '#/pc' }, nb(nAct('Commande'), 'commande à vérifier', 'commandes à vérifier') + ' avec ' + (S.respNom || 'ton responsable')) : null) : pasExport('4 · Commandes retrouvées dans EBP'),
     E ? ligne('5 · Factures émises', source('EBP du ' + dateExp), nb(E.cur.facN, 'facture', 'factures'), eur(Math.round(E.cur.facHt * 100)) + ' HT', E.prev ? deltaTxt(E.cur.facN, E.prev.facN, null, per.plib) : null,
       nAct('Facture') ? h('a', { class: 'btn sec', href: '#/pc' }, nb(nAct('Facture'), 'livraison à faire facturer', 'livraisons à faire facturer')) : null) : pasExport('5 · Factures émises'),
-    E && E.echu ? ligne('6 · Impayés échus', source('EBP du ' + dateExp), nb(E.echu.n, 'facture', 'factures'), (E.echu.reste == null ? (E.echu.n ? 'reste à payer à confirmer' : 'aucun impayé vérifié') : eur(Math.round(E.echu.reste * 100)) + ' de reste vérifié') + (E.echu.aVerifier ? ' · ' + E.echu.aVerifier + ' à vérifier (solde inconnu)' : ''), null,
-      nAct('Règlement') ? h('a', { class: 'btn sec', href: '#/pc' }, 'Traiter ' + nb(nAct('Règlement'), 'règlement', 'règlements')) : null) : pasExport('6 · Impayés échus'),
+    E && E.echu ? ligne('6 · Impayés échus', source('EBP du ' + dateExp), nb(E.echu.n, 'facture', 'factures'), E.echu.reste == null ? 'aucun montant échu vérifié' + (E.echu.aVerifier?' · '+E.echu.aVerifier+' facture(s) à vérifier':'') : eur(Math.round(E.echu.reste * 100)) + ' de reste vérifié' + (E.echu.aVerifier?' · '+E.echu.aVerifier+' facture(s) à vérifier':''), null,
+      nAct('Règlement') ? h('a', { class: 'btn sec', href: '#/pc' }, 'Relancer ' + nb(nAct('Règlement'), 'paiement', 'paiements')) : null) : pasExport('6 · Impayés échus'),
     h('div', { class: 'carte' }, h('small', { class: 'etiq' }, 'Le fil de ton travail'), h('p', { style: 'font-size:17px;margin:6px 0' }, fil),
-      taux == null ? h('p', { class: 'mut' }, 'Pas encore de devis sur la période.') : h('p', { class: 'mut' }, M.devisCmd + ' des ' + M.devis + ' devis envoyés sur cette période sont déjà devenus commande (' + taux + ' %). Les devis récents peuvent encore se transformer.')),
+      taux == null ? h('p', { class: 'mut' }, 'Pas encore de devis envoyé sur la période.') : h('p', { class: 'mut' }, commandesCohorte + ' commande' + (commandesCohorte > 1 ? 's' : '') + ' issue' + (commandesCohorte > 1 ? 's' : '') + ' de ' + cohorte.length + ' devis envoyés dans la période (' + taux + ' %). Ce taux évolue lorsque des devis anciens deviennent des commandes.')),
     h('p', { class: 'mut' }, 'Les chiffres MOI ne comptent que ce que tu notes. Les chiffres EBP datent du dernier export : jamais « 0 » sans export, un tiret.'));
 }
 
@@ -1864,7 +1871,7 @@ function nettoyerPlan(o) {
   return { appli: 'plan-pc', version: 2, kpi, date: /^\d{4}-\d\d-\d\d/.test(o.date || '') ? String(o.date).slice(0, 30) : new Date().toISOString(), arrete: j(o.arrete), recuLe: new Date().toISOString(),
     changement: o.changement && o.changement.texte ? { texte: t(o.changement.texte, 300), mesure: t(o.changement.mesure, 200) } : null,
     indicateurs: (Array.isArray(o.indicateurs) ? o.indicateurs : []).slice(0, 12).map(x => ({ l: t(x && x.l, 60), v: t(x && x.v, 60), n: t(x && x.n, 100) })),
-    actions: (Array.isArray(o.actions) ? o.actions : []).slice(0, 200).map(x => ({ id:t(x&&x.id,150), prio:Math.max(1,Math.min(3,Number(x&&x.prio)||3)), statut:['a_faire','fait','reporte','bloque'].includes(x&&(x.statut||x.etat))?(x.statut||x.etat):'a_faire', note:t(x&&x.note,300), jourPrevu:j(x&&x.jourPrevu||x&&x.reportLe), modifieLe:t(x&&x.modifieLe,35), responsable:t(x&&x.responsable,50), jour: j(x && x.jour), t: t(x && x.t), d: t(x && x.d), tag: t(x && x.tag, 20), client: t(x && x.client, 80) })).filter(x => x.t),
+    actions: (Array.isArray(o.actions) ? o.actions : []).slice(0, 200).map(x => ({ id:t(x&&x.id,150), prio:Math.max(1,Math.min(3,Number(x&&x.prio)||3)), statut:['a_faire','fait','reporte','bloque'].includes(x&&(x.statut||x.etat))?(x.statut||x.etat):'a_faire', note:t(x&&x.note,300), jourPrevu:j(x&&x.jourPrevu||x&&x.reportLe), modifieLe:t(x&&x.modifieLe,35), responsable:t(x&&x.responsable,50), jour: j(x && x.jour), t: t(x && x.t), d: t(x && x.d), preuve:t(x&&x.preuve,500), source:t(x&&x.source,90), qualite:t(x&&x.qualite,100), tag: t(x && x.tag, 20), client: t(x && x.client, 80) })).filter(x => x.t),
     clients: (Array.isArray(o.clients) ? o.clients : []).slice(0, 600).map(x => ({ nom: t(x && x.nom, 80), code: t(x && x.code, 20), niveau: ['ok', 'warn', 'bad'].includes(x && x.niveau) ? x.niveau : 'ok', lignes: (Array.isArray(x && x.lignes) ? x.lignes : []).slice(0, 8).map(l => t(l, 160)) })).filter(x => x.nom) };
 }
 function cartePC(pc) {
@@ -1909,7 +1916,7 @@ async function pagePC() {
           const maj=async patch=>{Object.assign(a,patch,{modifieLe:new Date().toISOString()});const all=(await get('meta','pcActions'))||[];const i=all.findIndex(x=>x.id===a.id);if(i>=0)all[i]={...a};else all.push({...a});await put('meta',all,'pcActions');await put('meta',pc,'pc');pagePC()};
           const demain=prochainOuvre(), lundi=jourLocal(new Date(new Date(lundiDe(new Date())+'T12:00:00').getTime()+7*864e5));
           return h('div',{class:'ligne',style:'display:block'},
-          h('strong',{},'P'+a.prio+' · '+a.t),h('p',{class:'mut'},(a.jourPrevu||a.jour||'Non planifiée')+' · '+(a.statut==='bloque'?'Bloquée'+(a.note?' ('+a.note+')':''):a.statut==='reporte'?'Reportée':'À faire')),
+          h('strong',{},'P'+a.prio+' · '+a.t),h('p',{class:'mut'},a.preuve||a.d||'Justification non renseignée.'),h('small',{class:'mut'},'Source : '+(a.source||'non précisée')+' · '+(a.qualite||'à vérifier')),h('p',{class:'mut'},(a.jourPrevu||a.jour||'Non planifiée')+' · '+(a.statut==='bloque'?'Bloquée'+(a.note?' ('+a.note+')':''):a.statut==='reporte'?'Reportée':'À faire')),
           h('div',{class:'actions'},h('button',{class:'btn',onclick:()=>maj({statut:'fait',note:''})},'Fait'),h('button',{class:'btn sec',onclick:()=>maj({statut:'reporte',jourPrevu:demain,note:''})},'Demain'),h('button',{class:'btn sec',onclick:()=>maj({statut:'reporte',jourPrevu:lundi,note:''})},'Lundi'),h('button',{class:'btn sec',onclick:()=>maj({statut:'bloque',note:S.respNom||'Mohamed'})},'Bloqué : '+(S.respNom||'Mohamed')),h('button',{class:'btn sec',onclick:()=>maj({statut:'bloque',note:'client'})},'Bloqué : client')))})),
       h('div', { class: 'actions' }, h('a', { class: 'btn sec', href: '#/feuille' }, 'Voir la feuille de route'), h('button', { class: 'btn sec', onclick: async () => { await rq(st('meta', 'readwrite').delete('pc')); toast('Plan effacé.'); pagePC(); } }, 'Effacer le plan'))) : h('p', { class: 'vide' }, 'Aucun plan reçu pour l’instant.'));
 }
@@ -1926,10 +1933,6 @@ async function pagePC() {
   } catch (e) {
     montrer('Erreur', h('div', { class: 'carte erreur', role: 'alert' }, 'Le stockage du navigateur est indisponible (mode privé ?). ' + e.message));
   }
-  if ('serviceWorker' in navigator) {
-    let dejaCharge = !!navigator.serviceWorker.controller;
-    navigator.serviceWorker.addEventListener('controllerchange', () => { if (dejaCharge && !sessionStorage.getItem('swReload')) { try { sessionStorage.setItem('swReload', '1'); } catch (e) {} location.reload(); } dejaCharge = true; });
-    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(r => r.update()).catch(() => {});
-  }
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
 window.__t = { nettoyerPlan, normNom, planSemaine, indicateurs, semainesJusqua, tendance, factures, enRetard, feries, estOuvre, ecartJours, relanceDue, statsTournee, prochainOuvre, echeance, cibleSemaineDe, semaineObj, lundiDe, appelsSemaine, mesures, taches, relanceDue, coutPae, calculPoint, periodePoint, texteCommande, texteSignalement, sigEnRetard, objectifDuMois, activite, serie, jourLocal, analyserTexte, statsDevis, envoyerDevis, parseCents, parseQte, ligneTotal, totaux, importerArticles, importerClients, csvDevis, devinerColonnes, ligneEntete, tel2wa };
