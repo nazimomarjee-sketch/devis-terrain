@@ -576,7 +576,7 @@ async function pageAccueil() {
     dv.length ? dv.slice(0, 30).map(d => { const [lib, cls] = etiquetteDevis(d); return h('a', { class: 'ligne', href: '#/devis/' + d.id, style: 'color:inherit;text-decoration:none' },
       h('span', { class: 'g' }, h('strong', {}, d.clientNom), h('br'), h('small', {}, numero(d) + ' · ' + dateFr(d.creeLe))),
       h('span', { class: 'prix' }, eur(totaux(d).ht), h('br'), h('span', { class: 'tag ' + cls }, lib))); }) : h('p', { class: 'vide' }, 'Aucun devis pour l’instant.'),
-    cl.length ? null : h('p', { class: 'mut' }, 'Astuce : tu peux aussi importer ta liste de clients (onglet Clients).'));
+    cl.length ? null : h('p', { class: 'mut' }, 'Astuce : les imports de clients sont dans Réglages → Imports.'));
   { const n = new Date(); $('#sous').textContent = JN[n.getDay()] + ' ' + n.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) + ' · Accueil commercial'; }
 }
 
