@@ -161,5 +161,20 @@ var pageOpportunites;
   pagePlus=function(){anciennePlus();app.prepend(h('a',{href:'#/opportunites',class:'carte v22-entry',style:'display:block;text-decoration:none;color:inherit'},
     h('strong',{},'Opportunités commerciales'),h('p',{class:'mut'},'Reconquête, baisse d’achats, devis acceptés : avec leurs preuves.')))};
 
+  const ancienneRoute = route;
+  route = async function () {
+    const chemin = (location.hash || '#/').slice(2).split('/')[0];
+    if (chemin === 'opportunites') {
+      document.querySelectorAll('.onglets a').forEach(x => x.classList.toggle('on', x.dataset.p === 'plus'));
+      await pageOpportunites();
+    } else {
+      await ancienneRoute();
+    }
+  };
+  const ancienneReglages = pageReglages;
+  pageReglages = async function () {
+    await ancienneReglages();
+    app.append(h('p', {class:'mut',style:'font-weight:600;text-align:center'}, 'Module commercial v22 · recommandations avec preuves EBP'));
+  };
   window.__commercialV22={fiabilite,signauxClient};
 })();
