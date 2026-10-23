@@ -116,11 +116,11 @@
 
   function rechercheProduits(rapport){
     const input=h('input',{type:'search','aria-label':'Chercher dans le catalogue',
-      placeholder:'Code, vernis, mastic, abrasif…',autocomplete:'off',spellcheck:'false'});
+      placeholder:'Référence ou nom du produit…',autocomplete:'off',spellcheck:'false'});
     const sortie=h('div',{class:'v23-resultats','aria-live':'polite'});
     const dessiner=()=>{
       const q=input.value.trim();
-      if(!q){sortie.replaceChildren(p('Recherche par référence ou désignation du catalogue.'));return;}
+      if(!q){sortie.replaceChildren();return;}
       const trouves=chercher(q,7);
       sortie.replaceChildren(...(trouves.length?trouves.map(a=>h('a',{href:'#/article/'+encodeURIComponent(a.code),class:'v23-produit'},
         h('span',{},h('strong',{},a.des),h('small',{class:'mut'},'Réf. '+a.code)),
@@ -137,7 +137,6 @@
       : 'Tarifs importés : date non disponible';
     return h('section',{class:'carte v23-produits'},
       h('div',{class:'v23-between'},h('strong',{},'Trouver un produit'),lien('#/catalogue','Catalogue')),
-      p('Vernis, mastic, abrasifs, masquage, apprêts : recherche dans tes références réelles.'),
       CAT.length?[input,chips,sortie,h('small',{class:'v23-source'},CAT.length+' références · '+date)]
         :[p('Catalogue vide : importe tes références et tarifs avant de chiffrer.'),lien('#/catalogue','Importer les tarifs')]);
   }
@@ -152,7 +151,7 @@
         h('a',{href:'#/devis/acceptes'},h('b',{},a),h('span',{},'Devis acceptés sans commande')),
         h('a',{href:'#/devis/relancer'},h('b',{},r),h('span',{},'Devis à relancer')),
         h('a',{href:'#/opportunites'},h('b',{},'↗'),h('span',{},'Clients à reconquérir'))),
-      h('div',{class:'v23-liens'},lien('#/tournee','Tournée'),lien('#/travail','Mon travail'),lien('#/pc','Lien PC')),
+      h('div',{class:'v23-liens'},lien('#/tournee','Tournée'),lien('#/besoins','Noter une demande'),lien('#/travail','Mon travail')),
       h('small',{class:'v23-source'},pcAge>=0&&pcAge<=7?dateExport(pc):'Plan PC absent ou ancien : vérifier les données EBP avant décision.'));
   }
 
@@ -162,14 +161,13 @@
     const now=new Date(), JN=['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
     const actions=candidats(dv,cl,pc,tours);
     montrer('Bonjour, '+(S.accueilNom||'Mr Omarjee'),
-      h('small',{class:'v23-surtitre'},'VENTE CARROSSERIE · ACCUEIL COMMERCIAL'),
       carteObjectif(dv,pc,now),
       carteAction(actions),
       rechercheProduits(rapport),
       raccourcis(dv,pc),
       h('div',{class:'fab noprint'},h('a',{class:'btn gros noir',href:'#/nouveau'},'+ Nouveau devis')),
       h('div',{style:'height:85px'}));
-    const sous=$('#sous');if(sous)sous.textContent=JN[now.getDay()]+' '+now.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})+' · Accueil v23';
+    const sous=$('#sous');if(sous)sous.textContent=JN[now.getDay()]+' '+now.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})+' · Terrain';
   };
 
   // Le numéro du noyau d'origine n'est pas falsifié : l'extension annonce sa version propre.
