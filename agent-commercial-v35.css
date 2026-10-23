@@ -1,0 +1,41 @@
+/* ODICOLOR Solution v35 — Agent commercial Claude, sombre permanent */
+.v35-tete{border-left:4px solid #D41F2B!important}
+.v35-tete>strong{display:block;font-family:var(--cond),system-ui;font-size:26px;line-height:1.2;margin:8px 0}
+.v35-tete p{font-size:13px;margin:8px 0;line-height:1.5}
+.v35-action{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  border-top:1px solid var(--line);padding:12px 0;color:var(--fg)!important;text-decoration:none!important}
+.v35-action:first-of-type{margin-top:10px}
+.v35-action>span:first-child{display:flex;flex:1;min-width:0;flex-direction:column;gap:5px}
+.v35-action strong{font-size:14px}
+.v35-action small{font-size:12px;line-height:1.45}
+.v35-action>span:last-child{font-size:23px;color:var(--acc)}
+.v35-claude{border-left:4px solid var(--acc)!important}
+.v35-claude>strong{font-size:18px}
+.v35-claude>p{font-size:13px;line-height:1.5}
+.v35-claude>label:not(.v35-consent){display:block;font-size:13px;font-weight:700;margin:13px 0 6px}
+.v35-consent{display:flex;align-items:flex-start;gap:10px;font-size:13px;line-height:1.5;margin:13px 0;padding:10px 12px;
+ border-radius:10px;border:1px solid var(--line)}
+.v35-consent input{margin:1px 0 0;min-width:21px;min-height:21px;flex:none}
+.v35-primary{display:flex;align-items:center;justify-content:center;width:100%;min-height:56px;
+ font-weight:800;background:#D41F2B;color:#fff!important;margin:10px 0}
+.v35-open{display:flex;align-items:center;justify-content:center;min-height:54px;width:100%;margin:12px 0}
+.v35-claude textarea{font-size:14px;width:100%;min-height:130px}
+.v35-claude>button:last-of-type{width:100%;min-height:52px;margin-top:13px}
+.v35-status{font-size:13px;line-height:1.5;overflow-wrap:anywhere;margin:12px 0}
+.v35-avis{border-top:1px solid var(--line);padding:14px 0}
+.v35-avis p{font-size:15px;margin:10px 0;line-height:1.45}
+.v35-avis small{display:block;font-size:12px;line-height:1.5;margin:6px 0}
+.v35-avis a{margin-top:12px;display:inline-flex;align-items:center}
+.v35-line{display:flex;justify-content:space-between;align-items:center;gap:9px;flex-wrap:wrap}
+.v35-line strong{font-size:14px}
+.v35-accueil{display:flex;justify-content:space-between;gap:12px;align-items:center;
+ padding:14px 15px;border:1px solid var(--line);border-left:4px solid #D41F2B;
+ background:var(--card);border-radius:14px;color:var(--fg)!important;text-decoration:none!important;margin:12px 0}
+.v35-accueil>span:first-child{display:flex;flex-direction:column;gap:5px;min-width:0}
+.v35-accueil strong{font-size:16px}
+.v35-accueil small{font-size:12px;line-height:1.5;color:var(--mut)}
+.v35-accueil>span:last-child{font-size:24px;color:var(--acc)}
+.v35-plus{display:block;padding:15px;background:var(--card);border:1px solid var(--line);
+ border-left:4px solid #D41F2B;border-radius:12px;margin-bottom:10px;color:var(--fg)!important;
+ text-decoration:none!important;font-weight:800;font-size:15px}
+@media(max-width:370px){.v35-tete>strong{font-size:23px}.v35-avis a{width:100%}}
