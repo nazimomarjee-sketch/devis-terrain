@@ -224,7 +224,7 @@
   pagePlus=function(){
     avantPlus();
     app.prepend(h('a',{class:'v30-plus-new',href:'#/nouveau-garage'},
-      '+ Nouveau garage / prospect'));
+      '+ Nouveau prospect'));
   };
 
   const avantReglages=pageReglages;
