@@ -265,8 +265,12 @@
       h('strong',{},'Mon poste de travail'),
       h('p',{},'Un garage. Une action. Un résultat à suivre.'));
     app.prepend(headline);
+    // V40 : Objectif en premier sous le bandeau photo, puis action prioritaire.
+    // Les valeurs et leurs preuves restent calculées par le moteur existant.
+    const objectif=app.querySelector('.v23-objectif');
+    if(objectif){objectif.classList.add('v38-objectif');headline.after(objectif);}
     const next=app.querySelector('.v23-prochaine');
-    if(next)headline.after(next);
+    if(next)(objectif||headline).after(next);
     // Reuse the actual main quote action, not a decorative copy.
     const devis=app.querySelector('.v31-nouveau-devis');
     const shortcuts=h('div',{class:'v38-accueil-actions'});
@@ -286,9 +290,7 @@
     (next||headline).after(shortcuts);
     const oldAgent=app.querySelector('.v35-accueil');
     if(oldAgent)oldAgent.remove();
-    // Performance remains evidence-based: never manufacture figures.
-    const objectif=app.querySelector('.v23-objectif');
-    if(objectif){objectif.classList.add('v38-objectif');shortcuts.after(objectif);}
+    // L'objectif reste avant la prochaine action et les raccourcis.
     const produits=app.querySelector('.v23-produits');
     if(produits)produits.classList.add('v38-produits');
   };
@@ -340,7 +342,7 @@
   pageReglages=async function(){
     await regAvant();
     const t=app.querySelector('.v25-etat .v25-etat-titre strong');
-    if(t)t.textContent='ODICOLOR Solution · v39';
+    if(t)t.textContent='ODICOLOR Solution · v40';
   };
 
   window.__premiumProV38={optimiserPhoto,enregistrerPhoto,photoPour,supprimerPhoto,statutGarage};
