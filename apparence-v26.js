@@ -1,5 +1,5 @@
 'use strict';
-/* ODICOLOR v27 — apparence sombre permanente.
+/* ODICOLOR v28 — apparence sombre permanente, accueil épuré.
  * Aucun sélecteur de couleur ni préférence stockée.
  * Aucune donnée client, devis ou EBP modifiée. */
 (function () {
@@ -27,7 +27,7 @@
     const ancienPanel = app.querySelector('.v26-prefs');
     if (ancienPanel) ancienPanel.remove();
     const titre = app.querySelector('.v25-etat .v25-etat-titre strong');
-    if (titre) titre.textContent = 'ODICOLOR Solution · v27';
+    if (titre) titre.textContent = 'ODICOLOR Solution · v28';
     const detail = app.querySelector('.v25-etat small.mut');
     if (detail) detail.textContent =
       'Thème sombre permanent · devis et suivi commercial conservés.';
