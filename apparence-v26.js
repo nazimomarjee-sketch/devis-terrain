@@ -53,9 +53,9 @@
     const sous = $('#sous');
     if (sous) {
       const n = new Date();
-      sous.textContent = n.toLocaleDateString('fr-FR', {
-        weekday:'long',day:'numeric',month:'long',year:'numeric'
-      }) + ' · Commercial carrosserie';
+      sous.textContent = 'Terrain · ' + n.toLocaleDateString('fr-FR', {
+        weekday:'long',day:'numeric',month:'long'
+      });
     }
     const entete = app.querySelector('.v23-surtitre');
     if (entete && !app.querySelector('.v26-affichage')) {
