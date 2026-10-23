@@ -2,12 +2,12 @@
 /* ODICOLOR v29 — mise à jour réseau en priorité, fonctionnement hors ligne conservé.
  * Ce cache ne touche jamais aux données IndexedDB clients/devis.
  */
-const CACHE='terrain-v30';
+const CACHE='terrain-v31';
 const SHELL=[
   './','index.html','style.css','style-v22.css','accueil-v23.css',
-  'suivi-produits-v24.css','correctif-v25.css','apparence-v26.css','notes-terrain-v29.css','parcours-garage-v30.css',
+  'suivi-produits-v24.css','correctif-v25.css','apparence-v26.css','notes-terrain-v29.css','parcours-garage-v30.css','dossier-n1-v31.css',
   'app.js','commercial-v22.js','accueil-v23.js',
-  'suivi-produits-v24.js','rappels-produits-v24.js','correctif-v25.js','apparence-v26.js','notes-terrain-v29.js','parcours-garage-v30.js',
+  'suivi-produits-v24.js','rappels-produits-v24.js','correctif-v25.js','apparence-v26.js','notes-terrain-v29.js','parcours-garage-v30.js','dossier-n1-v31.js',
   'manifest.webmanifest'
 ];
 const OPTION=['icon-192.png','icon-512.png','icon-maskable-512.png','logo-96.png',
