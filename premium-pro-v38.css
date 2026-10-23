@@ -68,18 +68,18 @@ body.v38-catalogue .barre #titre{display:none}
 .v38-hero{position:relative;min-height:244px;isolation:isolate;overflow:hidden;
   border:1px solid #34414C;border-radius:19px;margin:3px 0 10px;
   background:#101A24;box-shadow:0 12px 30px rgba(0,0,0,.24)}
-.v38-hero::after{content:"";position:absolute;inset:0;z-index:-1;
+.v38-hero::after{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;
   background:linear-gradient(180deg,rgba(0,0,0,.18) 0%,rgba(1,4,8,.07) 28%,
     rgba(3,6,10,.50) 58%,rgba(2,5,9,.96) 100%)}
-.v38-hero-photo::before{content:"";position:absolute;inset:0;z-index:-1;
+.v38-hero-photo::before{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;
   background:rgba(0,0,0,.10)}
-.v38-hero-image{position:absolute;inset:0;z-index:-2;width:100%;height:100%;
+.v38-hero-image{position:absolute;inset:0;z-index:0;width:100%;height:100%;
   object-fit:cover;object-position:center 47%;display:block}
 .v38-hero-vide{background:
   radial-gradient(circle at 83% -10%,rgba(212,31,43,.45),transparent 50%),
   radial-gradient(circle at 10% 100%,rgba(118,29,43,.16),transparent 48%),
   linear-gradient(128deg,#172330,#0A1018)}
-.v38-hero-fallback{position:absolute;z-index:-1;inset:0;
+.v38-hero-fallback{position:absolute;z-index:0;inset:0;
   display:flex;flex-direction:column;justify-content:center;align-items:center;gap:7px;
   transform:rotate(-6deg);opacity:.12;font-weight:900;letter-spacing:.13em}
 .v38-hero-fallback span:first-child{font-size:66px;font-family:var(--cond),system-ui;color:#FFF}
@@ -183,7 +183,7 @@ body.v38-catalogue .barre #titre{display:none}
   padding:26px 17px 24px;margin:2px 0 12px;border-radius:18px;border:1px solid #5C1A25;
   background:linear-gradient(125deg,#35101B,#10131C 60%,#101B24);
   box-shadow:0 12px 27px #0004}
-.v38-accueil-rayon{position:absolute;z-index:-1;right:-65px;top:-90px;width:250px;height:250px;
+.v38-accueil-rayon{position:absolute;z-index:0;right:-65px;top:-90px;width:250px;height:250px;
   border:1px solid rgba(212,31,43,.4);border-radius:50%;
   box-shadow:0 0 0 45px rgba(212,31,43,.06),0 0 0 89px rgba(212,31,43,.05)}
 .v38-eyebrow{font-size:10px;letter-spacing:.13em;font-weight:900;color:#FF8090}
@@ -274,3 +274,5 @@ body.v38-catalogue .barre #titre{display:none}
 @media(prefers-reduced-motion:reduce){
   .v38-actions>.v38-action:active{transform:none}
 }
+
+.v38-accueil-hero>.v38-eyebrow,.v38-accueil-hero>strong,.v38-accueil-hero>p{position:relative;z-index:1}
