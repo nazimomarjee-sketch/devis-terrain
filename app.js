@@ -1761,9 +1761,14 @@ async function pageDevis(id) {
       h('button', { class: 'btn', onclick: () => { fini(); envoyerDevis([d], 'devis-' + numero(d) + '.json'); } }, 'Envoyer à mon responsable')] : null,
     h('details', { class: 'v32-options-devis' },
       h('summary', {}, 'Options du devis'),
-      h('p', { class: 'mut' }, 'Réutiliser les articles, quantités et remises dans un nouveau brouillon, avec les tarifs du catalogue actuel.'),
+      h('p', { class: 'mut' }, 'Un nouveau brouillon reprend articles, quantités et remises. Les prix sont actualisés uniquement pour les références encore présentes dans le catalogue.'),
       h('button', { class: 'btn sec', onclick: () => {
-        if (confirm('Créer un nouveau brouillon avec les mêmes articles et les tarifs actuels ?')) dupliquer(d);
+        if(!d.lignes.length){toast('Ce devis est vide : rien à réutiliser.',true);return;}
+        const absents=d.lignes.filter(l=>!CAT.some(a=>a.code===l.code));
+        const precision=absents.length
+          ? ' ATTENTION : '+absents.length+' référence(s) absente(s) du catalogue : leurs anciens prix seront conservés et devront être vérifiés.'
+          : '';
+        if (confirm('Créer un nouveau brouillon avec les mêmes articles et quantités ?'+precision)) dupliquer(d);
       } }, 'Réutiliser ce devis')),
     d.statut === 'envoye' && d.lignes.length ? h('div', { class: 'trio' },
       h('button', { class: 'btn vert', onclick: async () => { d.statut = 'accepte'; d.reponseLe = new Date().toISOString(); if (client && client.conv && client.conv !== 'converti') { client.conv = 'converti'; await putMany('clients', [client]); } await sauver(); toast('Devis accepté.'); pageDevis(id); } }, 'Accepté'),
