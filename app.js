@@ -1487,10 +1487,17 @@ async function pageClient(id) {
     (etatCompte!=='non renseigné'?' · '+etatCompte:'')+
     (retard?' · '+retard+' à vérifier':''),
     blocCompte(c,()=>putMany('clients',[c])),attentionCompte);
-  const groupeEntreprise=panneau('Identité officielle et analyse commerciale',[
-    h('div',{class:'actions'},bRech),zoneRech,fiche,verdict,
-    h('p',{class:'mut'},'La recherche au registre public n’est effectuée qu’à ta demande.')
-  ]);
+  // Le dossier N+1 est le parcours unique de vérification d'un nouveau prospect.
+  // Garder ici l'avis commercial, sans présenter deux recherches officielles identiques.
+  const groupeEntreprise=c.statutCrm==='prospect'
+    ? panneau('Analyse commerciale du prospect',[
+      h('p',{class:'mut'},'Vérification SIREN, état officiel et ouverture de compte : dans le dossier N+1 du prospect.'),
+      verdict
+    ])
+    : panneau('Identité officielle et analyse commerciale',[
+      h('div',{class:'actions'},bRech),zoneRech,fiche,verdict,
+      h('p',{class:'mut'},'La recherche au registre public n’est effectuée qu’à ta demande.')
+    ]);
   const groupeProfil=panneau('Profil, contacts et qualification',[
     h('label',{},'A-t-il une cabine de peinture ?'),cabine,
     h('label',{},'Fournisseur actuel'),fourn,
