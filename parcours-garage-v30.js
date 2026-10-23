@@ -52,7 +52,7 @@
       autocomplete:'address-level2','aria-label':'Ville du garage'});
     const resultats=h('div',{class:'v30-matches','aria-live':'polite'});
     const avertissement=h('p',{class:'v30-warning',role:'status'});
-    const valider=h('button',{class:'btn gros v30-save',type:'button'},'Créer la fiche prospect');
+    const valider=h('button',{class:'btn gros v30-save',type:'button'},'Créer et vérifier le prospect');
     const infos=h('small',{class:'mut'},'Ce garage sera un prospect tant que son statut n’est pas confirmé. Aucun devis ni vente n’est créé automatiquement.');
 
     function afficheResultats(){
@@ -93,7 +93,7 @@
         toast('Prospect créé, sans commande ni chiffre d’affaires.');
         if(mode==='note') location.hash='#/note-terrain/'+r.id;
         else if(mode==='devis') await creerDevis({id:r.id,nom:r.nom});
-        else location.hash='#/client/'+r.id;
+        else location.hash='#/dossier-prospect/'+r.id;
       }catch(e){avertissement.textContent=e.message||String(e);toast('Impossible de créer la fiche.',true)}
       finally{enCours=false;afficheResultats();}
     });
