@@ -253,14 +253,6 @@
         '⚠ Tarifs de démonstration : ne pas utiliser pour une vente réelle.'));
   };
 
-  const prevPlus=pagePlus;
-  pagePlus=function(){
-    prevPlus();
-    app.prepend(h('a',{class:'v32-plus-entry',href:'#/catalogues-pdf'},
-      h('strong',{},'Catalogues fournisseurs PDF'),
-      h('span',{},'›')));
-  };
-
   const prevReglages=pageReglages;
   pageReglages=async function(){
     await prevReglages();
