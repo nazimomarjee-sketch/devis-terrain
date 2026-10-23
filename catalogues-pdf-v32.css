@@ -37,3 +37,5 @@
 .v32-options-devis p{font-size:12px;margin:5px 0 12px;color:var(--mut)}
 .v32-options-devis button{width:100%;min-height:48px;margin:6px 0}
 @media(max-width:375px){.v32-pdf-buttons button{flex:1 1 130px}.v32-pdf-buttons button:last-child{max-width:none}}
+
+.v32-demo-mini{padding:9px 11px;border-left:3px solid var(--warn);color:var(--warn)!important;background:var(--bg);font-size:12px!important;line-height:1.45}
