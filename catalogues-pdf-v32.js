@@ -148,31 +148,6 @@
     ];
     const localCarsystem=tous.find(x=>/^carsystem$/i.test(x.fournisseur)&&
       /catalogue|produits/i.test(x.nom)&&/2025/.test(x.nom));
-    const fournisseur=h('input',{type:'text',maxlength:90,
-      placeholder:'Nom du fournisseur (ex. Carsystem)',
-      'aria-label':'Nom du fournisseur'});
-    const files=h('input',{type:'file',multiple:true,accept:'.pdf,application/pdf',
-      'aria-label':'Importer les catalogues PDF fournisseurs'});
-    const message=h('div',{role:'status',class:'v32-message'});
-    const bouton=h('button',{class:'btn v32-import',type:'button'},'+ Ajouter les catalogues PDF');
-
-    bouton.addEventListener('click',async()=>{
-      const ff=Array.from(files.files||[]);
-      if(!ff.length){message.textContent='Sélectionne un ou plusieurs PDF.';return;}
-      bouton.disabled=true;
-      let ok=0;const errors=[];
-      for(const fichier of ff){
-        try{const r=await sauvegarderPDF(fichier,fournisseur.value);if(!r.annule)ok++}
-        catch(e){errors.push(propre(fichier.name,45)+' : '+(e.message||String(e)))}
-      }
-      bouton.disabled=false;
-      message.textContent=ok+' PDF enregistré(s). '+errors.join(' · ');
-      if(ok){
-        await pageCataloguesPDF();
-        if(errors.length)app.prepend(h('div',{class:'carte alerte'},errors.join(' · ')));
-      }
-    });
-
     const cartes=tous.sort((a,b)=>a.fournisseur.localeCompare(b.fournisseur,'fr')||a.nom.localeCompare(b.nom,'fr')).map(x=>{
       const date=Number.isFinite(Date.parse(x.date))?new Date(x.date).toLocaleDateString('fr-FR'):'Date inconnue';
       const btOpen=h('button',{type:'button',class:'btn'},'Ouvrir');
@@ -211,11 +186,7 @@
           localCarsystem?
             h('button',{class:'btn sec',type:'button',onclick:()=>ouvrirPDF(localCarsystem.id)},
               'Ouvrir la copie hors ligne'):
-            h('button',{class:'btn sec',type:'button',onclick:()=>{
-              fournisseur.value='Carsystem';
-              message.textContent='Choisis « Catalogue de Produits 2025.pdf » sur ton téléphone, puis appuie sur « Ajouter les catalogues PDF ».';
-              files.click();
-            }},'Ajouter ma copie hors ligne')),
+            h('a',{class:'btn sec',href:'#/reglages'},'Importer via Réglages')),
         h('details',{class:'v34-cs-sections'},
           h('summary',{},'Accès rapide · 9 familles de produits'),
           h('div',{class:'v34-cs-grid'},rubriquesCarsystem.map(([titre,page])=>
@@ -224,7 +195,7 @@
               h('strong',{},titre),h('small',{},'Page PDF '+page+' · en ligne'))))),
         h('p',{class:'mut'},localCarsystem?
           'Copie PDF enregistrée sur ce Samsung : disponible hors connexion. Les raccourcis de chapitres ouvrent la version officielle en ligne.':
-          'PDF officiel accessible avec Internet. Pour l’utiliser hors connexion, importe une fois ton fichier PDF dans la bibliothèque.'),
+          'PDF officiel accessible avec Internet. Pour l’utiliser hors connexion, importe une fois ton fichier PDF depuis Réglages.'),
         h('small',{class:'mut'},'Document technique fournisseur uniquement : aucun tarif ODICOLOR, stock ou prix de vente vérifiés.')),
       h('section',{class:'carte v32-pdf-item'},
         h('div',{class:'v32-pdf-head'},
@@ -235,14 +206,9 @@
             h('small',{class:'mut'},'Catalogue en ligne (Calaméo) · Internet requis'))),
         h('div',{class:'v32-pdf-buttons'},
           h('a',{class:'btn',href:'https://www.calameo.com/books/006112838f2f47d2c47da',target:'_blank',rel:'noopener noreferrer'},'Consulter SIFA 2025')),
-        h('p',{class:'mut'},'Pour un accès hors connexion, importe le PDF SIFA si le fournisseur te le transmet. Ce catalogue ne renseigne pas les tarifs EBP.')),
-      h('div',{class:'carte v32-form'},
-        h('strong',{},'Importer un PDF fournisseur'),
-        h('label',{},'Fournisseur'),fournisseur,
-        h('label',{},'Choisir les documents PDF'),files,bouton,message,
-        h('small',{class:'mut'},'PDF uniquement · 60 Mo maximum par fichier · 25 documents maximum.')),
+        h('p',{class:'mut'},'Pour un accès hors connexion, importe le PDF SIFA depuis Réglages si le fournisseur te le transmet. Ce catalogue ne renseigne pas les tarifs EBP.')),
       h('h2',{},'Mes catalogues'),
-      cartes.length?cartes:h('p',{class:'mut'},'Aucun catalogue PDF enregistré. Ajoute les documents fournis par tes fournisseurs.'),
+      cartes.length?cartes:h('p',{class:'mut'},'Aucun catalogue PDF enregistré. Ajoute des documents depuis Réglages.'),
       h('div',{class:'carte v32-warning'},h('strong',{},'Sauvegarde importante'),
         h('p',{},'Ces PDF ne sont pas inclus dans la sauvegarde JSON des clients et devis. Garde toujours les originaux et utilise « Télécharger PDF » pour récupérer une copie.'),
         h('p',{class:'mut'},'Le navigateur peut effacer ses données si son stockage est réinitialisé. Ne sélectionne pas « Tout effacer » dans les réglages.')),
@@ -263,7 +229,7 @@
     const bloc=h('a',{class:'carte v32-catalogue-entry',href:'#/catalogues-pdf'},
       h('span',{class:'v32-pdf-icon'},'PDF'),
       h('span',{},h('strong',{},'Catalogues fournisseurs (PDF)'),
-        h('small',{},'Ouvrir ou importer les catalogues, même sans réseau')),
+        h('small',{},'Consulter les PDF fournisseurs, en ligne ou hors connexion')),
       h('span',{class:'v32-arrow'},'›'));
     app.prepend(bloc);
     const rapport=await get('meta','rapport_articles');
