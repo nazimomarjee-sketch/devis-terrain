@@ -1,0 +1,47 @@
+/* ODICOLOR v26 — choix explicite du thème, contraste et lisibilité commerciale.
+   La préférence par défaut est CLAIR. Sombre et Auto restent disponibles. */
+:root[data-theme=light]{
+  color-scheme:light;
+  --bg:#F5F3F1;--fg:#1d1d1f;--mut:#55555c;--card:#ffffff;
+  --line:#E6E1DC;--acc:#D41F2B;--acc-fg:#fff;--ok:#1b6e3a;--warn:#8a5a00;--ko:#D41F2B;
+}
+:root[data-theme=dark]{
+  color-scheme:dark;
+  --bg:#121214;--fg:#f2f2f4;--mut:#b5b5be;--card:#1e1e22;
+  --line:#414149;--acc:#e45b60;--acc-fg:#101012;--ok:#78d69a;--warn:#f1c56b;--ko:#ff868b;
+}
+@media(prefers-color-scheme:dark){
+  :root:not([data-theme=dark]):not([data-theme=light]){color-scheme:dark}
+  :root[data-theme=light]{
+    --bg:#F5F3F1;--fg:#1d1d1f;--mut:#55555c;--card:#ffffff;
+    --line:#E6E1DC;--acc:#D41F2B;--acc-fg:#fff;--ok:#1b6e3a;--warn:#8a5a00;--ko:#D41F2B;
+  }
+}
+/* Les anciennes règles du thème sombre automatique doivent également
+   fonctionner quand l'utilisateur sélectionne Sombre manuellement. */
+:root[data-theme=dark] .tag,:root[data-theme=dark] .pastille.ko{background:#3a1d1f;color:#ff9a9e}
+:root[data-theme=dark] .tag.ok,:root[data-theme=dark] .pastille.ok{background:#16301f;color:#7fdc9e}
+:root[data-theme=dark] .tag.warn{background:#3a2e14;color:#f1c56b}
+:root[data-theme=dark] .etiq{color:#ff9a9e}
+:root[data-theme=dark] .btn.ambre{color:#f1c56b;border-color:#f1c56b}
+:root[data-theme=dark] .quatre strong.ok{color:#7fdc9e}
+:root[data-theme=dark] .quatre strong.warn{color:#f1c56b}
+:root[data-theme=dark] .tend.ok,:root[data-theme=dark] .ind-d.ok{color:#7fdc9e}
+:root[data-theme=dark] .tend.ko,:root[data-theme=dark] .ind-d.ko,:root[data-theme=dark] .quatre strong.ko{color:#ff9a9e}
+:root[data-theme=dark] .v23-prochaine .v23-primary{background:#D41F2B;color:#fff!important}
+/* Pas de mention de version technique dans le bandeau de l'accueil. */
+.v26-affichage{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px}
+.v26-affichage .mut{font-size:13px}
+.v26-switch{border:1px solid var(--line);border-radius:99px;min-height:40px;padding:7px 14px;
+ background:var(--card);color:var(--fg);font:inherit;font-size:13px;font-weight:750;cursor:pointer}
+.v26-switch:focus-visible,.v26-theme-button:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.v26-prefs{margin:12px 0 18px;border-left:4px solid #D41F2B!important}
+.v26-prefs>strong{font-size:19px}
+.v26-prefs p{margin:10px 0;font-size:14px}
+.v26-theme-choices{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:10px 0}
+.v26-theme-button{background:var(--card);color:var(--fg);border:1.5px solid var(--line);
+ border-radius:12px;min-height:48px;padding:8px 5px;font-size:14px;font-weight:750}
+.v26-theme-button.on{border-color:#D41F2B;box-shadow:inset 0 0 0 1px #D41F2B;color:var(--fg)}
+.v26-theme-button[aria-pressed=true]:before{content:"✓ ";color:var(--ok);font-weight:900}
+/* Un texte long ne doit jamais sortir de l’écran Samsung. */
+.v23-prochaine,.v23-client,.v23-prochaine p,.v23-objectif,.v25-etat{overflow-wrap:anywhere}
