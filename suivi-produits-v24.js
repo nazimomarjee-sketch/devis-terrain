@@ -75,7 +75,7 @@
       h('option',{value:'vendeur'},'Piste envisagée par moi'));
     const detail=h('textarea',{rows:3,maxlength:300,placeholder:'Ex. Le carrossier demande un devis pour du mastic polyester en cartons.','aria-label':'Observation ou demande'});
     const suite=h('select',{'aria-label':'Prochaine action'},SUITES.map(([v,t])=>h('option',{value:v},t)));
-    const suivi=h('input',{type:'date','aria-label':'Date de suivi'});
+    const suivi=h('input',{type:'date','aria-label':'Date de suivi',value:jourLocal(new Date())});
     const erreur=h('div',{role:'status',class:'mut'});
     const sauver=async()=>{
       const note=texte(detail.value);
