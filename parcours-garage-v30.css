@@ -1,0 +1,29 @@
+/* ODICOLOR v30 — parcours nouveau garage, thème sombre permanent */
+.v30-intro{border-left:4px solid var(--acc)!important}
+.v30-intro strong{display:block;font-size:20px;margin:8px 0}
+.v30-intro p{font-size:14px;margin:8px 0 0}
+.v30-form label{display:block;margin:12px 0 6px;font-size:13px;font-weight:700}
+.v30-form input{font-size:16px}
+.v30-save{margin:18px 0 10px;min-height:58px;width:100%;background:#D41F2B;color:#fff!important}
+.v30-save:disabled{opacity:.52;cursor:not-allowed}
+.v30-warning{color:var(--warn);font-size:13px;font-weight:700;min-height:10px;line-height:1.4}
+.v30-matches{margin-top:12px}
+.v30-matches>strong{display:block;font-size:13px;margin-bottom:5px}
+.v30-result{display:flex;justify-content:space-between;align-items:center;gap:12px;color:var(--fg)!important;
+  text-decoration:none!important;padding:10px 0;border-bottom:1px solid var(--line)}
+.v30-result span:first-child{display:flex;flex-direction:column;gap:2px;min-width:0}
+.v30-result small{display:block;font-size:12px}
+.v30-result span:last-child{flex:none;color:var(--acc);font-weight:700;font-size:13px}
+.v30-bottom{margin:15px 0;display:flex}
+.v30-client-new,.v30-plus-new{display:flex;align-items:center;justify-content:center;min-height:50px;
+  padding:12px 14px;background:var(--card);border:1px solid var(--acc);border-radius:12px;
+  color:var(--fg)!important;text-decoration:none!important;font-weight:800;margin:9px 0 15px}
+.v30-new-link{display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:11px 14px;margin-top:8px;border:1px dashed var(--line);border-radius:12px;
+  color:var(--fg)!important;text-decoration:none!important;min-height:46px}
+.v30-new-link span{font-size:14px;font-weight:800}
+.v30-new-link small{font-size:11px;color:var(--mut);text-align:right}
+.v30-add-from-note{display:flex;width:100%;margin:8px 0 14px;min-height:48px}
+.v30-prospect{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:5px 0 11px}
+.v30-prospect small{font-size:12px;line-height:1.35}
+@media(max-width:365px){.v30-new-link{align-items:flex-start;flex-direction:column}.v30-new-link small{text-align:left}}
