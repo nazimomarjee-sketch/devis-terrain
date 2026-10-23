@@ -90,7 +90,7 @@
         else if(mode==='devis') await creerDevis({id:r.id,nom:r.nom});
         else location.hash='#/client/'+r.id;
       }catch(e){avertissement.textContent=e.message||String(e);toast('Impossible de créer la fiche.',true)}
-      finally{enCours=false;valider.disabled=false}
+      finally{enCours=false;afficheResultats();}
     });
 
     montrer('Nouveau garage',
