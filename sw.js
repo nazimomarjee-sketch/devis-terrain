@@ -2,12 +2,12 @@
 /* ODICOLOR v25 — mise à jour réseau en priorité, fonctionnement hors ligne conservé.
  * Ce cache ne touche jamais aux données IndexedDB clients/devis.
  */
-const CACHE='terrain-v25';
+const CACHE='terrain-v26';
 const SHELL=[
   './','index.html','style.css','style-v22.css','accueil-v23.css',
-  'suivi-produits-v24.css','correctif-v25.css',
+  'suivi-produits-v24.css','correctif-v25.css','apparence-v26.css',
   'app.js','commercial-v22.js','accueil-v23.js',
-  'suivi-produits-v24.js','rappels-produits-v24.js','correctif-v25.js',
+  'suivi-produits-v24.js','rappels-produits-v24.js','correctif-v25.js','apparence-v26.js',
   'manifest.webmanifest'
 ];
 const OPTION=['icon-192.png','icon-512.png','icon-maskable-512.png','logo-96.png',
