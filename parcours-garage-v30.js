@@ -6,7 +6,12 @@
 (function(){
   const nomNet=(v,n=120)=>String(v==null?'':v).replace(/\s+/g,' ').trim().slice(0,n);
   const cle=v=>normNom(v);
-  const chiffres=v=>String(v||'').replace(/\D/g,'');
+  const chiffres=v=>{
+    let n=String(v||'').replace(/\D/g,'');
+    if(n.startsWith('0033')&&n.length===13)n='0'+n.slice(4);
+    else if(n.startsWith('33')&&n.length===11)n='0'+n.slice(2);
+    return n;
+  };
   const btn=(href,title,cls='sec')=>h('a',{href,class:'btn '+cls},title);
 
   function doublons(cl,nom,tel,ville){
@@ -209,7 +214,8 @@
     if(!c || c.statutCrm!=='prospect')return;
     const bande=h('div',{class:'v30-prospect'},
       h('span',{class:'tag warn'},'PROSPECT'),
-      h('small',{class:'mut'},'Premier contact enregistré. Aucune commande vérifiée par EBP.'));
+      h('small',{class:'mut'},(c.villeProspection?c.villeProspection+' · ':'')+
+        'Premier contact enregistré. Aucune commande vérifiée par EBP.'));
     const trio=app.querySelector('.trio');
     if(trio)trio.before(bande);
   };
