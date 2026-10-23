@@ -116,7 +116,20 @@
     const action=moteur(devis,clients,pc,tournees)[0];
     if(!action||typeof action.url!=='string')return null;
     const p=action.url.match(/^#\/(client|devis)\/(\d+)$/);
-    if(!p)return null;
+    if(!p){
+      // Plan PC : ne pré-sélectionner que si la source EBP est récente,
+      // et qu'un nom de client explicite correspond à UNE seule fiche.
+      const age=pc&&pc.arrete?ecartJours(pc.arrete,Date.now()):Infinity;
+      if(action.url!=='#/pc'||!pc||pc.chiffre?.source!=='import'||
+         age<0||age>7||!Array.isArray(pc.actions))return null;
+      const auj=jourLocal(Date.now());
+      const actif=pc.actions.filter(a=>a.prio===1&&a.statut!=='fait'&&a.statut!=='bloque'
+        &&(!a.jourPrevu||a.jourPrevu<=auj)&&a.preuve&&a.source)[0];
+      const nom=actif&&actif.client;
+      if(!nom)return null;
+      const correspondances=clients.filter(c=>cle(c.nom)===cle(nom));
+      return correspondances.length===1?correspondances[0]:null;
+    }
     let id;
     if(p[1]==='client')id=Number(p[2]);
     else{
