@@ -3,7 +3,7 @@
  * Rouge ODICOLOR pour la marque et les actions ; fond noir/anthracite permanent.
  */
 :root[data-theme=dark]{
-  --acc:#ED1C2B;
+  --acc:#D41F2B;
   --acc-fg:#ffffff;
   --bg:#090A0D;
   --card:#14171C;
@@ -16,7 +16,7 @@ body{background:var(--bg)}
   background:
     radial-gradient(ellipse at 100% -45%,rgba(237,28,43,.27),transparent 72%),
     linear-gradient(135deg,#0C0E12 10%,#171115 65%,#100B0E);
-  border-bottom:2px solid #ED1C2B;
+  border-bottom:2px solid #D41F2B;
   border-radius:0 0 22px 22px;
   color:#fff;
   padding:14px 18px 18px;
@@ -29,7 +29,7 @@ body{background:var(--bg)}
   width:52px;height:52px;min-width:52px;
   display:block;object-fit:contain;
   border-radius:13px;
-  background:#ED1C2B;
+  background:#D41F2B;
   box-shadow:0 0 0 1px rgba(255,255,255,.14),0 7px 18px rgba(0,0,0,.40);
 }
 .marque .nom{
@@ -50,18 +50,18 @@ body{background:var(--bg)}
 .minibarre{
   background:linear-gradient(100deg,#101218,#1A0B10);
   color:#FFF;
-  border-bottom:2px solid #ED1C2B;
+  border-bottom:2px solid #D41F2B;
   box-shadow:0 5px 18px rgba(0,0,0,.4);
 }
 .minibarre img{
   width:32px;height:32px;
   object-fit:contain;
-  background:#ED1C2B;
+  background:#D41F2B;
   border-radius:8px;
   box-shadow:0 0 0 1px rgba(255,255,255,.15);
 }
 .onglets{background:#0D0F13;border-top:1px solid #30333B}
-.onglets a.on{color:#FF3447;box-shadow:inset 0 3px 0 #ED1C2B}
+.onglets a.on{color:#FF3447;box-shadow:inset 0 3px 0 #D41F2B}
 .onglets a:not(.on){color:#A5AAB3}
 .btn:not(.sec):not(.danger):not(.ambre):not([disabled]){color:var(--acc-fg)}
 @media(max-width:375px){
