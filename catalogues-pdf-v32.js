@@ -148,7 +148,19 @@
     ];
     const localCarsystem=tous.find(x=>/^carsystem$/i.test(x.fournisseur)&&
       /catalogue|produits/i.test(x.nom)&&/2025/.test(x.nom));
-    const cartes=tous.sort((a,b)=>a.fournisseur.localeCompare(b.fournisseur,'fr')||a.nom.localeCompare(b.nom,'fr')).map(x=>{
+    const localSifa=tous.find(x=>/^sifa$/i.test(x.fournisseur)&&
+      /catalogue/i.test(x.nom)&&/2025/.test(x.nom));
+    const gestionCopie=x=>h('details',{class:'v34-cs-sections'},
+      h('summary',{},'Gérer ma copie hors ligne'),
+      h('div',{class:'v32-pdf-buttons'},
+        h('button',{type:'button',class:'btn sec',onclick:()=>telechargerPDF(x.id)},'Télécharger PDF'),
+        h('button',{type:'button',class:'btn sec',onclick:async()=>{
+          await supprimerPDF(x.id);await pageCataloguesPDF();
+        }},'Supprimer la copie')));
+    // Une seule fiche par document : les copies officielles sont gérées
+    // dans la carte de leur fournisseur, pas répétées dans « Mes catalogues ».
+    const cartes=tous.filter(x=>x.id!==localCarsystem?.id&&x.id!==localSifa?.id)
+      .sort((a,b)=>a.fournisseur.localeCompare(b.fournisseur,'fr')||a.nom.localeCompare(b.nom,'fr')).map(x=>{
       const date=Number.isFinite(Date.parse(x.date))?new Date(x.date).toLocaleDateString('fr-FR'):'Date inconnue';
       const btOpen=h('button',{type:'button',class:'btn'},'Ouvrir');
       const btSave=h('button',{type:'button',class:'btn sec'},'Télécharger PDF');
@@ -187,6 +199,7 @@
             h('button',{class:'btn sec',type:'button',onclick:()=>ouvrirPDF(localCarsystem.id)},
               'Ouvrir la copie hors ligne'):
             h('a',{class:'btn sec',href:'#/reglages'},'Importer via Réglages')),
+        localCarsystem?gestionCopie(localCarsystem):null,
         h('details',{class:'v34-cs-sections'},
           h('summary',{},'Accès rapide · 9 familles de produits'),
           h('div',{class:'v34-cs-grid'},rubriquesCarsystem.map(([titre,page])=>
@@ -205,10 +218,12 @@
             h('small',{},'Fournitures professionnelles · Automobile, bâtiment, industrie et nautisme'),
             h('small',{class:'mut'},'Catalogue en ligne (Calaméo) · Internet requis'))),
         h('div',{class:'v32-pdf-buttons'},
-          h('a',{class:'btn',href:'https://www.calameo.com/books/006112838f2f47d2c47da',target:'_blank',rel:'noopener noreferrer'},'Consulter SIFA 2025')),
-        h('p',{class:'mut'},'Pour un accès hors connexion, importe le PDF SIFA depuis Réglages si le fournisseur te le transmet. Ce catalogue ne renseigne pas les tarifs EBP.')),
-      h('h2',{},'Mes catalogues'),
-      cartes.length?cartes:h('p',{class:'mut'},'Aucun catalogue PDF enregistré. Ajoute des documents depuis Réglages.'),
+          h('a',{class:'btn',href:'https://www.calameo.com/books/006112838f2f47d2c47da',target:'_blank',rel:'noopener noreferrer'},'Consulter SIFA 2025'),
+          localSifa?h('button',{type:'button',class:'btn sec',onclick:()=>ouvrirPDF(localSifa.id)},'Ouvrir la copie hors ligne'):null),
+        localSifa?gestionCopie(localSifa):null,
+        h('p',{class:'mut'},localSifa?'Copie SIFA 2025 enregistrée sur ce téléphone : disponible hors connexion.':'Pour un accès hors connexion, importe le PDF SIFA depuis Réglages si le fournisseur te le transmet. Ce catalogue ne renseigne pas les tarifs EBP.')),
+      h('h2',{},localCarsystem||localSifa?'Mes autres catalogues':'Mes catalogues'),
+      cartes.length?cartes:h('p',{class:'mut'},localCarsystem||localSifa?'Aucun autre catalogue PDF enregistré.':'Aucun catalogue PDF enregistré. Ajoute des documents depuis Réglages.'),
       h('div',{class:'carte v32-warning'},h('strong',{},'Sauvegarde importante'),
         h('p',{},'Ces PDF ne sont pas inclus dans la sauvegarde JSON des clients et devis. Garde toujours les originaux et utilise « Télécharger PDF » pour récupérer une copie.'),
         h('p',{class:'mut'},'Le navigateur peut effacer ses données si son stockage est réinitialisé. Ne sélectionne pas « Tout effacer » dans les réglages.')),
