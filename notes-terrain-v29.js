@@ -247,8 +247,11 @@
     if((location.hash||'#/')!=='#/')return;
     const bloc=app.querySelector('.v23-prochaine');
     if(!bloc)return;
+    const garages=await getAll('clients');
+    const dus=garages.reduce((s,c)=>s+notesDe(c).filter(estEchue).length,0);
     const n=h('a',{class:'v29-home-note',href:'#/note-terrain'},
-      h('span',{},'✎ Note terrain'),h('small',{},'Prix · Marque · Obstacle · Client'));
+      h('span',{},'✎ Note terrain'),
+      h('small',{},dus?dus+' suivi'+(dus>1?'s':'')+' à traiter':'Prix · Marque · Obstacle'));
     bloc.append(n);
   };
 
