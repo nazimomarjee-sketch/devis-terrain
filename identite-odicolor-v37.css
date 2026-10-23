@@ -1,0 +1,76 @@
+/* ODICOLOR v37 — identité premium sombre, logo fourni par le commercial.
+ * CSS uniquement : devis, données clients et flux EBP inchangés.
+ * Rouge ODICOLOR pour la marque et les actions ; fond noir/anthracite permanent.
+ */
+:root[data-theme=dark]{
+  --acc:#ED1C2B;
+  --acc-fg:#ffffff;
+  --bg:#090A0D;
+  --card:#14171C;
+  --line:#30323B;
+  --fg:#F6F6F8;
+  --mut:#ABB0BA;
+}
+body{background:var(--bg)}
+.barre{
+  background:
+    radial-gradient(ellipse at 100% -45%,rgba(237,28,43,.27),transparent 72%),
+    linear-gradient(135deg,#0C0E12 10%,#171115 65%,#100B0E);
+  border-bottom:2px solid #ED1C2B;
+  border-radius:0 0 22px 22px;
+  color:#fff;
+  padding:14px 18px 18px;
+  min-height:120px;
+  box-shadow:0 10px 28px rgba(0,0,0,.20);
+}
+.barre .bg{width:100%;min-width:0;position:relative;z-index:1;gap:4px}
+.marque{display:flex;align-items:center;gap:12px;margin:0 0 8px}
+.marque .logo{
+  width:52px;height:52px;min-width:52px;
+  display:block;object-fit:contain;
+  border-radius:13px;
+  background:#ED1C2B;
+  box-shadow:0 0 0 1px rgba(255,255,255,.14),0 7px 18px rgba(0,0,0,.40);
+}
+.marque .nom{
+  font-size:16px;line-height:1.1;letter-spacing:.095em;
+  color:#FFF;font-weight:900;
+}
+.marque .nom small{
+  margin-top:5px;font-size:10px;letter-spacing:.19em;
+  font-weight:650;color:#CCD0D8;opacity:1;
+}
+.barre .bg #titre{
+  font-size:31px;line-height:1.1;
+  font-weight:900;letter-spacing:-.01em;
+  text-shadow:0 2px 8px rgba(0,0,0,.27);
+  overflow-wrap:anywhere;
+}
+.barre #sous{color:#D8D9DF}
+.minibarre{
+  background:linear-gradient(100deg,#101218,#1A0B10);
+  color:#FFF;
+  border-bottom:2px solid #ED1C2B;
+  box-shadow:0 5px 18px rgba(0,0,0,.4);
+}
+.minibarre img{
+  width:32px;height:32px;
+  object-fit:contain;
+  background:#ED1C2B;
+  border-radius:8px;
+  box-shadow:0 0 0 1px rgba(255,255,255,.15);
+}
+.onglets{background:#0D0F13;border-top:1px solid #30333B}
+.onglets a.on{color:#FF3447;box-shadow:inset 0 3px 0 #ED1C2B}
+.onglets a:not(.on){color:#A5AAB3}
+.btn:not(.sec):not(.danger):not(.ambre):not([disabled]){color:var(--acc-fg)}
+@media(max-width:375px){
+  .barre{min-height:110px;padding:12px 15px 15px}
+  .marque .logo{width:46px;height:46px;min-width:46px}
+  .marque .nom{font-size:14px}
+  .marque .nom small{font-size:9px;letter-spacing:.16em}
+  .barre .bg #titre{font-size:28px}
+}
+@media(prefers-reduced-motion:reduce){
+  .barre,.marque .logo{transition:none}
+}
