@@ -1,0 +1,8 @@
+/* ODICOLOR v25 : fix header overlay on Samsung settings and clear release status */
+body.v25-reglages .minibarre{display:none!important}
+.v25-etat{margin:20px 0!important;border-left:4px solid var(--acc)}
+.v25-etat p{margin:9px 0;font-size:14px}
+.v25-etat-titre{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.v25-maj{position:fixed;bottom:calc(76px + env(safe-area-inset-bottom));left:12px;right:12px;z-index:20;max-width:550px;margin:auto;padding:14px;border:2px solid var(--acc);border-radius:14px;color:var(--fg);background:var(--card);box-shadow:0 5px 25px #0005}
+.v25-maj p{font-size:13px;margin:7px 0}
+.v25-maj .actions{margin:5px 0}
