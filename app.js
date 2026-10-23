@@ -1759,12 +1759,17 @@ async function pageDevis(id) {
       h('button', { class: 'btn sec', onclick: () => { fini(); window.print(); } }, 'PDF / Imprimer'),
       h('button', { class: 'btn sec', onclick: () => { fini(); telecharger(numero(d) + '.csv', csvDevis(d), 'text/csv;charset=utf-8'); } }, 'CSV pour EBP'),
       h('button', { class: 'btn', onclick: () => { fini(); envoyerDevis([d], 'devis-' + numero(d) + '.json'); } }, 'Envoyer à mon responsable')] : null,
-    h('button', { class: 'btn sec', onclick: () => dupliquer(d) }, 'Dupliquer (prix du jour)'),
+    h('details', { class: 'v32-options-devis' },
+      h('summary', {}, 'Options du devis'),
+      h('p', { class: 'mut' }, 'Réutiliser les articles, quantités et remises dans un nouveau brouillon, avec les tarifs du catalogue actuel.'),
+      h('button', { class: 'btn sec', onclick: () => {
+        if (confirm('Créer un nouveau brouillon avec les mêmes articles et les tarifs actuels ?')) dupliquer(d);
+      } }, 'Réutiliser ce devis')),
     d.statut === 'envoye' && d.lignes.length ? h('div', { class: 'trio' },
       h('button', { class: 'btn vert', onclick: async () => { d.statut = 'accepte'; d.reponseLe = new Date().toISOString(); if (client && client.conv && client.conv !== 'converti') { client.conv = 'converti'; await putMany('clients', [client]); } await sauver(); toast('Devis accepté.'); pageDevis(id); } }, 'Accepté'),
       h('button', { class: 'btn ambre', onclick: async () => { d.relanceLe = new Date().toISOString(); await sauver(); window.open('https://wa.me/' + tel + '?text=' + encodeURIComponent('Bonjour, avez-vous pu regarder le devis ' + numero(d) + ' (' + eur(totaux(d).ht) + ' HT) ? Je reste à votre disposition.'), '_blank', 'noopener'); pageDevis(id); } }, 'À relancer'),
       h('button', { class: 'btn gris', onclick: async () => { d.statut = 'refuse'; d.reponseLe = new Date().toISOString(); await sauver(); toast('Devis noté refusé.'); pageDevis(id); } }, 'Refusé')) : null,
-    h('button', { class: 'btn ' + (verrou ? 'sec' : ''), onclick: async () => { if (!verrou) fini(); if (verrou) { d.statut = 'brouillon'; delete d.reponseLe; } else d.statut = 'envoye'; await sauver(); pageDevis(id); } }, verrou ? 'Rouvrir pour modifier' : 'Marquer comme envoyé'),
+    h('button', { class: 'btn ' + (verrou ? 'sec' : ''), disabled: !verrou && !d.lignes.length, onclick: async () => { if (!verrou) fini(); if (verrou) { d.statut = 'brouillon'; delete d.reponseLe; } else d.statut = 'envoye'; await sauver(); pageDevis(id); } }, verrou ? 'Rouvrir pour modifier' : 'Marquer comme envoyé'),
     h('button', { class: 'btn danger', onclick: async () => { if (confirm('Supprimer ce devis ?')) { await del('devis', id); location.hash = '#/'; } } }, 'Supprimer'));
   montrer(numero(d),
     h('div', { class: 'ecran' },
