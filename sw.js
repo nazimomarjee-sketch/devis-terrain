@@ -1,22 +1,54 @@
 'use strict';
-/* Devis terrain : cache d'abord, pour fonctionner sans réseau. Changer CACHE à chaque nouvelle version. */
-const CACHE = 'terrain-v24';
-const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'commercial-v22.js', 'style-v22.css', 'accueil-v23.js', 'accueil-v23.css', 'suivi-produits-v24.js', 'suivi-produits-v24.css', 'rappels-produits-v24.js', 'manifest.webmanifest']; // indispensables : sans eux, pas d'installation
-const OPTION = ['icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'logo-96.png', 'xlsx.mini.min.js', 'barlow-condensed-latin-700-normal.woff2', 'barlow-condensed-latin-800-normal.woff2']; // le reste : si un fichier manque, l'appli s'installe quand même
-
-self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL).then(() => Promise.allSettled(OPTION.map(u => c.add(u))))).then(() => self.skipWaiting()));
+/* ODICOLOR v25 — mise à jour réseau en priorité, fonctionnement hors ligne conservé.
+ * Ce cache ne touche jamais aux données IndexedDB clients/devis.
+ */
+const CACHE='terrain-v25';
+const SHELL=[
+  './','index.html','style.css','style-v22.css','accueil-v23.css',
+  'suivi-produits-v24.css','correctif-v25.css',
+  'app.js','commercial-v22.js','accueil-v23.js',
+  'suivi-produits-v24.js','rappels-produits-v24.js','correctif-v25.js',
+  'manifest.webmanifest'
+];
+const OPTION=['icon-192.png','icon-512.png','icon-maskable-512.png','logo-96.png',
+  'xlsx.mini.min.js','barlow-condensed-latin-700-normal.woff2','barlow-condensed-latin-800-normal.woff2'];
+self.addEventListener('install',event=>{
+  event.waitUntil(caches.open(CACHE)
+    .then(cache=>cache.addAll(SHELL))
+    .then(()=>caches.open(CACHE))
+    .then(cache=>Promise.allSettled(OPTION.map(url=>cache.add(url))))
+    .then(()=>self.skipWaiting()));
 });
-self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+self.addEventListener('activate',event=>{
+  event.waitUntil(caches.keys()
+    .then(keys=>Promise.all(keys.filter(key=>key.startsWith('terrain-')&&key!==CACHE)
+      .map(key=>caches.delete(key))))
+    .then(()=>self.clients.claim()));
 });
-self.addEventListener('fetch', e => {
-  const r = e.request;
-  if (r.method !== 'GET') return;
-  const u = new URL(r.url);
-  if (u.origin !== location.origin) return; // registre officiel, etc. : jamais mis en cache
-  e.respondWith(caches.match(r, { ignoreSearch: true }).then(hit => hit || fetch(r).then(res => {
-    if (res.ok) { const copie = res.clone(); caches.open(CACHE).then(c => c.put(r, copie)); }
-    return res;
-  }).catch(() => caches.match('index.html'))));
+self.addEventListener('fetch',event=>{
+  const request=event.request;
+  if(request.method!=='GET')return;
+  const u=new URL(request.url);
+  if(u.origin!==location.origin)return;
+  if(request.mode==='navigate'){
+    event.respondWith(
+      fetch(request,{cache:'no-store'}).then(response=>{
+        if(response.ok){const copy=response.clone();caches.open(CACHE).then(c=>c.put(request,copy));}
+        return response;
+      }).catch(()=>caches.match(request).then(cached=>cached||caches.match('index.html')))
+    );
+    return;
+  }
+  const localShell=SHELL.some(x=>u.pathname.endsWith('/'+x.replace(/^\.\//,'')))||u.pathname.endsWith('/devis-terrain/');
+  if(localShell){
+    event.respondWith(fetch(request,{cache:'no-store'}).then(response=>{
+      if(response.ok){const copy=response.clone();caches.open(CACHE).then(c=>c.put(request,copy));}
+      return response;
+    }).catch(()=>caches.match(request)));
+    return;
+  }
+  event.respondWith(caches.match(request).then(cached=>cached||fetch(request).then(response=>{
+    if(response.ok){const copy=response.clone();caches.open(CACHE).then(c=>c.put(request,copy));}
+    return response;
+  })));
 });
