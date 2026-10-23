@@ -1,0 +1,46 @@
+/* ODICOLOR v31 — devis visible et dossier N+1, sombre permanent. */
+.v31-nouveau-devis{display:flex;align-items:center;gap:12px;width:100%;min-height:78px;
+  padding:13px 18px;margin:12px 0 16px;border-radius:17px;background:#D41F2B;
+  color:#fff!important;text-decoration:none!important;box-shadow:0 4px 16px #b0001730}
+.v31-nouveau-devis .v31-plus{font-size:35px;font-weight:800;line-height:1}
+.v31-nouveau-devis span:nth-child(2){flex:1;min-width:0;display:flex;flex-direction:column}
+.v31-nouveau-devis strong{color:#fff!important;font-family:var(--cond),system-ui;font-size:29px;line-height:1.08;letter-spacing:.01em}
+.v31-nouveau-devis small{color:#fff;opacity:.9;font-size:12px;font-weight:600;line-height:1.35;margin-top:5px}
+.v31-chevron{font-size:28px;color:#fff}
+.v31-entete{padding:16px 3px 6px}
+.v31-entete strong{display:block;color:var(--fg);font-family:var(--cond),system-ui;font-size:32px;line-height:1.18;margin:8px 0}
+.v31-entete p{font-size:13px;margin:10px 0}
+.v31-verif,.v31-dossier{padding:18px!important}
+.v31-verif>strong,.v31-dossier>strong{display:block;font-size:18px}
+.v31-verif label,.v31-dossier label{display:block;margin:13px 0 6px;font-weight:750;font-size:13px}
+.v31-etat{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:12px 0}
+.v31-etat .tag{line-height:1.4;white-space:normal}
+.v31-identite{display:flex;flex-direction:column;gap:5px;padding:10px 12px;background:var(--bg);border:1px solid var(--line);border-radius:12px;margin:10px 0}
+.v31-identite strong{font-size:15px}
+.v31-identite small{font-size:12px;color:var(--mut)}
+.v31-resultats{margin:12px 0}
+.v31-candidat{display:flex;flex-direction:column;gap:7px;padding:12px 4px;border-bottom:1px solid var(--line)}
+.v31-candidat>strong{font-size:15px}
+.v31-candidat small{font-size:12px}
+.v31-choix{width:100%;min-height:44px}
+.v31-dossier p{font-size:13px}
+.v31-dossier textarea{min-height:74px}
+.v31-options{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:14px 0}
+.v31-options .btn{min-height:54px;padding:8px;font-size:13px;white-space:normal}
+.v31-options .v31-partage{grid-column:1/-1;min-height:58px;background:#D41F2B;color:#fff!important;font-size:17px}
+.v31-erreur{font-size:13px;color:var(--ko);font-weight:750;overflow-wrap:anywhere}
+.v31-retour{margin:14px 0 0;padding:12px;border-radius:12px;border:1px solid var(--line)}
+.v31-retour summary{font-weight:750;min-height:32px;cursor:pointer}
+.v31-retour .btn{margin-top:12px}
+.v31-bas{display:flex;gap:8px;flex-wrap:wrap;margin:15px 0}
+.v31-bas>*{flex:1 1 125px;min-height:49px;font-size:13px}
+.v31-client-dossier{display:flex;flex-direction:column;gap:5px;color:var(--fg)!important;
+  text-decoration:none!important;border-left:4px solid var(--acc)!important}
+.v31-client-dossier strong{font-size:16px}
+.v31-client-dossier small{font-size:12px}
+.v31-plus-lien{display:flex;align-items:center;justify-content:center;padding:12px;
+  border:1px solid var(--acc);color:var(--fg)!important;text-decoration:none!important;
+  min-height:52px;background:var(--card);border-radius:12px;font-weight:750;margin-bottom:10px}
+.v31-copie textarea{min-height:160px;font-size:13px}
+@media(max-width:375px){.v31-nouveau-devis strong{font-size:25px}.v31-options{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:no-preference){.v31-nouveau-devis:active{transform:scale(.99)}}
