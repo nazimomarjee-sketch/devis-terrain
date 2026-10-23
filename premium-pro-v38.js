@@ -340,7 +340,7 @@
   pageReglages=async function(){
     await regAvant();
     const t=app.querySelector('.v25-etat .v25-etat-titre strong');
-    if(t)t.textContent='ODICOLOR Solution · v38';
+    if(t)t.textContent='ODICOLOR Solution · v39';
   };
 
   window.__premiumProV38={optimiserPhoto,enregistrerPhoto,photoPour,supprimerPhoto,statutGarage};
