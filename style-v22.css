@@ -1,0 +1,16 @@
+/* v22 — extension commerciale, préserve le thème ODICOLOR */
+.v22-entry{display:block;color:var(--fg)!important;text-decoration:none!important;border-left:4px solid var(--acc)!important}
+.v22-between{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.v22-entry p{margin:6px 0}
+.v22-intro p{margin:8px 0}
+.v22-signal{border-left:4px solid var(--acc)!important}
+.v22-signal-row{padding:10px 0;border-bottom:1px solid var(--line)}
+.v22-signal-row:last-child{border-bottom:0}
+.v22-signal-row p{margin:8px 0}
+.v22-proof{margin-top:8px;padding:8px 10px;border:1px solid var(--line);border-radius:10px}
+.v22-proof summary{min-height:38px;display:flex;align-items:center;color:var(--acc);font-weight:700}
+.v22-proof p{overflow-wrap:anywhere}
+.v22-client-label{margin-top:5px;line-height:1.6}
+.v22-item .actions,.v22-signal .actions{margin-bottom:0}
+.v22-evidence{border-left:4px solid var(--ok)!important}
+@media (prefers-color-scheme:dark){.v22-entry,.v22-signal,.v22-evidence{box-shadow:none}}
