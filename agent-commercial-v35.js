@@ -266,7 +266,7 @@
   pageReglages=async function(){
     await reglagesAvant();
     const version=app.querySelector('.v25-etat .v25-etat-titre strong');
-    if(version)version.textContent='ODICOLOR Solution · v36';
+    if(version)version.textContent='ODICOLOR Solution · v37';
   };
   window.__odicolorAgent01={collecte,briefing,lireAvis};
 })();
