@@ -1,0 +1,31 @@
+/* ODICOLOR v36 — fiche garage épurée, aucune suppression de données. */
+.v36-contact{margin:4px 0 12px;font-size:13px}
+.v36-rapide{margin:8px 0 13px}
+.v36-rapide .btn{min-height:52px;font-size:14px;font-weight:800}
+.v36-devis{background:#d41f2b!important;color:#fff!important}
+.v36-prochaine{border-left:4px solid #d41f2b!important}
+.v36-prochaine>strong,.v36-visite>strong{display:block;font-size:17px;line-height:1.4;margin-bottom:9px}
+.v36-prochaine label{font-size:13px;font-weight:700;display:block;margin:10px 0 5px}
+.v36-prochaine input{font-size:16px}
+.v36-prochaine .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.v36-prochaine .actions button{flex:1 1 132px;min-height:48px;font-size:13px}
+.v36-visite .actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.v36-visite .actions button{flex:1 1 102px;min-height:48px;font-size:13px}
+.v36-details{border:1px solid var(--line);border-radius:13px;background:var(--card);
+ margin:9px 0;overflow:hidden}
+.v36-details summary{cursor:pointer;display:flex;align-items:center;justify-content:space-between;
+ min-height:57px;padding:13px 15px;font-size:14px;font-weight:800;line-height:1.35;color:var(--fg);list-style:none;gap:12px}
+.v36-details summary::-webkit-details-marker{display:none}
+.v36-details summary::after{content:'⌄';font-size:22px;color:var(--acc);flex:none}
+.v36-details[open] summary::after{transform:rotate(180deg)}
+.v36-details[open] summary{border-bottom:1px solid var(--line)}
+.v36-details-corps{padding:13px 14px 15px}
+.v36-details-corps>label{display:block;margin:12px 0 5px;font-size:13px;font-weight:700}
+.v36-details-corps>input,.v36-details-corps>select,.v36-details-corps>textarea{font-size:16px;max-width:100%}
+.v36-details-corps>button{min-height:52px;width:100%;margin-top:14px}
+.v36-details-corps .carte{margin:8px 0;padding:12px}
+.v36-details-corps .actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.v36-details-corps .actions button{min-height:45px}
+.v36-details:focus-within{border-color:var(--acc)}
+.v36-details summary:focus-visible{outline:2px solid var(--acc);outline-offset:-3px}
+@media(max-width:360px){.v36-rapide .btn{font-size:12px;padding:8px 5px}.v36-visite .actions button{flex:1 1 138px}}
