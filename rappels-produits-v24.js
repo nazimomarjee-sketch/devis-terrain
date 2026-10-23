@@ -1,6 +1,8 @@
 'use strict';
 /* ODICOLOR v24 — rappels produits déclarés, sans prédiction inventée. */
 (function(){
+  const avantReglages=pageReglages;
+  pageReglages=async function(){await avantReglages();app.append(h('p',{class:'mut',style:'font-weight:700;text-align:center'},'Suivi commercial produits v24 · données locales conservées'));};
   const ancienAccueil=pageAccueil;
   pageAccueil=async function(){
     await ancienAccueil();
