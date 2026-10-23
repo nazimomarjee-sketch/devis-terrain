@@ -127,18 +127,6 @@
     if(partie[0]==='besoin'&&/^\d+$/.test(partie[1]||''))return pageBesoinsClient(Number(partie[1]));
     return avantRoute();
   };
-  const avantAccueil=pageAccueil;
-  pageAccueil=async function(){
-    await avantAccueil();
-    if(location.hash&&location.hash!=='#/')return;
-    const cible=app.querySelector('.v23-prochaine');
-    if(cible){
-      const n=h('a',{class:'v24-cta',href:'#/besoins'},
-        h('span',{},h('strong',{},'+ Besoin d’un garage'),h('small',{},'Vernis · Mastic · Abrasifs · Masquage · Apprêt')),
-        h('span',{},'›'));
-      cible.after(n);
-    }
-  };
   const avantClient=pageClient;
   pageClient=async function(id){
     await avantClient(id);
