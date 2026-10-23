@@ -24,6 +24,13 @@
   const etatEntreprise=c=>{
     const ent=c&&c.ent;
     if(!ent||!sirenValide(ent.siren))return {valide:false,libelle:'À vérifier',alerte:true};
+    const v=c.verificationDossier;
+    const preuve=v&&v.selectionParCommercial===true &&
+      v.source==='API Recherche d’entreprises'&&v.siren===ent.siren &&
+      ['A','C'].includes(v.etat)&&v.etat===ent.etat&&Number.isFinite(Date.parse(v.date));
+    if(!preuve)return {valide:false,libelle:'Identité en fiche · à revérifier sur le registre',alerte:true};
+    const age=(Date.now()-Date.parse(v.date))/86400000;
+    if(age<0||age>30)return {valide:false,libelle:'Vérification ancienne · à renouveler',alerte:true};
     if(ent.etat==='A')return {valide:true,libelle:'Entreprise active au registre (à la date du contrôle)',alerte:false};
     if(ent.etat==='C')return {valide:true,libelle:'Entreprise cessée selon le registre',alerte:true};
     return {valide:false,libelle:'État administratif non déterminé',alerte:true};
@@ -31,7 +38,8 @@
 
   function dossierTexte(client,details){
     const c=client||{},d=details||d0(c),ent=c.ent||{},etat=etatEntreprise(c);
-    const source=ent.siren?'API Recherche d’entreprises (registre public)':'Aucune vérification enregistrée';
+    const source=etat.valide?'API Recherche d’entreprises (sélection explicite du commercial)':
+      ent.siren?'Identité en fiche : à revérifier officiellement':'Aucune vérification enregistrée';
     return [
       'ODICOLOR — DEMANDE DE VALIDATION N+1 / OUVERTURE DE COMPTE',
       'Dossier préparé le : '+new Date().toLocaleString('fr-FR'),
@@ -215,7 +223,7 @@
           h('small',{},'SIREN : '+client.ent.siren+
             (siretValide(client.ent.siret)?' · SIRET : '+client.ent.siret:'')),
           h('small',{class:'mut'},client.ent.adresse||'Adresse non renseignée'),
-          h('small',{class:'mut'},'API officielle · vérifié le '+dateAffiche(client.ent.lu))):
+          h('small',{class:'mut'},(e.valide?'API officielle · contrôlé le ':'Données de la fiche · à recontrôler · datées du ')+dateAffiche(client.ent.lu))):
         h('p',{class:'mut'},'Non vérifiée : la seule présence du nom du garage ne prouve pas son immatriculation.'),
       h('label',{},'Rechercher une entreprise'),inputRecherche,btnRechercher,zoneResultats,
       h('div',{class:'actions'},btnSiren,lien('https://www.pappers.fr/recherche','Consulter Pappers')),
