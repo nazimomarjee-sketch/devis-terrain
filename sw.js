@@ -2,12 +2,12 @@
 /* ODICOLOR v29 — mise à jour réseau en priorité, fonctionnement hors ligne conservé.
  * Ce cache ne touche jamais aux données IndexedDB clients/devis.
  */
-const CACHE='terrain-v39';
+const CACHE='terrain-v40';
 const SHELL=[
   './','index.html','style.css','style-v22.css','accueil-v23.css',
-  'suivi-produits-v24.css','correctif-v25.css','apparence-v26.css','notes-terrain-v29.css','parcours-garage-v30.css','dossier-n1-v31.css','catalogues-pdf-v32.css','agent-commercial-v35.css','fiche-client-v36.css','identite-odicolor-v37.css','premium-pro-v38.css','photo-magasin-odicolor-v39.css','odicolor-logo-officiel.png',
+  'suivi-produits-v24.css','correctif-v25.css','apparence-v26.css','notes-terrain-v29.css','parcours-garage-v30.css','dossier-n1-v31.css','catalogues-pdf-v32.css','agent-commercial-v35.css','fiche-client-v36.css','identite-odicolor-v37.css','premium-pro-v38.css','photo-magasin-odicolor-v39.css','imports-centralises-v40.css','odicolor-logo-officiel.png',
   'app.js','commercial-v22.js','accueil-v23.js',
-  'suivi-produits-v24.js','rappels-produits-v24.js','correctif-v25.js','apparence-v26.js','notes-terrain-v29.js','parcours-garage-v30.js','dossier-n1-v31.js','catalogues-pdf-v32.js','agent-commercial-v35.js','premium-pro-v38.js',
+  'suivi-produits-v24.js','rappels-produits-v24.js','correctif-v25.js','apparence-v26.js','notes-terrain-v29.js','parcours-garage-v30.js','dossier-n1-v31.js','catalogues-pdf-v32.js','agent-commercial-v35.js','premium-pro-v38.js','imports-centralises-v40.js',
   'manifest.webmanifest'
 ];
 const OPTION=['icon-192.png','icon-512.png','icon-maskable-512.png','logo-96.png',
