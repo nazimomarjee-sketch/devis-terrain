@@ -320,6 +320,16 @@
     const c=await lireClient(id);
     if(!c)return;
     const d=d0(c);
+    // Un prospect créé sur le terrain n'a pas de preuve EBP d'ouverture :
+    // éviter qu'un clic dans la fiche le présente comme compte ouvert.
+    if(c.statutCrm==='prospect'&&c.origineCreation==='visite-terrain'){
+      const statutCompte=app.querySelector('select[aria-label="Statut du compte"]');
+      const optionOuvert=statutCompte&&statutCompte.querySelector('option[value="ouvert"]');
+      if(optionOuvert&&!optionOuvert.selected){
+        optionOuvert.disabled=true;
+        optionOuvert.textContent='Ouvert (uniquement après confirmation EBP)';
+      }
+    }
     // Afficher le dossier en cours pour les prospects ou lorsqu'une
     // demande N+1 existe. Aucun faux badge 'compte ouvert'.
     if(c.statutCrm==='prospect'||c.demandeCompteN1){
