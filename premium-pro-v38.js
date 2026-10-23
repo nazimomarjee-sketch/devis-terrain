@@ -146,13 +146,12 @@
     });
   }
   function sectionNotesEtIncident(id){
-    return h('details',{class:'v38-secondaires'},
-      h('summary',{},'Autres actions du garage'),
-      h('div',{class:'v38-secondaires-liens'},
-        lien('#/signaler/'+id,'Signaler un incident'),
-        lien('#/notes-client/'+id,'Historique des notes'),
-        lien('#/besoins','Suivi des besoins produits')));
+    // A unique, secondary entry for technical incidents.
+    // Note terrain is the main action; its history has its own panel.
+    return h('a',{class:'v38-incident-link',href:'#/signaler/'+id},
+      'Signaler un incident technique ›');
   }
+
   function resumeLocal(devis,client){
     const mine=devis.filter(d=>d.clientId===client.id);
     const acceptes=mine.filter(d=>d.statut==='accepte');
@@ -234,11 +233,28 @@
     }
     const notes=app.querySelector('.v29-client-note');
     if(notes){
-      // Keep original historic notes and links inside a secondary collapsible block.
-      const d=h('details',{class:'v38-secondaires v38-note-detail'},
-        h('summary',{},'Remontées commerciales · notes'),
-        notes);
-      app.append(d);
+      // One access to create notes (top action), one access to history.
+      // Suppress duplicate creation/history buttons without deleting any notes.
+      const create=notes.querySelector('a[href^="#/note-terrain/"]');
+      if(create)create.remove();
+      const history=notes.querySelector('a[href^="#/notes-client/"]');
+      const heading=notes.querySelector('.v29-ligne');
+      if(heading)heading.remove();
+      if(history){
+        const d=h('details',{class:'v38-secondaires v38-note-detail'},
+          h('summary',{},'Historique des informations terrain'),
+          notes);
+        app.append(d);
+      }else notes.remove();
+    }
+    // The hero already shows "Prospect": remove only its duplicate badge,
+    // keep the important warning that EBP has not verified any order.
+    const prospect=app.querySelector('.v30-prospect');
+    if(prospect){
+      const badge=prospect.querySelector('.tag');
+      if(badge)badge.remove();
+      prospect.classList.add('v38-prospect-compact');
+      hero.after(prospect);
     }
     const fin=h('div',{class:'v38-fin-client'},
       sectionNotesEtIncident(id),
