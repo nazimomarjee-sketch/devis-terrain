@@ -1558,11 +1558,8 @@ async function pageClient(id) {
 }
 async function pageClients() {
   const cl = (await getAll('clients')).sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
-  const zone = h('div');
   montrer('Clients',
     h('p', { class: 'mut' }, cl.length + ' client(s) sur ce téléphone.'),
-    h('div', { class: 'actions' }, h('button', { class: 'btn', onclick: () => importUI('clients', zone) }, 'Importer une liste (Excel / CSV)')),
-    zone,
     cl.map(c => h('div', { class: 'ligne' }, h('span', { class: 'g' }, h('strong', {}, c.nom), c.tel ? h('br') : null, c.tel ? h('small', {}, c.tel) : null),
       h('span', { class: 'rapide' },
         h('a', { class: 'btn sec', href: '#/client/' + c.id }, 'Fiche'),
@@ -1598,7 +1595,6 @@ async function pageArticle(codeBrut) {
 }
 async function pageCatalogue() {
   const rapport = await get('meta', 'rapport_articles');
-  const zone = h('div');
   const res = h('div');
   const q = h('input', { type: 'search', placeholder: 'Chercher : code ou désignation…', 'aria-label': 'Chercher dans le catalogue', autocomplete: 'off' });
   q.addEventListener('input', () => {
@@ -1607,8 +1603,7 @@ async function pageCatalogue() {
   });
   montrer('Catalogue',
     h('p', { class: 'mut' }, CAT.length + ' article(s). Pas de gestion de stock. Pas de prix d’achat ni de marge sur ce téléphone.'),
-    h('div', { class: 'actions' }, h('button', { class: 'btn', onclick: () => importUI('articles', zone) }, 'Importer un export EBP (Excel / CSV)')),
-    zone, q, res,
+    q, res,
     rapport ? [h('h2', {}, 'Dernier import · ' + new Date(rapport.date).toLocaleString('fr-FR')), rapportNode(rapport.fichier, rapport.rep)] : null);
 }
 function importUI(kind, zone) {
@@ -1653,11 +1648,13 @@ async function lancer(kind, rows, debut, map, nomFichier) {
     await put('meta', { date: new Date().toISOString(), fichier: nomFichier, rep: r.rep }, 'rapport_articles');
     await chargerBase();
     toast(r.rep.crees + r.rep.maj + ' article(s) importé(s), ' + r.rep.ignorees + ' refusé(s).', r.rep.erreurs.length > 0 && !(r.rep.crees + r.rep.maj));
+    if(location.hash==='#/reglages')location.hash='#/catalogue';
     await pageCatalogue();
   } else {
     const ex = new Map((await getAll('clients')).map(c => [norm(c.nom), c]));
     r = importerClients(rows, debut, map, ex);
     await putMany('clients', r.items);
+    if(location.hash==='#/reglages')location.hash='#/clients';
     await pageClients();
     app.prepend(rapportNode('Import clients : ' + nomFichier, r.rep));
   }
@@ -1948,29 +1945,42 @@ async function blocPCClient(c) {
   if (!e || !e.lignes.length) return null;
   return h('div', { class: 'carte ' + (e.niveau === 'bad' ? 'alerte' : '') }, h('small', { class: 'etiq' }, 'VU PAR LE PC (export EBP du ' + (pc.arrete?dateFr(pc.arrete+'T12:00:00'):'date inconnue') + ')'), e.lignes.map(l => h('p', { style: 'margin:6px 0 0' }, l)));
 }
+// Import unique PC : appelé seulement depuis Réglages → Imports.
+async function importerPlanPC(f){
+  if(!f)throw new Error('Choisis le fichier du PC.');
+  if(f.size>5*1024*1024)throw new Error('Fichier trop gros.');
+  const o=JSON.parse(await f.text());
+  if(!o||o.appli!=='plan-pc'||!Array.isArray(o.actions)||o.version!==2||!/^\d{4}-\d\d-\d\dT/.test(o.date||''))throw new Error('Plan PC v2 invalide.');
+  if(o.chiffre&&o.chiffre.source==='demo')throw new Error('Plan fictif : import refusé.');
+  const p=nettoyerPlan(o), previous=await lirePC();
+  if(previous&&new Date(p.date).getTime()<=new Date(previous.date).getTime())throw new Error('Plan ancien ou déjà importé.');
+  if(!confirm('Importer '+p.actions.length+' actions ? Le plan précédent sera conservé.'))return null;
+  if(previous){
+    const archives=(await get('meta','pcArchives'))||[];
+    archives.push(previous);
+    await put('meta',archives.slice(-5),'pcArchives');
+    await put('meta',previous,'pcPrecedent');
+  }
+  const history=(await get('meta','pcActions'))||[];
+  const by=new Map(history.map(x=>[x.id,x]));
+  p.actions.forEach(a=>{
+    const old=by.get(a.id);
+    if(old&&old.modifieLe&&(!a.modifieLe||old.modifieLe>=a.modifieLe))
+      Object.assign(a,{statut:old.statut||old.etat,note:old.note,jourPrevu:old.jourPrevu||old.reportLe,modifieLe:old.modifieLe});
+    by.set(a.id,a);
+  });
+  await put('meta',Array.from(by.values()),'pcActions');
+  await put('meta',p,'pc');
+  return p;
+}
 async function pagePC() {
-  const pc = await lirePC(), fich = h('input', { type: 'file', accept: '.json', 'aria-label': 'Plan du PC' });
+  const pc = await lirePC();
   montrer('Lien avec le PC',
     h('div', { class: 'carte' }, h('strong', {}, '1. Envoyer ta sauvegarde au PC'), h('p', { class: 'mut' }, 'Devis, commandes envoyées, clients, visites, tournées. Passe le fichier au PC comme tu veux : partage Samsung, câble ou mail à toi-même. Rien ne part tout seul.'),
       h('div', { class: 'actions' }, h('button', { class: 'btn', onclick: async () => { await exporterSauvegarde(); toast('Fichier prêt : envoie-le au PC.'); } }, 'Télécharger le fichier pour le PC'))),
-    h('div', { class: 'carte' }, h('strong', {}, '2. Recevoir le plan du PC'), h('p', { class: 'mut' }, 'Le PC croise ta sauvegarde et les exports EBP, puis produit le plan de la semaine : relances, impayés, commandes bloquées.'), fich,
-      h('div', { class: 'actions' }, h('button', { class: 'btn', onclick: async () => {
-        try {
-          const f = fich.files[0]; if (!f) { toast('Choisis le fichier du PC.', true); return; }
-          if (f.size > 5 * 1024 * 1024) throw new Error('Fichier trop gros.');
-          const o = JSON.parse(await f.text());
-          if (!o || o.appli !== 'plan-pc' || !Array.isArray(o.actions) || o.version !== 2 || !/^\d{4}-\d\d-\d\dT/.test(o.date||'')) throw new Error('Plan PC v19 invalide.');
-          if(o.chiffre&&o.chiffre.source==='demo')throw new Error('Plan fictif : import refusé.');
-          const p = nettoyerPlan(o), previous=await lirePC();
-          if(previous&&new Date(p.date).getTime()<=new Date(previous.date).getTime())throw new Error('Plan ancien ou déjà importé.');
-          if(!confirm('Importer '+p.actions.length+' actions ? Le plan précédent sera conservé.'))return;
-          if(previous){const archives=(await get('meta','pcArchives'))||[];archives.push(previous);await put('meta',archives.slice(-5),'pcArchives');await put('meta',previous,'pcPrecedent')}
-          const history=(await get('meta','pcActions'))||[];const by=new Map(history.map(x=>[x.id,x]));
-          p.actions.forEach(a=>{const old=by.get(a.id);if(old&&old.modifieLe&&(!a.modifieLe||old.modifieLe>=a.modifieLe))Object.assign(a,{statut:old.statut||old.etat,note:old.note,jourPrevu:old.jourPrevu||old.reportLe,modifieLe:old.modifieLe});by.set(a.id,a)});
-          await put('meta',Array.from(by.values()),'pcActions');
-          await put('meta', p, 'pc'); toast('Plan reçu : ' + p.actions.length + ' actions.'); pagePC();
-        } catch (e) { toast('Import impossible : ' + e.message, true); }
-      } }, 'Importer le plan'))),
+    h('div', { class: 'carte' }, h('strong', {}, '2. Recevoir le plan du PC'),
+      h('p', { class: 'mut' }, 'Les imports se trouvent dans Réglages. Le plan reste consultable ici sans modifier tes données EBP.'),
+      h('a', { class: 'btn sec', href: '#/reglages' }, 'Ouvrir Réglages · Imports')),
     pc ? h('div', { class: 'carte' }, h('strong', {}, 'Plan en cours'), h('p', { class: 'mut' }, 'Reçu le ' + dateFr(pc.recuLe || pc.date) + ' · export EBP du ' + (pc.arrete ? dateFr(pc.arrete + 'T12:00:00') : '?') + ' · pas en direct'),
       pc.changement ? h('div', { class: 'carte' }, h('strong', {}, 'Changement proposé'), h('p', {}, pc.changement.texte), pc.changement.mesure ? h('small', { class: 'mut' }, pc.changement.mesure) : null) : null,
       pc.indicateurs.length ? pc.indicateurs.map(x => h('div', { class: 'ligne' }, h('span', { class: 'g' }, h('strong', {}, x.l), x.n ? h('small', {}, ' · ' + x.n) : null), h('span', { class: 'prix' }, x.v))) : null,
