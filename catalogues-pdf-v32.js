@@ -186,6 +186,17 @@
         h('strong',{},'Catalogues fournisseurs · PDF'),
         h('p',{class:'mut'},'Les catalogues restent sur ce Samsung, accessibles sans Internet après import. Ils sont distincts des prix EBP et ne modifient jamais automatiquement tes devis.'),
         h('p',{class:'v32-count'},tous.length+' PDF · '+taille(somme)+' stockés localement')),
+      h('h2',{},'Catalogues en ligne'),
+      h('section',{class:'carte v32-pdf-item'},
+        h('div',{class:'v32-pdf-head'},
+          h('span',{class:'v32-pdf-icon'},'WEB'),
+          h('span',{class:'v32-pdf-info'},
+            h('strong',{},'SIFA · Catalogue 2025'),
+            h('small',{},'Fournitures professionnelles · Automobile, bâtiment, industrie et nautisme'),
+            h('small',{class:'mut'},'Catalogue en ligne (Calaméo) · Internet requis'))),
+        h('div',{class:'v32-pdf-buttons'},
+          h('a',{class:'btn',href:'https://www.calameo.com/books/006112838f2f47d2c47da',target:'_blank',rel:'noopener noreferrer'},'Consulter SIFA 2025')),
+        h('p',{class:'mut'},'Pour un accès hors connexion, importe le PDF SIFA si le fournisseur te le transmet. Ce catalogue ne renseigne pas les tarifs EBP.')),
       h('div',{class:'carte v32-form'},
         h('strong',{},'Importer un PDF fournisseur'),
         h('label',{},'Fournisseur'),fournisseur,
@@ -249,7 +260,7 @@
   pageReglages=async function(){
     await prevReglages();
     const textVersion=app.querySelector('.v25-etat .v25-etat-titre strong');
-    if(textVersion)textVersion.textContent='ODICOLOR Solution · v32';
+    if(textVersion)textVersion.textContent='ODICOLOR Solution · v33';
   };
 
   addEventListener('pagehide',()=>{urls.forEach(u=>URL.revokeObjectURL(u));urls.clear()});
