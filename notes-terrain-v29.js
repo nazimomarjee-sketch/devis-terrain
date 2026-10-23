@@ -231,7 +231,8 @@
   route=async function(){
     const p=(location.hash||'#/').slice(2).split('/');
     if(p[0]==='note-terrain'){
-      const id=/^\d+$/.test(p[1]||'')?Number(p[1]):null;
+      const morceau=String(p[1]||'').split('?')[0];
+      const id=/^\d+$/.test(morceau)?Number(morceau):null;
       const m=/[?&]modifier=([^&]+)/.exec(location.hash||'');
       return pageNoteTerrain(id,m?decodeURIComponent(m[1]):null);
     }
