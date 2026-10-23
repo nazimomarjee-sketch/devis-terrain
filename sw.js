@@ -2,7 +2,7 @@
 /* ODICOLOR v29 — mise à jour réseau en priorité, fonctionnement hors ligne conservé.
  * Ce cache ne touche jamais aux données IndexedDB clients/devis.
  */
-const CACHE='terrain-v41';
+const CACHE='terrain-v42';
 const SHELL=[
   './','index.html','style.css','style-v22.css','accueil-v23.css',
   'suivi-produits-v24.css','correctif-v25.css','apparence-v26.css','notes-terrain-v29.css','parcours-garage-v30.css','dossier-n1-v31.css','catalogues-pdf-v32.css','agent-commercial-v35.css','fiche-client-v36.css','identite-odicolor-v37.css','premium-pro-v38.css','photo-magasin-odicolor-v39.css','imports-centralises-v40.css','odicolor-logo-officiel.png',
