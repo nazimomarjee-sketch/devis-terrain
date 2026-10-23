@@ -136,7 +136,7 @@
       ? 'Dernier import tarifs : '+dateFr(rapport.date)
       : 'Tarifs importés : date non disponible';
     return h('section',{class:'carte v23-produits'},
-      h('div',{class:'v23-between'},h('strong',{},'Trouver un produit'),lien('#/catalogue','Catalogue')),
+      h('div',{class:'v23-between'},h('strong',{},'Trouver un produit')),
       CAT.length?[input,chips,sortie,h('small',{class:'v23-source'},CAT.length+' références · '+date)]
         :[p('Catalogue vide : importe tes références et tarifs avant de chiffrer.'),lien('#/catalogue','Importer les tarifs')]);
   }
