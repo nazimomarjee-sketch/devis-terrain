@@ -112,7 +112,7 @@
     importZoneActive=null;
     app.prepend(construireHub());
     const t=app.querySelector('.v25-etat .v25-etat-titre strong');
-    if(t)t.textContent='ODICOLOR Solution · v42';
+    if(t)t.textContent='ODICOLOR Solution · v43';
   };
 
   window.__importsV40={importEBP,importPDF,importPC,construireHub};
