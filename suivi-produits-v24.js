@@ -56,7 +56,7 @@
       h('div',{class:'carte v24-intro'},h('strong',{},'Vendre des consommables, sans supposer les stocks des clients'),
         h('p',{class:'mut'},'Note la demande réelle du garage ou ta propre piste de vente. Une saisie vendeur ne devient jamais une preuve de besoin client.')),
       h('div',{class:'carte'},h('strong',{},'1. Choisir un garage'),rech,zone,
-        !cl.length?bouton('#/clients','Importer mes clients'):null),
+        !cl.length?bouton('#/reglages','Importer mes clients · Réglages'):null),
       h('h2',{},'2. Suivis produits en cours · '+ouverts.length),
       ouverts.length?ouverts.slice(0,15).map(({c,b})=>h('a',{class:'carte v24-follow',href:'#/besoin/'+c.id},
         h('div',{class:'v24-between'},h('strong',{},c.nom),h('span',{class:'tag warn'},b.famille)),
