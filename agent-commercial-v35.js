@@ -162,7 +162,7 @@
       'Quand le briefing contient ODICOLOR-AGENT-01, réponds uniquement au JSON demandé, avec 0 à 3 priorités existantes.',
       'Utilise les références du briefing sans en inventer et conserve son identifiant de lot.',
       'Quand une preuve manque, indique À vérifier. Français direct, concis et contradictoire.'
-    ].join('\\n');
+    ].join('\n');
     const preparerClaude=h('button',{type:'button',class:'btn sec v35-setup',onclick:async()=>{
       try{
         if(!navigator.clipboard||!navigator.clipboard.writeText)throw new Error('Copie impossible');
