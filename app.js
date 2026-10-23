@@ -1395,11 +1395,8 @@ async function pageClient(id) {
   const rythme = h('input', { type: 'number', inputmode: 'numeric', min: 0, max: 365, value: c.rythme || '', placeholder: 'Facultatif : tous les … jours', 'aria-label': 'Rythme en jours' });
   const cNom = h('input', { value: c.contactNom || '', maxlength: 60, placeholder: 'Gérant ou chef d’atelier', 'aria-label': 'Contact décideur' });
   const pNom = h('input', { value: c.peintreNom || '', maxlength: 60, placeholder: 'Peintre qui utilisera le produit', 'aria-label': 'Contact peintre' });
-  const puces = h('div', { class: 'puces' });
-  const dessinerPuces = () => puces.replaceChildren(...CRITERES.filter(x => x[0]).map(([v, l]) => h('button', { class: 'puce' + (crit.value === v ? ' on' : ''), 'aria-pressed': crit.value === v ? 'true' : 'false', onclick: async () => { crit.value = crit.value === v ? '' : v; c.critere = crit.value; await putMany('clients', [c]); dessinerPuces(); } }, l.replace(/^(Le|La|Les) /, '').replace(/^./, m => m.toUpperCase()))));
-  const crit = h('select', { 'aria-label': 'Ce qui compte pour lui', style: 'display:none' }, CRITERES.map(([v, l]) => h('option', { value: v, selected: (c.critere || '') === v }, l)));
   const etape = h('input', { value: c.etape || '', maxlength: 100, placeholder: 'Ex. rappeler vendredi, apporter un échantillon', 'aria-label': 'Prochaine étape' });
-  const etapeD = h('input', { type: 'date', value: /^\d{4}-\d\d-\d\d$/.test(c.etapeDate || '') ? c.etapeDate : '', 'aria-label': 'Date de la prochaine étape' });
+  const etapeD = h('input', { type: 'date', value: /^\d{4}-\d\d-\d\d$/.test(c.etapeDate || '') ? c.etapeDate : jourLocal(new Date()), 'aria-label': 'Date de la prochaine étape' });
   const conv = h('select', { 'aria-label': 'Étape commerciale' }, CONV.map(([v, l]) => h('option', { value: v, selected: (c.conv || '') === v }, l)));
   const exRob = h('input', { type: 'checkbox', checked: !!c.exRoberlo, style: 'width:24px;min-height:24px', 'aria-label': 'Ancien client Roberlo' });
   const forma = h('input', { type: 'checkbox', checked: !!c.formation, style: 'width:24px;min-height:24px', 'aria-label': 'Démo ou formation proposée' });
@@ -1433,7 +1430,7 @@ async function pageClient(id) {
     await putMany('clients', [c]); dessinerVisites(); toast(res === 'vu' ? 'Visite notée.' : 'Noté. Rappel le ' + dateFr(c.rappel) + '.');
   };
   const notes = h('textarea', { rows: 3, maxlength: 500, placeholder: 'Contact, visite, ce qu’il a dit…', 'aria-label': 'Notes' }, c.notes || '');
-  const lire = () => { c.cabine = cabine.value; c.fournisseur = clean(fourn.value).slice(0, 60); c.volume = Math.max(0, Math.min(1e6, Number(vol.value) || 0)) || ''; c.statutCrm = stat.value; c.priorite = prio.value; c.rythme = Math.max(0, Math.min(365, Math.round(Number(rythme.value) || 0))) || ''; c.notes = notes.value.slice(0, 500); c.contactNom = clean(cNom.value).slice(0, 60); c.peintreNom = clean(pNom.value).slice(0, 60); c.critere = crit.value; c.etape = clean(etape.value).slice(0, 100); c.etapeDate = /^\d{4}-\d\d-\d\d$/.test(etapeD.value) ? etapeD.value : ''; c.conv = conv.value; c.exRoberlo = exRob.checked; c.formation = forma.checked; };
+  const lire = () => { c.cabine = cabine.value; c.fournisseur = clean(fourn.value).slice(0, 60); c.volume = Math.max(0, Math.min(1e6, Number(vol.value) || 0)) || ''; c.statutCrm = stat.value; c.priorite = prio.value; c.rythme = Math.max(0, Math.min(365, Math.round(Number(rythme.value) || 0))) || ''; c.notes = notes.value.slice(0, 500); c.contactNom = clean(cNom.value).slice(0, 60); c.peintreNom = clean(pNom.value).slice(0, 60); c.etape = clean(etape.value).slice(0, 100); c.etapeDate = c.etape && /^\d{4}-\d\d-\d\d$/.test(etapeD.value) ? etapeD.value : ''; c.conv = conv.value; c.exRoberlo = exRob.checked; c.formation = forma.checked; };
   const dessinerVerdict = () => {
     lire(); const a = avisProspect(c);
     verdict.replaceChildren(h('div', { class: 'carte ' + (a.n === 'ko' ? 'erreur' : a.n === 'ok' ? 'reussi' : 'alerte'), role: 'status' },
@@ -1464,44 +1461,100 @@ async function pageClient(id) {
   [prio, rythme].forEach(x => x.addEventListener('input', () => { lire(); dessinerVisites(); }));
   const bRech = h('button', { class: 'btn', onclick: () => rechercher(bRech) }, c.ent ? '🔎 Relire le registre' : '🔎 Fiche officielle (réseau)');
   const vuPC = await blocPCClient(c);
+  // Fiche de visite v36 : actions visibles, détails conservés dans des panneaux.
+  // Aucune suppression des données existantes (y compris l'ancien critère c.critere).
+  const facturesOuvertes=Array.isArray(c.factures)?c.factures.filter(x=>!x.regleLe):[];
+  const retard= facturesOuvertes.filter(x=>enRetard(x)).length;
+  const etatCompte=(c.compte&&c.compte.statut)||'non renseigné';
+  const attentionCompte=etatCompte==='bloque'||retard>0;
+  const panneau=(nom,contenu,initial=false)=>h('details',{
+    class:'v36-details',open:initial
+  },h('summary',{},nom),h('div',{class:'v36-details-corps'},contenu));
+  const boutonSauver=h('button',{class:'btn',onclick:async()=>{
+    lire();await putMany('clients',[c]);toast('Fiche client enregistrée.');
+  }},'Enregistrer les informations');
+  const boutonPlan=h('button',{class:'btn',onclick:async()=>{
+    lire();await putMany('clients',[c]);dessinerVisites();toast('Plan de visites enregistré.');
+  }},'Enregistrer le rythme');
+  const boutonAction=h('button',{class:'btn vert',onclick:async()=>{
+    lire();await putMany('clients',[c]);toast('Prochaine action enregistrée.');
+  }},'Enregistrer l’action');
+  const boutonEtapeFaite=h('button',{class:'btn sec',onclick:async()=>{
+    c.etape='';c.etapeDate='';etape.value='';etapeD.value=jourLocal(new Date());
+    await putMany('clients',[c]);toast('Action terminée.');
+  }},'Action terminée');
+  const groupeCompte=panneau('Compte et règlements'+
+    (etatCompte!=='non renseigné'?' · '+etatCompte:'')+
+    (retard?' · '+retard+' à vérifier':''),
+    blocCompte(c,()=>putMany('clients',[c])),attentionCompte);
+  const groupeEntreprise=panneau('Identité officielle et analyse commerciale',[
+    h('div',{class:'actions'},bRech),zoneRech,fiche,verdict,
+    h('p',{class:'mut'},'La recherche au registre public n’est effectuée qu’à ta demande.')
+  ]);
+  const groupeProfil=panneau('Profil, contacts et qualification',[
+    h('label',{},'A-t-il une cabine de peinture ?'),cabine,
+    h('label',{},'Fournisseur actuel'),fourn,
+    h('label',{},'Achat de peinture par mois (€) · estimation'),vol,
+    h('label',{},'Statut du garage'),stat,
+    h('label',{},'Décideur (gérant ou chef d’atelier)'),cNom,
+    h('label',{},'Peintre'),pNom,
+    h('label',{style:'display:flex;gap:10px;align-items:center'},forma,'Démo ou formation proposée'),
+    h('label',{style:'display:flex;gap:10px;align-items:center'},exRob,'Ancien client Roberlo'),
+    h('label',{},'Étape de conversion'),conv,
+    h('label',{},'Notes générales'),notes,
+    boutonSauver
+  ]);
+  const groupeEssais=panneau('Essais produits',[
+    essaisBox,
+    h('div',{class:'actions'},prodEssai,
+      h('button',{class:'btn',onclick:async()=>{
+        lire();
+        if(!Array.isArray(c.essais))c.essais=[];
+        c.essais.push({id:nouvelUid(),date:aujourdhui(),
+          produit:clean(prodEssai.value).slice(0,60),
+          statut:'encours',suivis:[]});
+        if(!c.conv||c.conv==='cible'||c.conv==='contacte')c.conv='essai';
+        await putMany('clients',[c]);
+        prodEssai.value='';conv.value=c.conv;dessinerEssais();
+        toast('Essai lancé : rappels à J+2 et J+7.');
+      }},'Lancer un essai')),
+    h('p',{class:'mut'},'Les rappels d’essai sont indicatifs. Vérifie le résultat avec le peintre.')
+  ]);
+  const groupeVisites=panneau('Historique et fréquence des visites',[
+    h('label',{},'Priorité du garage'),prio,
+    h('label',{},'Rythme personnalisé (jours)'),rythme,
+    bloc,boutonPlan
+  ]);
+  const groupeDevis=panneau('Historique des devis',devisBox);
   montrer(c.nom,
-    h('p', { class: 'mut' }, c.tel || 'Pas de téléphone'),
-    c.compte && c.compte.statut === 'bloque' ? h('div', { class: 'bandeau-ko' }, 'COMPTE BLOQUÉ') : null,
-    vuPC,
-    h('div', { class: 'trio' }, h('button', { class: 'btn', onclick: () => creerDevis(c) }, 'Devis'), c.tel ? h('a', { class: 'btn sec', href: 'tel:' + String(c.tel).replace(/[^0-9+]/g, '') }, 'Appeler') : h('button', { class: 'btn sec', disabled: true }, 'Appeler'), h('a', { class: 'btn sec', href: '#/signaler/' + c.id }, 'Signaler')),
-    h('div', { class: 'carte' }, h('small', { class: 'etiq' }, 'PROCHAINE ÉTAPE'), h('label', {}, 'Quoi'), etape, h('label', {}, 'Pour le (date)'), etapeD,
-      h('div', { class: 'actions' }, h('button', { class: 'btn vert', onclick: async () => { c.etape = ''; c.etapeDate = ''; etape.value = ''; etapeD.value = ''; await putMany('clients', [c]); toast('Étape faite.'); } }, 'Étape faite'))),
-    h('div', { class: 'carte' }, h('small', { class: 'etiq' }, 'CE QUI COMPTE POUR LUI'), puces, crit),
-    blocCompte(c, () => putMany('clients', [c])),
-    h('div', { class: 'actions' }, bRech), zoneRech, fiche, verdict,
-    h('h2', {}, 'Questions terrain'),
-    h('label', {}, 'A-t-il une cabine de peinture ?'), cabine,
-    h('label', {}, 'Fournisseur actuel'), fourn,
-    h('label', {}, 'Achat de peinture par mois (€)'), vol,
-    h('label', {}, 'Statut'), stat,
-    h('h2', {}, 'Contacts'),
-    h('label', {}, 'Décideur (gérant, chef d’atelier)'), cNom, h('label', {}, 'Peintre (celui qui décide en pratique)'), pNom, 
-    h('label', { style: 'display:flex;gap:10px;align-items:center' }, forma, 'Démo ou formation proposée au peintre'),
-    h('h2', {}, 'Relation commerciale'),
-    h('label', { style: 'display:flex;gap:10px;align-items:center' }, exRob, 'Ancien client Roberlo'),
-    h('label', {}, 'Étape de conversion'), conv,
-    h('h2', {}, 'Essais'), essaisBox,
-    h('div', { class: 'actions' }, prodEssai, h('button', { class: 'btn', onclick: async () => { lire(); if (!Array.isArray(c.essais)) c.essais = []; c.essais.push({ id: nouvelUid(), date: aujourdhui(), produit: clean(prodEssai.value).slice(0, 60), statut: 'encours', suivis: [] }); if (!c.conv || c.conv === 'cible' || c.conv === 'contacte') c.conv = 'essai'; await putMany('clients', [c]); prodEssai.value = ''; conv.value = c.conv; dessinerEssais(); toast('Essai lancé. Rappels à J+2 et J+7.'); } }, 'Lancer un essai')),
-    h('p', { class: 'mut' }, 'Essai conseillé : une semaine environ, sur un vrai chantier, avec le peintre présent (hypothèse tirée de sources américaines, à vérifier sur le terrain).'),
-    h('h2', {}, 'Devis de ce garage'), devisBox,
-    h('h2', {}, 'Plan d’action'),
-    h('label', {}, 'Priorité (fixe le rythme de visite)'), prio,
-    h('label', {}, 'Rythme personnalisé en jours'), rythme,
-    bloc,
-    h('div', { class: 'actions' },
-      h('button', { class: 'btn', onclick: () => noterVisite('vu') }, '✅ Vu aujourd’hui'),
-      h('button', { class: 'btn sec', onclick: () => noterVisite('absent') }, 'Absent (rappel 2 j)'),
-      h('button', { class: 'btn sec', onclick: () => noterVisite('rappeler') }, 'À rappeler (7 j)')),
-    h('label', {}, 'Notes'), notes,
-    h('div', { style: 'height:10px' }),
-    h('button', { class: 'btn gros', onclick: async () => { lire(); await putMany('clients', [c]); toast('Enregistré.'); } }, 'Enregistrer'),
-    h('p', { class: 'mut' }, 'Seul le nom du client est envoyé au registre public quand tu appuies sur « Fiche officielle ». Rien d’autre ne quitte le téléphone.'));
-  dessinerFiche(); dessinerVerdict(); dessinerVisites(); dessinerEssais(); dessinerPuces();
+    h('p',{class:'mut v36-contact'},c.tel||'Téléphone non renseigné'),
+    c.compte&&c.compte.statut==='bloque'?
+      h('div',{class:'bandeau-ko'},'COMPTE BLOQUÉ · vérifier avant toute commande'):null,
+    h('div',{class:'trio v36-rapide'},
+      h('button',{class:'btn v36-devis',onclick:()=>creerDevis(c)},'+ Devis'),
+      c.tel?h('a',{class:'btn sec',href:'tel:'+String(c.tel).replace(/[^0-9+]/g,'')},'Appeler'):
+        h('button',{class:'btn sec',disabled:true},'Appeler'),
+      h('a',{class:'btn sec',href:'#/signaler/'+c.id},'Incident')),
+    h('section',{class:'carte v36-prochaine'},
+      h('strong',{},'Prochaine action'),
+      h('label',{},'À faire'),etape,
+      h('label',{},'Quand ?'),etapeD,
+      h('div',{class:'actions'},boutonAction,boutonEtapeFaite)),
+    h('section',{class:'carte v36-visite'},
+      h('strong',{},'Terminer la visite'),
+      h('div',{class:'actions'},
+        h('button',{class:'btn',onclick:()=>noterVisite('vu')},'Vu aujourd’hui'),
+        h('button',{class:'btn sec',onclick:()=>noterVisite('absent')},'Absent'),
+        h('button',{class:'btn sec',onclick:()=>noterVisite('rappeler')},'À rappeler'))),
+    groupeCompte,
+    vuPC?panneau('Opportunités · analyse EBP',vuPC):null,
+    groupeDevis,
+    groupeEntreprise,
+    groupeProfil,
+    groupeEssais,
+    groupeVisites);
+
+  dessinerFiche(); dessinerVerdict(); dessinerVisites(); dessinerEssais();
 }
 async function pageClients() {
   const cl = (await getAll('clients')).sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
