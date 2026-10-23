@@ -137,6 +137,17 @@
   async function pageCataloguesPDF(){
     const tous=await indexPDF();
     const somme=tous.reduce((s,x)=>s+x.size,0);
+    // Le vrai PDF Carsystem 2025 (FR, 110 pages) est servi par Carsystem.org.
+    // Ne pas republier le PDF fournisseur dans ce dépôt public.
+    const urlCarsystem='https://www.carsystem.org/fileadmin/CS-Kataloge-2025/Carsystem-catalogue-de-produits-2025.pdf';
+    const rubriquesCarsystem=[
+      ['Abrasifs',4],['Mastics',27],['Masquage',42],
+      ['Peinture · vernis · apprêts',48],['Polissage · finition',65],
+      ['Collage · étanchéité',75],['Nettoyage',85],
+      ['Protection individuelle',91],['Fournitures de peinture',98]
+    ];
+    const localCarsystem=tous.find(x=>/^carsystem$/i.test(x.fournisseur)&&
+      /catalogue|produits/i.test(x.nom)&&/2025/.test(x.nom));
     const fournisseur=h('input',{type:'text',maxlength:90,
       placeholder:'Nom du fournisseur (ex. Carsystem)',
       'aria-label':'Nom du fournisseur'});
@@ -186,7 +197,35 @@
         h('strong',{},'Catalogues fournisseurs · PDF'),
         h('p',{class:'mut'},'Les catalogues restent sur ce Samsung, accessibles sans Internet après import. Ils sont distincts des prix EBP et ne modifient jamais automatiquement tes devis.'),
         h('p',{class:'v32-count'},tous.length+' PDF · '+taille(somme)+' stockés localement')),
-      h('h2',{},'Catalogues en ligne'),
+      h('h2',{},'Catalogues fournisseurs officiels'),
+      h('section',{class:'carte v34-carsystem'},
+        h('div',{class:'v34-cs-header'},
+          h('span',{class:'v32-pdf-icon'},'PDF'),
+          h('span',{},
+            h('strong',{},'CARSYSTEM · Catalogue produits 2025'),
+            h('small',{},'Catalogue officiel français · 110 pages · Vosschemie'),
+            h('small',{class:'mut'},'Abrasifs, mastics, masquage, vernis, polissage et consommables'))),
+        h('div',{class:'v34-cs-buttons'},
+          h('a',{class:'btn',href:urlCarsystem,target:'_blank',rel:'noopener noreferrer',
+            referrerPolicy:'no-referrer'},'Ouvrir le PDF officiel'),
+          localCarsystem?
+            h('button',{class:'btn sec',type:'button',onclick:()=>ouvrirPDF(localCarsystem.id)},
+              'Ouvrir la copie hors ligne'):
+            h('button',{class:'btn sec',type:'button',onclick:()=>{
+              fournisseur.value='Carsystem';
+              message.textContent='Choisis « Catalogue de Produits 2025.pdf » sur ton téléphone, puis appuie sur « Ajouter les catalogues PDF ».';
+              files.click();
+            }},'Ajouter ma copie hors ligne')),
+        h('details',{class:'v34-cs-sections'},
+          h('summary',{},'Accès rapide · 9 familles de produits'),
+          h('div',{class:'v34-cs-grid'},rubriquesCarsystem.map(([titre,page])=>
+            h('a',{href:urlCarsystem+'#page='+page,target:'_blank',
+              rel:'noopener noreferrer',referrerPolicy:'no-referrer'},
+              h('strong',{},titre),h('small',{},'Page PDF '+page+' · en ligne'))))),
+        h('p',{class:'mut'},localCarsystem?
+          'Copie PDF enregistrée sur ce Samsung : disponible hors connexion. Les raccourcis de chapitres ouvrent la version officielle en ligne.':
+          'PDF officiel accessible avec Internet. Pour l’utiliser hors connexion, importe une fois ton fichier PDF dans la bibliothèque.'),
+        h('small',{class:'mut'},'Document technique fournisseur uniquement : aucun tarif ODICOLOR, stock ou prix de vente vérifiés.')),
       h('section',{class:'carte v32-pdf-item'},
         h('div',{class:'v32-pdf-head'},
           h('span',{class:'v32-pdf-icon'},'WEB'),
@@ -260,7 +299,7 @@
   pageReglages=async function(){
     await prevReglages();
     const textVersion=app.querySelector('.v25-etat .v25-etat-titre strong');
-    if(textVersion)textVersion.textContent='ODICOLOR Solution · v33';
+    if(textVersion)textVersion.textContent='ODICOLOR Solution · v34';
   };
 
   addEventListener('pagehide',()=>{urls.forEach(u=>URL.revokeObjectURL(u));urls.clear()});
