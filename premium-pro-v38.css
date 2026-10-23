@@ -276,3 +276,37 @@ body.v38-catalogue .barre #titre{display:none}
 }
 
 .v38-accueil-hero>.v38-eyebrow,.v38-accueil-hero>strong,.v38-accueil-hero>p{position:relative;z-index:1}
+
+/* V42 — deduplication: one prospect status, one note entry and one history. */
+.v38-client .v38-prospect-compact{
+  display:block;
+  margin:0 3px 10px;
+  padding:7px 10px;
+  background:transparent;
+  border-left:2px solid #9A6A33;
+  color:#C2CDD7;
+}
+.v38-client .v38-prospect-compact small{
+  display:block;
+  font-size:11px;
+  line-height:1.5;
+}
+.v38-client .v38-note-detail{
+  margin:10px 0;
+  border:1px solid #2D3944;
+  background:linear-gradient(135deg,#101923,#0B131B);
+}
+.v38-client .v38-note-detail .v29-client-note{
+  padding:9px 12px 14px;
+}
+.v38-client .v38-incident-link{
+  display:flex;
+  align-items:center;
+  min-height:45px;
+  margin:8px 3px 3px;
+  font-size:12px;
+  font-weight:700;
+  text-decoration:none!important;
+  color:#B7C2CE!important;
+}
+.v38-client .v38-incident-link:focus-visible{outline:2px solid #D41F2B;outline-offset:4px}
