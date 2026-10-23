@@ -247,7 +247,7 @@
     const btnConfirmer=h('button',{type:'button',class:'btn sec'},'J’ai transmis au N+1');
     btnConfirmer.addEventListener('click',()=>{
       if(!confirm('Confirmer que tu as réellement transmis ce dossier au N+1 ?'))return;
-      action(()=>noterTransmission(id,champs()));
+      return action(()=>noterTransmission(id,champs()));
     });
 
     const retour=h('textarea',{rows:2,maxlength:700,
