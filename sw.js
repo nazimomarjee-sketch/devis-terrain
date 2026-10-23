@@ -1,7 +1,7 @@
 'use strict';
 /* Devis terrain : cache d'abord, pour fonctionner sans réseau. Changer CACHE à chaque nouvelle version. */
-const CACHE = 'terrain-v23';
-const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'commercial-v22.js', 'style-v22.css', 'accueil-v23.js', 'accueil-v23.css', 'manifest.webmanifest']; // indispensables : sans eux, pas d'installation
+const CACHE = 'terrain-v24';
+const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'commercial-v22.js', 'style-v22.css', 'accueil-v23.js', 'accueil-v23.css', 'suivi-produits-v24.js', 'suivi-produits-v24.css', 'rappels-produits-v24.js', 'manifest.webmanifest']; // indispensables : sans eux, pas d'installation
 const OPTION = ['icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'logo-96.png', 'xlsx.mini.min.js', 'barlow-condensed-latin-700-normal.woff2', 'barlow-condensed-latin-800-normal.woff2']; // le reste : si un fichier manque, l'appli s'installe quand même
 
 self.addEventListener('install', e => {
