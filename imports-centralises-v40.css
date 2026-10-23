@@ -1,0 +1,36 @@
+/* ODICOLOR v40 — hub unique des imports dans Réglages, Premium Pro noir/rouge. */
+.v40-import-hub{margin:2px 0 22px;padding:14px;background:linear-gradient(145deg,#191923,#0B121A);
+ border:1px solid #64313A;border-radius:17px;box-shadow:0 14px 30px rgba(0,0,0,.25)}
+.v40-import-head{padding:9px 5px 14px}
+.v40-import-eyebrow{display:block;font-size:10px;font-weight:900;letter-spacing:.16em;color:#F17A86;margin:0 0 9px}
+.v40-import-head strong{display:block;font-size:23px;font-weight:900;line-height:1.13;color:#FFF;letter-spacing:-.015em}
+.v40-import-head p{font-size:13px;color:#CAD2D9;line-height:1.55;margin:10px 0 0}
+.v40-import-detail{border:1px solid #37424F;background:linear-gradient(135deg,#121B26,#0E151D);
+ border-radius:13px;margin:8px 0;overflow:hidden}
+.v40-import-detail[open]{border-color:#94404C}
+.v40-import-detail>summary{cursor:pointer;list-style:none;display:flex;flex-direction:column;gap:4px;
+ padding:13px 37px 13px 13px;min-height:69px;position:relative}
+.v40-import-detail>summary::-webkit-details-marker{display:none}
+.v40-import-detail>summary::after{content:'⌄';position:absolute;right:13px;top:20px;color:#FE7885;font-size:25px}
+.v40-import-detail[open]>summary::after{transform:rotate(180deg)}
+.v40-import-detail[open]>summary{border-bottom:1px solid #37424F}
+.v40-import-titre{color:#F4F6F8;font-size:15px;font-weight:850;line-height:1.3}
+.v40-import-desc{color:#ABB9C4;font-size:11px;line-height:1.4}
+.v40-import-body{padding:11px 13px 16px}
+.v40-import-body>p{font-size:13px;line-height:1.55;margin:4px 0 12px}
+.v40-import-body>label{display:block;font-size:13px;font-weight:750;margin:12px 0 5px;color:#DFE4EB}
+.v40-import-body input{min-height:50px;width:100%;font-size:15px;background:#0D141E}
+.v40-import-body input[type=file]{padding:10px 8px;overflow-wrap:anywhere}
+.v40-import-action{width:100%;min-height:51px;margin:12px 0 7px;background:#D41F2B!important;color:#FFF!important}
+.v40-import-action:disabled{opacity:.65}
+.v40-import-resultat{margin-top:10px;overflow-wrap:anywhere;font-size:13px;color:#C7D4DF}
+.v40-import-resultat .carte{margin-top:8px;padding:12px}
+.v40-import-resultat button.btn{min-height:49px;width:100%;margin-top:10px}
+.v40-import-resultat select{min-height:50px;background:#0D141E;font-size:15px}
+.v40-import-rappel{font-size:11px;line-height:1.6;color:#ABB8C3;padding:9px 5px 0;margin:3px 0}
+.v40-secondaire{display:inline-flex;align-items:center;min-height:43px;margin-top:12px;
+ color:#F1A1AA!important;font-size:13px;font-weight:750;text-decoration:none!important;
+ border-bottom:1px solid #6D2A32}
+body.v38-home .v38-objectif{margin:9px 0 12px!important}
+body.v38-home .v23-prochaine{margin:8px 0 12px!important}
+@media(max-width:360px){.v40-import-hub{padding:10px}.v40-import-head strong{font-size:21px}}
