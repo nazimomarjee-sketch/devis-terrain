@@ -39,3 +39,22 @@
 @media(max-width:375px){.v32-pdf-buttons button{flex:1 1 130px}.v32-pdf-buttons button:last-child{max-width:none}}
 
 .v32-demo-mini{padding:9px 11px;border-left:3px solid var(--warn);color:var(--warn)!important;background:var(--bg);font-size:12px!important;line-height:1.45}
+
+/* v34 — vrai catalogue Carsystem 2025 (source officielle). */
+.v34-carsystem{border-left:4px solid #D41F2B!important;padding:16px!important}
+.v34-cs-header{display:flex;gap:12px;align-items:flex-start}
+.v34-cs-header>span:last-child{min-width:0;display:flex;flex-direction:column;gap:6px}
+.v34-cs-header strong{font-size:17px;line-height:1.25}
+.v34-cs-header small{font-size:12px;line-height:1.45}
+.v34-cs-buttons{display:flex;gap:9px;flex-wrap:wrap;margin:14px 0}
+.v34-cs-buttons>*{flex:1 1 150px;font-size:14px;min-height:52px;padding:9px 10px}
+.v34-cs-sections{border:1px solid var(--line);border-radius:12px;margin:13px 0;padding:10px 12px}
+.v34-cs-sections summary{font-weight:700;font-size:14px;cursor:pointer;min-height:38px;display:flex;align-items:center}
+.v34-cs-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:7px 0 3px}
+.v34-cs-grid a{border:1px solid var(--line);border-radius:9px;padding:10px 8px;
+  color:var(--fg)!important;text-decoration:none!important;display:flex;flex-direction:column;gap:5px;
+  overflow-wrap:anywhere;min-height:65px}
+.v34-cs-grid strong{font-size:13px}
+.v34-cs-grid small{font-size:11px;color:var(--mut)}
+.v34-carsystem>p{line-height:1.5;font-size:13px;margin:8px 0}
+@media(max-width:345px){.v34-cs-grid{grid-template-columns:1fr}}
