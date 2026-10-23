@@ -63,7 +63,7 @@
       dossier:avecDetails?x.titre:x.ref+' (anonymisé)',
       contexte:avecDetails?x.detail:'Contexte masqué : consulter la fiche locale',
       preuve:avecDetails?x.justification:'Non transmise (confidentialité)',
-      source:x.source
+      source:avecDetails?x.source:'Source téléphone / PC (détails masqués)'
     }));
     const contexte={
       protocole:'ODICOLOR-AGENT-01',version:1,id,
@@ -148,6 +148,32 @@
       'aria-label':'Réponse JSON de Claude'});
     const consent=h('input',{type:'checkbox','aria-label':'Autoriser le briefing nominatif'});
     const secours=h('div');
+    const instructionsProjet=[
+      'TU ES : ODICOLOR — AGENT COMMERCIAL 01.',
+      'Tu es mon assistant de travail B2B peinture et fournitures carrosserie, pas mon supérieur.',
+      'Je suis commercial terrain, 7 heures par jour, une chose à la fois.',
+      'Aide-moi à préparer mes visites, qualifier les besoins, relancer, suivre les commandes et les règlements.',
+      'Les produits et marques restent neutres : diagnostic avant proposition.',
+      'EBP seul confirme les tarifs, les commandes et les règlements ; le téléphone contient des saisies déclaratives.',
+      'Ne fabrique jamais de prix, stocks, clients, ventes, dettes ni preuves EBP.',
+      'Une commande préparée ne prouve pas une commande envoyée. Une note n’est pas une preuve de solvabilité.',
+      'Aucune ouverture de compte sans les règles ODICOLOR et la décision du N+1.',
+      'Tu proposes. Je décide. Tu ne déclares ni commande, ni règlement, ni compte ouvert.',
+      'Quand le briefing contient ODICOLOR-AGENT-01, réponds uniquement au JSON demandé, avec 0 à 3 priorités existantes.',
+      'Utilise les références du briefing sans en inventer et conserve son identifiant de lot.',
+      'Quand une preuve manque, indique À vérifier. Français direct, concis et contradictoire.'
+    ].join('\\n');
+    const preparerClaude=h('button',{type:'button',class:'btn sec v35-setup',onclick:async()=>{
+      try{
+        if(!navigator.clipboard||!navigator.clipboard.writeText)throw new Error('Copie impossible');
+        await navigator.clipboard.writeText(instructionsProjet);
+        secours.replaceChildren();
+        status.textContent='Instructions copiées. Colle-les dans les instructions de ton projet Claude « ODICOLOR — Agent commercial ».';
+      }catch(e){
+        secours.replaceChildren(h('textarea',{rows:7,readOnly:true,'aria-label':'Instructions du projet Claude à copier'},instructionsProjet));
+        status.textContent='Sélectionne le texte affiché puis colle-le dans ton projet Claude.';
+      }
+    }},'0. Copier les instructions de mon projet Claude');
     const precedent=await get('meta',R);
     if(precedent&&precedent.contexte&&precedent.contexte.date===etat.date&&Array.isArray(precedent.avis))
       montrerAvis(precedent.avis,precedent.contexte,zoneAvis);
@@ -199,6 +225,8 @@
       h('section',{class:'carte v35-claude'},
         h('strong',{},'Faire travailler Claude sur ton briefing'),
         h('p',{class:'mut'},'Par défaut : aucun nom de garage, téléphone ou texte libre transmis.'),
+        h('p',{class:'mut'},'Première utilisation : crée un projet Claude « ODICOLOR — Agent commercial » sur ton compte habituel. Il est accessible avec le même compte sur Samsung et PC.'),
+        preparerClaude,
         h('label',{class:'v35-consent'},consent,
           'Inclure les détails clients (seulement avec autorisation ODICOLOR)'),
         copier,secours,
