@@ -1,8 +1,8 @@
 'use strict';
-/* ODICOLOR v27 — mise à jour réseau en priorité, fonctionnement hors ligne conservé.
+/* ODICOLOR v28 — mise à jour réseau en priorité, fonctionnement hors ligne conservé.
  * Ce cache ne touche jamais aux données IndexedDB clients/devis.
  */
-const CACHE='terrain-v27';
+const CACHE='terrain-v28';
 const SHELL=[
   './','index.html','style.css','style-v22.css','accueil-v23.css',
   'suivi-produits-v24.css','correctif-v25.css','apparence-v26.css',
