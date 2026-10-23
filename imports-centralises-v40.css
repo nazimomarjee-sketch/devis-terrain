@@ -34,3 +34,16 @@
 body.v38-home .v38-objectif{margin:9px 0 12px!important}
 body.v38-home .v23-prochaine{margin:8px 0 12px!important}
 @media(max-width:360px){.v40-import-hub{padding:10px}.v40-import-head strong{font-size:21px}}
+
+/* Photo compacte : l'objectif et la prochaine action restent hauts sur Samsung. */
+body.v38-home .v38-accueil-hero{
+ min-height:177px!important;
+ padding:14px 16px 16px!important;
+}
+body.v38-home .v38-accueil-hero strong{font-size:28px!important;line-height:1.06}
+body.v38-home .v38-accueil-hero p{margin-top:5px!important}
+@media(min-width:650px){body.v38-home .v38-accueil-hero{min-height:225px!important}}
+@media(max-width:370px){
+ body.v38-home .v38-accueil-hero{min-height:161px!important}
+ body.v38-home .v38-accueil-hero strong{font-size:26px!important}
+}
