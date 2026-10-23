@@ -342,13 +342,6 @@
     }
   };
 
-  const plusAvant=pagePlus;
-  pagePlus=function(){
-    plusAvant();
-    app.prepend(h('a',{class:'v31-plus-lien',href:'#/nouveau-garage'},
-      'Nouveau prospect · vérification et N+1'));
-  };
-
   const reglagesAvant=pageReglages;
   pageReglages=async function(){
     await reglagesAvant();
