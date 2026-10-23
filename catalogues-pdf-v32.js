@@ -231,6 +231,10 @@
     const produits=app.querySelector('.v23-produits');
     const ligne=produits&&produits.querySelector('.v23-between');
     if(ligne)ligne.append(h('a',{class:'v32-pdf-link',href:'#/catalogues-pdf'},'PDF fournisseurs ›'));
+    const rapport=await get('meta','rapport_articles');
+    if(produits&&rapport&&/(?:^|[\\\\/])demo[-_]/i.test(rapport.fichier||''))
+      produits.append(h('p',{class:'v32-demo-mini'},
+        '⚠ Tarifs de démonstration : ne pas utiliser pour une vente réelle.'));
   };
 
   const prevPlus=pagePlus;
