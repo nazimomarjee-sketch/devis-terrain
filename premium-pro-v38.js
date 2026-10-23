@@ -166,23 +166,26 @@
           h('div',{class:'v38-kpi'},h('strong',{},nombre(n)),h('small',{},label)))));
   }
   function onglets(details){
-    return h('nav',{class:'v38-vue-tabs','aria-label':'Accès rapide aux informations de la fiche'},
-      h('button',{type:'button',class:'v38-tab actif',onclick:()=>{
-        const hero=app.querySelector('.v38-hero');
-        if(hero)hero.scrollIntoView({behavior:'smooth',block:'start'});
-      }},'Vue d’ensemble'),
-      h('button',{type:'button',class:'v38-tab',onclick:()=>{
-        const t=details.find(x=>/Profil, contacts/i.test(x.querySelector('summary')?.textContent||''));
-        if(t){t.open=true;t.scrollIntoView({behavior:'smooth',block:'start'});}
-      }},'Détails'),
-      h('button',{type:'button',class:'v38-tab',onclick:()=>{
-        const t=details.find(x=>/Historique des devis/i.test(x.querySelector('summary')?.textContent||''));
-        if(t){t.open=true;t.scrollIntoView({behavior:'smooth',block:'start'});}
-      }},'Historique'),
-      h('button',{type:'button',class:'v38-tab',onclick:()=>{
-        const t=details.find(x=>/analyse EBP|Identité officielle/i.test(x.querySelector('summary')?.textContent||''));
-        if(t){t.open=true;t.scrollIntoView({behavior:'smooth',block:'start'});}
-      }},'Analyse'));
+    const nav=h('nav',{class:'v38-vue-tabs','aria-label':'Accès rapide aux informations de la fiche'});
+    const choisir=(button,target)=>{
+      nav.querySelectorAll('.v38-tab').forEach(el=>el.classList.toggle('actif',el===button));
+      if(target){
+        if(target.tagName==='DETAILS')target.open=true;
+        target.scrollIntoView({behavior:'smooth',block:'start'});
+      }
+    };
+    const configs=[
+      ['Vue d’ensemble',()=>app.querySelector('.v38-hero')],
+      ['Détails',()=>details.find(x=>/Profil, contacts/i.test(x.querySelector('summary')?.textContent||''))],
+      ['Historique',()=>details.find(x=>/Historique des devis/i.test(x.querySelector('summary')?.textContent||''))],
+      ['Analyse',()=>details.find(x=>/analyse EBP|Identité officielle/i.test(x.querySelector('summary')?.textContent||''))]
+    ];
+    configs.forEach(([nom,trouver],i)=>{
+      const b=h('button',{type:'button',class:'v38-tab'+(i===0?' actif':'')},nom);
+      b.addEventListener('click',()=>choisir(b,trouver()));
+      nav.append(b);
+    });
+    return nav;
   }
 
   const routeAvant=route;
