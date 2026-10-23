@@ -151,7 +151,7 @@
         h('a',{href:'#/devis/acceptes'},h('b',{},a),h('span',{},'Devis acceptés sans commande')),
         h('a',{href:'#/devis/relancer'},h('b',{},r),h('span',{},'Devis à relancer')),
         h('a',{href:'#/opportunites'},h('b',{},'↗'),h('span',{},'Clients à reconquérir'))),
-      h('div',{class:'v23-liens'},lien('#/tournee','Tournée'),lien('#/besoins','Noter une demande'),lien('#/travail','Mon travail')),
+      h('div',{class:'v23-liens'},lien('#/besoins','Noter une demande'),lien('#/travail','Mon travail')),
       h('small',{class:'v23-source'},pcAge>=0&&pcAge<=7?dateExport(pc):'Plan PC absent ou ancien : vérifier les données EBP avant décision.'));
   }
 
