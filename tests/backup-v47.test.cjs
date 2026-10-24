@@ -84,7 +84,7 @@ test('refuse les IDs en double, invalides et données incomplètes',()=>{
 });
 test('n’ouvre aucune transaction si le fichier est invalide',async()=>{
   const m=mockDb(original),{restaurerSauvegardeLocale:r}=helpers(m);
-  await assert.rejects(r({...valide,clients:[{id:1,nom:''}]}));
+  await assert.rejects(async()=>r({...valide,clients:[{id:1,nom:''}]}));
   assert.equal(m.called,0);
   assert.equal(m.current.clients.get(1).nom,'Garage original');
 });
