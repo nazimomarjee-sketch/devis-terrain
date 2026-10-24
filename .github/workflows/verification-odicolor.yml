@@ -1,0 +1,36 @@
+name: Vérification ODICOLOR
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  securite-et-syntaxe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Récupérer le projet
+        uses: actions/checkout@v4
+      - name: Préparer Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Vérifier tous les scripts chargés par l'application
+        shell: bash
+        run: |
+          node <<'NODE'
+          const {readFileSync}=require('node:fs');
+          const {execFileSync}=require('node:child_process');
+          const html=readFileSync('index.html','utf8');
+          const files=[...html.matchAll(/<script src="([^"]+\.js)"><\/script>/g)].map(m=>m[1]);
+          files.push('sw.js');
+          if(files.length<10)throw Error('Scripts absents de index.html');
+          for(const f of files){
+            execFileSync(process.execPath,['--check',f],{stdio:'inherit'});
+            console.log('OK',f);
+          }
+          NODE
+      - name: Tester validation, sauvegarde et restauration atomique
+        run: node --test tests/backup-v47.test.cjs
