@@ -275,7 +275,6 @@ function importerClients(rows, debut, map, existants) {
     if(doublonsGarages(vus,nom,tel,ville).length){
       rep.ignorees++;rep.avertissements.push(ligne+' présent plusieurs fois dans le fichier : doublon ignoré.');continue;
     }
-    vus.push({nom,tel,villeProspection:ville});
     const correspondances=doublonsGarages(base,nom,tel,ville);
     if(correspondances.length>1){
       rep.ignorees++;rep.avertissements.push(ligne+' : plusieurs fiches possibles. Aucune fusion : vérifier manuellement la ville et le téléphone.');continue;
@@ -292,10 +291,10 @@ function importerClients(rows, debut, map, existants) {
       }
       if(telDivergent)rep.avertissements.push(ligne+' : téléphone différent ; numéro existant conservé pour vérification.');
       const maj={...ex,tel:ex.tel||tel,villeProspection:ex.villeProspection||ville};
-      out.push(maj);rep.maj++;
+      out.push(maj);rep.maj++;vus.push({nom,tel,villeProspection:ville});
     }else{
       out.push({nom:nom.slice(0,120),tel,villeProspection:ville});
-      rep.crees++;
+      rep.crees++;vus.push({nom,tel,villeProspection:ville});
     }
   }
   return {rep,items:out};
@@ -315,7 +314,7 @@ addEventListener('scroll', () => { const on = scrollY > 110; document.body.class
 function nonTrouve() { montrer('Introuvable', h('p', { class: 'vide' }, 'Cette page n’existe pas. '), h('a', { class: 'btn', href: '#/' }, 'Retour')); }
 async function route() {
   const p = (location.hash || '#/').slice(2).split('/');
-  { const q = p[0] || 'accueil', tab = q === 'accueil' ? 'accueil' : q === 'tournee' ? 'tournee' : (q === 'clients' || q === 'client') ? 'clients' : (q === 'devis' || q === 'nouveau') ? 'devis' : 'plus'; document.querySelectorAll('.onglets a').forEach(x => x.classList.toggle('on', x.dataset.p === tab)); }
+  { const q = p[0] || 'accueil', tab = q === 'accueil' ? 'accueil' : q === 'tournee' ? 'tournee' : (q === 'clients' || q === 'client') ? 'clients' : (q === 'devis' || q === 'nouveau') ? 'devis' : (q === 'catalogue' || q === 'article' || q === 'catalogues-pdf') ? 'catalogue' : 'plus'; document.querySelectorAll('.onglets a').forEach(x => x.classList.toggle('on', x.dataset.p === tab)); }
   try {
     if (p[0] === '' || p[0] === undefined) await pageAccueil();
     else if (p[0] === 'nouveau') await pageChoixClient();
@@ -1962,7 +1961,7 @@ async function pageReglages() {
       for (const n of ['articles', 'clients', 'devis', 'meta']) await rq(st(n, 'readwrite').clear());
       await chargerBase(); toast('Tout est effacé.'); location.hash = '#/';
     } }, 'Tout effacer')),
-    h('p', { class: 'mut' }, 'Version ' + VERSION + ' · Fonctionne sans réseau · Aucune donnée n’est envoyée.'));
+    h('p', { class: 'mut' }, 'Noyau ' + VERSION + ' · Fonctionne sans réseau · Les données restent sur ce téléphone sauf partage volontaire.'));
 }
 
 
