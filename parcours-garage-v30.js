@@ -14,18 +14,8 @@
   };
   const btn=(href,title,cls='sec')=>h('a',{href,class:'btn '+cls},title);
 
-  function doublons(cl,nom,tel,ville){
-    const key=cle(nom),villeKey=cle(ville),phone=chiffres(tel);
-    if(!key)return [];
-    return cl.filter(c=>{
-      const sameTel=phone.length>=8 && chiffres(c.tel)===phone;
-      const sameName=cle(c.nom)===key;
-      // Une même enseigne peut avoir des sites dans deux villes distinctes.
-      const villeC=cle(c.villeProspection||'');
-      const sameSite=!villeKey||!villeC||villeKey===villeC;
-      return sameTel || (sameName && sameSite);
-    });
-  }
+  // Même contrôle pour création terrain et import client Excel.
+  function doublons(cl,nom,tel,ville){return doublonsGarages(cl,nom,tel,ville)}
   const afficheGarage=c=>c.nom+(c.villeProspection?' · '+c.villeProspection:'');
 
   async function creerProspect(valeurs){
@@ -220,12 +210,7 @@
     if(trio)trio.before(bande);
   };
 
-  const avantPlus=pagePlus;
-  pagePlus=function(){
-    avantPlus();
-    app.prepend(h('a',{class:'v30-plus-new',href:'#/nouveau-garage'},
-      '+ Nouveau prospect'));
-  };
+  // La création est déjà disponible sur Accueil et Clients : pas de troisième entrée dans Plus.
 
   const avantReglages=pageReglages;
   pageReglages=async function(){
