@@ -43,6 +43,17 @@
           source:'Saisie locale terrain',href:'#/notes-client/'+c.id});
       }
     }
+    // Moteur local v46 : connaissances embarquées + données réellement accessibles.
+    const moteur=window.__odicolorTechniquesV46;
+    const conseils=moteur?moteur.recommandations(clients,devis,pc,3):[];
+    for(const conseil of conseils){
+      if(actions.length>=12)break;
+      if(actions.some(a=>a.href===conseil.href))continue;
+      actions.push({ref:'A'+String(actions.length+1).padStart(2,'0'),
+        categorie:'IDÉE COMMERCIALE CONTEXTUELLE',titre:texte(conseil.nom,100),
+        detail:texte(conseil.titre,140),justification:texte(conseil.raison,220),
+        source:texte(conseil.source,95),href:conseil.href});
+    }
     const valide=Boolean(pc&&pc.chiffre&&pc.chiffre.source==='import'&&ISO(pc.arrete)
       &&ecartJours(pc.arrete,Date.now())>=0&&ecartJours(pc.arrete,Date.now())<=7);
     return{
@@ -52,7 +63,7 @@
       sourceEBP:valide?'Plan PC issu d’un export EBP récent — preuves à contrôler':
         'Plan EBP absent, ancien ou non validé',
       dateEBP:valide?pc.arrete:null,
-      actions
+      conseils,actions
     };
   }
 
@@ -72,6 +83,10 @@
       ebp:etat.sourceEBP,
       dateEBP:etat.dateEBP,
       compteurs:etat.compteurs,
+      // Les recettes adaptées sont calculées sur le téléphone ; détails nominaux
+      // transmis uniquement après consentement explicite.
+      techniquesTerrain:window.__odicolorTechniquesV46?
+        window.__odicolorTechniquesV46.pourClaude(etat.conseils||[],avecDetails):[],
       actions
     };
     const exemple={
@@ -89,6 +104,9 @@
       'Une note terrain et un devis accepté ne sont pas une preuve de paiement ou de commande EBP.',
       'Ne transmets rien, ne passe aucune commande et ne déclare aucun compte client ouvert : propose uniquement.',
       'Ne propose que les références présentes dans le contexte. Si les informations sont trop pauvres, rends zéro proposition ou écris À vérifier.',
+      'Tu as accès aux suggestions techniquesTerrain issues de la bibliothèque commerciale ODICOLOR v46. Elles sont des hypothèses locales et non des décisions.',
+      'Choisis des techniques utiles selon le scénario, la preuve et le niveau de risque. Donne une question terrain, un prochain geste vérifiable et un contrôle.',
+      'Ne suggère jamais de contourner un compte bloqué, d’inventer un tarif, un stock, un résultat de test ni un règlement.',
       'Réponds UNIQUEMENT avec un objet JSON valide, sans bloc de code, selon cette forme :',
       JSON.stringify(exemple,null,2),
       'CONTEXTE DU JOUR :',
@@ -161,7 +179,9 @@
       'Tu proposes. Je décide. Tu ne déclares ni commande, ni règlement, ni compte ouvert.',
       'Quand le briefing contient ODICOLOR-AGENT-01, réponds uniquement au JSON demandé, avec 0 à 3 priorités existantes.',
       'Utilise les références du briefing sans en inventer et conserve son identifiant de lot.',
-      'Quand une preuve manque, indique À vérifier. Français direct, concis et contradictoire.'
+      'Quand une preuve manque, indique À vérifier. Français direct, concis et contradictoire.',
+      'Référentiel disponible dans le CRM : 12 familles de techniques (prospection, découverte, qualification, démonstration, objections, négociation, conclusion, fidélisation, règlements, pilotage).',
+      'Le bloc techniquesTerrain du briefing indique les techniques pertinentes, les faits saisis, les questions et les vérifications. Ne l’interprète pas comme une preuve EBP.'
     ].join('\n');
     const preparerClaude=h('button',{type:'button',class:'btn sec v35-setup',onclick:async()=>{
       try{
@@ -205,6 +225,17 @@
       }catch(e){status.textContent=e.message;toast(e.message,true)}
     }},'3. Valider les propositions de Claude');
 
+    const connaissances=window.__odicolorTechniquesV46;
+    const idees=h('section',{class:'carte v46-agent'},
+      h('small',{class:'etiq'},'ODICOLOR · SAVOIR-FAIRE TERRAIN'),
+      h('strong',{},'Mes idées commerciales adaptées'),
+      h('p',{class:'mut'},'Recommandations locales fondées sur les données disponibles. Elles ne sont pas générées par Claude et ne modifient rien.'),
+      etat.conseils&&etat.conseils.length&&connaissances?
+        etat.conseils.map(c=>connaissances.ligneSuggestion(c)):
+        h('p',{class:'mut'},'Aucun garage exploitable : ajoute un prospect ou une information terrain.'),
+      h('small',{class:'mut'},connaissances?
+        connaissances.techniques.length+' techniques consultables hors ligne, organisées en '+connaissances.familles.length+' familles.':
+        'Bibliothèque commerciale indisponible : actualise l’application.'));
     montrer('Agent commercial · Claude',
       h('section',{class:'carte v35-tete'},
         h('small',{class:'etiq'},'ODICOLOR · AGENT 01'),
@@ -213,6 +244,7 @@
           ' · '+etat.compteurs.garages+' garages · '+etat.compteurs.notes+' notes terrain'),
         h('p',{class:'mut'},'EBP : '+etat.sourceEBP),
         h('p',{class:'mut'},'Claude analyse uniquement ce que tu lui transmets. Aucune synchronisation automatique.')),
+      idees,
       h('section',{class:'carte'},
         h('strong',{},'Les actions repérées par ODICOLOR'),
         etat.actions.length?etat.actions.slice(0,6).map(a=>
