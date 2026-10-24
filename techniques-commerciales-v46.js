@@ -85,7 +85,7 @@
     },
     reconquete:{
       nom:'Reprendre contact et comprendre le désengagement',priorite:72,
-      technique:['Reconquête','Méthode des 5 pourquoi','Vente par la valeur'],
+      technique:['Reconquête','Méthode des 5 pourquoi','Value Selling'],
       action:'Demander ce qui a motivé la baisse ou l’arrêt et proposer un essai seulement si un besoin existe.',
       question:'Qu’est-ce qui vous a fait changer votre façon de vous approvisionner ?',
       mesure:'Cause de désengagement identifiée et prochaine étape',controle:'Ne pas affirmer une baisse d’achats sans export EBP récent.'
@@ -158,7 +158,7 @@
       retenir('reconquete','La fiche mentionne un refus ou un ancien client à qualifier','Qualification locale',
         'Vérifier le motif du refus avant toute nouvelle offre.');
     const notes=tableau(c.infosTerrain);
-    if(notes.some(n=>dateOK(n.suiviLe)&&n.suiviLe<=aujourdHui()&&!n.termineeLe))
+    if(notes.some(n=>n&&n.nature==='note-commerciale'&&n.suite&&n.suite!=='aucune'&&n.statut!=='fait'&&dateOK(n.suiviLe)&&n.suiviLe<=aujourdHui()))
       retenir('note_terrain','Une note terrain comporte un suivi arrivé à échéance','Notes déclaratives sur le téléphone');
     if(c.statutCrm==='prospect')
       retenir('prospect','La fiche est classée « prospect » sans vente EBP confirmée','Statut CRM local');
