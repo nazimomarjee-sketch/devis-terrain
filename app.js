@@ -183,6 +183,7 @@ const CHAMPS = {
   clients: [
     ['nom', 'Nom du client', true, [/^(nom|raison|client|societe|entreprise|designation)/]],
     ['tel', 'Téléphone (facultatif)', false, [/tel|phone|mobile|portable/]],
+    ['ville', 'Ville (facultatif)', false, [/^(ville|city|commune|localite)$/, /ville|commune|localite/]],
   ],
 };
 function devinerColonnes(kind, entetes) {
@@ -239,22 +240,65 @@ function importerArticles(rows, debut, map, existants) {
   }
   return { rep, items: out };
 }
+// Rapprochement commun à la création terrain et aux imports EBP : ne jamais
+// fusionner deux établissements d'une même enseigne situés dans des villes différentes.
+function numeroGarage(v) {
+  let n=String(v||'').replace(/\D/g,'');
+  if(n.startsWith('0033')&&n.length===13)n='0'+n.slice(4);
+  else if(n.startsWith('33')&&n.length===11)n='0'+n.slice(2);
+  return n;
+}
+function doublonsGarages(clients,nom,tel='',ville='') {
+  const name=normNom(nom), city=normNom(ville), phone=numeroGarage(tel);
+  if(!name)return [];
+  return (Array.isArray(clients)?clients:[]).filter(c=>{
+    const previousCity=normNom(c.villeProspection||c.ville||'');
+    if(city&&previousCity&&city!==previousCity)return false;
+    const sameName=normNom(c.nom)===name;
+    const samePhone=phone.length>=9&&numeroGarage(c.tel)===phone;
+    return sameName||samePhone;
+  });
+}
 function importerClients(rows, debut, map, existants) {
-  const rep = nouveauRapport(), out = [], vusN = new Set();
-  for (let i = debut + 1; i < rows.length; i++) {
-    const r = rows[i] || [];
-    if (r.every(c => clean(c) === '')) continue;
+  const rep=nouveauRapport(),out=[],vus=[];
+  const base=existants instanceof Map?Array.from(existants.values()):
+    Array.isArray(existants)?existants:[];
+  for(let i=debut+1;i<rows.length;i++){
+    const r=rows[i]||[];
+    if(r.every(c=>clean(c)===''))continue;
     rep.lues++;
-    const nom = clean(r[map.nom]).replace(/\s+/g, ' ');
-    if (!nom) { rep.ignorees++; err(rep, i + 1, 'ligne sans nom'); continue; }
-    const k = norm(nom);
-    if (vusN.has(k)) { rep.ignorees++; rep.avertissements.push('ligne ' + (i + 1) + ' : « ' + nom + ' » en double, ignoré'); continue; }
-    vusN.add(k);
-    const tel = map.tel != null ? clean(r[map.tel]).slice(0, 30) : '';
-    const ex = existants.get(k);
-    if (ex) { rep.maj++; out.push({ ...ex, tel: tel || ex.tel }); } else { rep.crees++; out.push({ nom: nom.slice(0, 120), tel }); }
+    const nom=clean(r[map.nom]).replace(/\s+/g,' ');
+    if(!nom){rep.ignorees++;err(rep,i+1,'ligne sans nom');continue;}
+    const tel=map.tel!=null?clean(r[map.tel]).slice(0,30):'';
+    const ville=map.ville!=null?clean(r[map.ville]).slice(0,70):'';
+    const ligne='ligne '+(i+1)+' : « '+nom+' »';
+    if(doublonsGarages(vus,nom,tel,ville).length){
+      rep.ignorees++;rep.avertissements.push(ligne+' présent plusieurs fois dans le fichier : doublon ignoré.');continue;
+    }
+    vus.push({nom,tel,villeProspection:ville});
+    const correspondances=doublonsGarages(base,nom,tel,ville);
+    if(correspondances.length>1){
+      rep.ignorees++;rep.avertissements.push(ligne+' : plusieurs fiches possibles. Aucune fusion : vérifier manuellement la ville et le téléphone.');continue;
+    }
+    if(correspondances.length===1){
+      const ex=correspondances[0];
+      if(normNom(ex.nom)!==normNom(nom)){
+        rep.ignorees++;rep.avertissements.push(ligne+' : téléphone déjà associé à « '+ex.nom+' ». Rapprochement manuel nécessaire.');continue;
+      }
+      const ancienTel=numeroGarage(ex.tel),nouveauTel=numeroGarage(tel);
+      const telDivergent=ancienTel.length>=9&&nouveauTel.length>=9&&ancienTel!==nouveauTel;
+      if(telDivergent&&!(ville&&normNom(ex.villeProspection||ex.ville)===normNom(ville))){
+        rep.ignorees++;rep.avertissements.push(ligne+' : même nom, téléphone différent et ville non confirmée. Fiche existante conservée.');continue;
+      }
+      if(telDivergent)rep.avertissements.push(ligne+' : téléphone différent ; numéro existant conservé pour vérification.');
+      const maj={...ex,tel:ex.tel||tel,villeProspection:ex.villeProspection||ville};
+      out.push(maj);rep.maj++;
+    }else{
+      out.push({nom:nom.slice(0,120),tel,villeProspection:ville});
+      rep.crees++;
+    }
   }
-  return { rep, items: out };
+  return {rep,items:out};
 }
 
 // ---------- routage ----------
@@ -1570,8 +1614,7 @@ async function pageClients() {
     cl.map(c => h('div', { class: 'ligne' }, h('span', { class: 'g' }, h('strong', {}, c.nom), c.tel ? h('br') : null, c.tel ? h('small', {}, c.tel) : null),
       h('span', { class: 'rapide' },
         h('a', { class: 'btn sec', href: '#/client/' + c.id }, 'Fiche'),
-        h('button', { class: 'btn sec', onclick: () => creerDevis(c) }, 'Devis'),
-        h('button', { class: 'btn danger', 'aria-label': 'Supprimer ' + c.nom, onclick: async () => { if (confirm('Supprimer le client « ' + c.nom + ' » ? Ses devis sont conservés.')) { await del('clients', c.id); pageClients(); } } }, '🗑')))));
+        h('button', { class: 'btn sec', onclick: () => creerDevis(c) }, 'Devis')))));
 }
 
 // ---------- catalogue ----------
