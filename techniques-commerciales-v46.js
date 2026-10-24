@@ -128,12 +128,12 @@
   const aujourdHui=()=>jourLocal(new Date());
   const dateOK=s=>typeof s==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(s);
   const tableau=x=>Array.isArray(x)?x:[];
-  function suggestion(c,dv,pc) {
+  function suggestion(c,dv,pc,tousClients=[]) {
     const lignes=[],nom=propre(c.nom,90)||'Garage';
-    const retenir=(id,raison,source,controleEnPlus)=>{
+    const retenir=(id,raison,source,controleEnPlus,score)=>{
       const p=PLAYBOOKS[id]; if(!p)return;
       lignes.push({id,nom,clientId:c.id,href:'#/client/'+c.id,
-        titre:p.nom,priorite:p.priorite,raison:propre(raison,240),source:propre(source,100),
+        titre:p.nom,priorite:score||p.priorite,raison:propre(raison,240),source:propre(source,100),
         techniques:p.technique.map(t=>({nom:t,id:index.get(t)?.id||''})),
         action:p.action,question:p.question,mesure:p.mesure,
         controle:[p.controle,controleEnPlus].filter(Boolean).join(' ')});
@@ -154,6 +154,28 @@
       retenir('essai','Un essai produit est marqué en cours','Essai saisi sur la fiche garage');
     if(c.etape && dateOK(c.etapeDate) && c.etapeDate<=aujourdHui())
       retenir('prochaine_action','Une prochaine action saisie est arrivée à échéance','Fiche garage locale');
+    // Signaux de reconquête issus de l'export PC uniquement si la qualité
+    // commerciale et l'identité du garage sont validées par le moteur v22.
+    const sources=window.__commercialV22;
+    if(pc&&sources&&Array.isArray(tousClients)&&tousClients.length&&
+      typeof sources.fiabilite==='function'&&sources.fiabilite(pc).ok&&
+      typeof sources.signauxClient==='function'){
+      const signaux=sources.signauxClient(pc,c,tousClients)||[];
+      if(signaux.some(x=>x.type==='reconquete'||x.type==='baisse'))
+        retenir('reconquete','Un signal de reconquête ou de baisse est documenté dans le plan PC',
+          'Plan EBP validé du '+pc.arrete,
+          'Ce signal historique ne prouve pas la cause ; la vérifier auprès du garage.',75);
+    }
+    const besoins=tableau(c.besoinsProduits).filter(b=>b&&b.statut==='ouvert'&&b.suite!=='aucun');
+    const demandes=besoins.filter(b=>b.source==='client');
+    if(demandes.length)
+      retenir('suivi_client',demandes.length+' besoin(s) produit déclaré(s) par le client et encore à suivre',
+        'Fiche besoins produits · saisie locale',
+        'Vérifier que le besoin reste actuel, puis confirmer tarif et disponibilité dans EBP.',80);
+    else if(besoins.length)
+      retenir('suivi_client',besoins.length+' piste(s) produits émises par le vendeur, non confirmées par le client',
+        'Fiche besoins produits · hypothèse du vendeur',
+        'Commencer par qualifier le besoin avec le client, sans présumer la commande.',60);
     if(c.conv==='refus'||c.ancienRoberlo===true||c.exRoberlo===true)
       retenir('reconquete','La fiche mentionne un refus ou un ancien client à qualifier','Qualification locale',
         'Vérifier le motif du refus avant toute nouvelle offre.');
@@ -168,7 +190,7 @@
     return lignes.sort((a,b)=>b.priorite-a.priorite)[0]||null;
   }
   function recommandations(clients,devis,pc,limite=3){
-    const arr=tableau(clients).map(c=>suggestion(c,devis,pc)).filter(Boolean)
+    const arr=tableau(clients).map(c=>suggestion(c,devis,pc,clients)).filter(Boolean)
       .sort((a,b)=>b.priorite-a.priorite||a.nom.localeCompare(b.nom,'fr'));
     return arr.slice(0,Math.max(0,Math.min(3,limite)));
   }
@@ -203,7 +225,10 @@
     if(!c)return;
     const dv=await getAll('devis');
     if(location.hash!=='#/client/'+id)return;
-    const idee=suggestion(c,dv,null);
+    const pc=typeof lirePC==='function'?await lirePC():null;
+    const tousClients=await getAll('clients');
+    if(location.hash!=='#/client/'+id)return;
+    const idee=suggestion(c,dv,pc,tousClients);
     if(!idee)return;
     const panneau=h('section',{class:'carte v46-fiche'},
       h('small',{class:'etiq'},'STRATÉGIE TERRAIN · SUGGESTION'),
