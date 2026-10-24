@@ -1701,7 +1701,7 @@ async function lancer(kind, rows, debut, map, nomFichier) {
     if(location.hash==='#/reglages')location.hash='#/catalogue';
     await pageCatalogue();
   } else {
-    const ex = new Map((await getAll('clients')).map(c => [norm(c.nom), c]));
+    const ex = await getAll('clients'); // Conserver tous les établissements homonymes.
     r = importerClients(rows, debut, map, ex);
     await putMany('clients', r.items);
     if(location.hash==='#/reglages')location.hash='#/clients';
