@@ -233,7 +233,10 @@
   const prevRoute=route;
   route=async function(){
     const p=(location.hash||'#/').slice(2).split('/')[0];
-    if(p==='catalogues-pdf')return pageCataloguesPDF();
+    if(p==='catalogues-pdf'){
+      document.querySelectorAll('.onglets a').forEach(el=>el.classList.toggle('on',el.dataset.p==='catalogue'));
+      return pageCataloguesPDF();
+    }
     return prevRoute();
   };
 
@@ -260,8 +263,7 @@
     await prevAccueil();
     if((location.hash||'#/')!=='#/')return;
     const produits=app.querySelector('.v23-produits');
-    const ligne=produits&&produits.querySelector('.v23-between');
-    if(ligne)ligne.append(h('a',{class:'v32-pdf-link',href:'#/catalogues-pdf'},'PDF fournisseurs ›'));
+    // La bibliothèque PDF reste accessible dans Catalogue, sans second raccourci sur l'Accueil.
     const rapport=await get('meta','rapport_articles');
     if(produits&&rapport&&/(?:^|[\\\\/])demo[-_]/i.test(rapport.fichier||''))
       produits.append(h('p',{class:'v32-demo-mini'},
