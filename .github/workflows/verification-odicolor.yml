@@ -4,7 +4,11 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main]
+    branches: [main, fix/lot1-f01-f03-recuperation]
+
+concurrency:
+  group: odicolor-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
 
 jobs:
   securite-et-syntaxe:
@@ -38,6 +42,11 @@ jobs:
         run: node scripts/build-pwa.cjs --check
       - name: Tester validation, sauvegarde et restauration atomique
         run: node --test tests/*.test.cjs
+      - name: Générer et vérifier le jeu synthétique de volume
+        shell: bash
+        run: |
+          node scripts/generer-jeu-synthetique.cjs terrain "$RUNNER_TEMP/odicolor-terrain"
+          node scripts/verifier-sauvegarde.cjs "$RUNNER_TEMP/odicolor-terrain/jeu-terrain.odicolor" "$RUNNER_TEMP/odicolor-terrain/attendus-terrain.json" > "$RUNNER_TEMP/verification-terrain.json"
       - name: Installer le navigateur de test (aucune dépendance de production)
         run: |
           npm install --no-save --ignore-scripts playwright@1.56.1
