@@ -18,7 +18,7 @@ const mockDb=(initial,options={})=>memoryDb(initial,{failSync:options.failOnPut}
 function helpers(mock){
   return runInNewContext(app.slice(start,end)+
     '\n({verifierSauvegardeLocale,restaurerSauvegardeLocale})',
-    {DB:{db:mock.db,maintenance:false},ODICOLOR_BACKUP:B,Set,Number,Error,Promise});
+    {DB:{db:mock.db,maintenance:false},ODICOLOR_BACKUP:B,avecRestaurationExclusive:async action=>action(),Set,Number,Error,Promise});
 }
 const original={
   clients:[[1,{id:1,nom:'Garage original',visites:[{date:'2026-10-01',res:'vu'}]}]],

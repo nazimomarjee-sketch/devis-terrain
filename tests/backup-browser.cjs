@@ -52,3 +52,17 @@ test('application complète : modules chargés et sauvegarde complète dans Rég
   const download=await file;assert.match(download.suggestedFilename(),/\.odicolor$/);
   assert.deepEqual(errors,[]);await ui.close();
 });
+test('deux onglets : une ancienne fiche ne peut plus écrire après restauration',async()=>{
+  const context=await browser.newContext(),first=await context.newPage(),second=await context.newPage();
+  const url='http://127.0.0.1:'+server.address().port+'/#/reglages';
+  await first.goto(url);await first.getByRole('button',{name:'Télécharger une sauvegarde complète',exact:true}).waitFor();
+  await second.goto(url);await second.getByRole('button',{name:'Télécharger une sauvegarde complète',exact:true}).waitFor();
+  await second.evaluate(()=>{window.ancienneFiche={id:1,nom:'Ancien portefeuille'};});
+  await first.evaluate(async()=>{await restaurerSauvegardeLocale({appli:'devis-terrain',version:2,date:new Date().toISOString(),stores:{articles:[],clients:[{id:1,nom:'Nouveau portefeuille'}],devis:[],meta:[]}})});
+  const blocked=await second.evaluate(async()=>{try{await putMany('clients',[window.ancienneFiche]);return false}catch(_){return true}});
+  assert.equal(blocked,true);
+  assert.equal(await first.evaluate(async()=>(await get('clients',1)).nom),'Nouveau portefeuille');
+  await second.reload();await second.getByRole('button',{name:'Télécharger une sauvegarde complète',exact:true}).waitFor();
+  assert.equal(await second.evaluate(async()=>(await get('clients',1)).nom),'Nouveau portefeuille');
+  await context.close();
+});

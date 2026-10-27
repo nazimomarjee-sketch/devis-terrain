@@ -287,7 +287,9 @@ const ODICOLOR_BACKUP = (() => {
 
   async function decode(file) {
     if (!(file instanceof Blob) || !file.size || file.size>MAX_FILE) fail('Fichier vide ou trop volumineux (1 Go maximum).');
-    if (await file.slice(0,MAGIC.length).text()!==MAGIC) {
+    const prefix=await file.slice(0,MAGIC.length).text();
+    if (prefix!==MAGIC) {
+      if(prefix.startsWith('ODICOLOR-BACKUP-'))fail('Version de sauvegarde ODICOLOR non prise en charge.');
       if (file.size>MAX_LEGACY) fail('Ancienne sauvegarde JSON trop volumineuse (25 Mo maximum).');
       let o;try { o=JSON.parse(await file.text()); } catch (_) { fail('Sauvegarde illisible ou tronquée.'); }
       const out=legacy(o);validate(out);return out;

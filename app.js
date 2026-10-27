@@ -85,6 +85,33 @@ const pct = c => (c / 100).toLocaleString('fr-FR', { maximumFractionDigits: 2 })
 
 // ---------- base locale ----------
 const DB = { db: null, maintenance: false };
+// Une session ouverte partage ce verrou ; une restauration attend son exclusivité.
+// Un onglet rendu obsolète ferme sa connexion et doit être rechargé avant écriture.
+const VERROU_STOCKAGE = 'odicolor-portefeuille-local';
+let libererSessionStockage = null;
+const canalStockage = typeof BroadcastChannel === 'function' ? new BroadcastChannel(VERROU_STOCKAGE) : null;
+if (canalStockage) canalStockage.onmessage = event => {
+  if (event.data !== 'restauration' || !DB.db) return;
+  DB.maintenance = true; DB.db.close();
+  if (libererSessionStockage) { libererSessionStockage(); libererSessionStockage=null; }
+  toast('Une restauration est en cours dans un autre onglet. Recharge cet onglet avant de travailler.', true);
+};
+function tenirSessionStockage() {
+  if (!navigator.locks) return Promise.resolve();
+  return new Promise((resolve,reject)=>{
+    navigator.locks.request(VERROU_STOCKAGE,{mode:'shared'},()=>new Promise(release=>{
+      libererSessionStockage=release;resolve();
+    })).catch(reject);
+  });
+}
+async function avecRestaurationExclusive(action) {
+  if (!navigator.locks) throw new Error('Restauration indisponible : utilise une version récente de Chrome sur une adresse HTTPS. La sauvegarde reste accessible.');
+  if (libererSessionStockage) { libererSessionStockage(); libererSessionStockage=null; }
+  if (canalStockage) canalStockage.postMessage('restauration');
+  toast('Restauration : les autres onglets doivent fermer leur accès aux données.');
+  try { return await navigator.locks.request(VERROU_STOCKAGE,{mode:'exclusive'},action); }
+  finally { await tenirSessionStockage(); }
+}
 const rq = r => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
 const st = (n, m = 'readonly') => {
   if (m === 'readwrite' && DB.maintenance) throw new Error('Restauration en cours : écriture suspendue.');
@@ -102,7 +129,8 @@ function putMany(n, items) {
     t.oncomplete = () => res(); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error);
   });
 }
-function openDB() {
+async function openDB() {
+  await tenirSessionStockage();
   return new Promise((res, rej) => {
     const r = indexedDB.open('devis-terrain', 2);
     r.onupgradeneeded = () => {
@@ -1993,7 +2021,7 @@ async function restaurerSauvegardeLocale(o) {
   if(DB.maintenance)throw new Error('Une restauration est déjà en cours.');
   verifierSauvegardeLocale(o);
   DB.maintenance=true;
-  try{return await ODICOLOR_BACKUP.restore(DB.db,o)}
+  try{return await avecRestaurationExclusive(()=>ODICOLOR_BACKUP.restore(DB.db,o))}
   finally{DB.maintenance=false}
 }
 

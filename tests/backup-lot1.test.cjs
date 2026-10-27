@@ -53,3 +53,4 @@ test('refuse une version de format inconnue dans un fichier binaire même avec e
   const h=JSON.parse(new TextDecoder().decode(b.slice(begin))),next=new TextEncoder().encode(JSON.stringify({...h,version:999})),length=new Uint8Array(4);new DataView(length.buffer).setUint32(0,next.length,true);
   const hash=await crypto.subtle.digest('SHA-256',next);await assert.rejects(B.decode(new Blob([b.slice(0,offset),length,hash,next])),/Version/);
 });
+test('signale clairement un futur format de fichier',async()=>{await assert.rejects(B.decode(new Blob(['ODICOLOR-BACKUP-3\ncontenu futur'])),/Version.*non prise en charge/);});
