@@ -1,0 +1,277 @@
+{
+  "repository": "nazimomarjee-sketch/devis-terrain",
+  "commit": "15358121354f9cf050d4f90e51a7b87272af78f9",
+  "tree": "42df1be0422195a2468fea95c0c9b931740ab65c",
+  "files": [
+    {
+      "path": ".github/workflows/verification-odicolor.yml",
+      "sha": "e083b3d21dbd33b64e660b54ec1a165c559735c5",
+      "size": 1150
+    },
+    {
+      "path": "CHALLENGE_JANVIER_2027.md",
+      "sha": "8d0dee5e4e7175f3101eabd8dbf859f56fb5dc7a",
+      "size": 6159
+    },
+    {
+      "path": "CLAUDE_AGENT01_INSTRUCTIONS.md",
+      "sha": "5c7e898a4f8718ba7996f9c76f4d3cdf255f2322",
+      "size": 3963
+    },
+    {
+      "path": "LISEZ-MOI.md",
+      "sha": "b3352f7240009ce2e84e01ea8e1c69b3e7d08902",
+      "size": 2022
+    },
+    {
+      "path": "README.md",
+      "sha": "adc0096dff605139c6a4c69375d1a67adf11fb74",
+      "size": 19
+    },
+    {
+      "path": "accueil-v23.css",
+      "sha": "314ecccaf9f5d9f2512dcedf65da4b34a86064eb",
+      "size": 3404
+    },
+    {
+      "path": "accueil-v23.js",
+      "sha": "78a45fdc442ef724bf5c4334506d84233936a06f",
+      "size": 12506
+    },
+    {
+      "path": "agent-commercial-v35.css",
+      "sha": "cfa99f2ccd95bc4ebaaebfad79ef9784ae7162d9",
+      "size": 3000
+    },
+    {
+      "path": "agent-commercial-v35.js",
+      "sha": "9abd11845064879d3b19a9848f7db502066d5114",
+      "size": 17527
+    },
+    {
+      "path": "app.js",
+      "sha": "8c521fdb6815949aae183b74d2c5ed22462c16c8",
+      "size": 202059
+    },
+    {
+      "path": "apparence-v26.css",
+      "sha": "cc97e2fac5bc64268e0d3034f5602361b0441991",
+      "size": 3055
+    },
+    {
+      "path": "apparence-v26.js",
+      "sha": "a272734e444527b810044fb5e0610414280bc5ab",
+      "size": 1381
+    },
+    {
+      "path": "barlow-condensed-latin-700-normal.woff2",
+      "sha": "3726e9dccc00171c2b54534fc148d5dc5dcfddf7",
+      "size": 22444
+    },
+    {
+      "path": "barlow-condensed-latin-800-normal.woff2",
+      "sha": "33c8a26ee2cd79dc94efb1b5a0364b250693d47e",
+      "size": 22464
+    },
+    {
+      "path": "catalogues-pdf-v32.css",
+      "sha": "1ed4dad1f903e9d2e268986bd3e0cbf85e69b388",
+      "size": 4282
+    },
+    {
+      "path": "catalogues-pdf-v32.js",
+      "sha": "ed450e89ff8cc96cb068eacd3f3270bd146bf59e",
+      "size": 15162
+    },
+    {
+      "path": "commercial-v22.js",
+      "sha": "af7df59942c387f7a263bb7f0a53e33e8d17e026",
+      "size": 11817
+    },
+    {
+      "path": "correctif-v25.css",
+      "sha": "dce25a1585210307a20fd46a29ba64139ab9d30d",
+      "size": 682
+    },
+    {
+      "path": "correctif-v25.js",
+      "sha": "938af87c3a9f3499661969d0f218623fe05b17b6",
+      "size": 2692
+    },
+    {
+      "path": "dossier-n1-v31.css",
+      "sha": "0ad637b87ad667d21bf802b4099fc2c918b7d291",
+      "size": 3344
+    },
+    {
+      "path": "dossier-n1-v31.js",
+      "sha": "829f389a5a0c3b81754b37768941356671ce3d06",
+      "size": 19317
+    },
+    {
+      "path": "fiche-client-v36.css",
+      "sha": "c53c0d10ecd698c78719da94a8193f94f2491d32",
+      "size": 2227
+    },
+    {
+      "path": "icon-192.png",
+      "sha": "72722a0ec9340b60a02386015251d63385fc7682",
+      "size": 3691
+    },
+    {
+      "path": "icon-192_1.png",
+      "sha": "d17185bb209e77e5cab949c7c9529e16f678718c",
+      "size": 23744
+    },
+    {
+      "path": "icon-512.png",
+      "sha": "95afad66e808cbd6fd1f78e5f01b34eb354cde3d",
+      "size": 10748
+    },
+    {
+      "path": "icon-512_1.png",
+      "sha": "528e37b77576dec57d9cbfcb97aa8e6ad96bba17",
+      "size": 107067
+    },
+    {
+      "path": "icon-maskable-512.png",
+      "sha": "57e6393dcacbc68da2960aba184bb9234213d4ad",
+      "size": 54245
+    },
+    {
+      "path": "identite-odicolor-v37.css",
+      "sha": "3c54ff8ecd9e8b7b32d4fc4a38d7e5d4875b34fc",
+      "size": 2378
+    },
+    {
+      "path": "imports-centralises-v40.css",
+      "sha": "1e1003aedc9d18e9256f527faae53e2f6201aa43",
+      "size": 3353
+    },
+    {
+      "path": "imports-centralises-v40.js",
+      "sha": "6de0fe1d2d93e2a4961019d7274f7a121f503eed",
+      "size": 6293
+    },
+    {
+      "path": "index.html",
+      "sha": "9d91fa4ffe69227adf6f49d1bb7ea05fba664b2a",
+      "size": 4104
+    },
+    {
+      "path": "logo-96.png",
+      "sha": "822cea7dcdef0595e640dadf7ff10912a76c6c9b",
+      "size": 9056
+    },
+    {
+      "path": "manifest.webmanifest",
+      "sha": "e5c1858e51df0dd1ca9483ef08f603b65d185172",
+      "size": 694
+    },
+    {
+      "path": "notes-terrain-v29.css",
+      "sha": "ed81dfdd7e818d7e4e9f01810e9de9fa61fa862f",
+      "size": 2971
+    },
+    {
+      "path": "notes-terrain-v29.js",
+      "sha": "1f35d93895f48b91d2ce5a1e3a236e098b496d2b",
+      "size": 15600
+    },
+    {
+      "path": "odicolor-logo-officiel.png",
+      "sha": "43f073c87798e1f8d7d8b7eb07a7496b3254fc18",
+      "size": 2518
+    },
+    {
+      "path": "parcours-garage-v30.css",
+      "sha": "490e30c30cb01f287df7b3b5d429f92d39b4733c",
+      "size": 2135
+    },
+    {
+      "path": "parcours-garage-v30.js",
+      "sha": "9b0ee1b8571866fb32c38f35cd292cc4f2982e22",
+      "size": 10499
+    },
+    {
+      "path": "photo-magasin-odicolor-v39.css",
+      "sha": "7102d0d2485e22c9a4dfc15e13aed7c066857506",
+      "size": 8463
+    },
+    {
+      "path": "premium-pro-v38.css",
+      "sha": "f37a567d77516662f11067e1f714e4f8b0a8571f",
+      "size": 17992
+    },
+    {
+      "path": "premium-pro-v38.js",
+      "sha": "7f54a65352fc2617e6ba3f9ae0986c9daaff14d9",
+      "size": 16621
+    },
+    {
+      "path": "rappels-produits-v24.js",
+      "sha": "ab8298be031e5acce3432caa8714812726db9b72",
+      "size": 1528
+    },
+    {
+      "path": "style-v22.css",
+      "sha": "8aeee2786753e51180a73eb2ad8830c30e56ce87",
+      "size": 1029
+    },
+    {
+      "path": "style.css",
+      "sha": "472cdd6bd9f1978dc9b8b531600c3670f41125ad",
+      "size": 13616
+    },
+    {
+      "path": "suivi-produits-v24.css",
+      "sha": "a4f222785a8dbaa6d37cd01cf9e70103a4c4eb14",
+      "size": 1737
+    },
+    {
+      "path": "suivi-produits-v24.js",
+      "sha": "68aedd3d080f6d6ae8904bc5c3cbbdf50fcb0777",
+      "size": 9144
+    },
+    {
+      "path": "sw.js",
+      "sha": "4d1175343660ee01f7eb9357a82d42d395b839d1",
+      "size": 2886
+    },
+    {
+      "path": "techniques-commerciales-v46.css",
+      "sha": "a018940d4c6d437a24d3ce8367a6127326ed9706",
+      "size": 1489
+    },
+    {
+      "path": "techniques-commerciales-v46.js",
+      "sha": "157dbff2186a074691db57a4b93dc1ba4fc6e732",
+      "size": 19665
+    },
+    {
+      "path": "tests/backup-v47.test.cjs",
+      "sha": "c8deec2cd1fab6010f247bbc8516d400e2aca517",
+      "size": 4817
+    },
+    {
+      "path": "tests/identite-v47.test.cjs",
+      "sha": "3ccc06b139cb205172e40939653e26a854463bf3",
+      "size": 4280
+    },
+    {
+      "path": "tests/pwa-v47.test.cjs",
+      "sha": "a0797388f3af94a950c9052d7fa931342a9ebf61",
+      "size": 1614
+    },
+    {
+      "path": "xlsx.LICENSE.txt",
+      "sha": "4bdda80385ac0fcc0dd6573e23a048175801b24f",
+      "size": 11355
+    },
+    {
+      "path": "xlsx.mini.min.js",
+      "sha": "7e44340c478b61634891281682cb5d7769ed7586",
+      "size": 250826
+    }
+  ]
+}

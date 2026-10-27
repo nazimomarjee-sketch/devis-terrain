@@ -1,0 +1,74 @@
+✔ A01 : lignes invalides, référence orpheline et version future acceptées (12.176093ms)
+✔ A02 : une modification de TVA recalcule un ancien devis (1.395468ms)
+✔ A03 : les bornes autorisées dépassent la précision entière de Number (2.862014ms)
+✔ A04 : la dictée découpe les décimales françaises (1.681009ms)
+✔ A05 : deux références distinctes sont tronquées vers la même clé (1.491734ms)
+✔ A06 : put() réussit au succès de requête sans attendre le commit (1.21189ms)
+✔ A07 : la 61e photo de signalement est supprimée automatiquement (1.50941ms)
+✔ A08 : la 101e visite efface la plus ancienne (1.731315ms)
+✔ A09 : sauvegarde sans catalogue, plan PC ni pièces jointes (1.987291ms)
+✔ A10 : une restauration garde les anciennes métadonnées liées aux IDs (1.332853ms)
+✔ A11 : deux créations de notes concurrentes perdent une des notes (3.257992ms)
+✔ A12 : le suivi des notes réécrit seulement les entrées reconnues (2.330901ms)
+✔ A13 : service worker retourne une erreur HTTP 503 malgré le cache (1.516781ms)
+✔ A14 : le fallback EBP v22 associe le premier homonyme sans code client (17.567026ms)
+✔ A15 : les KPI EBP acceptent une source démo si la période correspond (1.273614ms)
+✔ A16 : le comparateur accepte un coût de base nul et produit Infinity (1.004017ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 64.28099
+✔ valide une sauvegarde existante (3.685177ms)
+✔ refuse origine et format incorrects (1.763825ms)
+✔ refuse les IDs en double, invalides et données incomplètes (3.138941ms)
+✔ n’ouvre aucune transaction si le fichier est invalide (1.521298ms)
+✔ remplace les garages et devis ensemble, sans perdre les notes importées (1.187003ms)
+✔ en cas d’erreur d’écriture les anciens clients et devis restent intacts (0.966991ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 18.845678
+✔ aucune photo ne bloque une restauration cohérente (1.358072ms)
+✔ photo conservée si même ID, nom et numéro (0.580006ms)
+✔ photo bloquée si l’identité a changé pour le même ID (0.596311ms)
+✔ photo bloquée si la fiche a disparu de la sauvegarde (1.00596ms)
+✔ photo bloquée pour simple homonyme sans ville ni téléphone (0.239892ms)
+✔ photo bloquée si les données connues se contredisent (0.219712ms)
+✔ photo conservée si seul le nom et la ville fiable sont connus (0.297409ms)
+✔ import ne fusionne jamais un nom sans preuve téléphonique ou géographique (0.54988ms)
+✔ import accepte le même téléphone normalisé (0.394807ms)
+✔ import accepte même ville connue et conserve les notes (0.364621ms)
+✔ import respecte deux garages homonymes dans deux villes (0.32413ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 12.830702
+✔ tous les fichiers HTML essentiels existent (1.430781ms)
+✔ tous les fichiers du cache hors ligne existent (0.345742ms)
+✔ toutes les feuilles de style et tous les scripts sont accessibles hors ligne (0.179101ms)
+✔ pas de doublon dans les ressources hors ligne (1.029224ms)
+✔ version cache et afficheur préparés pour V47 (0.277439ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9.223252
+Syntaxe : 17 scripts valides via vm.Script (compilation sans exécution).
+Empreintes : 54 fichiers de production identiques à la V47 auditée.
+Runtime : v24.19.0; les tests CI ciblent Node 22.
+Limite : aucun navigateur ni IndexedDB réel exécuté ; mocks et données synthétiques.
