@@ -41,8 +41,8 @@ test('abort asynchrone réel après clear/put restaure aussi l’archive',async(
   assert.equal(r.rejected,true);assert.equal(r.aborted,true);assert.equal(r.clients[0].id,1);assert.equal(r.archives,0);assert.equal(r.articles,0);
 });
 test('legacy JSON ne réassocie pas les anciennes métadonnées et garde une récupération',async()=>{
-  const r=await page.evaluate(async()=>{const db=await openTest('legacy-'+crypto.randomUUID());await seed(db,sample());const legacy={appli:'devis-terrain',version:1,clients:[{id:7,nom:'Autre garage'}],devis:[]};await B.restore(db,await B.decode(new Blob([JSON.stringify(legacy)])));const out=await B.read(db),old=out.recuperations[0];db.close();return {photo:new Map(out.meta).has('garage-photo-v38:7'),oldPhoto:await new Map(old.stores.meta).get('garage-photo-v38:7').blob.text(),article:out.articles[0].code,name:out.clients[0].nom};});
-  assert.equal(r.photo,false);assert.equal(r.oldPhoto,'photo');assert.equal(r.article,'V');assert.equal(r.name,'Autre garage');
+  const r=await page.evaluate(async()=>{const db=await openTest('legacy-'+crypto.randomUUID());await seed(db,sample());const legacy={appli:'devis-terrain',version:1,clients:[{id:7,nom:'Autre garage'}],devis:[]};await B.restore(db,await B.decode(new Blob([JSON.stringify(legacy)])));const out=await B.read(db),old=out.recuperations[0];db.close();return {photo:new Map(out.meta).has('garage-photo-v38:7'),oldPhoto:await new Map(old.stores.meta).get('garage-photo-v38:7').blob.text(),articles:out.articles.length,previousArticle:old.stores.articles[0].code,name:out.clients[0].nom};});
+  assert.equal(r.photo,false);assert.equal(r.oldPhoto,'photo');assert.equal(r.articles,0);assert.equal(r.previousArticle,'V');assert.equal(r.name,'Autre garage');
 });
 test('application complète : modules chargés et sauvegarde complète dans Réglages',async()=>{
   const ui=await browser.newPage({viewport:{width:412,height:915}}),errors=[];ui.on('pageerror',e=>errors.push(e.message));

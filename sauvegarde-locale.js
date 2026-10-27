@@ -347,7 +347,6 @@ const ODICOLOR_BACKUP = (() => {
               existing.add(id);recovery.add({...r,id,...(id!==r.id?{sourceId:r.id}:{})});
             }
             for (const n of STORES) {
-              if (legacyFile && n==='articles') continue; // Les anciens fichiers n'ont aucun tarif.
               const store=tx.objectStore(n);store.clear();
               for (const v of incoming[n]) n==='meta' ? store.put(v[1],v[0]) : store.put(v);
             }

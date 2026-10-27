@@ -16,7 +16,7 @@ Branche de préparation : `fix/lot1-f01-f03-recuperation`. Aucun déploiement, a
 
 ## Compatibilité
 
-Les anciens JSON v1 sont lisibles. L’interface avertit qu’ils ne contiennent pas les photos/PDF/tarifs. Lors de leur restauration, les tarifs locaux restent actifs ; les anciennes métadonnées liées au portefeuille sont archivées puis remplacées, afin qu’une photo ou un signalement d’un autre garage ne soit pas réattribué. Les données omises restent dans l’archive récupérable, pas dans les nouvelles fiches.
+Les anciens JSON v1 sont lisibles. L’interface avertit qu’ils ne contiennent pas les photos/PDF/tarifs. Leur restauration laisse donc le catalogue actif vide et demande de réimporter les tarifs EBP. Les tarifs et métadonnées du portefeuille précédent sont archivés puis remplacés : aucun ancien tarif, photo ou signalement ne reste mélangé au nouveau portefeuille. Les données omises restent dans l’archive récupérable, pas dans les nouvelles fiches. Un ancien fichier seul ne peut pas reconstruire les pièces et tarifs qu’il n’a jamais contenus.
 
 L’échange PC reste un JSON v1, avec son contrat existant. Le bouton du parcours PC appelle un export dédié et l’indique comme fichier d’échange ; il ne prétend plus être la sauvegarde complète. Le bouton de sauvegarde de Réglages produit le nouveau fichier `.odicolor`.
 

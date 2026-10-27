@@ -1991,7 +1991,7 @@ async function pageReglages() {
         const f = fich.files[0]; if (!f) { toast('Choisis un fichier de sauvegarde.', true); return; }
         const o=await ODICOLOR_BACKUP.decode(f),resume=verifierSauvegardeLocale(o);
         const avertissement=o.version===1
-          ? ' Ancien JSON incomplet : les tarifs locaux seront conservés. Les photos, PDF et suivis locaux absents de ce fichier seront accessibles dans la copie de récupération, sans être rattachés aux nouveaux garages.'
+          ? ' Ancien JSON incomplet : aucun tarif, photo ou PDF n’est fourni. Le catalogue actif sera vide ; importe ensuite les tarifs EBP. Les tarifs, photos, PDF et suivis locaux remplacés resteront dans la copie de récupération, sans être mélangés au portefeuille restauré.'
           : ' Tarifs, photos, PDF et suivis actifs seront remplacés par ceux de la sauvegarde.';
         if(!confirm('Restaurer '+resume.garages+' garages et '+resume.devis+' devis ?'+avertissement+
           ' L’état actuel sera archivé avant remplacement. Cette opération ne fusionne pas les fiches. L’application redémarrera ; enregistre tes saisies avant de continuer.'))return;
