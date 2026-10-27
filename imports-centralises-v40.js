@@ -83,7 +83,7 @@
     return [h('p',{class:'mut'},'Fichiers techniques des fournisseurs : séparés des tarifs EBP. 60 Mo maximum par PDF, 25 documents sur ce téléphone.'),
       h('label',{},'Fournisseur'),fournisseur,
       h('label',{},'Sélectionner un ou plusieurs PDF'),file,btn,res,
-      h('small',{class:'mut'},'Attention : les PDF sont stockés localement et ne sont pas inclus dans la sauvegarde JSON habituelle.'),
+      h('small',{class:'mut'},'Les PDF sont stockés localement et inclus dans la sauvegarde complète v2.'),
       h('a',{class:'v40-secondaire',href:'#/catalogues-pdf'},'Consulter mes catalogues ›')];
   }
 

@@ -2,7 +2,7 @@
 /* ODICOLOR v32 — catalogues fournisseurs en PDF, sur le Samsung.
  * Manuels PDFs : jamais des tarifs EBP automatiques.
  * Stockage dans IndexedDB/meta existant (pas de migration).
- * Les PDF ne sont pas inclus dans la sauvegarde JSON actuelle :
+ * Les PDF sont inclus dans la sauvegarde complète v2 :
  * export individuel possible, originaux à conserver.
  */
 (function () {
@@ -225,7 +225,7 @@
       h('h2',{},localCarsystem||localSifa?'Mes autres catalogues':'Mes catalogues'),
       cartes.length?cartes:h('p',{class:'mut'},localCarsystem||localSifa?'Aucun autre catalogue PDF enregistré.':'Aucun catalogue PDF enregistré. Ajoute des documents depuis Réglages.'),
       h('div',{class:'carte v32-warning'},h('strong',{},'Sauvegarde importante'),
-        h('p',{},'Ces PDF ne sont pas inclus dans la sauvegarde JSON des clients et devis. Garde toujours les originaux et utilise « Télécharger PDF » pour récupérer une copie.'),
+        h('p',{},'Ces PDF sont inclus dans la sauvegarde complète v2. Garde aussi les originaux et utilise « Télécharger PDF » pour récupérer une copie.'),
         h('p',{class:'mut'},'Le navigateur peut effacer ses données si son stockage est réinitialisé. Ne sélectionne pas « Tout effacer » dans les réglages.')),
       h('div',{class:'actions'},h('a',{class:'btn sec',href:'#/catalogue'},'Retour au catalogue EBP')));
   }

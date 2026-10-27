@@ -6,7 +6,7 @@ const {join}=require('node:path');
 
 const source=readFileSync(join(__dirname,'..','app.js'),'utf8');
 const start=source.indexOf('async function verifierCompatibilitePhotosSauvegarde(o)');
-const end=source.indexOf('function restaurerSauvegardeLocale(o)',start);
+const end=source.indexOf('async function restaurerSauvegardeLocale(o)',start);
 assert.ok(start>0&&end>start);
 const guard=source.slice(start,end);
 
