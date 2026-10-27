@@ -1944,25 +1944,25 @@ async function pageReglages() {
     } }, 'Enregistrer')),
     h('h2', {}, 'Sauvegarde'),
     h('p', { class: 'mut' }, 'Tes devis et clients ne sont QUE sur ce téléphone. Si tu perds le téléphone ou effaces les données du navigateur, ils sont perdus. Sauvegarde régulièrement, puis envoie le fichier où tu veux.'),
-    h('div', { class: 'actions' }, h('button', { class: 'btn', onclick: async () => { await exporterSauvegarde(); toast('Sauvegarde téléchargée.'); } }, 'Télécharger une sauvegarde')),
+    h('div', { class: 'actions' }, h('button', { class: 'btn', onclick: async () => { try { await exporterSauvegarde(); toast('Sauvegarde complète téléchargée.'); } catch(e) { toast('Sauvegarde annulée : '+e.message,true); } } }, 'Télécharger une sauvegarde')),
     h('label', {}, 'Restaurer une sauvegarde (contrôle avant remplacement)'), fich,
-    h('p', {class:'mut'}, 'Sécurité v47 : garages et devis contrôlés, puis restaurés ensemble. Les photos des garages et les PDF sont exclus de la sauvegarde JSON. Les restaurations risquant de mélanger les photos entre garages seront refusées. Conserve les originaux des photos et catalogues.'),
+    h('p', {class:'mut'}, 'Sauvegarde complète v2 : tarifs, garages, devis, historiques, plan, assistant, photos et PDF. Contrôle des relations, calculs et pièces avant remplacement. Une archive locale conserve l’état précédent ; télécharge-la pour la garder hors du téléphone.'),
     h('div', { class: 'actions' }, h('button', { class: 'btn sec', onclick: async () => {
       try {
         const f = fich.files[0]; if (!f) { toast('Choisis un fichier de sauvegarde.', true); return; }
-        if(f.size>25*1024*1024)throw new Error('Sauvegarde trop volumineuse (25 Mo maximum).');
+        if(f.size>SAUVEGARDE_MAX)throw new Error('Sauvegarde trop volumineuse (600 Mo maximum).');
         const o = JSON.parse(await f.text());
-        verifierSauvegardeLocale(o);
-        await verifierCompatibilitePhotosSauvegarde(o);
+        await preparerSauvegardeLocale(o);
         const actuels=await getAll('clients'),devisActuels=await getAll('devis');
         if(!confirm('ATTENTION : remplacer '+actuels.length+' garages et '+devisActuels.length+
           ' devis actuels par '+o.clients.length+' garages et '+o.devis.length+
-          ' devis de cette sauvegarde ? Cette opération ne fusionne pas les données.'))return;
+          ' devis de cette sauvegarde, avec '+(o.articles||[]).length+' articles et '+(o.manifeste?.pieces||[]).length+' pièces ? '+(o.version===1?'Ancien format INCOMPLET : tarifs, photos, PDF, plan et assistant absents seront remplacés par un état vide. ':'Sauvegarde complète. ')+'Les calculs ont été vérifiés à blanc. Une archive récupérable de l’état actuel sera conservée sur ce téléphone. Cette opération ne fusionne pas les données.'))return;
         await restaurerSauvegardeLocale(o);
         await chargerBase();
         toast('Restauration terminée : garages et devis remplacés ensemble.'); pageReglages();
       } catch (e) { toast('Restauration annulée : ' + e.message, true); }
     } }, 'Restaurer après contrôle')),
+    h('button', {class:'btn sec',onclick:async()=>{try{await exporterArchivesRestauration();}catch(e){toast('Archive : '+e.message,true);}}}, 'Télécharger les états avant restauration'),
     stock,
     h('h2', {}, 'Données'),
     h('div', { class: 'actions' }, h('button', { class: 'btn danger', onclick: async () => {
@@ -1976,33 +1976,195 @@ async function pageReglages() {
 
 // ---------- v47 : restauration sûre et atomique, sans écriture partielle ----------
 // Fichier JSON uniquement. Contrôler AVANT toute suppression et refuser les ID en double.
+// Contrat de sauvegarde indépendant de la version visuelle.
+const SAUVEGARDE_MAX = 600 * 1024 * 1024;
+const ARCHIVE_PREFIX = 'restauration-v2:';
+const MAGASINS_SAUVEGARDE = ['articles','clients','devis','meta'];
+function objetSauvegarde(v) { return v !== null && typeof v === 'object' && !Array.isArray(v); }
 function verifierSauvegardeLocale(o) {
-  if(!o || typeof o!=='object' || Array.isArray(o) || o.appli!=='devis-terrain' ||
+  if(!objetSauvegarde(o) || o.appli!=='devis-terrain' || ![1,2].includes(o.version) ||
      !Array.isArray(o.clients) || !Array.isArray(o.devis))
-    throw new Error('Ce fichier n’est pas une sauvegarde ODICOLOR valide.');
-  if(o.clients.length>20000 || o.devis.length>50000)
-    throw new Error('Sauvegarde trop volumineuse en nombre de fiches.');
-  for(const [nom,liste] of [['garages',o.clients],['devis',o.devis]]){
-    const ids=new Set();
-    for(const enreg of liste){
-      if(!enreg || typeof enreg!=='object' || Array.isArray(enreg) ||
-        !Number.isSafeInteger(enreg.id) || enreg.id<1 || ids.has(enreg.id))
-        throw new Error('Identifiant invalide ou répété dans les '+nom+'.');
-      ids.add(enreg.id);
-      if(nom==='garages' && (typeof enreg.nom!=='string' || !enreg.nom.trim()))
-        throw new Error('Un garage de la sauvegarde ne possède pas de nom.');
-      if(nom==='devis' && !Array.isArray(enreg.lignes))
-        throw new Error('Un devis de la sauvegarde ne comporte pas de lignes valides.');
+    throw new Error('Format ou version de sauvegarde ODICOLOR non pris en charge.');
+  const entier=(n,min,max=Number.MAX_SAFE_INTEGER)=>Number.isSafeInteger(n)&&n>=min&&n<=max;
+  const texte=(v)=>typeof v==='string'&&v.trim().length>0;
+  const date=v=>typeof v==='string' && /^\d{4}-\d\d-\d\d(?:T\d\d:\d\d:\d\d(?:\.\d{1,3})?(?:Z|[+-]\d\d:\d\d))?$/.test(v) &&
+    Number.isFinite(Date.parse(v)) && new Date(v.slice(0,10)+'T00:00:00Z').toISOString().slice(0,10)===v.slice(0,10);
+  const ids=new Set(), devisIds=new Set();
+  for(const c of o.clients){
+    if(!objetSauvegarde(c)||!entier(c.id,1)||ids.has(c.id))throw new Error('Identifiant garage invalide ou répété.');
+    if(!texte(c.nom))throw new Error('Garage sans nom.');
+    ids.add(c.id);
+    for(const k of ['visites','infosTerrain','essais','factures','besoinsProduits'])
+      if(c[k]!=null&&(!Array.isArray(c[k])||c[k].some(v=>!objetSauvegarde(v))))throw new Error('Historique garage invalide : '+k);
+  }
+  const meta=o.version===2?o.meta:[];
+  if(!Array.isArray(meta))throw new Error('Métadonnées invalides.');
+  const keys=new Set();
+  for(const e of meta){
+    if(!Array.isArray(e)||e.length!==2||typeof e[0]!=='string'||keys.has(e[0])||e[0].startsWith(ARCHIVE_PREFIX))throw new Error('Clé de métadonnée invalide ou répétée.');
+    keys.add(e[0]);
+  }
+  const m=new Map(meta), reglages=o.version===2?m.get('settings'):o.reglages;
+  if(reglages!=null&&!objetSauvegarde(reglages))throw new Error('Réglages invalides.');
+  const s={...SET_DEF,...reglages};
+  for(const [k,max] of [['tva100',10000],['remiseMax100',10000],['relanceJours',36500],['delaiUrgentH',876000],['delaiNormalH',876000],['objSemaine',Number.MAX_SAFE_INTEGER]])
+    if(s[k]!=null&&!entier(s[k],0,max))throw new Error('Réglage numérique invalide : '+k);
+  if(s.objectifs!=null&&(!Array.isArray(s.objectifs)||s.objectifs.some(n=>!entier(n,0))))throw new Error('Objectifs invalides.');
+  for(const d of o.devis){
+    if(!objetSauvegarde(d)||!entier(d.id,1)||devisIds.has(d.id))throw new Error('Identifiant devis invalide ou répété.');
+    devisIds.add(d.id);
+    if(!Array.isArray(d.lignes))throw new Error('Devis sans lignes valides.');
+    if(!ids.has(d.clientId))throw new Error('Référence client absente dans un devis.');
+    if(!['brouillon','envoye','accepte','refuse'].includes(d.statut)||!date(d.creeLe))throw new Error('Statut ou date de devis invalide.');
+    for(const k of ['t1','t2','reponseLe','commandeLe','relanceLe'])if(d[k]!=null&&d[k]!==''&&!date(d[k]))throw new Error('Date de devis invalide : '+k);
+    let ht=0n;
+    for(const l of d.lignes){
+      if(!objetSauvegarde(l)||!texte(l.code)||!texte(l.des)||!entier(l.q,1,99999999)||!entier(l.pu,0)||!entier(l.r,0,10000))throw new Error('Ligne de devis invalide (quantité, prix ou remise).');
+      const n=BigInt(l.q)*BigInt(l.pu)*BigInt(10000-l.r);
+      ht+=(n*2n+1000000n)/2000000n;
+    }
+    const tva=(ht*BigInt(s.tva100||0)*2n+10000n)/20000n;
+    if(ht+tva>BigInt(Number.MAX_SAFE_INTEGER))throw new Error('Calcul à blanc : montant du devis trop grand.');
+  }
+  if(o.version===2){
+    if(!Array.isArray(o.articles)||!objetSauvegarde(o.manifeste)||o.manifeste.complet!==true||!Array.isArray(o.manifeste.pieces))throw new Error('Sauvegarde complète ou manifeste absent.');
+    const codes=new Set();
+    for(const a of o.articles){
+      if(!objetSauvegarde(a)||!texte(a.code)||!texte(a.des)||!entier(a.pu,0)||codes.has(a.code))throw new Error('Article ou prix invalide, référence répétée.');
+      codes.add(a.code);
+    }
+    for(const [k,v] of meta){
+      if(k.startsWith('garage-photo-v38:')&&!ids.has(Number(k.slice('garage-photo-v38:'.length))))throw new Error('Photo sans garage.');
+      if(k==='pdfFournisseursIndex'){
+        if(!Array.isArray(v))throw new Error('Index PDF invalide.');
+        const pdfIds=new Set();
+        for(const p of v){
+          if(!objetSauvegarde(p)||typeof p.id!=='string'||!p.id||pdfIds.has(p.id)||!m.has('pdfFournisseur:'+p.id))throw new Error('PDF absent ou index répété.');
+          pdfIds.add(p.id);
+        }
+      }
+      if(k.startsWith('pdfFournisseur:')&&!(m.get('pdfFournisseursIndex')||[]).some(p=>p.id===k.slice('pdfFournisseur:'.length)))throw new Error('PDF sans index.');
     }
   }
-  for(const k of ['signalements','appels','pcActions'])
-    if(o[k]!=null && !Array.isArray(o[k]))
-      throw new Error('Rubrique '+k+' incorrecte dans la sauvegarde.');
-  for(const k of ['point','tournees','comparateur','reglages'])
-    if(o[k]!=null && (typeof o[k]!=='object' || Array.isArray(o[k])))
-      throw new Error('Rubrique '+k+' incorrecte dans la sauvegarde.');
+  const metier=o.version===2?meta:[...['signalements','point','appels','tournees','comparateur','pcActions'].filter(k=>o[k]!=null).map(k=>[k,o[k]])];
+  for(const [k,v] of metier){
+    if(['signalements','appels','pcActions'].includes(k)&&!Array.isArray(v))throw new Error('Rubrique '+k+' incorrecte.');
+    if(['point','tournees','comparateur','pc','agent01Contexte','agent01Avis'].includes(k)&&v!=null&&!objetSauvegarde(v))throw new Error('Rubrique '+k+' incorrecte.');
+  }
+  const actions=(v,nom)=>{
+    if(!Array.isArray(v))throw new Error('Actions invalides : '+nom);
+    const ids=new Set();
+    for(const a of v){
+      if(!objetSauvegarde(a)||!texte(a.id)||ids.has(a.id))throw new Error('Identifiant action invalide : '+nom);
+      ids.add(a.id);
+      if(a.statut!=null&&!['a_faire','fait','reporte','bloque'].includes(a.statut))throw new Error('Statut action invalide.');
+    }
+  };
+  const plan=p=>{
+    if(p==null)return;
+    if(!objetSauvegarde(p)||p.appli!=='plan-pc')throw new Error('Plan PC invalide.');
+    actions(p.actions,'plan PC');
+    if(!Array.isArray(p.indicateurs)||p.indicateurs.some(i=>!objetSauvegarde(i)))throw new Error('Indicateurs du plan PC invalides.');
+    if(p.clients!=null&&(!Array.isArray(p.clients)||p.clients.some(c=>!objetSauvegarde(c)||!Array.isArray(c.lignes)||c.lignes.some(l=>typeof l!=='string'))))throw new Error('Fiches du plan PC invalides.');
+  };
+  for(const [k,v] of metier){
+    if(k==='pcActions')actions(v,k);
+    if(['signalements','appels'].includes(k)){
+      if(v.some(a=>!objetSauvegarde(a)))throw new Error('Entrée invalide : '+k);
+      if(k==='signalements'&&v.some(a=>!['nouveau','envoye','pris','resolu'].includes(a.statut)))throw new Error('Statut signalement invalide.');
+    }
+    if(k==='pc'||k==='pcPrecedent')plan(v);
+    if(k==='pcArchives'){if(!Array.isArray(v))throw new Error('Archives PC invalides.');v.forEach(plan);}
+    if(k==='agent01Avis'&&v?.avis!=null&&(!Array.isArray(v.avis)||v.avis.some(a=>!objetSauvegarde(a))))throw new Error('Avis assistant invalide.');
+  }
+  // Contrôle récursif des relations explicites ; les champs inconnus sont conservés.
+  const parcourir=(v,depth=0)=>{
+    if(depth>80)throw new Error('Données trop imbriquées.');
+    if(v==null||typeof v!=='object')return;
+    if(typeof Blob!=='undefined'&&v instanceof Blob)return;
+    if(Object.hasOwn(v,'clientId')&&v.clientId!=null&&!ids.has(v.clientId))throw new Error('Référence client absente.');
+    for(const [k,x] of Object.entries(v)){
+      if(['date','creeLe','modifieLe','envoyeLe','reponseLe','commandeLe','rappel','reporteAu','echeance'].includes(k)&&x!=null&&x!==''&&!date(x))throw new Error('Date invalide : '+k);
+      if(typeof x==='number'&&!Number.isFinite(x))throw new Error('Nombre non fini.');
+      parcourir(x,depth+1);
+    }
+  };
+  parcourir(o.clients);parcourir(metier);
+  const tours=o.version===2?m.get('tournees'):o.tournees;
+  if(tours)for(const [jour,t] of Object.entries(tours)){
+    if(!date(jour)||!objetSauvegarde(t)||!Array.isArray(t.ids)||t.ids.some(id=>!ids.has(id))||new Set(t.ids).size!==t.ids.length)throw new Error('Tournée ou référence garage invalide.');
+    if(t.res&&(!objetSauvegarde(t.res)||Object.keys(t.res).some(id=>!ids.has(Number(id)))))throw new Error('Résultat de tournée sans garage.');
+  }
   return {garages:o.clients.length,devis:o.devis.length};
 }
+async function lireInstantaneSauvegarde(){
+  return new Promise((resolve,reject)=>{
+    const tx=DB.db.transaction(MAGASINS_SAUVEGARDE,'readonly'),result={};
+    for(const n of MAGASINS_SAUVEGARDE){
+      const store=tx.objectStore(n),r=store.getAll();r.onsuccess=()=>{result[n]=r.result;};
+      if(n==='meta'){const k=store.getAllKeys();k.onsuccess=()=>{result.keys=k.result;};}
+    }
+    tx.oncomplete=()=>{result.meta=result.keys.map((k,i)=>[k,result.meta[i]]).filter(([k])=>!k.startsWith(ARCHIVE_PREFIX));delete result.keys;resolve(result);};
+    tx.onabort=()=>reject(tx.error||new Error('Lecture interrompue.'));tx.onerror=()=>{};
+  });
+}
+async function empreinteSauvegarde(bytes){
+  return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('');
+}
+async function encoderInstantaneSauvegarde(etat){
+  const pieces=[];
+  async function encoder(v,path){
+    if(v instanceof Blob){
+      const bytes=new Uint8Array(await v.arrayBuffer());let b64='';
+      for(let i=0;i<bytes.length;i+=24576)b64+=btoa(String.fromCharCode(...bytes.subarray(i,i+24576)));
+      const piece={chemin:path,octets:v.size,type:v.type,sha256:await empreinteSauvegarde(bytes)};
+      pieces.push(piece);return {__odicolorBlob:piece,base64:b64};
+    }
+    if(Array.isArray(v))return Promise.all(v.map((x,i)=>encoder(x,path+'/'+i)));
+    if(objetSauvegarde(v)){
+      if(Object.hasOwn(v,'__odicolorBlob'))throw new Error('Champ réservé __odicolorBlob : export impossible sans altération.');
+      const out={};for(const [k,x] of Object.entries(v))Object.defineProperty(out,k,{value:await encoder(x,path+'/'+k.replace(/~/g,'~0').replace(/\//g,'~1')),enumerable:true,writable:true,configurable:true});return out;
+    }
+    if(v===undefined)throw new Error('Champ non JSON : export impossible sans altération.');
+    return v;
+  }
+  const o={appli:'devis-terrain',version:2,date:new Date().toISOString(),...await encoder(etat,'')};
+  o.manifeste={complet:true,pieces:pieces.sort((a,b)=>a.chemin.localeCompare(b.chemin))};
+  verifierSauvegardeLocale(o);
+  if(new Blob([JSON.stringify(o)]).size>SAUVEGARDE_MAX)throw new Error('Sauvegarde supérieure à 600 Mo : aucun fichier incomplet produit.');
+  return o;
+}
+async function preparerSauvegardeLocale(o){
+  verifierSauvegardeLocale(o);
+  if(o.version===1){
+    // Migration conservatrice : aucun mélange avec les métadonnées locales.
+    const meta=[['settings',{...SET_DEF,...o.reglages}]];
+    for(const k of ['signalements','point','appels','tournees','comparateur','pcActions'])if(o[k]!=null)meta.push([k,o[k]]);
+    return {articles:[],clients:o.clients,devis:o.devis,meta};
+  }
+  const pieces=[];
+  async function decoder(v,path){
+    if(Array.isArray(v))return Promise.all(v.map((x,i)=>decoder(x,path+'/'+i)));
+    if(objetSauvegarde(v)){
+      if(Object.hasOwn(v,'__odicolorBlob')){
+        const p=v.__odicolorBlob;
+        if(!objetSauvegarde(p)||p.chemin!==path||typeof p.type!=='string'||!Number.isSafeInteger(p.octets)||p.octets<0||typeof v.base64!=='string'||!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(v.base64))throw new Error('Pièce jointe mal formée.');
+        const bytes=Uint8Array.from(atob(v.base64),c=>c.charCodeAt(0));
+        if(bytes.length!==p.octets||await empreinteSauvegarde(bytes)!==p.sha256)throw new Error('Pièce jointe corrompue.');
+        pieces.push(p);return new Blob([bytes],{type:p.type});
+      }
+      const out={};for(const [k,x] of Object.entries(v))Object.defineProperty(out,k,{value:await decoder(x,path+'/'+k.replace(/~/g,'~0').replace(/\//g,'~1')),enumerable:true,writable:true,configurable:true});return out;
+    }
+    return v;
+  }
+  const etat=await decoder({articles:o.articles,clients:o.clients,devis:o.devis,meta:o.meta},'');
+  if(JSON.stringify(pieces.sort((a,b)=>a.chemin.localeCompare(b.chemin)))!==JSON.stringify(o.manifeste.pieces))throw new Error('Manifeste des pièces incohérent.');
+  for(const [k,v] of etat.meta){
+    if((k.startsWith('garage-photo-v38:')||k.startsWith('pdfFournisseur:'))&&(!objetSauvegarde(v)||!(v.blob instanceof Blob)||!v.blob.size||!v.blob.type.startsWith(k.startsWith('garage-photo')?'image/':'application/pdf')))throw new Error('Pièce jointe manquante ou type incorrect.');
+  }
+  verifierSauvegardeLocale({...o,...etat});return etat;
+}
+
 // Les photos locales sont stockées hors sauvegarde sous une clé portant l'ID.
 // Bloquer toute restauration susceptible de les afficher pour le mauvais client.
 async function verifierCompatibilitePhotosSauvegarde(o){
@@ -2038,35 +2200,50 @@ async function verifierCompatibilitePhotosSauvegarde(o){
   }
   return {photos:ids.length};
 }
-function restaurerSauvegardeLocale(o) {
-  verifierSauvegardeLocale(o);
-  // Un seul commit IndexedDB pour les garages, devis et métadonnées restaurées.
-  // Si le stockage manque ou un enregistrement échoue, toute la transaction est annulée.
+async function restaurerSauvegardeLocale(o) {
+  const etat=await preparerSauvegardeLocale(o);
+  // Lecture de l'ancien état, archive et remplacement dans le même commit.
   return new Promise((resolve,reject)=>{
     let tx;
     try{
-      tx=DB.db.transaction(['clients','devis','meta'],'readwrite');
+      tx=DB.db.transaction(MAGASINS_SAUVEGARDE,'readwrite');
       tx.oncomplete=()=>resolve();
       tx.onabort=()=>reject(tx.error||new Error('Transaction annulée : données précédentes conservées.'));
-      tx.onerror=()=>{}; // onabort signale l’échec de la transaction complète
-      const clients=tx.objectStore('clients'),devis=tx.objectStore('devis'),meta=tx.objectStore('meta');
-      clients.clear();devis.clear();
-      o.clients.forEach(c=>clients.put(c));
-      o.devis.forEach(d=>devis.put(d));
-      if(o.signalements!=null)meta.put(o.signalements,'signalements');
-      if(o.point!=null)meta.put(o.point,'point');
-      if(o.appels!=null)meta.put(o.appels,'appels');
-      if(o.tournees!=null)meta.put(o.tournees,'tournees');
-      if(o.comparateur!=null)meta.put(o.comparateur,'comparateur');
-      if(o.pcActions!=null)meta.put(o.pcActions,'pcActions');
-      if(o.reglages!=null)meta.put({...SET_DEF,...o.reglages},'settings');
+      tx.onerror=()=>{};
+      const avant={},archives=[];let restant=5;
+      const recueillir=(k,r)=>{r.onsuccess=()=>{
+        avant[k]=r.result;if(--restant)return;
+        try{
+          avant.meta=avant.keys.map((key,i)=>[key,avant.meta[i]]);delete avant.keys;
+          for(const e of avant.meta)if(e[0].startsWith(ARCHIVE_PREFIX))archives.push(e);
+          avant.meta=avant.meta.filter(([k])=>!k.startsWith(ARCHIVE_PREFIX));
+          for(const n of MAGASINS_SAUVEGARDE){
+            const store=tx.objectStore(n);store.clear();
+            if(n==='meta'){
+              for(const [k,v] of [...archives,...etat.meta])store.put(v,k);
+              store.put(avant,ARCHIVE_PREFIX+crypto.randomUUID());
+            }else for(const v of etat[n])store.put(v);
+          }
+        }catch(e){try{tx.abort();}catch(_){}reject(e);}
+      };};
+      for(const n of MAGASINS_SAUVEGARDE)recueillir(n,tx.objectStore(n).getAll());
+      recueillir('keys',tx.objectStore('meta').getAllKeys());
     }catch(e){if(tx){try{tx.abort()}catch(_){}}reject(e);}
   });
+}
+async function exporterArchivesRestauration(){
+  const keys=await rq(st('meta').getAllKeys()),archives=keys.filter(k=>typeof k==='string'&&k.startsWith(ARCHIVE_PREFIX));
+  if(!archives.length){toast('Aucune archive de restauration disponible.');return;}
+  // Chaque état reste exportable, sans suppression automatique d'archives.
+  for(const k of archives){
+    const o=await encoderInstantaneSauvegarde(await get('meta',k));
+    telecharger('retour-avant-'+k.slice(ARCHIVE_PREFIX.length)+'.json',JSON.stringify(o),'application/json');
+  }
 }
 
 // ---------- lien avec le PC (sauvegarde envoyée au PC, plan de la semaine reçu du PC) ----------
 async function exporterSauvegarde() {
-  const o = { appli: 'devis-terrain', version: 1, date: new Date().toISOString(), reglages: S, clients: await getAll('clients'), devis: await getAll('devis'), signalements: await lireSig(), point: (await get('meta', 'point')) || null, comparateur: (await get('meta', 'comparateur')) || null, appels: await lireAppels(), tournees: await lireTournees(), pcActions: (await get('meta', 'pcActions')) || [] };
+  const o = await encoderInstantaneSauvegarde(await lireInstantaneSauvegarde());
   telecharger('sauvegarde-devis-' + new Date().toISOString().slice(0, 10) + '.json', JSON.stringify(o), 'application/json');
 }
 const normNom = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
