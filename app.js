@@ -285,6 +285,15 @@ function importerClients(rows, debut, map, existants) {
         rep.ignorees++;rep.avertissements.push(ligne+' : téléphone déjà associé à « '+ex.nom+' ». Rapprochement manuel nécessaire.');continue;
       }
       const ancienTel=numeroGarage(ex.tel),nouveauTel=numeroGarage(tel);
+      // Un homonyme sans preuve d'identité ne doit jamais écraser sa fiche.
+      // On exige le téléphone identique OU le nom + la même ville connue.
+      const memeTelephone=ancienTel.length>=9&&nouveauTel.length>=9&&ancienTel===nouveauTel;
+      const memeVille=Boolean(ville&&normNom(ex.villeProspection||ex.ville)===normNom(ville));
+      if(!memeTelephone&&!memeVille){
+        rep.ignorees++;rep.avertissements.push(ligne+
+          ' : rapprochement impossible sans téléphone identique ou ville connue. Aucune fiche modifiée ; vérification manuelle.');
+        continue;
+      }
       const telDivergent=ancienTel.length>=9&&nouveauTel.length>=9&&ancienTel!==nouveauTel;
       if(telDivergent&&!(ville&&normNom(ex.villeProspection||ex.ville)===normNom(ville))){
         rep.ignorees++;rep.avertissements.push(ligne+' : même nom, téléphone différent et ville non confirmée. Fiche existante conservée.');continue;
@@ -1937,13 +1946,14 @@ async function pageReglages() {
     h('p', { class: 'mut' }, 'Tes devis et clients ne sont QUE sur ce téléphone. Si tu perds le téléphone ou effaces les données du navigateur, ils sont perdus. Sauvegarde régulièrement, puis envoie le fichier où tu veux.'),
     h('div', { class: 'actions' }, h('button', { class: 'btn', onclick: async () => { await exporterSauvegarde(); toast('Sauvegarde téléchargée.'); } }, 'Télécharger une sauvegarde')),
     h('label', {}, 'Restaurer une sauvegarde (contrôle avant remplacement)'), fich,
-    h('p', {class:'mut'}, 'Sécurité v47 : les données sont vérifiées avant toute écriture et le remplacement s’effectue en une transaction. Fais d’abord une sauvegarde actuelle si elle contient des informations importantes.'),
+    h('p', {class:'mut'}, 'Sécurité v47 : garages et devis contrôlés, puis restaurés ensemble. Les photos des garages et les PDF sont exclus de la sauvegarde JSON. Les restaurations risquant de mélanger les photos entre garages seront refusées. Conserve les originaux des photos et catalogues.'),
     h('div', { class: 'actions' }, h('button', { class: 'btn sec', onclick: async () => {
       try {
         const f = fich.files[0]; if (!f) { toast('Choisis un fichier de sauvegarde.', true); return; }
         if(f.size>25*1024*1024)throw new Error('Sauvegarde trop volumineuse (25 Mo maximum).');
         const o = JSON.parse(await f.text());
         verifierSauvegardeLocale(o);
+        await verifierCompatibilitePhotosSauvegarde(o);
         const actuels=await getAll('clients'),devisActuels=await getAll('devis');
         if(!confirm('ATTENTION : remplacer '+actuels.length+' garages et '+devisActuels.length+
           ' devis actuels par '+o.clients.length+' garages et '+o.devis.length+
@@ -1992,6 +2002,41 @@ function verifierSauvegardeLocale(o) {
     if(o[k]!=null && (typeof o[k]!=='object' || Array.isArray(o[k])))
       throw new Error('Rubrique '+k+' incorrecte dans la sauvegarde.');
   return {garages:o.clients.length,devis:o.devis.length};
+}
+// Les photos locales sont stockées hors sauvegarde sous une clé portant l'ID.
+// Bloquer toute restauration susceptible de les afficher pour le mauvais client.
+async function verifierCompatibilitePhotosSauvegarde(o){
+  verifierSauvegardeLocale(o);
+  const prefix='garage-photo-v38:';
+  const keys=await rq(st('meta').getAllKeys());
+  const ids=keys.filter(k=>typeof k==='string'&&k.startsWith(prefix))
+    .map(k=>Number(k.slice(prefix.length)));
+  if(!ids.length)return {photos:0};
+  const courants=await getAll('clients');
+  const actuel=new Map(courants.map(c=>[c.id,c]));
+  const importe=new Map(o.clients.map(c=>[c.id,c]));
+  for(const id of ids){
+    const avant=actuel.get(id),apres=importe.get(id);
+    if(!Number.isSafeInteger(id)||!avant||!apres)
+      throw new Error('Photo locale liée à une fiche absente de la sauvegarde. Restauration bloquée pour éviter une mauvaise association.');
+    if(normNom(avant.nom)!==normNom(apres.nom))
+      throw new Error('Le garage n°'+id+' possède une photo et son identité diffère. Restauration bloquée.');
+    const telAvant=numeroGarage(avant.tel),telApres=numeroGarage(apres.tel);
+    const villeAvant=normNom(avant.villeProspection||avant.ville);
+    const villeApres=normNom(apres.villeProspection||apres.ville);
+    const codeAvant=String(avant.code||'').trim();
+    const codeApres=String(apres.code||'').trim();
+    const telephoneIdentique=telAvant.length>=9&&telApres.length>=9&&telAvant===telApres;
+    const villeIdentique=Boolean(villeAvant&&villeApres&&villeAvant===villeApres);
+    const codeIdentique=Boolean(codeAvant&&codeApres&&codeAvant===codeApres);
+    if((telAvant&&telApres&&telAvant!==telApres)||
+       (villeAvant&&villeApres&&villeAvant!==villeApres)||
+       (codeAvant&&codeApres&&codeAvant!==codeApres)||
+       (!telephoneIdentique&&!villeIdentique&&!codeIdentique))
+      throw new Error('Identité insuffisante ou contradictoire pour la photo du garage n°'+id+
+        '. Restauration bloquée. Conserve les photos et vérifie la sauvegarde.');
+  }
+  return {photos:ids.length};
 }
 function restaurerSauvegardeLocale(o) {
   verifierSauvegardeLocale(o);
@@ -2111,4 +2156,4 @@ async function pagePC() {
   }
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
-window.__t = { nettoyerPlan, normNom, planSemaine, indicateurs, semainesJusqua, tendance, factures, enRetard, feries, estOuvre, ecartJours, relanceDue, statsTournee, prochainOuvre, echeance, cibleSemaineDe, semaineObj, lundiDe, appelsSemaine, mesures, taches, relanceDue, coutPae, calculPoint, periodePoint, texteCommande, texteSignalement, sigEnRetard, objectifDuMois, activite, serie, jourLocal, analyserTexte, statsDevis, envoyerDevis, parseCents, parseQte, ligneTotal, totaux, importerArticles, importerClients, verifierSauvegardeLocale, restaurerSauvegardeLocale, csvDevis, devinerColonnes, ligneEntete, tel2wa };
+window.__t = { nettoyerPlan, normNom, planSemaine, indicateurs, semainesJusqua, tendance, factures, enRetard, feries, estOuvre, ecartJours, relanceDue, statsTournee, prochainOuvre, echeance, cibleSemaineDe, semaineObj, lundiDe, appelsSemaine, mesures, taches, relanceDue, coutPae, calculPoint, periodePoint, texteCommande, texteSignalement, sigEnRetard, objectifDuMois, activite, serie, jourLocal, analyserTexte, statsDevis, envoyerDevis, parseCents, parseQte, ligneTotal, totaux, importerArticles, importerClients, verifierSauvegardeLocale, verifierCompatibilitePhotosSauvegarde, restaurerSauvegardeLocale, csvDevis, devinerColonnes, ligneEntete, tel2wa };
