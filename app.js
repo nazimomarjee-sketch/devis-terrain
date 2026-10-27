@@ -84,15 +84,19 @@ const qtxt = q => (q / 100).toLocaleString('fr-FR', { maximumFractionDigits: 2 }
 const pct = c => (c / 100).toLocaleString('fr-FR', { maximumFractionDigits: 2 });
 
 // ---------- base locale ----------
-const DB = { db: null };
+const DB = { db: null, maintenance: false };
 const rq = r => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
-const st = (n, m = 'readonly') => DB.db.transaction(n, m).objectStore(n);
+const st = (n, m = 'readonly') => {
+  if (m === 'readwrite' && DB.maintenance) throw new Error('Restauration en cours : écriture suspendue.');
+  return DB.db.transaction(n, m).objectStore(n);
+};
 const getAll = n => rq(st(n).getAll());
 const get = (n, k) => rq(st(n).get(k));
 const put = (n, v, k) => rq(st(n, 'readwrite').put(v, k));
 const del = (n, k) => rq(st(n, 'readwrite').delete(k));
 function putMany(n, items) {
   return new Promise((res, rej) => {
+    if (DB.maintenance) { rej(new Error('Restauration en cours : écriture suspendue.')); return; }
     const t = DB.db.transaction(n, 'readwrite'), s = t.objectStore(n);
     items.forEach(i => s.put(i));
     t.oncomplete = () => res(); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error);
@@ -100,15 +104,16 @@ function putMany(n, items) {
 }
 function openDB() {
   return new Promise((res, rej) => {
-    const r = indexedDB.open('devis-terrain', 1);
+    const r = indexedDB.open('devis-terrain', 2);
     r.onupgradeneeded = () => {
-      const d = r.result;
-      d.createObjectStore('articles', { keyPath: 'code' });
-      d.createObjectStore('clients', { keyPath: 'id', autoIncrement: true });
-      d.createObjectStore('devis', { keyPath: 'id', autoIncrement: true });
-      d.createObjectStore('meta');
+      ODICOLOR_BACKUP.schema(r.result);
     };
-    r.onsuccess = () => { DB.db = r.result; res(); };
+    r.onsuccess = () => {
+      DB.db = r.result;
+      DB.db.onversionchange = () => { DB.db.close(); DB.maintenance=true; toast('Ferme puis rouvre l’application pour terminer la mise à jour.', true); };
+      res();
+    };
+    r.onblocked = () => toast('Ferme les autres onglets ODICOLOR puis réessaie : ils bloquent l’ouverture du stockage.', true);
     r.onerror = () => rej(r.error);
   });
 }
@@ -1919,7 +1924,8 @@ async function pageReglages() {
     objs = [0, 1, 2].map(i => h('input', { value: (S.objectifs && S.objectifs[i]) ? String(S.objectifs[i] / 100) : '', inputmode: 'decimal', placeholder: 'Mois ' + (i + 1) + ' (€)', 'aria-label': 'Objectif du mois ' + (i + 1) }));
   const stock = h('p', { class: 'mut' }, 'Stockage : vérification…');
   if (navigator.storage && navigator.storage.persist) navigator.storage.persisted().then(p => { stock.textContent = p ? 'Stockage protégé : le navigateur ne l’effacera pas tout seul.' : 'Stockage non protégé : fais une sauvegarde régulièrement.'; });
-  const fich = h('input', { type: 'file', accept: '.json', 'aria-label': 'Fichier de sauvegarde' });
+  const fich = h('input', { type: 'file', accept: '.odicolor,.json', 'aria-label': 'Fichier de sauvegarde' });
+  const recuperations = await panneauRecuperations();
   montrer('Réglages',
     h('div', { class: 'carte alerte' }, 'Valeurs par défaut non confirmées : TVA 8,5 % et remise maximale 60 % sont des hypothèses. Vérifie-les avant usage réel.'),
     h('label', {}, 'TVA (%)'), tva, h('label', {}, 'Remise maximale (%)'), rem, h('label', {}, 'Indicatif WhatsApp (33 = France, 262 = La Réunion)'), ind, h('label', {}, 'Nom sur le devis'), soc, h('label', {}, 'Ton nom (joint aux devis envoyés)'), ven,
@@ -1944,130 +1950,87 @@ async function pageReglages() {
     } }, 'Enregistrer')),
     h('h2', {}, 'Sauvegarde'),
     h('p', { class: 'mut' }, 'Tes devis et clients ne sont QUE sur ce téléphone. Si tu perds le téléphone ou effaces les données du navigateur, ils sont perdus. Sauvegarde régulièrement, puis envoie le fichier où tu veux.'),
-    h('div', { class: 'actions' }, h('button', { class: 'btn', onclick: async () => { await exporterSauvegarde(); toast('Sauvegarde téléchargée.'); } }, 'Télécharger une sauvegarde')),
+    h('div', { class: 'actions' }, h('button', { class: 'btn', onclick: async event => {
+      const btn=event.currentTarget;btn.disabled=true;
+      try{const r=await exporterSauvegarde();toast('Copie préparée : '+r.garages+' garages, '+r.photos+' photos, '+r.pdf+' PDF. Vérifie les téléchargements.');}
+      catch(e){toast('Sauvegarde impossible : '+e.message,true)}finally{btn.disabled=false}
+    } }, 'Télécharger une sauvegarde complète')),
     h('label', {}, 'Restaurer une sauvegarde (contrôle avant remplacement)'), fich,
-    h('p', {class:'mut'}, 'Sécurité v47 : garages et devis contrôlés, puis restaurés ensemble. Les photos des garages et les PDF sont exclus de la sauvegarde JSON. Les restaurations risquant de mélanger les photos entre garages seront refusées. Conserve les originaux des photos et catalogues.'),
-    h('div', { class: 'actions' }, h('button', { class: 'btn sec', onclick: async () => {
+    h('p', {class:'mut'}, 'La sauvegarde complète inclut clients, notes, historiques, tarifs, photos, PDF et suivi PC. Conserve une copie hors du téléphone. Ferme les autres onglets ODICOLOR avant de restaurer. L’état remplacé sera conservé dans les copies de récupération ci-dessous.'),
+    h('div', { class: 'actions' }, h('button', { class: 'btn sec', onclick: async event => {
+      const btn=event.currentTarget;btn.disabled=true;
       try {
         const f = fich.files[0]; if (!f) { toast('Choisis un fichier de sauvegarde.', true); return; }
-        if(f.size>25*1024*1024)throw new Error('Sauvegarde trop volumineuse (25 Mo maximum).');
-        const o = JSON.parse(await f.text());
-        verifierSauvegardeLocale(o);
-        await verifierCompatibilitePhotosSauvegarde(o);
-        const actuels=await getAll('clients'),devisActuels=await getAll('devis');
-        if(!confirm('ATTENTION : remplacer '+actuels.length+' garages et '+devisActuels.length+
-          ' devis actuels par '+o.clients.length+' garages et '+o.devis.length+
-          ' devis de cette sauvegarde ? Cette opération ne fusionne pas les données.'))return;
+        const o=await ODICOLOR_BACKUP.decode(f),resume=verifierSauvegardeLocale(o);
+        const avertissement=o.version===1
+          ? ' Ancien JSON incomplet : les tarifs locaux seront conservés. Les photos, PDF et suivis locaux absents de ce fichier seront accessibles dans la copie de récupération, sans être rattachés aux nouveaux garages.'
+          : ' Tarifs, photos, PDF et suivis actifs seront remplacés par ceux de la sauvegarde.';
+        if(!confirm('Restaurer '+resume.garages+' garages et '+resume.devis+' devis ?'+avertissement+
+          ' L’état actuel sera archivé avant remplacement. Cette opération ne fusionne pas les fiches. L’application redémarrera ; enregistre tes saisies avant de continuer.'))return;
         await restaurerSauvegardeLocale(o);
-        await chargerBase();
-        toast('Restauration terminée : garages et devis remplacés ensemble.'); pageReglages();
+        DB.db.close();location.reload();
       } catch (e) { toast('Restauration annulée : ' + e.message, true); }
+      finally{btn.disabled=false}
     } }, 'Restaurer après contrôle')),
+    recuperations,
     stock,
     h('h2', {}, 'Données'),
     h('div', { class: 'actions' }, h('button', { class: 'btn danger', onclick: async () => {
-      if (!confirm('Tout effacer sur ce téléphone (catalogue, clients, devis) ? Irréversible.')) return;
-      for (const n of ['articles', 'clients', 'devis', 'meta']) await rq(st(n, 'readwrite').clear());
-      await chargerBase(); toast('Tout est effacé.'); location.hash = '#/';
-    } }, 'Tout effacer')),
+      if (!confirm('Effacer les données actives (tarifs, clients, devis, photos, PDF et suivis) ? Une copie locale de récupération sera conservée. Sauvegarde aussi hors du téléphone avant de continuer.')) return;
+      try{await restaurerSauvegardeLocale({appli:'devis-terrain',version:2,date:new Date().toISOString(),stores:{articles:[],clients:[],devis:[],meta:[]}});DB.db.close();location.reload();}
+      catch(e){toast('Effacement annulé : '+e.message,true)}
+    } }, 'Effacer les données actives')),
     h('p', { class: 'mut' }, 'Noyau ' + VERSION + ' · Fonctionne sans réseau · Les données restent sur ce téléphone sauf partage volontaire.'));
 }
 
 
 // ---------- v47 : restauration sûre et atomique, sans écriture partielle ----------
-// Fichier JSON uniquement. Contrôler AVANT toute suppression et refuser les ID en double.
+// Fichier complet versionné ou ancien JSON : contrôler avant toute écriture.
 function verifierSauvegardeLocale(o) {
-  if(!o || typeof o!=='object' || Array.isArray(o) || o.appli!=='devis-terrain' ||
-     !Array.isArray(o.clients) || !Array.isArray(o.devis))
-    throw new Error('Ce fichier n’est pas une sauvegarde ODICOLOR valide.');
-  if(o.clients.length>20000 || o.devis.length>50000)
-    throw new Error('Sauvegarde trop volumineuse en nombre de fiches.');
-  for(const [nom,liste] of [['garages',o.clients],['devis',o.devis]]){
-    const ids=new Set();
-    for(const enreg of liste){
-      if(!enreg || typeof enreg!=='object' || Array.isArray(enreg) ||
-        !Number.isSafeInteger(enreg.id) || enreg.id<1 || ids.has(enreg.id))
-        throw new Error('Identifiant invalide ou répété dans les '+nom+'.');
-      ids.add(enreg.id);
-      if(nom==='garages' && (typeof enreg.nom!=='string' || !enreg.nom.trim()))
-        throw new Error('Un garage de la sauvegarde ne possède pas de nom.');
-      if(nom==='devis' && !Array.isArray(enreg.lignes))
-        throw new Error('Un devis de la sauvegarde ne comporte pas de lignes valides.');
-    }
-  }
-  for(const k of ['signalements','appels','pcActions'])
-    if(o[k]!=null && !Array.isArray(o[k]))
-      throw new Error('Rubrique '+k+' incorrecte dans la sauvegarde.');
-  for(const k of ['point','tournees','comparateur','reglages'])
-    if(o[k]!=null && (typeof o[k]!=='object' || Array.isArray(o[k])))
-      throw new Error('Rubrique '+k+' incorrecte dans la sauvegarde.');
-  return {garages:o.clients.length,devis:o.devis.length};
+  return ODICOLOR_BACKUP.validate(o);
 }
-// Les photos locales sont stockées hors sauvegarde sous une clé portant l'ID.
-// Bloquer toute restauration susceptible de les afficher pour le mauvais client.
-async function verifierCompatibilitePhotosSauvegarde(o){
+async function restaurerSauvegardeLocale(o) {
+  if(DB.maintenance)throw new Error('Une restauration est déjà en cours.');
   verifierSauvegardeLocale(o);
-  const prefix='garage-photo-v38:';
-  const keys=await rq(st('meta').getAllKeys());
-  const ids=keys.filter(k=>typeof k==='string'&&k.startsWith(prefix))
-    .map(k=>Number(k.slice(prefix.length)));
-  if(!ids.length)return {photos:0};
-  const courants=await getAll('clients');
-  const actuel=new Map(courants.map(c=>[c.id,c]));
-  const importe=new Map(o.clients.map(c=>[c.id,c]));
-  for(const id of ids){
-    const avant=actuel.get(id),apres=importe.get(id);
-    if(!Number.isSafeInteger(id)||!avant||!apres)
-      throw new Error('Photo locale liée à une fiche absente de la sauvegarde. Restauration bloquée pour éviter une mauvaise association.');
-    if(normNom(avant.nom)!==normNom(apres.nom))
-      throw new Error('Le garage n°'+id+' possède une photo et son identité diffère. Restauration bloquée.');
-    const telAvant=numeroGarage(avant.tel),telApres=numeroGarage(apres.tel);
-    const villeAvant=normNom(avant.villeProspection||avant.ville);
-    const villeApres=normNom(apres.villeProspection||apres.ville);
-    const codeAvant=String(avant.code||'').trim();
-    const codeApres=String(apres.code||'').trim();
-    const telephoneIdentique=telAvant.length>=9&&telApres.length>=9&&telAvant===telApres;
-    const villeIdentique=Boolean(villeAvant&&villeApres&&villeAvant===villeApres);
-    const codeIdentique=Boolean(codeAvant&&codeApres&&codeAvant===codeApres);
-    if((telAvant&&telApres&&telAvant!==telApres)||
-       (villeAvant&&villeApres&&villeAvant!==villeApres)||
-       (codeAvant&&codeApres&&codeAvant!==codeApres)||
-       (!telephoneIdentique&&!villeIdentique&&!codeIdentique))
-      throw new Error('Identité insuffisante ou contradictoire pour la photo du garage n°'+id+
-        '. Restauration bloquée. Conserve les photos et vérifie la sauvegarde.');
-  }
-  return {photos:ids.length};
-}
-function restaurerSauvegardeLocale(o) {
-  verifierSauvegardeLocale(o);
-  // Un seul commit IndexedDB pour les garages, devis et métadonnées restaurées.
-  // Si le stockage manque ou un enregistrement échoue, toute la transaction est annulée.
-  return new Promise((resolve,reject)=>{
-    let tx;
-    try{
-      tx=DB.db.transaction(['clients','devis','meta'],'readwrite');
-      tx.oncomplete=()=>resolve();
-      tx.onabort=()=>reject(tx.error||new Error('Transaction annulée : données précédentes conservées.'));
-      tx.onerror=()=>{}; // onabort signale l’échec de la transaction complète
-      const clients=tx.objectStore('clients'),devis=tx.objectStore('devis'),meta=tx.objectStore('meta');
-      clients.clear();devis.clear();
-      o.clients.forEach(c=>clients.put(c));
-      o.devis.forEach(d=>devis.put(d));
-      if(o.signalements!=null)meta.put(o.signalements,'signalements');
-      if(o.point!=null)meta.put(o.point,'point');
-      if(o.appels!=null)meta.put(o.appels,'appels');
-      if(o.tournees!=null)meta.put(o.tournees,'tournees');
-      if(o.comparateur!=null)meta.put(o.comparateur,'comparateur');
-      if(o.pcActions!=null)meta.put(o.pcActions,'pcActions');
-      if(o.reglages!=null)meta.put({...SET_DEF,...o.reglages},'settings');
-    }catch(e){if(tx){try{tx.abort()}catch(_){}}reject(e);}
-  });
+  DB.maintenance=true;
+  try{return await ODICOLOR_BACKUP.restore(DB.db,o)}
+  finally{DB.maintenance=false}
 }
 
 // ---------- lien avec le PC (sauvegarde envoyée au PC, plan de la semaine reçu du PC) ----------
+function telechargerFichierSauvegarde(file, nom) {
+  const url=URL.createObjectURL(file),a=h('a',{href:url,download:nom});
+  document.body.append(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),30000);
+}
 async function exporterSauvegarde() {
-  const o = { appli: 'devis-terrain', version: 1, date: new Date().toISOString(), reglages: S, clients: await getAll('clients'), devis: await getAll('devis'), signalements: await lireSig(), point: (await get('meta', 'point')) || null, comparateur: (await get('meta', 'comparateur')) || null, appels: await lireAppels(), tournees: await lireTournees(), pcActions: (await get('meta', 'pcActions')) || [] };
-  telecharger('sauvegarde-devis-' + new Date().toISOString().slice(0, 10) + '.json', JSON.stringify(o), 'application/json');
+  const data=await ODICOLOR_BACKUP.read(DB.db);
+  const {file,summary}=await ODICOLOR_BACKUP.encode(data);
+  telechargerFichierSauvegarde(file,'odicolor-sauvegarde-'+new Date().toISOString().replace(/[:.]/g,'-')+'.odicolor');
+  return summary;
+}
+async function exporterSauvegardePC() {
+  const data=await ODICOLOR_BACKUP.read(DB.db,ODICOLOR_BACKUP.STORES);
+  telecharger('odicolor-echange-pc-'+new Date().toISOString().slice(0,10)+'.json',JSON.stringify(ODICOLOR_BACKUP.pcExchange(data)),'application/json');
+}
+async function panneauRecuperations() {
+  const archives=await getAll(ODICOLOR_BACKUP.RECOVERY);
+  const box=h('details',{class:'carte'},h('summary',{},'États conservés avant restauration · '+archives.length),
+    h('p',{class:'mut'},'Ces copies locales permettent de retrouver l’état remplacé. Elles ne remplacent pas une sauvegarde conservée hors du téléphone. Aucune archive n’est effacée automatiquement.'));
+  const list=h('div');let visible=0;
+  const more=h('button',{class:'btn sec',type:'button'},'Afficher la suite');
+  const show=()=>{
+    for(const r of archives.slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(visible,visible+10)){
+      const btn=h('button',{class:'btn sec',type:'button',onclick:async()=>{
+        btn.disabled=true;
+        try{const {file,warning}=await ODICOLOR_BACKUP.encode(r.stores,{recovery:true});telechargerFichierSauvegarde(file,'odicolor-recuperation-'+r.id+'.odicolor');toast(warning?'Copie brute conservée : données à réparer avant restauration.':'Copie préparée : vérifie sa présence dans les téléchargements.',Boolean(warning));}
+        catch(e){toast('Export impossible : '+e.message,true)}finally{btn.disabled=false}
+      }},'Télécharger cette copie');
+      list.append(h('div',{class:'carte'},h('strong',{},new Date(r.date).toLocaleString('fr-FR')),h('p',{class:'mut'},r.stores.clients.length+' garages · '+r.stores.devis.length+' devis'),btn));
+    }
+    visible+=10;more.hidden=visible>=archives.length;
+  };
+  more.addEventListener('click',show);box.append(list,more);show();return box;
 }
 const normNom = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 const lirePC = async () => { const v = await get('meta', 'pc'); return v && v.appli === 'plan-pc' && Array.isArray(v.actions) ? v : null; };
@@ -2124,8 +2087,8 @@ async function importerPlanPC(f){
 async function pagePC() {
   const pc = await lirePC();
   montrer('Lien avec le PC',
-    h('div', { class: 'carte' }, h('strong', {}, '1. Envoyer ta sauvegarde au PC'), h('p', { class: 'mut' }, 'Devis, commandes envoyées, clients, visites, tournées. Passe le fichier au PC comme tu veux : partage Samsung, câble ou mail à toi-même. Rien ne part tout seul.'),
-      h('div', { class: 'actions' }, h('button', { class: 'btn', onclick: async () => { await exporterSauvegarde(); toast('Fichier prêt : envoie-le au PC.'); } }, 'Télécharger le fichier pour le PC'))),
+    h('div', { class: 'carte' }, h('strong', {}, '1. Envoyer les données commerciales au PC'), h('p', { class: 'mut' }, 'Devis, commandes envoyées, clients, visites, tournées. Passe le fichier au PC comme tu veux : partage Samsung, câble ou mail à toi-même. Rien ne part tout seul.'),
+      h('div', { class: 'actions' }, h('button', { class: 'btn', onclick: async () => { await exporterSauvegardePC(); toast('Fichier d’échange PC préparé.'); } }, 'Télécharger le JSON pour le PC'))),
     h('div', { class: 'carte' }, h('strong', {}, '2. Recevoir le plan du PC'),
       h('p', { class: 'mut' }, 'Les imports se trouvent dans Réglages. Le plan reste consultable ici sans modifier tes données EBP.'),
       h('a', { class: 'btn sec', href: '#/reglages' }, 'Ouvrir Réglages · Imports')),
@@ -2156,4 +2119,4 @@ async function pagePC() {
   }
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
-window.__t = { nettoyerPlan, normNom, planSemaine, indicateurs, semainesJusqua, tendance, factures, enRetard, feries, estOuvre, ecartJours, relanceDue, statsTournee, prochainOuvre, echeance, cibleSemaineDe, semaineObj, lundiDe, appelsSemaine, mesures, taches, relanceDue, coutPae, calculPoint, periodePoint, texteCommande, texteSignalement, sigEnRetard, objectifDuMois, activite, serie, jourLocal, analyserTexte, statsDevis, envoyerDevis, parseCents, parseQte, ligneTotal, totaux, importerArticles, importerClients, verifierSauvegardeLocale, verifierCompatibilitePhotosSauvegarde, restaurerSauvegardeLocale, csvDevis, devinerColonnes, ligneEntete, tel2wa };
+window.__t = { nettoyerPlan, normNom, planSemaine, indicateurs, semainesJusqua, tendance, factures, enRetard, feries, estOuvre, ecartJours, relanceDue, statsTournee, prochainOuvre, echeance, cibleSemaineDe, semaineObj, lundiDe, appelsSemaine, mesures, taches, relanceDue, coutPae, calculPoint, periodePoint, texteCommande, texteSignalement, sigEnRetard, objectifDuMois, activite, serie, jourLocal, analyserTexte, statsDevis, envoyerDevis, parseCents, parseQte, ligneTotal, totaux, importerArticles, importerClients, verifierSauvegardeLocale, restaurerSauvegardeLocale, csvDevis, devinerColonnes, ligneEntete, tel2wa };

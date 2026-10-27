@@ -9,7 +9,7 @@ on:
 jobs:
   securite-et-syntaxe:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - name: Récupérer le projet
         uses: actions/checkout@v4
@@ -34,3 +34,9 @@ jobs:
           NODE
       - name: Tester validation, sauvegarde et restauration atomique
         run: node --test tests/*.test.cjs
+      - name: Installer le navigateur de test (aucune dépendance de production)
+        run: |
+          npm install --no-save --ignore-scripts playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Tester la récupération avec IndexedDB réel et les modules complets
+        run: node tests/backup-browser.cjs

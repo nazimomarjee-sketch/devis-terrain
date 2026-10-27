@@ -12,53 +12,23 @@ const start=app.indexOf('function verifierSauvegardeLocale(o)');
 const end=app.indexOf('// ---------- lien avec le PC',start);
 assert.ok(start>0 && end>start,'Le bloc de restauration sécurisée doit exister.');
 
-function mockDb(initial,opts={}){
-  let called=0;
-  const current={};
-  for(const [name,items] of Object.entries(initial))
-    current[name]=new Map(items.map(([key,value])=>[key,structuredClone(value)]));
-  const db={transaction(names,mode){
-    assert.equal(mode,'readwrite');called++;
-    const staged={};
-    for(const name of names)staged[name]=new Map(current[name]);
-    const tx={onabort:null,oncomplete:null,onerror:null,error:null,aborted:false,
-      abort(){if(this.aborted)return;this.aborted=true;if(this.onabort)this.onabort();},
-      objectStore(name){
-        if(!staged[name])throw Error('Magasin absent : '+name);
-        return {
-          clear(){staged[name].clear();},
-          put(item,key){
-            if(opts.failOnPut===name)throw Error('Écriture impossible : '+name);
-            const id=key===undefined?item.id:key;
-            if(id==null)throw Error('Clé absente');
-            staged[name].set(id,structuredClone(item));
-          }
-        };
-      }
-    };
-    queueMicrotask(()=>{
-      if(tx.aborted)return;
-      for(const name of names)current[name]=staged[name];
-      if(tx.oncomplete)tx.oncomplete();
-    });
-    return tx;
-  }};
-  return {db,current,get called(){return called}};
-}
+const B=require('../sauvegarde-locale.js');
+const memoryDb=require('./support/memory-db.cjs');
+const mockDb=(initial,options={})=>memoryDb(initial,{failSync:options.failOnPut});
 function helpers(mock){
   return runInNewContext(app.slice(start,end)+
     '\n({verifierSauvegardeLocale,restaurerSauvegardeLocale})',
-    {DB:{db:mock.db},SET_DEF:{societe:'Odicolor'},Set,Number,Error,Promise});
+    {DB:{db:mock.db,maintenance:false},ODICOLOR_BACKUP:B,Set,Number,Error,Promise});
 }
 const original={
-  clients:[[1,{id:1,nom:'Garage original',visites:[{date:'2026-10-01'}]}]],
-  devis:[[1,{id:1,clientId:1,lignes:[{code:'AB'}]}]],
+  clients:[[1,{id:1,nom:'Garage original',visites:[{date:'2026-10-01',res:'vu'}]}]],
+  devis:[[1,{id:1,clientId:1,clientNom:'Garage original',statut:'brouillon',creeLe:'2026-10-01T09:00:00Z',lignes:[{code:'AB',des:'Test',q:100,pu:100,r:0}]}]],
   meta:[['settings',{societe:'ODICOLOR'}],['pcActions',[{id:'P1'}]]]
 };
 const valide={
   appli:'devis-terrain',version:1,
   clients:[{id:7,nom:'Garage nouveau',infosTerrain:[{texte:'Visite prévue'}]}],
-  devis:[{id:21,clientId:7,lignes:[{code:'V'}]}],
+  devis:[{id:21,clientId:7,clientNom:'Garage nouveau',statut:'brouillon',creeLe:'2026-10-01T09:00:00Z',lignes:[{code:'V',des:'Test',q:100,pu:100,r:0}]}],
   pcActions:[{id:'A1',statut:'a_faire'}],reglages:{societe:'ODICOLOR'}
 };
 function refuse(f,mot){
@@ -67,12 +37,12 @@ function refuse(f,mot){
 
 test('valide une sauvegarde existante',()=>{
   const {verifierSauvegardeLocale}=helpers(mockDb(original));
-  assert.deepEqual(JSON.parse(JSON.stringify(verifierSauvegardeLocale(valide))),{garages:1,devis:1});
+  assert.deepEqual(JSON.parse(JSON.stringify(verifierSauvegardeLocale(valide))),{garages:1,devis:1,articles:0,photos:0,pdf:0});
 });
 test('refuse origine et format incorrects',()=>{
   const {verifierSauvegardeLocale:v}=helpers(mockDb(original));
   refuse(()=>v({...valide,appli:'autre'}),'ODICOLOR');
-  refuse(()=>v({...valide,clients:'faux'}),'ODICOLOR');
+  refuse(()=>v({...valide,clients:'faux'}),'garages');
 });
 test('refuse les IDs en double, invalides et données incomplètes',()=>{
   const {verifierSauvegardeLocale:v}=helpers(mockDb(original));
@@ -85,7 +55,7 @@ test('refuse les IDs en double, invalides et données incomplètes',()=>{
 test('n’ouvre aucune transaction si le fichier est invalide',async()=>{
   const m=mockDb(original),{restaurerSauvegardeLocale:r}=helpers(m);
   await assert.rejects(async()=>r({...valide,clients:[{id:1,nom:''}]}));
-  assert.equal(m.called,0);
+  assert.equal(m.calls,0);
   assert.equal(m.current.clients.get(1).nom,'Garage original');
 });
 test('remplace les garages et devis ensemble, sans perdre les notes importées',async()=>{

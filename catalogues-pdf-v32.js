@@ -31,6 +31,7 @@
 
   function ecrireAtomiquement(doc,meta,effacerId=null){
     return new Promise((resolve,reject)=>{
+      if(DB.maintenance){reject(new Error('Restauration en cours : import PDF suspendu.'));return;}
       let transaction;
       try{
         transaction=DB.db.transaction('meta','readwrite');
