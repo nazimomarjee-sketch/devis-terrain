@@ -46,7 +46,7 @@ async function complet(h){
     ['settings',valide.reglages],['rapport_articles',{date,fichier:'synthetique.csv'}],['pc',{appli:'plan-pc',actions:[],clients:[],indicateurs:[]}],['pcArchives',[]],['pcPrecedent',null],['pcActions',valide.pcActions],
     ['agent01Contexte',{id:'ctx',candidats:[]}],['agent01Avis',{date,avis:[]}],['tournees',{'2026-10-27':{ids:[7],res:{7:'vu'}}}],
     ['garage-photo-v38:7',{blob:new Blob(['PHOTO synthétique'],{type:'image/png'}),date}],
-    ['pdfFournisseursIndex',[{id:'p1',nom:'Synthétique.pdf',fournisseur:'Test'}]],['pdfFournisseur:p1',{id:'p1',blob:new Blob(['%PDF-1.4 synthétique'],{type:'application/pdf'}),date}],
+    ['pdfFournisseursIndex',[{id:'p1',nom:'Synthétique.pdf',fournisseur:'Test'}]],['pdfFournisseur:p1',{id:'p1',blob:new Blob(['%PDF-1.4 synthétique'],{type:''}),date}],
     ['extensionInconnue',{texte:'préservé',liste:[1,2,3]}]
   ]});
 }

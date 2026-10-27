@@ -2130,7 +2130,7 @@ async function encoderInstantaneSauvegarde(etat){
   }
   const o={appli:'devis-terrain',version:2,date:new Date().toISOString(),...await encoder(etat,'')};
   o.manifeste={complet:true,pieces:pieces.sort((a,b)=>a.chemin.localeCompare(b.chemin))};
-  verifierSauvegardeLocale(o);
+  await preparerSauvegardeLocale(o);
   if(new Blob([JSON.stringify(o)]).size>SAUVEGARDE_MAX)throw new Error('Sauvegarde supérieure à 600 Mo : aucun fichier incomplet produit.');
   return o;
 }
@@ -2160,7 +2160,12 @@ async function preparerSauvegardeLocale(o){
   const etat=await decoder({articles:o.articles,clients:o.clients,devis:o.devis,meta:o.meta},'');
   if(JSON.stringify(pieces.sort((a,b)=>a.chemin.localeCompare(b.chemin)))!==JSON.stringify(o.manifeste.pieces))throw new Error('Manifeste des pièces incohérent.');
   for(const [k,v] of etat.meta){
-    if((k.startsWith('garage-photo-v38:')||k.startsWith('pdfFournisseur:'))&&(!objetSauvegarde(v)||!(v.blob instanceof Blob)||!v.blob.size||!v.blob.type.startsWith(k.startsWith('garage-photo')?'image/':'application/pdf')))throw new Error('Pièce jointe manquante ou type incorrect.');
+    if(k.startsWith('garage-photo-v38:')||k.startsWith('pdfFournisseur:')){
+      if(!objetSauvegarde(v)||!(v.blob instanceof Blob)||!v.blob.size)throw new Error('Pièce jointe manquante.');
+      if(k.startsWith('garage-photo-v38:')&&!v.blob.type.startsWith('image/'))throw new Error('Type de photo incorrect.');
+      // Les imports PDF existants acceptent un MIME vide : contrôler la signature, sans altérer les octets.
+      if(k.startsWith('pdfFournisseur:')&&(v.blob.size<8||!(await v.blob.slice(0,1024).text()).includes('%PDF-')))throw new Error('Signature PDF incorrecte.');
+    }
   }
   verifierSauvegardeLocale({...o,...etat});return etat;
 }
