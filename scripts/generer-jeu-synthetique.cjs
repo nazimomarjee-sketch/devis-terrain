@@ -32,10 +32,12 @@ function create(profile='smoke'){
 }
 async function generate(profile,destination){
   const {stores,expected}=create(profile),{file}=await B.encode(stores),bytes=Buffer.from(await file.arrayBuffer());
+  const report=await require('./verifier-sauvegarde.cjs').inspect(stores);
   fs.mkdirSync(destination,{recursive:true});
   const write=(name,data)=>fs.writeFileSync(path.join(destination,name),data,{flag:'wx'});
-  write('jeu-'+profile+'.odicolor',bytes);write('attendus-'+profile+'.json',JSON.stringify({...expected,octets:bytes.length},null,2)+'\n');
+  write('jeu-'+profile+'.odicolor',bytes);write('attendus-'+profile+'.json',JSON.stringify({...report,octets:bytes.length},null,2)+'\n');
   const broken=Buffer.from(bytes);broken[broken.length-1]^=1;write('corrompu-'+profile+'.odicolor',broken);write('tronque-'+profile+'.odicolor',bytes.subarray(0,Math.floor(bytes.length/2)));
+  for(const [key,value]of stores.meta)if(value&&value.blob instanceof Blob){const photo=key.startsWith('garage-photo-v38:');if(profile==='smoke'||(photo&&key==='garage-photo-v38:1')||(!photo&&value.id==='pdf-synthetique-1'))write((photo?key.replace(':','-')+'.svg':value.nom),Buffer.from(await value.blob.arrayBuffer()));}
   return {...expected,octets:bytes.length,destination};
 }
 if(require.main===module)generate(process.argv[2]||'smoke',path.resolve(process.argv[3]||'scratch/validation-samsung')).then(r=>console.log(JSON.stringify(r,null,2))).catch(e=>{console.error(e.message);process.exitCode=1});

@@ -1,0 +1,5 @@
+node_modules/
+scratch/
+*.odicolor
+sauvegarde-devis-*.json
+odicolor-echange-pc-*.json
