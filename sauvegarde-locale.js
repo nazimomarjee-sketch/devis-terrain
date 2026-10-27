@@ -316,7 +316,7 @@ const ODICOLOR_BACKUP = (() => {
     validate(o);return o;
   }
 
-  function restore(db, backup) {
+  function restore(db, backup, options={}) {
     // Vérification synchrone avant toute ouverture de transaction d'écriture.
     const legacyFile=backup && backup.version===1;
     const normalized=legacyFile && !backup.stores ? legacy(backup) : backup;
@@ -335,6 +335,7 @@ const ODICOLOR_BACKUP = (() => {
           if (--pending) return;
           try {
             current.meta=current.meta.map((v,i)=>[keys.meta[i],v]);
+            if(options.requireEmpty && names.some(n=>current[n].length))fail('La destination contient déjà des données. Choisis une origine ou un profil vierge ; aucune donnée n’a été remplacée.');
             const before=Object.fromEntries(STORES.map(n=>[n,current[n]]));
             // L'archive et le remplacement forment un seul commit ; aucun prune.
             const recovery=tx.objectStore(RECOVERY), existing=new Set(current[RECOVERY].map(r=>r.id));
@@ -361,6 +362,27 @@ const ODICOLOR_BACKUP = (() => {
     });
   }
 
+  // IndexedDB ne permet pas de diminuer une version. Le retour V47 utilise une
+  // COPIE sur une origine vierge ; la base v2 et son fichier complet restent intacts.
+  async function createV47Copy(backup, name='devis-terrain') {
+    validate(backup);
+    if(backup.version!==2)fail('Le retour V47 exige une sauvegarde complète de format 2.');
+    const db=await new Promise((resolve,reject)=>{
+      let cancelled=false;
+      const r=indexedDB.open(name,1);
+      r.onupgradeneeded=()=>{if(cancelled)r.transaction.abort();else schema(r.result)};
+      r.onblocked=()=>{cancelled=true;reject(new Error('Destination occupée : ferme ses autres onglets. Aucune version n’a été diminuée.'))};
+      r.onerror=()=>reject(new Error('Destination incompatible ou occupée. Utilise une origine vierge : une base v2 ne peut pas être diminuée en v1.'));
+      r.onsuccess=()=>{
+        const d=r.result;
+        if(cancelled){d.close();return;}
+        if(d.version!==1 || [...STORES,RECOVERY].some(n=>!d.objectStoreNames.contains(n))){d.close();reject(new Error('Destination non vierge ou schéma incompatible.'))}
+        else resolve(d);
+      };
+    });
+    try{return await restore(db,backup,{requireEmpty:true})}finally{db.close()}
+  }
+
   // JSON v1 réservé à l'outil PC existant ; ce n'est pas la sauvegarde complète.
   function pcExchange(stores) {
     const m=new Map(stores.meta);
@@ -368,6 +390,6 @@ const ODICOLOR_BACKUP = (() => {
       signalements:m.get('signalements')||[],point:m.get('point')||null,comparateur:m.get('comparateur')||null,
       appels:m.get('appels')||[],tournees:m.get('tournees')||{},pcActions:m.get('pcActions')||[]};
   }
-  return {schema,read,validate,validateStores,legacy,encode,decode,restore,pcExchange,STORES,RECOVERY,MAX_FILE};
+  return {schema,read,validate,validateStores,legacy,encode,decode,restore,createV47Copy,pcExchange,STORES,RECOVERY,MAX_FILE};
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports=ODICOLOR_BACKUP;

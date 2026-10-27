@@ -167,7 +167,7 @@ function chercher(q, max = 15) {
 const MAX_OCTETS = 10 * 1024 * 1024, MAX_LIGNES = 50000;
 function chargerXlsx() {
   if (window.XLSX) return Promise.resolve();
-  return new Promise((res, rej) => { const s = h('script', { src: 'xlsx.mini.min.js' }); s.onload = res; s.onerror = () => rej(new Error('Lecteur Excel introuvable')); document.head.append(s); });
+  return new Promise((res, rej) => { const s = h('script', { src: window.ODICOLOR_PWA.asset('xlsx.mini.min.js'), integrity:window.ODICOLOR_PWA.integrity('xlsx.mini.min.js'), crossorigin:'anonymous' }); s.onload = res; s.onerror = () => rej(new Error('Lecteur Excel introuvable')); document.head.append(s); });
 }
 function parseCSV(text) {
   const first = text.split(/\r?\n/, 1)[0];
@@ -2139,12 +2139,13 @@ async function pagePC() {
   const maj = () => { etat.textContent = navigator.onLine ? '' : 'Hors ligne'; };
   addEventListener('online', maj); addEventListener('offline', maj); maj();
   try {
+    if(!window.ODICOLOR_PWA)throw new Error('Version de l’application incomplète : recharge avec une connexion.');
+    await window.ODICOLOR_PWA.ready;
     await openDB(); await chargerBase();
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
     addEventListener('hashchange', route); await route();
   } catch (e) {
     montrer('Erreur', h('div', { class: 'carte erreur', role: 'alert' }, 'Le stockage du navigateur est indisponible (mode privé ?). ' + e.message));
   }
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
 window.__t = { nettoyerPlan, normNom, planSemaine, indicateurs, semainesJusqua, tendance, factures, enRetard, feries, estOuvre, ecartJours, relanceDue, statsTournee, prochainOuvre, echeance, cibleSemaineDe, semaineObj, lundiDe, appelsSemaine, mesures, taches, relanceDue, coutPae, calculPoint, periodePoint, texteCommande, texteSignalement, sigEnRetard, objectifDuMois, activite, serie, jourLocal, analyserTexte, statsDevis, envoyerDevis, parseCents, parseQte, ligneTotal, totaux, importerArticles, importerClients, verifierSauvegardeLocale, restaurerSauvegardeLocale, csvDevis, devinerColonnes, ligneEntete, tel2wa };

@@ -13,6 +13,8 @@ jobs:
     steps:
       - name: Récupérer le projet
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Préparer Node.js
         uses: actions/setup-node@v4
         with:
@@ -24,7 +26,7 @@ jobs:
           const {readFileSync}=require('node:fs');
           const {execFileSync}=require('node:child_process');
           const html=readFileSync('index.html','utf8');
-          const files=[...html.matchAll(/<script src="([^"]+\.js)"><\/script>/g)].map(m=>m[1]);
+          const files=[...html.matchAll(/<script src="([^"]+)"[^>]*><\/script>/g)].map(m=>m[1].split('?')[0]);
           files.push('sw.js');
           if(files.length<10)throw Error('Scripts absents de index.html');
           for(const f of files){
@@ -32,6 +34,8 @@ jobs:
             console.log('OK',f);
           }
           NODE
+      - name: Vérifier la construction PWA reproductible
+        run: node scripts/build-pwa.cjs --check
       - name: Tester validation, sauvegarde et restauration atomique
         run: node --test tests/*.test.cjs
       - name: Installer le navigateur de test (aucune dépendance de production)
@@ -39,4 +43,6 @@ jobs:
           npm install --no-save --ignore-scripts playwright@1.56.1
           npx playwright install --with-deps chromium
       - name: Tester la récupération avec IndexedDB réel et les modules complets
-        run: node tests/backup-browser.cjs
+        run: |
+          node tests/backup-browser.cjs
+          node tests/pwa-browser.cjs

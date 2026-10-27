@@ -3,9 +3,9 @@
 // CI : npm install --no-save playwright@1.56.1 && npx playwright install chromium
 const {test,before,after}=require('node:test');
 const assert=require('node:assert/strict');
-const fs=require('node:fs'),path=require('node:path'),http=require('node:http');
+const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),os=require('node:os');
 const {chromium}=require('playwright');
-let server,browser,page;
+let server,browser,page,legacyServer,temp;
 before(async()=>{
   const root=path.resolve(__dirname,'..');
   server=http.createServer((req,res)=>{
@@ -17,6 +17,14 @@ before(async()=>{
     res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':file.endsWith('.html')?'text/html':'application/octet-stream');res.end(fs.readFileSync(file));
   });
   await new Promise((r,j)=>{server.once('error',j);server.listen(0,'127.0.0.1',r)});
+  temp=fs.mkdtempSync(path.join(os.tmpdir(),'odicolor-retour-test-'));
+  const kit=require('../scripts/preparer-retour-v47.cjs').prepare(path.join(temp,'kit'));
+  legacyServer=http.createServer((req,res)=>{
+    const p=new URL(req.url,'http://localhost').pathname,file=path.resolve(kit.destination,'.'+(p==='/'?'/index.html':p));
+    if(!file.startsWith(kit.destination+path.sep)||!fs.existsSync(file)||!fs.statSync(file).isFile()){res.writeHead(404);res.end();return;}
+    res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':file.endsWith('.html')?'text/html':'application/octet-stream');res.end(fs.readFileSync(file));
+  });
+  await new Promise((r,j)=>{legacyServer.once('error',j);legacyServer.listen(0,'127.0.0.1',r)});
   browser=await chromium.launch({headless:true,args:['--no-sandbox']});
   page=await browser.newPage();
   await page.goto('http://127.0.0.1:'+server.address().port+'/test');
@@ -27,7 +35,7 @@ before(async()=>{
     window.sample=()=>({articles:[{code:'V',des:'Vernis test',pu:1234}],clients:[{id:7,nom:'Garage test',infosTerrain:[{nature:'ancien-format',texte:'À conserver'}]}],devis:[{id:21,clientId:7,clientNom:'Garage test',creeLe:'2026-10-20T09:00:00Z',statut:'brouillon',lignes:[{code:'V',des:'Vernis test',q:100,pu:1234,r:0}]}],meta:[['settings',{tva100:850,remiseMax100:6000}],['garage-photo-v38:7',{blob:new Blob(['photo'],{type:'image/webp'})}]],recuperations:[]});
   });
 });
-after(async()=>{await browser?.close();if(server?.listening)await new Promise(r=>server.close(r));});
+after(async()=>{await browser?.close();for(const s of [server,legacyServer])if(s?.listening)await new Promise(r=>s.close(r));if(temp)fs.rmSync(temp,{recursive:true,force:true});});
 test('migration IndexedDB v1 → v2 conserve les fiches et ajoute seulement les archives',async()=>{
   const result=await page.evaluate(async()=>{const name='migration-'+crypto.randomUUID(),old=await openTest(name,1);await seed(old,{clients:[{id:1,nom:'Garage initial'}]});old.close();const db=await openTest(name),s=await B.read(db);const out={names:[...db.objectStoreNames],clients:s.clients};db.close();indexedDB.deleteDatabase(name);return out;});
   assert.deepEqual(result.names,['articles','clients','devis','meta','recuperations']);assert.equal(result.clients[0].nom,'Garage initial');
@@ -65,4 +73,25 @@ test('deux onglets : une ancienne fiche ne peut plus écrire après restauration
   await second.reload();await second.getByRole('button',{name:'Télécharger une sauvegarde complète',exact:true}).waitFor();
   assert.equal(await second.evaluate(async()=>(await get('clients',1)).nom),'Nouveau portefeuille');
   await context.close();
+});
+test('échec de migration : la base v1 et ses données restent intactes',async()=>{
+  const r=await page.evaluate(async()=>{const name='migration-abort-'+crypto.randomUUID(),old=await openTest(name,1);await seed(old,{clients:[{id:1,nom:'Initial'}]});old.close();let rejected=false;await new Promise(resolve=>{const req=indexedDB.open(name,2);req.onupgradeneeded=()=>{B.schema(req.result);req.transaction.abort()};req.onerror=()=>{rejected=true;resolve()}});const db=await openTest(name,1),tx=db.transaction('clients'),clients=await new Promise(r=>{const q=tx.objectStore('clients').getAll();q.onsuccess=()=>r(q.result)});const result={version:db.version,hasRecovery:db.objectStoreNames.contains('recuperations'),clients,rejected};db.close();return result;});
+  assert.equal(r.version,1);assert.equal(r.hasRecovery,false);assert.equal(r.clients[0].nom,'Initial');assert.equal(r.rejected,true);
+});
+test('retour refusé sur une base v2 existante, sans baisse de version ni effacement',async()=>{
+  const r=await page.evaluate(async()=>{const name='no-downgrade-'+crypto.randomUUID(),db=await openTest(name);await seed(db,sample());db.close();let refused=false;try{await B.createV47Copy({appli:'devis-terrain',version:2,date:new Date().toISOString(),stores:sample()},name)}catch(_){refused=true}const after=await openTest(name),s=await B.read(after);const result={refused,version:after.version,name:s.clients[0].nom,photos:new Map(s.meta).has('garage-photo-v38:7')};after.close();return result;});
+  assert.equal(r.refused,true);assert.equal(r.version,2);assert.equal(r.name,'Garage test');assert.equal(r.photos,true);
+});
+test('procédure complète : exporter v2, créer une copie v1 et ouvrir le vrai code V47 figé',async()=>{
+  const context=await browser.newContext(),source=await context.newPage(),target=await context.newPage();
+  await source.goto('http://127.0.0.1:'+server.address().port+'/test');
+  await source.evaluate(async()=>{const B=ODICOLOR_BACKUP;const req=indexedDB.open('devis-terrain',2);const db=await new Promise((r,j)=>{req.onupgradeneeded=()=>B.schema(req.result);req.onsuccess=()=>r(req.result);req.onerror=()=>j(req.error)});const {stores}=await (async()=>({stores:{articles:[{code:'V',des:'Vernis test',pu:1234}],clients:[{id:7,nom:'Garage retour synthétique',visites:[{date:'2026-10-20',res:'vu'}],infosTerrain:[{nature:'ancien-format',texte:'Ne pas filtrer'}]}],devis:[],meta:[['garage-photo-v38:7',{blob:new Blob(['photo'],{type:'image/webp'})}]],recuperations:[]}}))();await B.restore(db,{appli:'devis-terrain',version:2,date:new Date().toISOString(),stores});db.close()});
+  await source.goto('http://127.0.0.1:'+server.address().port+'/recuperation-v47.html');
+  const promise=source.waitForEvent('download');await source.getByRole('button',{name:'Télécharger la sauvegarde complète de cette origine'}).click();const download=await promise,file=path.join(temp,'retour-complet.odicolor');await download.saveAs(file);
+  await target.goto('http://127.0.0.1:'+legacyServer.address().port+'/recuperation-v47.html');await target.locator('#fichier').setInputFiles(file);await target.locator('#isole').check();target.on('dialog',d=>d.accept());await target.locator('#copier-v47').click();await target.waitForFunction(()=>document.querySelector('#resultat').textContent.includes('Copie créée au schéma 1'));
+  await target.goto('http://127.0.0.1:'+legacyServer.address().port+'/#/reglages');await target.getByRole('button',{name:'Télécharger une sauvegarde',exact:true}).waitFor();
+  const restored=await target.evaluate(async()=>({version:DB.db.version,clients:await getAll('clients'),articles:await getAll('articles'),photo:await (await get('meta','garage-photo-v38:7')).blob.text(),archives:(await getAll('recuperations')).length}));
+  assert.equal(restored.version,1);assert.equal(restored.clients[0].nom,'Garage retour synthétique');assert.equal(restored.clients[0].infosTerrain[0].texte,'Ne pas filtrer');assert.equal(restored.articles[0].pu,1234);assert.equal(restored.photo,'photo');assert.ok(restored.archives>=1);
+  const unchanged=await source.evaluate(async()=>{const req=indexedDB.open('devis-terrain');const db=await new Promise(r=>req.onsuccess=()=>r(req.result)),s=await ODICOLOR_BACKUP.read(db),v=db.version;db.close();return {version:v,clients:s.clients,photo:await new Map(s.meta).get('garage-photo-v38:7').blob.text()}});
+  assert.equal(unchanged.version,2);assert.deepEqual(unchanged.clients,restored.clients);assert.equal(unchanged.photo,'photo');await context.close();
 });
