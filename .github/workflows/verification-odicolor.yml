@@ -33,4 +33,4 @@ jobs:
           }
           NODE
       - name: Tester validation, sauvegarde et restauration atomique
-        run: node --test tests/backup-v47.test.cjs
+        run: node --test tests/*.test.cjs
