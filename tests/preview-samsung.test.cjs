@@ -17,6 +17,7 @@ test('paquet téléphone : runtime exact sur A/B, guide indépendant et données
     assert.equal(r.status,'PREPARE_NON_PUBLIE');
     const manifest=JSON.parse(fs.readFileSync(path.join(root,'pwa-release.json')));
     for(const folder of ['a','b'])for(const file of [...manifest.assets.map(e=>e.path),'sw.js','pwa-release.json'])assert.deepEqual(fs.readFileSync(path.join(dest,folder,file)),fs.readFileSync(path.join(root,file)),folder+'/'+file);
+    for(const folder of ['a','b'])assert.equal(fs.readFileSync(path.join(dest,folder,'_redirects'),'utf8'),'/index.html / 200\n/recuperation-v47.html /recuperation-v47 200\n');
     for(const folder of ['a','b','guide']){assert.equal(fs.existsSync(path.join(dest,folder,'.git')),false);assert.equal(fs.existsSync(path.join(dest,folder,'.github')),false);assert.match(fs.readFileSync(path.join(dest,folder,'_headers'),'utf8'),/X-Robots-Tag: noindex/);}
     const guide=path.join(dest,'guide'),html=fs.readFileSync(path.join(guide,'index.html'),'utf8');
     assert.equal(fs.existsSync(path.join(guide,'sw.js')),false);assert.doesNotMatch(html,/<script\b|__ORIGIN_|__RELEASE__/);assert.ok(html.includes(a+'/'));assert.ok(html.includes(b+'/'));

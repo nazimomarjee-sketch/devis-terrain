@@ -25,6 +25,9 @@ async function preparePreview(destination,a,b){
   fs.writeFileSync(path.join(portal,'index.html'),template.replaceAll('__ORIGIN_A__',a).replaceAll('__ORIGIN_B__',b).replaceAll('__RELEASE__',runtime.release));
   for(const folder of ['a','b','guide']){
     fs.writeFileSync(path.join(destination,folder,'_headers'),headers);
+    // Pages normalise les .html par redirection. Le worker refuse à raison
+    // toute ressource redirigée : servir les deux HTML par proxy interne 200.
+    if(folder!=='guide')fs.writeFileSync(path.join(destination,folder,'_redirects'),'/index.html / 200\n/recuperation-v47.html /recuperation-v47 200\n');
     // Évite le fallback SPA de Pages ; le worker conserve sa navigation applicative.
     fs.writeFileSync(path.join(destination,folder,'404.html'),'<!doctype html><html lang="fr"><meta charset="utf-8"><title>Introuvable</title><p>Fichier de test introuvable.</p></html>');
   }

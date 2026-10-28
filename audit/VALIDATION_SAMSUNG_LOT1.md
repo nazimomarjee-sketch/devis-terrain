@@ -61,7 +61,7 @@ Les SVG vérifient la conservation et l’association des pièces, pas encore la
 
 `scripts/preparer-preview-samsung.cjs` prépare localement trois dossiers à partir de la construction vérifiée :
 
-- `a/` et `b/` : mêmes ressources applicatives **octet pour octet**, aucune modification du design, du manifeste ou du code métier ; seules s’ajoutent les règles d’en-têtes de l’hébergeur et une page 404.
+- `a/` et `b/` : mêmes ressources applicatives **octet pour octet**, aucune modification du design, du manifeste ou du code métier ; seules s’ajoutent les règles d’en-têtes/proxy de l’hébergeur et une page 404. Les deux HTML du manifeste sont servis par proxy interne 200, pour éviter les redirections de normalisation `.html` de Pages que le worker refuse. Ce comportement doit être confirmé sur l’hébergement réel avant de valider le hors ligne.
 - `guide/` : page mobile sans script, boutons vers A/B, petit jeu complet, deux fichiers volontairement invalides, images/PDF séparés, manifeste attendu. Le guide ne touche à aucune base ni fichier local.
 - Pas de SDK, de jeton, de commande réseau ou d’action de déploiement. Les destinations existantes sont refusées, ainsi que les URL hors projets `odicolor-test-*.pages.dev`, identiques ou contenant un chemin.
 
