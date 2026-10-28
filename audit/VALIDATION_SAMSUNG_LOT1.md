@@ -14,6 +14,8 @@ Un compte Cloudflare sous contrôle de l’utilisateur et un accès de publicati
 
 La méthode prévue est un **envoi manuel de dossiers statiques figés**, après accord, sans intégration Git automatique : aucun push sur la PR ou sur `main` ne doit publier un site. Aucun changement de configuration du site actuellement publié. Ne pas utiliser les Pages du dépôt de production. Les noms exacts et l’origine réellement utilisée en production seront vérifiés avant la création des projets. Une restriction temporaire sur les nouveaux comptes Cloudflare peut retarder la création de plusieurs projets pendant leurs 48 premières heures.
 
+Les trois ZIP sont préparés et conservés sept jours dans les artefacts de la CI GitHub, après réussite des tests, sans secret Cloudflare ni publication de site. Le [parcours de mise en ligne depuis Samsung](MISE_EN_LIGNE_SAMSUNG.md) explique leur envoi au tableau de bord Cloudflare si aucun accès de publication n’est connecté à l’assistant. Les adresses du guide devront être vérifiées avant son envoi.
+
 Le portail et les jeux seront accessibles publiquement à toute personne connaissant les liens. `noindex` décourage l’indexation mais ne constitue pas un mot de passe. Cette proposition porte uniquement sur du code déjà public et des données synthétiques ; elle ne comprend pas de contrôle d’accès privé. Cloudflare reçoit les requêtes HTTP habituelles, notamment l’IP. Aucune télémétrie ajoutée, aucun envoi des sauvegardes, aucun formulaire serveur, aucun compte client réel.
 
 ## Isolation des données

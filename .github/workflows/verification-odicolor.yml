@@ -55,3 +55,30 @@ jobs:
         run: |
           node tests/backup-browser.cjs
           node tests/pwa-browser.cjs
+      - name: Préparer les paquets Samsung (aucun déploiement)
+        run: >-
+          node scripts/preparer-preview-samsung.cjs
+          "${{ runner.temp }}/preview-samsung"
+          https://odicolor-test-pr2-20261028-a.pages.dev
+          https://odicolor-test-pr2-20261028-b.pages.dev
+      - name: Conserver le ZIP de l’espace A
+        uses: actions/upload-artifact@v4
+        with:
+          name: odicolor-test-pr2-20261028-a
+          path: ${{ runner.temp }}/preview-samsung/a/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Conserver le ZIP de l’espace B
+        uses: actions/upload-artifact@v4
+        with:
+          name: odicolor-test-pr2-20261028-b
+          path: ${{ runner.temp }}/preview-samsung/b/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Conserver le ZIP du guide Samsung
+        uses: actions/upload-artifact@v4
+        with:
+          name: odicolor-test-pr2-20261028-guide
+          path: ${{ runner.temp }}/preview-samsung/guide/
+          if-no-files-found: error
+          retention-days: 7
