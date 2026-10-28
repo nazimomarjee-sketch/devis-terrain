@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="fr">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<title>ODICOLOR — essais Samsung synthétiques</title>
+<style>
+body{margin:0;background:#152334;color:#fff;font:18px/1.6 system-ui,sans-serif}main{max-width:44rem;margin:auto;padding:1.2rem}h1,h2{line-height:1.25}a{color:#fff;text-decoration:underline;text-underline-offset:.2em}li{margin:.9rem 0}.button{display:block;background:#b71927;border:2px solid #fff;border-radius:.6rem;padding:.8rem;margin:1rem 0;text-align:center;font-weight:bold}.muted{font-size:.9rem;color:#d8dee5}code{overflow-wrap:anywhere}
+</style>
+<main>
+<h1>ODICOLOR : essais Samsung</h1>
+<p><strong>TEST UNIQUEMENT — données synthétiques.</strong> Aucune donnée commerciale réelle à importer. L’application conserve son design et ses fonctions.</p>
+<p>Ce guide n’ouvre aucune base et ne lit aucun fichier du téléphone. Les espaces A et B ont chacun leur stockage. Ne sélectionne que les fichiers téléchargés ici et les sauvegardes fabriquées pendant ce test.</p>
+<h2>1. Préparer Chrome</h2>
+<p>Ouvre ce lien dans Chrome du <strong>Dossier sécurisé Samsung</strong>, sans synchronisation commerciale. Reste dans cette instance pour tous les essais et les téléchargements. N’utilise pas la navigation privée. Aucun accès aux contacts, à l’appareil photo ou à la localisation n’est nécessaire.</p>
+<h2>2. Télécharger le petit jeu</h2>
+<p><a class="button" href="synthetique/jeu-smoke.odicolor" download>Télécharger le jeu synthétique (~34 Ko)</a>Attends la fin du téléchargement. Retrouve-le dans les téléchargements de cette instance Chrome.</p>
+<h2>3. Charger l’espace A</h2>
+<a class="button" href="__ORIGIN_A__/" target="_blank" rel="noopener noreferrer">Ouvrir A — essais</a>
+<p>Adresse A : <code>__ORIGIN_A__</code>. Vérifie qu’il n’y a aucun garage. Si des données apparaissent déjà, arrête et signale-le : ne les efface pas.</p>
+<p>Dans l’application : <strong>Plus → Réglages → Sauvegarde</strong>. Sélectionne <code>jeu-smoke.odicolor</code>, touche <strong>Restaurer après contrôle</strong>, puis confirme. Attends le redémarrage.</p>
+<h2>4. Vérifier les données</h2>
+<ul>
+<li>3 garages « GARAGE SYNTHETIQUE », 12 devis et 30 articles.</li>
+<li>Ouvre chaque garage : son image porte le même numéro. Chaque garage a 20 visites, 10 notes et 5 besoins synthétiques.</li>
+<li>Dans Catalogue, ouvre les catalogues PDF : les deux documents affichent « PDF SYNTHETIQUE 1 » et « 2 ».</li>
+<li>L’article <code>SYN-00001</code> coûte 10,00 € HT. Le premier devis : 30,03 € HT, 2,55 € de TVA et 32,58 € TTC.</li>
+</ul>
+<p>Les « photos » sont des images SVG numérotées artificielles. Cela teste les pièces sauvegardées, pas encore la prise de vue ni les fichiers JPEG/HEIC de l’appareil photo.</p>
+<h2>5. Sauvegarder A</h2>
+<p>Dans Réglages → Sauvegarde, touche <strong>Télécharger une sauvegarde complète</strong>. Vérifie dans les téléchargements qu’un nouveau fichier <code>odicolor-sauvegarde-….odicolor</code> est présent et non vide. Note son nom ; il sera utilisé sur B. Ne partage aucune sauvegarde commerciale.</p>
+<h2>6. Restaurer dans B, vierge</h2>
+<a class="button" href="__ORIGIN_B__/" target="_blank" rel="noopener noreferrer">Ouvrir B — restauration vierge</a>
+<p>Adresse B : <code>__ORIGIN_B__</code>. Vérifie d’abord l’absence de garages, puis restaure <strong>le fichier exporté de A</strong>, et non le jeu initial. Refais tous les contrôles de l’étape 4. Ferme B et rouvre son lien : les pièces et les données doivent rester présentes.</p>
+<h2>7. Refuser une sauvegarde abîmée</h2>
+<p>Télécharge <a href="synthetique/corrompu-smoke.odicolor" download>le fichier corrompu</a> et <a href="synthetique/tronque-smoke.odicolor" download>le fichier tronqué</a>. Sur B, essaie de les restaurer l’un après l’autre. Les deux doivent être refusés ; les données, images et PDF précédents doivent rester lisibles. Avec un fichier valide, annule ensuite la confirmation : aucun remplacement ne doit se produire.</p>
+<h2>8. Vérifier l’absence de mélange</h2>
+<p>Sur A uniquement, ajoute une note « NOTE TEST A ». Sur B, vérifie qu’elle est absente. Sur B, ajoute « NOTE TEST B », puis restaure à nouveau la sauvegarde de l’étape 5. La note B doit disparaître de l’état actif. Dans les copies de récupération, télécharge l’état précédent : le fichier doit être créé. Sa restauration complète demanderait une troisième destination vierge ; cet essai complémentaire reste à organiser.</p>
+<h2>9. Tester sans Internet</h2>
+<p>Avec Internet actif, ouvre A et B et laisse l’installation finir. Ferme tous leurs onglets puis rouvre chaque adresse une fois en ligne. Note ou mets en favoris ces deux liens.</p>
+<p>Active le <strong>mode avion</strong> et vérifie que le Wi-Fi est désactivé. Ferme puis rouvre A et B depuis leurs favoris. Vérifie les garages, images, tarifs, historiques et les deux PDF. Sur B, crée une note « NOTE HORS LIGNE », télécharge une sauvegarde complète et vérifie le fichier. Restaure ensuite le fichier de l’étape 5, toujours sans Internet : la note hors ligne doit quitter l’état actif et les pièces rester lisibles.</p>
+<p>Si le lancement échoue, note l’échec. Réactive Internet, attends une minute sur l’application puis referme et recommence. Le guide et ses téléchargements nécessitent Internet ; l’essai hors ligne porte sur <strong>A et B</strong>. Ne désinstalle rien et ne vide pas les données du navigateur.</p>
+<h2>10. Me transmettre le résultat</h2>
+<p>Réactive Internet. Indique ton modèle Samsung, Android, version de Chrome, puis pour chaque étape : <strong>réussi / échec / non testé</strong>. Ajoute le message exact ou une capture contenant exclusivement le jeu synthétique en cas d’échec. N’envoie aucune donnée réelle. Un essai non exécuté ne compte pas comme réussi.</p>
+<details><summary>Pièces synthétiques séparées pour un essai d’import manuel</summary>
+<p><a href="synthetique/garage-photo-v38-1.svg" download>Image garage 1</a> · <a href="synthetique/pdf-synthetique-1.pdf" download>PDF 1</a> · <a href="synthetique/pdf-synthetique-2.pdf" download>PDF 2</a>. Après les comparaisons de référence, tu peux les importer sur A uniquement. Choisis les fichiers téléchargés ; ne prends aucune photo réelle.</p>
+</details>
+<p class="muted">Version de test : <code>__RELEASE__</code>. Ce petit parcours ne certifie ni les gros volumes, ni les mises à jour entre versions, ni le retour V47 sur Samsung. Aucun résultat n’est envoyé automatiquement. L’hébergeur reçoit les requêtes habituelles de consultation (dont l’adresse IP), pas le contenu de tes sauvegardes locales.</p>
+</main>
+</html>

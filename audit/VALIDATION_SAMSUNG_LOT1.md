@@ -1,140 +1,74 @@
-# Validation Samsung — lot 1, récupération et PWA
+# Validation Samsung — téléphone seul, PR #2
 
-**Statut : protocole préparé, à exécuter sur appareil réel.** Les résultats Chromium de CI ne valent pas validation Samsung. Aucune fusion ou publication ne doit découler automatiquement de ce document.
+**Prévisualisation Cloudflare Pages Free autorisée par l’utilisateur le 28 octobre 2026. Aucune prévisualisation publiée : accès au compte Cloudflare encore manquant. Aucune autorisation de fusion ni de déploiement de production.**
 
-## 1. Isolation obligatoire
+Ce parcours remplace le parcours PC/USB pour l’utilisateur. Il ne nécessite ni PC, ni câble, ni ADB, ni terminal. L’ancien banc technique reste disponible pour les essais avancés dans [VALIDATION_SAMSUNG_BANC_TECHNIQUE.md](VALIDATION_SAMSUNG_BANC_TECHNIQUE.md) ; il n’est pas un prérequis au petit parcours Samsung.
 
-- Utiliser une instance Chrome dans le **Dossier sécurisé Samsung** ou un profil Android de test réellement distinct, sans compte synchronisé ni données commerciales. Si cette isolation n’est pas disponible, choisir un appareil/profil de test adapté avant de commencer. La navigation privée ne remplace pas ce profil persistant.
-- Les origines de test doivent être distinctes du site utilisé commercialement. Un autre chemin sur le même domaine ne suffit pas : IndexedDB dépend de l’origine, qui inclut le port.
-- N’importer que les fichiers produits par le générateur ci-dessous. N’utiliser ni export EBP réel, ni sauvegarde client, ni photo réelle, ni document fournisseur. Tous les noms et images doivent porter « SYNTHETIQUE » ; les téléphones sont vides.
-- Ne pas effacer les données du navigateur, supprimer une base ou vider le profil commercial pour préparer les essais. Créer de nouvelles origines/profils vierges. Ne pas forcer l’activation du service worker depuis DevTools.
+## Hébergement proposé et coûts
 
-## 2. Préparation locale, sans déploiement
+**Cloudflare Pages Free**, fichiers statiques uniquement : un portail-guide, un espace A et un espace B, sur **trois noms d’hôtes HTTPS distincts** `odicolor-test-<session>-guide.pages.dev`, `odicolor-test-<session>-a.pages.dev`, `odicolor-test-<session>-b.pages.dev`. Ces noms sont des exemples non réservés, pas des liens actifs. L’utilisateur recevra un seul lien d’entrée vers le guide, avec les boutons A/B et les téléchargements synthétiques.
 
-Un accompagnant technique peut servir des dossiers statiques sur le PC, uniquement sur sa boucle locale, puis utiliser la redirection USB ADB. `http://localhost` est un contexte de confiance pour Chrome ; l’outil et les données restent locaux. Cela ne publie aucun site.
+Budget prévu : **0 € d’hébergement**, HTTPS et sous-domaines `pages.dev` inclus, aucun domaine à acheter, ni fonction serveur, ni stockage payant. Le trafic mobile éventuel dépend du forfait du téléphone. Les conditions Free et leur disponibilité devront être reconfirmées avant publication ; aucune offre payante ne sera activée sans nouvel accord. Sources consultées le 28 octobre 2026 : [Cloudflare Pages](https://www.cloudflare.com/products/pages/), [limites Pages](https://developers.cloudflare.com/pages/platform/limits/). Free : 500 constructions/mois, 20 000 fichiers/site, **25 Mio maximum par fichier**. Le petit jeu de 34 117 octets convient ; le fichier terrain de 110,5 Mo **ne peut pas être servi tel quel par Pages**. Il n’est pas inclus dans cette proposition.
 
-Dans le dépôt de la PR #2 au commit à valider, sur un PC avec Node 22+, Git, `tar`, Python et ADB :
+Un compte Cloudflare sous contrôle de l’utilisateur et un accès de publication autorisé restent nécessaires. Aucun compte ni identifiant Cloudflare n’est actuellement connecté à cette session ; ne pas promettre une publication immédiate. La création/connexion éventuelle du compte pourra se faire depuis le navigateur Samsung, sans terminal. Ne jamais demander de secret dans la conversation.
 
-```sh
-node scripts/build-pwa.cjs --check
-node scripts/preparer-validation.cjs /tmp/odicolor-candidat
-node scripts/preparer-retour-v47.cjs /tmp/odicolor-retour-v47
-node scripts/generer-jeu-synthetique.cjs smoke /tmp/odicolor-jeu-smoke
-node scripts/generer-jeu-synthetique.cjs terrain /tmp/odicolor-jeu-terrain
-node scripts/verifier-sauvegarde.cjs /tmp/odicolor-jeu-smoke/jeu-smoke.odicolor /tmp/odicolor-jeu-smoke/attendus-smoke.json
-```
+La méthode prévue est un **envoi manuel de dossiers statiques figés**, après accord, sans intégration Git automatique : aucun push sur la PR ou sur `main` ne doit publier un site. Aucun changement de configuration du site actuellement publié. Ne pas utiliser les Pages du dépôt de production. Les noms exacts et l’origine réellement utilisée en production seront vérifiés avant la création des projets. Une restriction temporaire sur les nouveaux comptes Cloudflare peut retarder la création de plusieurs projets pendant leurs 48 premières heures.
 
-Les dossiers de préparation doivent être inexistants ; les fichiers synthétiques existants ne sont pas écrasés. Copier les jeux et leurs manifestes dans un dossier de test explicite du téléphone. Les images SVG et PDF séparés générés servent aux essais d’import manuel, sans utiliser l’appareil photo.
+Le portail et les jeux seront accessibles publiquement à toute personne connaissant les liens. `noindex` décourage l’indexation mais ne constitue pas un mot de passe. Cette proposition porte uniquement sur du code déjà public et des données synthétiques ; elle ne comprend pas de contrôle d’accès privé. Cloudflare reçoit les requêtes HTTP habituelles, notamment l’IP. Aucune télémétrie ajoutée, aucun envoi des sauvegardes, aucun formulaire serveur, aucun compte client réel.
 
-Lancer chaque serveur dans un terminal distinct, en le laissant ouvert :
+## Isolation des données
 
-```sh
-python -m http.server 8140 --bind 127.0.0.1 --directory /tmp/odicolor-candidat
-python -m http.server 8141 --bind 127.0.0.1 --directory /tmp/odicolor-candidat
-python -m http.server 8142 --bind 127.0.0.1 --directory /tmp/odicolor-retour-v47
-python -m http.server 8143 --bind 127.0.0.1 --directory /tmp/odicolor-candidat
-```
+- A et B ont des **origines distinctes entre elles et de la production** : IndexedDB, caches et service workers distincts, même si le nom interne de base reste `devis-terrain`. Un autre chemin du site de production serait insuffisant et est interdit.
+- Le guide est sur une troisième origine sans service worker ni script. Cela évite que le worker applicatif ne transforme la navigation vers le guide en accueil de l’application.
+- Ouvrir le guide et tous les essais dans Chrome du **Dossier sécurisé Samsung**, sans synchronisation commerciale. Si ce profil persistant n’est pas disponible, le signaler pour adapter l’isolation ; ne pas remplacer par la navigation privée et ne pas vider Chrome commercial. Les origines distinctes assurent déjà la séparation des stockages web ; le Dossier sécurisé renforce la séparation des fichiers téléchargés et du parcours utilisateur.
+- Le site de test ne peut pas lire le stockage web d’une autre origine. Le sélecteur de fichiers ne transmet que les fichiers choisis explicitement : ne choisir que ceux du guide et les exports de ce test. Aucun accès global aux fichiers du téléphone. Aucun accès aux contacts, caméra ou localisation nécessaire pour ce parcours.
+- Ne jamais ouvrir la production pour ce test, ni y importer le jeu. Ne jamais réutiliser une sauvegarde commerciale. Aucun effacement du navigateur ou des données réelles.
 
-Relier le Samsung au PC de test puis établir les redirections :
+## Parcours simple sur le téléphone
 
-```sh
-adb reverse tcp:8140 tcp:8140
-adb reverse tcp:8141 tcp:8141
-adb reverse tcp:8142 tcp:8142
-adb reverse tcp:8143 tcp:8143
-```
+Après accord et publication contrôlée, fournir le lien du guide, les deux adresses A/B et l’identifiant de construction. Les liens définitifs devront figurer dans le message de livraison ; les exemples ci-dessus ne sont pas utilisables.
 
-| Origine dans le Chrome isolé | Rôle |
+1. Ouvrir le guide dans Chrome du Dossier sécurisé. Télécharger `jeu-smoke.odicolor` ; attendre la fin du téléchargement.
+2. Toucher **Ouvrir A — essais**. Vérifier l’absence de garages. Si A contient déjà des données, arrêter et le signaler ; aucune suppression pour simuler une base vierge.
+3. Dans l’application : **Plus → Réglages → Sauvegarde**. Sélectionner le petit jeu, toucher **Restaurer après contrôle**, confirmer et attendre le redémarrage.
+4. Vérifier les données attendues ci-dessous, ouvrir les trois images et les deux PDF. Vérifier tarifs et historiques.
+5. Toucher **Télécharger une sauvegarde complète**. Vérifier dans les téléchargements qu’un nouveau fichier `.odicolor` est présent, non vide ; noter son nom.
+6. Depuis le guide, ouvrir **B — restauration vierge**. Vérifier l’état vide, puis restaurer **la sauvegarde exportée de A**, pas le jeu de départ. Fermer/rouvrir B et refaire les contrôles. Une autre origine simule la récupération sur nouvel appareil ; ce n’est pas un deuxième appareil physique.
+7. Télécharger les fichiers corrompu et tronqué du guide. Essayer leur restauration sur B : refus attendu, données précédentes toujours présentes. Avec un fichier valide, annuler la confirmation : aucun remplacement attendu.
+8. Ajouter sur A une note « NOTE TEST A » : elle ne doit pas apparaître sur B. Ajouter « NOTE TEST B » sur B puis restaurer l’export initial de A : la note B doit quitter l’état actif ; une copie de récupération doit être téléchargeable. Ne pas modifier les pièces avant les comparaisons de référence.
+9. Pour le hors ligne : ouvrir A et B en ligne et laisser l’installation finir ; fermer tous leurs onglets et rouvrir une fois en ligne. Garder leurs liens en favoris. Activer mode avion, Wi-Fi désactivé, fermer/rouvrir chaque adresse. Vérifier fiches, tarifs, historiques, images, PDF. Créer une note synthétique sur B, télécharger une sauvegarde puis restaurer l’export initial, toujours hors ligne. Le guide et ses téléchargements ne sont pas mis en cache : les fichiers doivent déjà être téléchargés. En cas d’échec au démarrage, le consigner ; reconnecter et attendre une minute dans l’application, puis réessayer sans effacement.
+10. Réactiver Internet. Transmettre modèle Samsung, Android, Chrome, date et résultats **réussi / échec / non testé** pour chaque étape, durée approximative et message exact en cas d’erreur. Captures exclusivement synthétiques. Aucun résultat automatique ni accès à distance au téléphone.
+
+Le guide HTML reprend ce parcours avec boutons et fichiers téléchargeables. Les PDF/images séparés permettent, après les contrôles de référence, un import manuel depuis les fichiers téléchargés ; aucune photo réelle.
+
+## Résultats attendus du petit jeu
+
+| Élément | Attendu |
 |---|---|
-| `http://localhost:8140` | A : candidat et source de sauvegarde |
-| `http://localhost:8141` | B : restauration vierge du candidat |
-| `http://localhost:8142` | C : copie de secours avec vrai code V47 figé |
-| `http://localhost:8143` | D : retour ultérieur vers le candidat, origine supplémentaire vierge |
+| Garages / devis / articles | 3 / 12 / 30, tous synthétiques |
+| Images locales | 3 SVG numérotés, une par garage correspondant |
+| PDF | 2 documents affichant « PDF SYNTHETIQUE » et leur numéro |
+| Historiques | 20 visites, 10 notes, 5 besoins et 1 facture fictive par garage |
+| Tarif `SYN-00001` | 10,00 € HT |
+| Premier devis | HT 30,03 €, TVA 2,55 €, TTC 32,58 € |
+| Fichier initial | 34 117 octets dans la génération vérifiée |
 
-Les ports correspondent à des bases et registrations distinctes. Les éventuelles instances sur d’autres ports ou profils restent hors essai. Pour une répétition complète, utiliser de nouveaux ports/profils ; ne pas supprimer des bases pour les rendre « vierges ».
+Les SVG vérifient la conservation et l’association des pièces, pas encore la prise de vue ni les JPEG/HEIC réels. La taille des exports change avec les dates/archives : une égalité de taille n’est pas une preuve d’intégrité. La CI vérifie les empreintes métier et des pièces ; le parcours téléphone seul fait des vérifications visibles, sans prétendre remplacer cette comparaison exhaustive.
 
-## 3. Jeux et résultats attendus
+## Préparation technique réalisée sans publication
 
-| Mesure | Petit jeu `smoke` | Jeu `terrain` |
-|---|---:|---:|
-| Garages | 3 | 2 000 |
-| Devis synthétiques | 12 | 10 000 |
-| Articles/tarifs | 30 | 20 000 |
-| Images locales | 3 | 200 |
-| PDF synthétiques | 2 | 6 |
-| Visites historiques | 60 | 40 000 |
-| Notes | 30 | 20 000 |
-| Besoins produits | 15 | 10 000 |
-| Factures déclaratives fictives | 3 | 2 000 |
+`scripts/preparer-preview-samsung.cjs` prépare localement trois dossiers à partir de la construction vérifiée :
 
-Le jeu terrain occupe environ **110,5 Mo de fichier** (105,4 Mio) dans la génération vérifiée. Les images ont environ 300 Kio chacune et les PDF environ 5 Mio. Les SVG et PDF contiennent du remplissage synthétique pour solliciter le stockage ; ce ne sont pas des photographies ou catalogues réels. Consigner la taille exacte du manifeste généré.
+- `a/` et `b/` : mêmes ressources applicatives **octet pour octet**, aucune modification du design, du manifeste ou du code métier ; seules s’ajoutent les règles d’en-têtes de l’hébergeur et une page 404.
+- `guide/` : page mobile sans script, boutons vers A/B, petit jeu complet, deux fichiers volontairement invalides, images/PDF séparés, manifeste attendu. Le guide ne touche à aucune base ni fichier local.
+- Pas de SDK, de jeton, de commande réseau ou d’action de déploiement. Les destinations existantes sont refusées, ainsi que les URL hors projets `odicolor-test-*.pages.dev`, identiques ou contenant un chemin.
 
-Le montant total HT du jeu est une somme technique des devis synthétiques, sans signification commerciale. Le vérificateur calcule également une empreinte de tout le contenu métier et une empreinte par pièce. Les archives de récupération sont comptées séparément : chaque restauration en ajoute une, sans altérer l’empreinte métier active.
+La commande de préparation est réservée au mainteneur ; **l’utilisateur n’a rien à exécuter**. Les dossiers restent locaux tant que l’accord n’est pas donné. Avant livraison, vérifier sur les adresses hébergées le HTTPS, l’absence de redirections/transformations des scripts, les empreintes/SRI, l’installation réelle du worker et les en-têtes. Désactiver les injections d’analytics et transformations automatiques de code ; conserver les URL et octets des ressources versionnées. Les tests de paquet ne sont pas une preuve de fonctionnement de l’hébergement encore inexistant.
 
-## 4. Fiche de session
+## Limites et validations complémentaires
 
-Relever avant essai : date, alias du testeur, modèle Samsung, RAM, Android/One UI, version complète Chrome, espace libre, mode d’isolation, ports, commit de PR, identifiant de `pwa-release.json`, version du kit V47 et empreintes des fichiers transmis. Prévoir assez d’espace pour plusieurs copies du jeu de volume, sans supprimer des données réelles pour faire de la place.
+Aucun test Samsung exécuté à ce stade. Les essais contrôlés de mise à jour entre versions, migration de l’ancienne PWA et retour V47 restent couverts par la CI et le banc technique, **pas par ce petit parcours**. Le retour V47 nécessiterait d’autres origines vierges et un kit spécifique ; ne pas héberger l’ancienne version sans accord complémentaire. Une restauration de l’archive précédente sur destination vierge nécessite également une nouvelle origine. Un espace B déjà utilisé n’est plus une base vierge pour un nouvel essai.
 
-Pour chaque cas : résultat **PASS / FAIL / NON EXÉCUTÉ**, durée, capture sur données synthétiques, nom du fichier produit et anomalie éventuelle. « NON EXÉCUTÉ » n’est pas une réussite.
+Le gros volume reste à organiser sur téléphone, avec une autre distribution que l’asset Pages unique limité à 25 Mio. Aucun coût R2, serveur ou offre payante n’est inclus ou autorisé. Le petit jeu ne certifie pas les performances commerciales à volume représentatif, ni le comportement matériel en manque de place. Ne pas saturer le téléphone pour forcer un échec.
 
-## 5. Cas de validation fonctionnelle
-
-| ID | Actions sur Samsung | Résultat et preuve attendus |
-|---|---|---|
-| S01 — base vierge | Ouvrir A pour la première fois ; consulter Clients, Catalogue et archives. Attendre l’installation du worker, fermer toutes les fenêtres A puis rouvrir. | Aucun client/article/PDF/archive métier antérieur. Version de code attendue. Aucun effacement pour obtenir cet état. |
-| S02 — restauration contrôlée | Dans Réglages A, sélectionner `jeu-smoke.odicolor`, lire le résumé, confirmer. | Redémarrage normal ; 3 garages, 12 devis, 30 tarifs, 3 images, 2 PDF. L’état vide précédent est archivé. |
-| S03 — identité et pièces | Ouvrir garages 1 et 2 et comparer les libellés des images ; consulter leurs visites, notes et besoins. Ouvrir les 2 PDF. | Chaque image correspond à son numéro ; aucune pièce d’un autre garage. Historique complet ; PDF affiche « PDF SYNTHETIQUE » et son numéro. |
-| S04 — tarifs/calcul de contrôle | Chercher `SYN-00001`, puis ouvrir le premier devis synthétique. | Prix de l’article : 10,00 € HT. Premier devis : 30,03 € HT, TVA 2,55 €, TTC 32,58 € avec les réglages du jeu. Ce ne sont pas des tarifs réels. |
-| S05 — import manuel | Importer un des PDF séparés depuis Réglages avec fournisseur « FOURNISSEUR SYNTHETIQUE ». Remplacer la photo du garage 1 par le SVG synthétique séparé. | Sélection/annulation/remplacement explicites, pièce consultable après fermeture de l’écran. Les autres garages et pièces sont intacts. Faire ce cas après la comparaison de référence, ou consigner cette modification avant un nouveau manifeste de comparaison. |
-| S06 — sauvegarde | Télécharger la sauvegarde complète A. Attendre la fin réelle du téléchargement, pas seulement le toast. Copier le fichier sur le PC de test. | Taille non nulle, extension `.odicolor`, vérification complète réussie. Conserver deux copies, dont une hors du téléphone. |
-| S07 — nouvel appareil simulé | Sur B jamais utilisée, vérifier l’état vierge puis restaurer le fichier exporté de A. Fermer puis rouvrir B ; réexporter. | Données et pièces présentes sans dépendre de A. Comparaison des empreintes métier/pièces A et B réussie. Le nombre d’archives peut augmenter ; aucune archive antérieure importée ne disparaît. |
-| S08 — corrompu/tronqué | Noter l’empreinte de B, essayer successivement `corrompu-smoke.odicolor` et `tronque-smoke.odicolor`. Réexporter B. | Refus avant remplacement ; même empreinte métier, mêmes pièces et même nombre d’archives qu’avant le refus. Aucun faux message de réussite. |
-| S09 — annulation | Sélectionner un fichier valide, annuler la confirmation. | Aucun remplacement, aucune nouvelle archive, saisies et fichiers inchangés. |
-| S10 — deux fenêtres | Ouvrir deux fenêtres B ; laisser une fiche dans la seconde. Restaurer depuis la première, puis essayer une écriture depuis l’ancienne fiche. | Ancienne fenêtre bloquée avec demande de rechargement ; aucun ancien historique réinjecté. Après rechargement, elle lit le nouveau portefeuille. |
-| S11 — état précédent | Sur un jeu synthétique, ajouter une note clairement nommée « NOTE AVANT REMPLACEMENT », sauvegarder, puis restaurer un autre jeu synthétique. Télécharger l’archive de l’état précédent, la restaurer sur une destination vierge supplémentaire. | La note et les pièces de l’état remplacé sont récupérables. Aucun mélange dans le portefeuille actif. Ne pas dépasser les limites historiques de l’ancien code pendant cet essai. |
-
-Vérification sur le PC, pour un export de référence avant toute modification manuelle :
-
-```sh
-node scripts/verifier-sauvegarde.cjs /chemin/export-A.odicolor /tmp/odicolor-jeu-smoke/attendus-smoke.json
-node scripts/verifier-sauvegarde.cjs /chemin/export-B.odicolor /tmp/odicolor-jeu-smoke/attendus-smoke.json
-```
-
-Après une modification manuelle volontaire, utiliser `node scripts/verifier-sauvegarde.cjs /chemin/export-A.odicolor` pour produire le nouveau rapport de référence, puis comparer B avec ce rapport. La date et l’empreinte du fichier binaire changent à chaque export ; **l’empreinte métier et les empreintes des pièces doivent rester égales** entre deux états métier identiques. Une copie binaire simplement transférée entre téléphone et PC doit, elle, conserver exactement son empreinte de fichier.
-
-## 6. Hors ligne et mises à jour
-
-| ID | Actions | Résultat attendu |
-|---|---|---|
-| P01 — arrêt réseau réel | Après installation complète sur A/B, fermer toutes leurs fenêtres. Arrêter les serveurs PC avec Ctrl-C et activer le mode avion, Wi-Fi désactivé. Rouvrir A/B ou leur PWA installée. | Accueil, Clients, fiches, catalogue local et devis s’ouvrent depuis le worker ; aucune page blanche. **Le mode avion seul ne suffit pas avec ADB : localhost peut rester accessible par USB.** |
-| P02 — pièces hors ligne | Serveurs toujours arrêtés, ouvrir plusieurs images puis tous les PDF importés ; exporter une sauvegarde, puis restaurer un fichier local valide. | Images et PDF lisibles ; sauvegarde et restauration sans Internet. Toute action réellement externe reste dépendante du réseau. Vérifier le téléchargement PDF si Chrome utilise un lecteur Android séparé. |
-| P03 — reprise | Relancer les serveurs, réactiver le réseau, fermer et rouvrir les fenêtres. | Aucune modification des données par le seul changement de réseau ; même empreinte métier. |
-| P04 — mise à jour contrôlée | Avec l’accompagnant technique et deux constructions cohérentes préparées localement, garder une saisie non enregistrée ouverte ; installer la suivante. Choisir « Plus tard ». | La version courante et la saisie restent en place. La nouvelle version attend ; aucun rechargement ni activation forcés. Après enregistrement et fermeture de **toutes** les fenêtres de l’origine, réouverture sur la nouvelle version cohérente. |
-| P05 — installation interrompue | Dans le banc local, rendre une ressource de la nouvelle construction indisponible ou incorrecte. Ne pas modifier un dossier actuellement utilisé sans plan de test. | Nouvelle installation refusée ; ancien lot complet reste utilisable hors ligne ; données inchangées. La CI reproduit HTTP 503, empreinte erronée et premier chargement incohérent. Si ce banc n’est pas reproduit sur Samsung, noter NON EXÉCUTÉ, sans forcer l’activation depuis DevTools. |
-| P06 — transition historique | Sur un profil/origine dédié contenant le vrai kit V47 et des données synthétiques, vérifier le worker `terrain-v47`, puis faire la transition locale vers le candidat. | Ancien écran stable pendant l’attente ; après fermeture des anciennes fenêtres, nouveau shell vérifié et migration v1→v2 conservant les données. L’ancien cache n’est pas supprimé. Cas aussi testé dans Chromium CI. |
-
-L’accompagnant peut relever en lecture seule via Chrome/USB : `window.ODICOLOR_PWA.release`, les états `active/waiting` de la registration et les noms de cache. Ne pas cocher « Update on reload », « Bypass for network » ou « Skip waiting » pendant la réception. La version visuelle reste V47 ; l’identifiant de construction distingue les ensembles techniques.
-
-## 7. Migration et retour au code V47
-
-Exécuter [RETOUR_CODE_V47.md](RETOUR_CODE_V47.md) sur A → C : sauvegarde complète A conservée hors téléphone ; outil de récupération ouvert sur C vierge ; création d’une copie au schéma 1 ; ouverture du code V47 figé sur C ; contrôles des tarifs, historiques, images et PDF. Réexporter C par l’outil autonome et comparer avec A.
-
-Vérifier ensuite que A est encore en v2 et inchangée. Tenter la copie vers une destination déjà remplie : refus sans perte. Ajouter une note synthétique dans C et exporter par l’outil autonome ; restaurer sur D pour prouver le trajet de retour vers le code corrigé. Ne pas tenter une diminution de version sur A.
-
-Une erreur de migration/écriture réelle est testée en CI par abort asynchrone. Sur Samsung, ne pas saturer le stockage général ni tuer le profil commercial pour provoquer une erreur. Une limite de quota sur **la seule origine de test**, si disponible avec l’accompagnant, peut servir à confirmer le refus sans changement. Sinon noter ce cas NON EXÉCUTÉ sur appareil ; conserver la preuve CI sans la présenter comme un essai de quota matériel.
-
-## 8. Volume représentatif et répétition
-
-Sur une nouvelle origine de test ou un profil vierge, restaurer `jeu-terrain.odicolor`, puis contrôler les 2 000 garages, 10 000 devis, 20 000 articles et tous les compteurs du tableau. Ouvrir les garages 1, 2, 199, 200 et 201 : les quatre premiers de ce choix ont une image numérotée ; le 201 n’en possède pas. Consulter les six PDF, les notes et les visites d’un garage éloigné dans la liste. Exporter et vérifier avec `attendus-terrain.json`.
-
-Mesurer sur le téléphone : durée de restauration, temps jusqu’à un écran utilisable, 20 navigations et 20 recherches, consultation d’un PDF, durée et taille de sauvegarde. Noter chauffe, fermeture Android, blocage prolongé, erreurs de quota et croissance du stockage après plusieurs restaurations. Les archives sont conservées : leur croissance est attendue, pas une fuite silencieuse.
-
-Critères de performance proposés : écran local utile en moins de 2 s à froid, navigation habituelle sous 500 ms et recherche sous 200 ms au 95e percentile. Mesurer avec Chrome Performance à distance si nécessaire ; un simple chronomètre ne prouve pas un seuil de 200 ms. Toute mesure absente doit être signalée. Ces seuils sont des objectifs, pas des résultats annoncés.
-
-Faire ensuite sept journées simulées : ouvrir, consulter, ajouter uniquement des notes synthétiques, fermer, reprendre hors ligne, sauvegarder hors appareil et vérifier une récupération. Aucun ralentissement cumulatif, aucune perte ni confusion de garage ne doit rester inexpliqué.
-
-## 9. Décision
-
-Critères bloquants : donnée manquante, pièce différente, mauvaise attribution, ancien onglet écrivant après restauration, sauvegarde corrompue acceptée, succès annoncé après échec, migration destructrice, mélange de scripts ou retour de secours non récupérable.
-
-Consigner les résultats et écarts dans un compte rendu avec le commit testé. Les cas non exécutés et les limites matérielles restent ouverts. L’acceptation Samsung et la décision de fusion/publication appartiennent à la validation utilisateur ; ce protocole ne lance ni merge ni déploiement.
+Les sauvegardes de test restent en clair dans le profil isolé. Pas de copie hors appareil garantie avec ce seul téléphone. Supprimer ultérieurement les projets de prévisualisation n’efface pas les données déjà stockées hors ligne : toute suppression du profil de test doit viser uniquement ce profil et attendre la fin des essais. Aucune fusion, aucun déploiement de production, aucun changement de `main` sans validation utilisateur.
