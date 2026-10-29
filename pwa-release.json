@@ -1,5 +1,5 @@
 {
-  "id": "3422b71eee714faa2a48f26c24738090daebfa1f31d4ee6accbeea171b4cc548",
+  "id": "3f0ff54f3e9f8624b21421379ca9d2c24fccf198afe69db6fa22df2af81bac73",
   "assets": [
     {
       "path": "accueil-v23.css",
@@ -43,7 +43,7 @@
     },
     {
       "path": "catalogues-pdf-v32.js",
-      "sha256": "8c043d1b53df890f1652ade521e28b645a7cbe80d1aa8c6efefc9096ca2b27e6"
+      "sha256": "2cf69840493d4eb11046ace9ee1eedb8dbd1b3266f17a5acc6bea17c64fc74e3"
     },
     {
       "path": "commercial-v22.js",
@@ -91,11 +91,11 @@
     },
     {
       "path": "imports-centralises-v40.js",
-      "sha256": "439c90dfe76136faaa8b3a767737a1da5cff267a5b177a76cec02e278e548cdc"
+      "sha256": "2d5d21ec558b2c5919ced63211dbe13b00d650008a925342b519a15373841d5f"
     },
     {
       "path": "index.html",
-      "sha256": "0e3be5d6d0e8e93914668ecce25750ee2cdd907d5b36c38c87dfc792406e8008"
+      "sha256": "ff24b34e30650492d9e04c2043426fdd4dbbd3421d45ce7859073495d68b46e3"
     },
     {
       "path": "logo-96.png",
@@ -135,11 +135,11 @@
     },
     {
       "path": "premium-pro-v38.js",
-      "sha256": "e1852f5266cacfc2a5e6d869189df885c8f98e8ac22c2b43e73a511ffcad80be"
+      "sha256": "52138949e836e85740b53c077cd189498a7aa6206a7607eac65efd25ad2d66ef"
     },
     {
       "path": "pwa-client.js",
-      "sha256": "94ad08a9da8d8fc5e44e7747a041f764b6b9a7c9b77d2d83473f3efddab55a41"
+      "sha256": "4e2fedee3078ba3bc4a0c56aaeb4bbf36d49dd053459e6e60aeba850d7a881fd"
     },
     {
       "path": "rappels-produits-v24.js",

@@ -259,7 +259,7 @@
     const fin=h('div',{class:'v38-fin-client'},
       sectionNotesEtIncident(id),
       h('p',{class:'v38-photo-info'},data?
-        'Photo enregistrée uniquement sur cet appareil : elle ne part pas dans la sauvegarde JSON.':
+        'Photo enregistrée sur cet appareil : incluse dans la sauvegarde complète .odicolor, mais pas dans l’ancien export JSON.':
         'Tu peux ajouter une vraie photo du garage. Elle reste locale et ne sera pas envoyée à Claude.'));
     if(data){
       const supprimer=h('button',{type:'button',class:'v38-photo-delete',onclick:async()=>{
