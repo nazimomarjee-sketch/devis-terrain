@@ -9,16 +9,16 @@ avant tout essai sur Samsung. Rien n'est fusionné, publié ou mis en production
 |---|---|---|
 | Téléphone V47 (`main`) | En service | 22 tests |
 | Téléphone Lot 1 — sauvegarde complète `.odicolor` (PR #2, brouillon) | Terminé, essais Samsung en grande partie réussis | 82 tests + 19 essais navigateur ; ticket #4 validé sur Samsung |
-| Bureau — Ville, carte, simulation (`bureau/`) | Récupéré (version du 31/10) | 41 tests (dont 1 « à faire ») + 6 essais navigateur |
+| Bureau — Ville, carte, simulation (`bureau/`) | Récupéré (version du 31/10) | 58 tests + 9 essais navigateur |
 | Bureau — Lot 2 annuaire du 91 | Code présent, jamais testé contre le vrai annuaire depuis ici | Testé avec un annuaire simulé |
-| Liaison téléphone → Bureau | **Partielle** : ancien format seulement | Test « todo » |
+| Liaison téléphone → Bureau | **Faite** (05/11) : `.odicolor` avec contrôle d'intégrité + ancien `.json` | Fichiers d'essai produits par le code du téléphone ; même verdict que lui sur 1 800+ cas ; pas encore essayé sur Samsung/PC |
 | Données réelles | **Bloqué** par le ticket #6 | — |
 
 ## Étapes, dans l'ordre
 
-1. **Liaison téléphone → Bureau (format Lot 1)** — le Bureau lit le fichier `.odicolor` en vérifiant son empreinte,
-   en réutilisant le lecteur du téléphone (`sauvegarde-locale.js`) au lieu d'en écrire un second. Refus clair si fichier abîmé.
-   Le test « todo » devient obligatoire. *Ne change rien au téléphone.*
+1. ~~**Liaison téléphone → Bureau (format Lot 1)**~~ — **faite le 05/11/2026** (`bureau/lecture-sauvegarde.js`).
+   Lecteur propre au Bureau (le module du téléphone n'est pas encore sur `main`) ; la concordance est garantie par
+   le contrôle croisé `TELEPHONE_LOT1`. À refaire si le format du téléphone change.
 2. **Clore le Lot 1 téléphone** — fermer #4 (validé), revérifier #5, fermer la PR #3 (doublon de la #2). Fusion sur ton accord.
 3. **Préalables aux données réelles (#6)** — accord du responsable ; sauvegardes stockées hors du dépôt public ;
    ajouter à la vérification GitHub un contrôle qui refuse tout fichier contenant SIRET, téléphone ou e-mail.

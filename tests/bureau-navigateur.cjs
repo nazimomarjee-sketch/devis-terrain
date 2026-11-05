@@ -6,7 +6,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
-const { mkdtempSync, writeFileSync } = require('node:fs');
+const { mkdtempSync, writeFileSync, readFileSync } = require('node:fs');
 const { join } = require('node:path');
 const { tmpdir } = require('node:os');
 
@@ -93,6 +93,54 @@ test('Bureau dans le navigateur', async (t) => {
       await page.setInputFiles('#fichier-sauvegarde', join(dossier, 'faux.json'));
       await page.waitForSelector('text=ne vient pas de l’appli téléphone');
       assert.equal((await page.textContent('#mode')).trim(), 'Démo');
+      assert.deepEqual(erreurs, []);
+      await contexte.close();
+    });
+
+    const FIXTURES = join(__dirname, 'fixtures', 'bureau');
+    const garagesAffiches = page => page.evaluate(() => document.querySelector('#kpis').textContent);
+
+    await t.test('Import .odicolor du téléphone : intégrité vérifiée, garages affichés, rien n’est envoyé', async () => {
+      const { contexte, page, erreurs, sorties } = await ouvrir(navigateur);
+      const avant = sorties.length;
+      await page.click('#mode');
+      assert.equal(await page.getAttribute('#fichier-sauvegarde', 'accept'), '.odicolor,.json', 'même filtre que le téléphone (validé sur Samsung)');
+      await page.setInputFiles('#fichier-sauvegarde', join(FIXTURES, 'telephone-jeu-samsung.odicolor'));
+      await page.waitForSelector('text=intégrité OK');
+      const texte = await page.textContent('#donnees');
+      assert.match(texte, /3 garages, 12 devis, 3 photos, 2 PDF/);
+      assert.match(texte, /Lecture seule/);
+      assert.equal((await page.textContent('#mode')).trim(), 'Mes garages');
+      assert.deepEqual(sorties.slice(avant), [], 'aucune requête réseau');
+      assert.deepEqual(erreurs, []);
+      await contexte.close();
+    });
+
+    await t.test('Fichier abîmé après un bon import : refusé, les garages chargés restent affichés', async () => {
+      const { contexte, page, erreurs } = await ouvrir(navigateur);
+      await page.click('#mode');
+      await page.setInputFiles('#fichier-sauvegarde', join(FIXTURES, 'telephone-idf.odicolor'));
+      await page.waitForSelector('text=intégrité OK');
+      const avant = await garagesAffiches(page);
+      const abime = readFileSync(join(FIXTURES, 'telephone-idf.odicolor')); abime[abime.length - 5] ^= 1;
+      await page.setInputFiles('#fichier-sauvegarde', { name: 'abime.odicolor', mimeType: 'application/octet-stream', buffer: abime });
+      await page.waitForSelector('text=Fichier refusé');
+      assert.match(await page.textContent('#donnees'), /corrompue.*Les garages déjà chargés restent affichés/);
+      assert.equal(await garagesAffiches(page), avant, 'aucune perte : même affichage qu’avant le mauvais fichier');
+      assert.equal((await page.textContent('#mode')).trim(), 'Mes garages');
+      // Le même bon fichier peut être rechargé (le champ est remis à zéro après chaque choix).
+      await page.setInputFiles('#fichier-sauvegarde', join(FIXTURES, 'telephone-idf.odicolor'));
+      await page.waitForSelector('text=intégrité OK');
+      assert.deepEqual(erreurs, []);
+      await contexte.close();
+    });
+
+    await t.test('Ancienne sauvegarde V47 (.json) : toujours acceptée, avec rappel du format complet', async () => {
+      const { contexte, page, erreurs } = await ouvrir(navigateur);
+      await page.click('#mode');
+      await page.setInputFiles('#fichier-sauvegarde', join(FIXTURES, 'telephone-v47.json'));
+      await page.waitForSelector('text=Ancienne sauvegarde V47');
+      assert.match(await page.textContent('#donnees'), /préfère la sauvegarde complète \.odicolor/);
       assert.deepEqual(erreurs, []);
       await contexte.close();
     });

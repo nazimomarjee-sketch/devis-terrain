@@ -16,6 +16,12 @@ Ces fichiers viennent de la page Claude « Ville ODICOLOR », version `179345433
 | `annuaire.js` | Lot 2 : import de l'annuaire officiel (activité 45.20A, département) | `6c029977…52a6d5ff` |
 | `communes-idf.js` | 1 287 communes d'Île-de-France (source INSEE / La Poste) | `4d7b8516…2626157` |
 
+Depuis la récupération, seuls `index.html` (bouton d'import) et `bureau-logique.js` (fonction `lireClients`, messages d'erreur)
+ont été modifiés, le 05/11/2026, pour lire le format `.odicolor` ; les empreintes ci-dessus sont celles des originaux.
+
+Ajouté le 05/11/2026 :
+- `lecture-sauvegarde.js` : lecture du fichier complet `.odicolor` du téléphone (voir ci-dessous).
+
 Recréés le 05/11/2026 (perdus avec la branche locale) :
 - `outils/generer-communes.cjs` : reproduit `communes-idf.js` **à l'identique** depuis `@etalab/decoupage-administratif` 6.0.0.
 - Les tests : `tests/bureau-*.cjs` (voir ci-dessous).
@@ -30,16 +36,28 @@ Recréés le 05/11/2026 (perdus avec la branche locale) :
 Contrôle du 05/11/2026 : aucun e-mail, téléphone, SIRET, IBAN, montant réel ni clé dans ces fichiers.
 ⚠️ Le dépôt GitHub est **public** : n'y mettre aucune donnée client.
 
+## Charger une sauvegarde du téléphone
+
+Bouton « Mes garages / Démo » → « Charger ma sauvegarde téléphone ».
+- **`.odicolor` (recommandé)** : sauvegarde complète du Lot 1. L'empreinte de l'en-tête et de chaque photo/PDF est vérifiée,
+  comme le fait le téléphone avant une restauration. Un fichier tronqué, abîmé ou rallongé est refusé avec la cause.
+- **`.json` V47** : toujours accepté, sans contrôle d'intégrité possible (le format n'en contient pas).
+- Fichier refusé → les garages déjà affichés restent affichés. Le fichier n'est jamais modifié.
+- Les photos et PDF sont vérifiés mais pas conservés : le Bureau n'utilise que les fiches garages.
+
 ## Limites connues
 
-- Lit les sauvegardes téléphone **V47 (JSON)** seulement. Le format complet `.odicolor` du Lot 1 est lu comme 0 garage, sans message (test « todo »).
 - L'annuaire en ligne n'est pas une extraction complète de SIRENE ; 45.20A mélange mécanique et carrosserie. « Carrosserie probable » = déduit du nom.
 - La carte charge Leaflet et les fonds OpenStreetMap depuis Internet ; sans connexion, un message l'indique.
+- La vérification d’intégrité utilise le chiffrement du navigateur : elle exige une adresse https, `localhost` ou un fichier local. Sur une adresse http de réseau local, l’import `.odicolor` est refusé avec un message explicite.
 
 ## Tester
 
 ```
-node --test tests/bureau-*.test.cjs        # logique, annuaire simulé, communes (sans réseau)
+node --test tests/bureau-*.test.cjs        # logique, lecture des sauvegardes, annuaire simulé, communes (sans réseau)
 node tests/bureau-navigateur.cjs           # vrai navigateur, Internet coupé, largeur Samsung
 ```
+Contrôles croisés facultatifs : `TELEPHONE_LOT1=<copie de la branche Lot 1>` (même verdict que le téléphone
+sur plus de 1 800 fichiers sains ou abîmés) et `ETALAB_PACKAGE=<paquet etalab>` (liste des communes).
+Les fichiers d'essai `tests/fixtures/bureau/` sont fabriqués par le vrai code du téléphone : voir `tests/support/generer-fixtures-odicolor.cjs`.
 Ouvrir : `python -m http.server 8140` à la racine du dépôt, puis http://localhost:8140/bureau/

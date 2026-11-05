@@ -102,7 +102,7 @@ test('lecture sauvegarde : aucun montant inventé pour des données réelles', (
 test('lecture sauvegarde : fichiers refusés avec un message clair', () => {
   assert.throws(() => B.lireSauvegarde(null), /illisible/);
   assert.throws(() => B.lireSauvegarde({ clients: [] }), /appli/);
-  assert.throws(() => B.lireSauvegarde({ appli: 'plan-pc', clients: [] }), /appli/);
+  assert.throws(() => B.lireSauvegarde({ appli: 'plan-pc', clients: [] }), /plan PC/);
 });
 
 test('lecture sauvegarde : champs nettoyés et bornés (pas de caractères de contrôle, 5000 garages max)', () => {
@@ -123,14 +123,19 @@ test('lecture sauvegarde : homonymes conservés comme fiches distinctes', () => 
   assert.notEqual(r.garages[0].id, r.garages[1].id);
 });
 
-// Écart connu, à traiter au chantier « liaison téléphone → Bureau » (voir docs/FEUILLE_DE_ROUTE_TELEPHONE_BUREAU.md).
-// Le nouveau format complet du Lot 1 (.odicolor, version 2) place les clients dans « stores ».
-// Aujourd'hui le Bureau lirait 0 garage SANS message d'erreur : c'est trompeur.
-test('sauvegarde Lot 1 version 2 : refus explicite ou lecture des clients', { todo: 'Liaison téléphone → Bureau : lire le format .odicolor v2' }, () => {
+// Corrigé le 05/11/2026 : avant, un objet version 2 était lu comme 0 garage SANS message.
+// Le vrai fichier .odicolor est lu par lecture-sauvegarde.js (tests/bureau-lecture-sauvegarde.test.cjs).
+test('objet JSON version 2 : refus explicite, jamais « 0 garage » silencieux', () => {
   const v2 = { appli: 'devis-terrain', version: 2, date: '2026-11-01T10:00:00.000Z', stores: { clients: [{ nom: 'Garage fictif', ville: 'Massy', cp: '91300' }] } };
-  let r = null;
-  try { r = B.lireSauvegarde(v2); } catch (e) { return; } // un refus explicite est acceptable
-  assert.equal(r.garages.length, 1);
+  assert.throws(() => B.lireSauvegarde(v2), /\.odicolor d’origine/);
+});
+
+test('lireClients : ne modifie pas la liste reçue (fiche gelée)', () => {
+  const clients = geler([{ nom: 'Garage fictif', ville: 'Massy', cp: '91300', statutCrm: 'client' }]);
+  const r = B.lireClients(clients, '2026-11-05');
+  assert.equal(r.garages[0].statut, 'actif');
+  assert.equal(r.rapport.date, '2026-11-05');
+  assert.throws(() => B.lireClients(null), /sans liste/);
 });
 
 test('démo : reproductible (même graine = mêmes garages) et 100 % fictive', () => {

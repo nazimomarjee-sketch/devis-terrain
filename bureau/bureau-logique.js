@@ -141,11 +141,23 @@
     return g;
   }
 
-  // Lit une sauvegarde JSON du téléphone. Lecture seule : on copie.
+  // Lit une ancienne sauvegarde JSON (V47) du téléphone. Lecture seule : on copie.
+  // Le format complet .odicolor est lu par lecture-sauvegarde.js, qui appelle ensuite lireClients.
   function lireSauvegarde(obj) {
-    if (!obj || typeof obj !== 'object') throw new Error('Fichier illisible : ce n’est pas une sauvegarde JSON.');
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) throw new Error('Fichier illisible : ce n’est pas une sauvegarde JSON.');
+    if (obj.appli === 'plan-pc') throw new Error('Ce fichier est un plan PC, pas une sauvegarde du téléphone.');
     if (obj.appli !== 'devis-terrain') throw new Error('Ce fichier ne vient pas de l’appli téléphone (champ « appli » absent).');
-    const clients = Array.isArray(obj.clients) ? obj.clients : [];
+    if (obj.type === 'envoi-devis') throw new Error('Ce fichier est un envoi de devis au responsable, pas une sauvegarde complète des garages.');
+    if (obj.version === 2) throw new Error('Sauvegarde complète enregistrée en JSON : charge le fichier .odicolor d’origine.');
+    if (obj.version != null && obj.version !== 1) throw new Error('Version de sauvegarde inconnue (' + texte(obj.version, 10) + ') : mets le Bureau à jour.');
+    if (!Array.isArray(obj.clients)) throw new Error('Sauvegarde sans liste de garages.');
+    return lireClients(obj.clients, texte(obj.date, 30));
+  }
+
+  // Convertit les fiches garages du téléphone (mêmes champs en V47 et en .odicolor) en garages du Bureau.
+  // Ne modifie jamais la liste reçue.
+  function lireClients(clients, date) {
+    if (!Array.isArray(clients)) throw new Error('Sauvegarde sans liste de garages.');
     const garages = [];
     clients.slice(0, 5000).forEach((c, i) => {
       if (!c || typeof c !== 'object') return;
@@ -168,7 +180,7 @@
         caMois: null, potentiel: null
       }));
     });
-    return { garages, rapport: rapportClassement(garages, clients.length, texte(obj.date, 30)) };
+    return { garages, rapport: rapportClassement(garages, clients.length, texte(date, 30)) };
   }
 
   function rapportClassement(garages, lus, date) {
@@ -327,7 +339,7 @@
   ].map(a => Object.assign({}, a, { apparence: Object.assign(apparence(a.id), { role: ROLE_ACTEUR[a.id] }) })));
 
   const api = { apparence, agentsSimulation, FAMILLES, ACTEURS, DEPARTEMENTS, depInfo, TERRITOIRES, DEPOT, STATUTS, CLASSEMENTS, normNom, normCommune, classer, statutGarage,
-    lireSauvegarde, rapportClassement, statsTerritoire, statsDepartement, garagesDuDepartement, communesDuDepartement, aClasser,
+    lireSauvegarde, lireClients, rapportClassement, statsTerritoire, statsDepartement, garagesDuDepartement, communesDuDepartement, aClasser,
     garagesDemo, mulberry32, nbCommunes: COMMUNES.length };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else racine.BureauLogique = api;

@@ -334,6 +334,7 @@ select.recherche{appearance:auto}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="communes-idf.js"></script>
 <script src="bureau-logique.js"></script>
+<script src="lecture-sauvegarde.js"></script>
 <script src="annuaire.js"></script>
 <script>
 (function(){
@@ -1038,14 +1039,15 @@ function rendreEntete(){
   const d = $('#donnees'); d.hidden = !etat.donneesOuvertes; if (etat.donneesOuvertes) d.replaceChildren(panneauDonnees());
 }
 function panneauDonnees(){
-  const input = h('input',{type:'file', id:'fichier-sauvegarde', accept:'.json,application/json', onchange:e=>importer(e.target.files[0])});
+  // Même filtre que l'appli téléphone (validé sur Samsung) : .odicolor complet ou ancien .json.
+  const input = h('input',{type:'file', id:'fichier-sauvegarde', accept:'.odicolor,.json', disabled:etat.lecture, onchange:e=>{ const f = e.target.files[0]; e.target.value = ''; importer(f); }});
   const r = etat.rapport;
   return h('section',{class:'bloc import', style:'box-shadow:0 14px 34px rgba(0,0,0,.55)'},
     h('div',{class:'titre-bloc'},'Données affichées'),
     h('div',{class:'info'}, etat.mode==='demo'
-      ? [h('b',{},'Démo : '), 'garages et chiffres inventés, communes réelles. Charge la sauvegarde JSON de l’appli téléphone pour voir tes garages. Lecture seule : rien n’est modifié ni envoyé.']
+      ? [h('b',{},'Démo : '), 'garages et chiffres inventés, communes réelles. Charge la sauvegarde de l’appli téléphone (.odicolor complet, ou ancien .json) pour voir tes garages. Lecture seule : rien n’est modifié ni envoyé.']
       : [h('b',{},`${r.classes} garages classés`), ` sur ${r.lus}. ${r.aVerifier} à vérifier, ${r.hors} hors Île-de-France, ${r.nonClasses} non classés. Fermer la page efface tout.`]),
-    h('label',{class:'btn', for:'fichier-sauvegarde'}, etat.mode==='demo' ? 'Charger ma sauvegarde téléphone' : 'Charger une autre sauvegarde', input),
+    h('label',{class:'btn', for:'fichier-sauvegarde', 'aria-disabled': etat.lecture ? 'true' : null}, etat.lecture ? 'Vérification du fichier…' : etat.mode==='demo' ? 'Charger ma sauvegarde téléphone' : 'Charger une autre sauvegarde', input),
     etat.mode==='reel' ? h('button',{class:'btn discret', onclick:retourDemo},'Revenir à la démo') : null,
     etat.message ? h('div',{class:'message'+(etat.message.erreur?' erreur':'')}, etat.message.texte) : null);
 }
@@ -1082,19 +1084,20 @@ function rendre(){
 }
 
 // ================= Import (lecture seule) =================
-function importer(f){
-  if (!f) return;
-  if (f.size > 20*1024*1024) { etat.message = {erreur:true, texte:'Fichier trop gros (plus de 20 Mo).'}; return rendre(); }
-  const lecteur = new FileReader();
-  lecteur.onload = () => {
-    try { const r = L0.lireSauvegarde(JSON.parse(String(lecteur.result)));
-      Object.assign(etat, {mode:'reel', garages:r.garages, rapport:r.rapport, tournee:[], filtre:'tous',
-        message:{texte:`Sauvegarde du ${r.rapport.date ? new Date(r.rapport.date).toLocaleDateString('fr-FR') : 'jour inconnu'} lue. ${r.rapport.classes} garages classés.`}});
-    } catch (e) { etat.message = {erreur:true, texte: e instanceof SyntaxError ? 'Ce fichier n’est pas un JSON valide.' : e.message}; }
-    rendre();
-  };
-  lecteur.onerror = () => { etat.message = {erreur:true, texte:'Lecture du fichier impossible.'}; rendre(); };
-  lecteur.readAsText(f);
+// Lit .odicolor (intégrité vérifiée) ou ancien .json. En cas de refus, les garages affichés
+// jusque-là restent affichés : un mauvais fichier ne fait jamais perdre ce qui était chargé.
+async function importer(f){
+  if (!f || etat.lecture) return;
+  etat.lecture = true; etat.message = {texte:'Vérification de « ' + f.name + ' »…'}; rendre();
+  try {
+    const r = await window.LectureSauvegarde.lire(f);
+    Object.assign(etat, {mode:'reel', garages:r.garages, rapport:r.rapport, tournee:[], filtre:'tous',
+      message:{texte: window.LectureSauvegarde.message(r.rapport)}});
+  } catch (e) {
+    etat.message = {erreur:true, texte:'Fichier refusé : ' + (e && e.message ? e.message : 'lecture impossible.') +
+      (etat.mode === 'reel' ? ' Les garages déjà chargés restent affichés.' : ' La démo reste affichée.')};
+  } finally { etat.lecture = false; }
+  rendre();
 }
 function retourDemo(){ const g = L0.garagesDemo(2026); Object.assign(etat,{mode:'demo', garages:g, rapport:L0.rapportClassement(g), tournee:[], message:null}); rendre(); }
 
