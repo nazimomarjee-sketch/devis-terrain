@@ -1,0 +1,1108 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Ville ODICOLOR</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap">
+<style>
+/* Concept : maquette de nuit posée sur un bureau sombre. Néon rouge ODICOLOR au centre,
+   indicateurs en haut, un onglet = un écran (Ville / Carte / Simulation). Violet réservé à la simulation. */
+:root{
+  --fond:#0A0B0D; --plateau:#111317; --carte:#16191E; --carte-2:#1C2026; --trait:#272C33;
+  --texte:#F4F2EF; --doux:#9EA3AB; --gris:#6E737B;
+  --rouge:#D41F2B; --neon:#FF2D3D; --rouge-doux:#FF8A92;
+  --vert:#2FB86C; --bleu:#3E86F0; --orange:#F0952B; --danger:#F0343F; --sim:#8B5CF6; --sim-doux:#C4B0FF;
+  --nuit-sol:#1C212A; --nuit-bord:#252B34; --herbe:#16281D; --route:#272C34; --route-bord:#2E333B; --lampe:#FFC873; --vitre:#FFD27A;
+  --f-titre:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --f-texte:"Barlow",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  color-scheme:dark;
+}
+html,body{background:var(--fond);color:var(--texte)}
+body{font-family:var(--f-texte);font-size:15px;line-height:1.45;margin:0}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+button,input,select{font:inherit}
+:focus-visible{outline:3px solid var(--neon);outline-offset:2px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:60;background:var(--fond)}
+.gouttiere{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+/* En-tête */
+.entete{position:sticky;top:env(safe-area-inset-top,0px);z-index:50;background:rgba(10,11,13,.96);backdrop-filter:blur(6px);border-bottom:1px solid var(--trait)}
+.entete-l1{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding-block:10px}
+.marque{display:flex;align-items:center;gap:10px;min-width:0}
+.logo{width:36px;height:36px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#FF4A55,var(--rouge) 60%,#8C0F17);display:grid;place-items:center;flex:none;box-shadow:0 0 14px rgba(255,45,61,.45)}
+.logo span{width:16px;height:16px;border:3.5px solid #fff;border-radius:50%}
+.marque-txt b{font-family:var(--f-titre);font-weight:800;font-size:24px;letter-spacing:.01em;line-height:1;font-style:italic}
+.marque-txt b em{color:var(--neon);font-style:italic}
+.marque-txt small{display:block;color:var(--doux);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase}
+.onglets{display:flex;gap:4px;margin-left:8px}
+.onglet{min-height:40px;padding:0 16px;border-radius:8px;border:1px solid transparent;background:none;color:var(--doux);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:8px;text-decoration:none}
+.onglet:hover{color:var(--texte);background:var(--carte)}
+.onglet[aria-current="page"]{background:var(--rouge);color:#fff;box-shadow:0 0 16px rgba(226,27,42,.35)}
+.onglet.sim[aria-current="page"]{background:var(--sim);box-shadow:0 0 16px rgba(139,92,246,.35)}
+.onglet svg{width:16px;height:16px}
+.outils{display:flex;align-items:center;gap:8px;margin-left:auto;min-width:0}
+.cherche{position:relative;min-width:0}
+.cherche input{width:min(280px,46vw);min-height:40px;border-radius:8px;border:1px solid var(--trait);background:var(--plateau);color:var(--texte);padding:0 12px 0 34px}
+.cherche>svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--doux)}
+.resultats{position:absolute;right:0;top:calc(100% + 6px);width:min(340px,90vw);background:var(--carte);border:1px solid var(--trait);border-radius:10px;padding:6px;z-index:70;box-shadow:0 12px 30px rgba(0,0,0,.5);display:flex;flex-direction:column;gap:4px}
+.mode{font-family:var(--f-titre);font-weight:700;font-size:12.5px;letter-spacing:.1em;text-transform:uppercase;padding:0 12px;min-height:40px;border-radius:8px;border:1px solid var(--orange);color:var(--orange);background:none;cursor:pointer;white-space:nowrap}
+.mode.reel{border-color:var(--vert);color:var(--vert)}
+.donnees{position:absolute;right:max(16px,env(safe-area-inset-right,0px));top:calc(100% + 6px);width:min(360px,calc(100vw - 32px));z-index:70}
+@media (max-width:720px){.onglets{order:3;width:100%;margin-left:0}.onglet{flex:1;justify-content:center;padding:0 8px}.cherche input{width:40vw}}
+
+/* Indicateurs */
+.kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;padding-block:14px 4px}
+@media (max-width:1180px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:560px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.kpi{display:flex;gap:12px;align-items:center;background:var(--carte);border:1px solid var(--trait);border-radius:12px;padding:12px 14px;min-width:0}
+.kpi .ic{width:40px;height:40px;flex:none;border-radius:10px;display:grid;place-items:center;background:rgba(226,27,42,.12);color:var(--neon)}
+.kpi .ic svg{width:21px;height:21px}
+.kpi .l{color:var(--doux);font-size:12.5px;line-height:1.2}
+.kpi .v{font-family:var(--f-titre);font-weight:800;font-size:30px;line-height:1;font-variant-numeric:tabular-nums;margin-top:2px}
+.kpi .v.petit{font-size:17px;font-weight:700;color:var(--gris)}
+.kpi .s{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:4px;font-size:11.5px;color:var(--doux)}
+.kpi>div{min-width:0}
+@media (max-width:560px){.kpi .ic{display:none}.kpi{padding:10px 12px}}
+
+.badge{font-family:var(--f-titre);font-weight:700;font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:2px 6px;border-radius:3px;white-space:nowrap}
+.b-demo{background:rgba(240,149,43,.16);color:var(--orange)}
+.b-terrain{background:rgba(62,134,240,.16);color:#8FB6F5}
+.b-confirme{background:rgba(47,184,108,.16);color:#71DBA0}
+.b-estime{background:rgba(158,163,171,.15);color:var(--doux)}
+.b-alerte{background:rgba(240,52,63,.16);color:var(--rouge-doux)}
+.b-sim{background:rgba(139,92,246,.18);color:var(--sim-doux)}
+.b-vide{background:transparent;color:var(--gris);border:1px dashed var(--trait)}
+
+/* Filtres */
+.barre-filtres{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding-block:10px}
+.barre-filtres:empty{display:none}
+.puce{display:inline-flex;align-items:center;gap:8px;min-height:38px;padding:0 14px;border-radius:8px;border:1px solid var(--trait);background:var(--carte);color:var(--texte);cursor:pointer;font-size:14px;font-weight:500}
+.puce i{width:10px;height:10px;border-radius:50%}
+.puce[aria-pressed="true"]{border-color:var(--texte)}
+.puce[aria-pressed="false"]{opacity:.55}
+.puce.tous[aria-pressed="true"]{background:var(--rouge);border-color:var(--rouge);color:#fff}
+
+/* Écran Ville */
+.ecran{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:14px;align-items:start;padding-block:0 16px}
+@media (max-width:980px){.ecran{grid-template-columns:minmax(0,1fr)}}
+.maquette{position:relative;border:1px solid var(--trait);border-radius:14px;overflow:hidden;min-width:0;
+  background:radial-gradient(ellipse 70% 60% at 50% 48%,#1A1E26 0%,#101217 55%,var(--fond) 100%)}
+.scene{overflow-x:auto}
+.maquette svg{display:block;width:100%;height:auto;max-height:78vh}
+@media (max-width:700px){.maquette svg{width:900px;max-height:none}}
+.legende{display:flex;flex-wrap:wrap;gap:6px 16px;padding:10px 14px;border-top:1px solid var(--trait);font-size:13px;color:var(--doux);background:rgba(10,11,13,.6)}
+.legende span{display:inline-flex;align-items:center;gap:6px}
+.legende i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.terr{cursor:pointer}
+.terr .bati{transition:transform .25s ease}
+.terr:hover .bati,.terr:focus .bati,.terr.choisi .bati{transform:translateY(-5px)}
+.terr:focus{outline:none}
+.terr.choisi .socle{stroke:var(--neon);stroke-width:2.5}
+.agent{animation:balance 2.6s ease-in-out infinite}
+@keyframes balance{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
+.vehicule{animation:rouler var(--d,10s) linear infinite alternate}
+@keyframes rouler{0%{offset-distance:0%}100%{offset-distance:100%}}
+.neon{animation:clignote 5s ease-in-out infinite}
+@keyframes clignote{0%,92%,100%{opacity:1}94%{opacity:.55}96%{opacity:1}97%{opacity:.75}}
+@media (prefers-reduced-motion:reduce){.agent,.vehicule,.neon{animation:none}.terr .bati{transition:none}}
+.c-nom{font:700 14px var(--f-titre);fill:var(--texte);letter-spacing:.02em}
+.c-txt{font:500 11px var(--f-texte);fill:var(--doux)}
+
+.panneau{display:flex;flex-direction:column;gap:12px;min-width:0}
+.bloc{background:var(--carte);border:1px solid var(--trait);border-radius:14px;padding:16px;min-width:0}
+.bloc h2{font-family:var(--f-titre);font-weight:800;font-size:28px;line-height:1.05;margin:0;text-wrap:balance}
+.sous{color:var(--doux);margin:2px 0 0;font-size:14px}
+.titre-bloc{font-family:var(--f-titre);font-weight:700;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--doux)}
+.chiffres{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+.chiffre{background:var(--plateau);border-radius:10px;padding:10px 12px;min-width:0}
+.chiffre .v{font-family:var(--f-titre);font-weight:700;font-size:26px;line-height:1;font-variant-numeric:tabular-nums}
+.chiffre .l{display:flex;align-items:center;justify-content:space-between;gap:6px;color:var(--doux);font-size:12.5px;margin-top:4px}
+.dep-resume{margin-top:12px;padding:10px 12px;border-radius:10px;border:1px dashed var(--trait);font-size:14px}
+.dep-resume small{display:block;color:var(--doux);font-size:12.5px;margin-top:2px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 16px;border-radius:9px;border:1px solid var(--trait);background:var(--carte-2);color:var(--texte);font-weight:600;cursor:pointer;text-decoration:none}
+.btn svg{width:18px;height:18px;flex:none}
+.btn:hover:not(:disabled){border-color:var(--doux)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.principal{background:var(--rouge);border-color:var(--rouge);color:#fff;font-family:var(--f-titre);font-size:18px;letter-spacing:.03em;min-height:52px;box-shadow:0 0 18px rgba(226,27,42,.3)}
+.btn.principal:hover:not(:disabled){background:var(--neon)}
+.btn.plein{width:100%;margin-top:14px}
+.btn.discret{background:transparent}
+.regle{font-size:12.5px;color:var(--doux);margin:12px 0 0}
+.info{font-size:13.5px;color:var(--doux)}
+.info b{color:var(--texte)}
+.message{font-size:13.5px;padding:10px 12px;border-radius:8px;background:var(--plateau);border-left:3px solid var(--vert)}
+.message.erreur{border-left-color:var(--danger)}
+.import{display:flex;flex-direction:column;gap:8px}
+.import input{position:absolute;opacity:0;width:1px;height:1px}
+.deps{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px}
+.dep{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto;column-gap:10px;align-items:center;text-align:left;
+  min-height:54px;padding:8px 28px 8px 10px;border-radius:9px;border:1px solid var(--trait);background:var(--plateau);color:var(--texte);cursor:pointer}
+.dep:hover:not(:disabled){border-color:var(--doux)}
+.dep:disabled{opacity:.45;cursor:default}
+.dep-n{grid-row:1/3;font-family:var(--f-titre);font-weight:800;font-size:24px;color:var(--neon);font-variant-numeric:tabular-nums}
+.dep-nom{font-weight:600;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dep-c{color:var(--doux);font-size:12px}
+.dep-alerte{position:absolute;top:6px;right:6px;min-width:20px;height:20px;border-radius:10px;background:var(--danger);color:#fff;font:800 12px var(--f-titre);display:grid;place-items:center;padding:0 5px}
+.a-classer .dep-n{color:var(--orange)}
+
+/* Fil d'actions */
+.fil-actions{border:1px solid var(--trait);border-radius:14px;background:var(--carte);padding:12px 14px 14px;margin-block:0 20px}
+.fil-tete{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.fil-tete h3{font-family:var(--f-titre);font-weight:700;font-size:20px;margin:0}
+.fil-liste{display:flex;gap:10px;overflow-x:auto;padding-top:12px;scroll-snap-type:x mandatory}
+.evt{flex:0 0 210px;scroll-snap-align:start;display:flex;gap:10px;align-items:flex-start;text-align:left;background:var(--plateau);border:1px solid var(--trait);border-radius:10px;padding:10px;color:var(--texte);cursor:pointer}
+.evt:hover{border-color:var(--doux)}
+.evt .pastille{width:36px;height:36px;flex:none;border-radius:50%;display:grid;place-items:center}
+.evt .pastille svg{width:17px;height:17px}
+.evt small{display:block;color:var(--doux);font-size:11.5px}
+.evt b{display:block;font-size:13.5px;line-height:1.2;margin-top:1px}
+.evt>span{min-width:0}
+.evt .g{font-size:12.5px;color:var(--doux);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.b-annuaire{background:rgba(201,205,211,.14);color:#E4E7EB;border:1px solid rgba(201,205,211,.35)}
+.marche .chiffres{margin-top:10px}
+.test-ok{margin-top:10px;padding:10px 12px;border-radius:10px;background:var(--plateau);display:flex;flex-direction:column;gap:4px;font-size:13.5px}
+.test-ok small{color:var(--doux)}
+.progression{margin-top:10px;display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--doux)}
+.progression .barre{height:8px;border-radius:4px;background:var(--trait);overflow:hidden}
+.progression .barre i{display:block;height:100%;background:var(--neon);transition:width .2s}
+.indic-commune{margin-top:12px;padding:10px 12px;border-radius:10px;border:1px dashed var(--trait)}
+.indic-commune small{display:block;color:var(--doux);font-size:12px}
+.gros-chiffre{font-family:var(--f-titre);font-weight:800;font-size:28px;font-variant-numeric:tabular-nums}
+.ligne .rang{width:24px;height:24px;flex:none;border-radius:50%;display:grid;place-items:center;background:var(--rouge);color:#fff;font:800 13px var(--f-titre)}
+.vignette.annuaire{color:var(--doux)}
+.vignette.annuaire svg{width:34px;height:34px}
+/* Carte réelle */
+.zone-carte{position:relative;border:1px solid var(--trait);border-radius:14px;overflow:hidden;background:var(--plateau);min-width:0}
+#carte{height:min(66vh,600px);width:100%}
+.avis-tuiles{position:absolute;left:12px;right:12px;bottom:12px;z-index:900;background:rgba(10,11,13,.95);border:1px solid var(--trait);border-radius:8px;padding:10px 12px;font-size:13.5px}
+.avis-tuiles a{color:var(--rouge-doux)}
+.recherche{width:100%;min-height:44px;border-radius:8px;border:1px solid var(--trait);background:var(--plateau);color:var(--texte);padding:0 12px}
+select.recherche{appearance:auto}
+.champs-filtre{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.liste{display:flex;flex-direction:column;gap:6px;max-height:44vh;overflow:auto;margin-top:10px}
+.ligne{display:flex;align-items:center;gap:10px;text-align:left;width:100%;min-height:50px;padding:8px 10px;border-radius:9px;border:1px solid transparent;background:var(--plateau);color:var(--texte);cursor:pointer}
+.ligne:hover{border-color:var(--trait)}
+.ligne i{width:10px;height:10px;border-radius:50%;flex:none}
+.ligne span{min-width:0;flex:1}
+.ligne small{display:block;color:var(--doux);font-size:12px}
+.ligne small.motif{color:var(--rouge-doux)}
+.ligne em{font-style:normal;font-size:11px;color:var(--gris);flex:none}
+.ligne .badge{flex:none}
+.tournee{border-color:rgba(226,27,42,.5)}
+.tournee ol{margin:8px 0 0;padding-left:20px;font-size:14px}
+.tournee li{padding:3px 0}
+
+/* Fiche garage */
+.voile{position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.55);display:flex;justify-content:flex-end}
+.fiche{width:min(460px,100%);height:100%;overflow:auto;background:var(--carte);border-left:1px solid var(--trait);
+  padding-block:calc(16px + env(safe-area-inset-top,0px)) calc(24px + env(safe-area-inset-bottom,0px));
+  padding-left:16px;padding-right:max(16px,env(safe-area-inset-right,0px))}
+.fiche-tete{display:grid;grid-template-columns:96px minmax(0,1fr) auto;gap:12px;align-items:start}
+.vignette{width:96px;height:72px;border-radius:10px;background:linear-gradient(160deg,#1E232B,#0E1014);border:1px solid var(--trait);display:grid;place-items:center;overflow:hidden}
+.fiche-tete h2{font-family:var(--f-titre);font-weight:800;font-size:24px;margin:0;line-height:1.05;overflow-wrap:anywhere}
+.pastille-statut{display:inline-flex;align-items:center;gap:6px;margin-top:6px;padding:3px 9px;border-radius:5px;font-weight:600;font-size:13px}
+.lieu{color:var(--doux);font-size:13px;margin-top:6px}
+.fermer{width:40px;height:40px;border-radius:8px;border:1px solid var(--trait);background:none;color:var(--texte);cursor:pointer;font-size:22px;line-height:1}
+.actions-fiche{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.actions-fiche .btn{min-height:44px;padding:0 12px;font-size:14px}
+.actions-fiche .btn.principal{font-size:17px;flex:1}
+.sous-onglets{display:flex;gap:4px;margin-top:16px;border-bottom:1px solid var(--trait)}
+.sous-onglets button{background:none;border:0;border-bottom:2px solid transparent;color:var(--doux);padding:10px;cursor:pointer;font-weight:600}
+.sous-onglets button[aria-selected="true"]{color:var(--neon);border-bottom-color:var(--neon)}
+.champs{display:flex;flex-direction:column}
+.champ{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;padding:10px 0;border-bottom:1px solid var(--trait)}
+.champ .n{color:var(--doux);font-size:12.5px}
+.champ .val{grid-column:1;font-weight:500;overflow-wrap:anywhere}
+.champ .badge{grid-row:1/3;grid-column:2;align-self:center}
+.champ.vide .val{color:var(--gris);font-weight:400}
+.vide-onglet{padding:24px 4px;color:var(--doux);font-size:14px}
+.action{margin-top:14px;padding:12px 14px;border-radius:10px;background:var(--plateau);border:1px solid rgba(226,27,42,.6)}
+.action .n{font-family:var(--f-titre);font-weight:700;letter-spacing:.1em;font-size:12px;color:var(--rouge-doux);text-transform:uppercase}
+
+/* Personnages */
+.perso{cursor:pointer}
+.perso *{pointer-events:none}
+.perso .zone{fill:transparent;pointer-events:all}
+.perso:hover .zone,.perso:focus .zone{fill:rgba(255,255,255,.06)}
+.perso .bulle{opacity:0;transition:opacity .15s;pointer-events:none}
+.perso:hover .bulle,.perso:focus .bulle{opacity:1}
+.perso:hover .corps,.perso:focus .corps{transform:translateY(-3px)}
+.perso .corps{transition:transform .15s}
+.perso:focus{outline:none}
+.perso:focus .corps{filter:drop-shadow(0 0 3px #FF2D3D)}
+.portraits{margin-top:14px}
+.portraits-liste{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.mini{display:flex;align-items:center;gap:8px;text-align:left;padding:6px;border-radius:10px;border:1px solid var(--trait);background:var(--plateau);color:var(--texte);cursor:pointer;min-width:0}
+.mini:hover{border-color:var(--doux)}
+.mini span{min-width:0;font-size:12.5px;font-weight:600;line-height:1.2;overflow:hidden;text-overflow:ellipsis}
+.mini small{display:block;font-size:11px;font-weight:500}
+.portrait{flex:none;display:block}
+.cartes-agents{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.carte-agent{display:flex;gap:12px;align-items:center;text-align:left;padding:10px;border-radius:12px;border:1px solid var(--trait);background:var(--plateau);color:var(--texte);cursor:pointer;min-width:0}
+.carte-agent:hover{border-color:var(--sim)}
+.ca-txt{display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:0}
+.ca-txt b{font-size:15px}
+.ca-txt small{color:var(--doux);font-size:12px}
+.ca-txt small.budget{color:var(--texte);font-variant-numeric:tabular-nums}
+.pastille-statut.petite{margin:0;padding:1px 7px;font-size:11.5px}
+.puce.tous.sim[aria-pressed="true"]{background:var(--sim);border-color:var(--sim)}
+.fiche.sim{border-left-color:rgba(139,92,246,.6)}
+.sec-agent{padding:12px 0;border-bottom:1px solid var(--trait)}
+.sec-agent p{margin:6px 0 0}
+.sec-agent ul{margin:6px 0 0;padding-left:18px}
+.sec-agent .gros{font-family:var(--f-titre);font-weight:800;font-size:26px;margin:4px 0 6px;font-variant-numeric:tabular-nums}
+.sec-agent .gros small{font-family:var(--f-texte);font-size:13px;font-weight:500;color:var(--doux)}
+.puces-texte{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.puces-texte span{padding:4px 10px;border-radius:14px;background:rgba(139,92,246,.14);color:var(--sim-doux);font-size:13px;font-weight:600}
+.deux-col{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.jauge{display:inline-flex;gap:4px;margin-top:8px}
+.jauge i{width:22px;height:8px;border-radius:4px;background:var(--trait)}
+@media (pointer:coarse){.perso .bulle{display:none}}
+.feuille-poignee{display:none}
+.choix-liste{display:flex;flex-direction:column;gap:8px}
+.choix{display:flex;align-items:center;gap:12px;min-height:72px;padding:8px 12px;text-align:left;border-radius:12px;border:1px solid var(--trait);background:var(--plateau);color:var(--texte);cursor:pointer}
+.choix.touche{border-color:var(--neon);box-shadow:0 0 0 1px var(--neon) inset}
+.choix span{min-width:0;display:flex;flex-direction:column;gap:2px}
+.choix b{font-size:16px}
+.choix small{color:var(--doux);font-size:13px}
+@media (max-width:700px){
+  .voile:has(.feuille){align-items:flex-end}
+  .fiche.feuille{height:auto;max-height:82vh;width:100%;border-left:0;border-top:1px solid var(--trait);border-radius:18px 18px 0 0;padding-top:10px}
+  .feuille-poignee{display:block;width:44px;height:5px;border-radius:3px;background:var(--trait);margin:0 auto 10px}
+}
+/* Simulation */
+.bandeau-sim{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 16px;border-radius:12px;border:1px solid rgba(139,92,246,.5);background:rgba(139,92,246,.1);margin-block:14px}
+.bandeau-sim b{font-family:var(--f-titre);font-size:18px;letter-spacing:.06em;color:var(--sim-doux)}
+.scenarios{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+@media (max-width:860px){.scenarios{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.scen{border-radius:12px;padding:14px;background:var(--carte);border:1px solid var(--trait);min-width:0}
+.scen h4{margin:0;font-family:var(--f-titre);font-weight:800;font-size:16px;letter-spacing:.06em;text-transform:uppercase}
+.scen p{margin:2px 0 10px;color:var(--doux);font-size:13px}
+.scen .ligne-s{display:flex;justify-content:space-between;font-size:13.5px;padding:4px 0;border-top:1px solid var(--trait);color:var(--doux)}
+.scen .ligne-s b{color:var(--gris);font-variant-numeric:tabular-nums}
+.agents{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-top:12px}
+.fig{background:var(--plateau);border:1px solid var(--trait);border-radius:10px;padding:10px;text-align:center;font-size:12.5px;color:var(--doux)}
+.fig b{display:block;color:var(--texte);font-size:13.5px;margin:4px 0 6px}
+
+/* Leaflet : feuille minimale embarquée (les feuilles externes sont bloquées dans l'aperçu) */
+.leaflet-pane,.leaflet-tile,.leaflet-marker-icon,.leaflet-tile-container,.leaflet-pane>svg,.leaflet-pane>canvas,.leaflet-layer{position:absolute;left:0;top:0}
+.leaflet-container{overflow:hidden;background:var(--plateau);outline:0;font-family:var(--f-texte);-webkit-tap-highlight-color:transparent}
+.leaflet-tile,.leaflet-marker-icon{user-select:none;-webkit-user-drag:none}
+.leaflet-container img.leaflet-tile{max-width:none!important;max-height:none!important;width:256px;height:256px;filter:grayscale(.55) brightness(.62) contrast(1.15)}
+.leaflet-tile{visibility:hidden}.leaflet-tile-loaded{visibility:inherit}
+.leaflet-zoom-animated{transform-origin:0 0}
+.leaflet-zoom-anim .leaflet-zoom-animated{transition:transform .25s cubic-bezier(0,0,.25,1)}
+.leaflet-pane{z-index:400}.leaflet-tile-pane{z-index:200}.leaflet-overlay-pane{z-index:400}.leaflet-marker-pane{z-index:600}.leaflet-tooltip-pane{z-index:650}
+.leaflet-pane>svg path.leaflet-interactive,.leaflet-marker-icon.leaflet-interactive{cursor:pointer;pointer-events:auto}
+.leaflet-pane>svg path{pointer-events:none}
+.leaflet-control{position:relative;z-index:800;pointer-events:auto;float:left;clear:both}
+.leaflet-top,.leaflet-bottom{position:absolute;z-index:1000;pointer-events:none}
+.leaflet-top{top:10px}.leaflet-bottom{bottom:0}.leaflet-left{left:10px}.leaflet-right{right:0}
+.leaflet-right .leaflet-control{float:right}
+.leaflet-control-zoom{display:flex;flex-direction:column;border-radius:8px;overflow:hidden;border:1px solid var(--trait)}
+.leaflet-control-zoom a{width:40px;height:40px;display:grid;place-items:center;background:var(--carte);color:var(--texte);text-decoration:none;font-size:20px;font-weight:600}
+.leaflet-control-zoom a+a{border-top:1px solid var(--trait)}
+.leaflet-control-attribution{background:rgba(18,19,20,.8);color:var(--doux);font-size:11px;padding:2px 6px}
+.leaflet-control-attribution a{color:var(--doux)}
+.leaflet-tooltip{position:absolute;background:var(--carte);color:var(--texte);border:1px solid var(--trait);border-radius:6px;padding:4px 8px;font-size:13px;white-space:nowrap;pointer-events:none}
+.repere-centre{width:18px;height:18px;border-radius:4px;background:var(--rouge);border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.5)}
+.repere-grappe{display:grid;place-items:center;width:38px;height:38px;border-radius:50%;background:var(--rouge);color:#fff;font-family:var(--f-titre);font-weight:800;font-size:17px;border:3px solid rgba(255,255,255,.85)}
+</style>
+<header class="entete">
+  <div class="entete-l1 gouttiere">
+    <div class="marque">
+      <div class="logo" aria-hidden="true"><span></span></div>
+      <div class="marque-txt"><b>ODICOLOR <em>2.0</em></b><small>Bureau · Île-de-France</small></div>
+    </div>
+    <nav class="onglets" id="onglets" aria-label="Écrans"></nav>
+    <div class="outils">
+      <div class="cherche" id="cherche"></div>
+      <button id="mode" class="mode" type="button" aria-expanded="false" aria-controls="donnees">Démo</button>
+    </div>
+  </div>
+  <div id="donnees" class="donnees" hidden></div>
+</header>
+
+<div class="gouttiere">
+  <section class="kpis" id="kpis" aria-label="Indicateurs"></section>
+  <div class="barre-filtres" id="filtres" aria-label="Filtres"></div>
+  <main id="vue"></main>
+  <section class="fil-actions" id="fil-actions" aria-label="Actions commerciales"></section>
+</div>
+<div id="couche-fiche" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="communes-idf.js"></script>
+<script src="bureau-logique.js"></script>
+<script src="annuaire.js"></script>
+<script>
+(function(){
+'use strict';
+const L0 = window.BureauLogique;
+const {TERRITOIRES, DEPOT, STATUTS} = L0;
+const $ = s => document.querySelector(s);
+const SVGT = new Set(['svg','g','path','polygon','polyline','ellipse','circle','text','rect','line','title','defs','filter','feGaussianBlur','feMerge','feMergeNode','radialGradient','stop']);
+function h(tag, attrs, ...enfants){
+  const el = SVGT.has(tag) ? document.createElementNS('http://www.w3.org/2000/svg', tag) : document.createElement(tag);
+  for (const [k,v] of Object.entries(attrs||{})) {
+    if (v == null || v === false) continue;
+    if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+    else el.setAttribute(k, v === true ? '' : v);
+  }
+  for (const e of enfants.flat(Infinity)) if (e != null && e !== false) el.append(e.nodeType ? e : document.createTextNode(String(e)));
+  return el;
+}
+const IC = {
+  ville:'M3 21V9l6-4v4l6-4v16M15 21V3h6v18M3 21h18', carte:'M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14',
+  sim:'M4 19V5M4 19h16M8 15l3-4 3 2 5-6', loupe:'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 20l-4-4',
+  clients:'M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2 20c0-3 3-5 6-5s6 2 6 5M17 11a3 3 0 1 0 0-6M22 20c0-3-2-5-5-5',
+  cible:'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
+  alerte:'M12 3 2 20h20L12 3zM12 10v4M12 17h.01', lieu:'M12 21s-7-6-7-11a7 7 0 0 1 14 0c0 5-7 11-7 11zM12 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
+  euro:'M17 6a7 7 0 1 0 0 12M4 10h9M4 14h9', fiole:'M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3',
+  visite:'M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2 20c0-3 3-5 6-5s6 2 6 5', devis:'M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6',
+  relance:'M4 12a8 8 0 1 0 3-6M4 4v4h4', tel:'M5 4h4l2 5-3 2a11 11 0 0 0 5 5l2-3 5 2v4a2 2 0 0 1-2 2A17 17 0 0 1 3 6a2 2 0 0 1 2-2',
+  copier:'M9 9h11v11H9zM5 15H4V4h11v1', calendrier:'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4'
+};
+const icone = k => h('svg',{viewBox:'0 0 24 24', fill:'none', stroke:'currentColor','stroke-width':2,'stroke-linecap':'round','stroke-linejoin':'round','aria-hidden':'true'}, h('path',{d:IC[k]}));
+const euros = v => v == null ? null : new Intl.NumberFormat('fr-FR',{maximumFractionDigits:0}).format(v) + ' €';
+const keuros = v => v == null ? null : (v >= 10000 ? new Intl.NumberFormat('fr-FR',{maximumFractionDigits:0}).format(v/1000) + ' k€' : euros(v));
+const pluriel = (n, mot) => n + ' ' + mot + (n > 1 ? 's' : '');
+async function copier(t){ try { await navigator.clipboard.writeText(t); return true; } catch(e){ return false; } }
+
+// ---- État (en mémoire seulement : rien n'est enregistré, rien n'est envoyé) ----
+const demo0 = L0.garagesDemo(2026);
+const etat = { mode:'demo', garages:demo0, rapport:L0.rapportClassement(demo0), choix:'palaiseau',
+  filtre:'tous', famille:'toutes', commune:'', recherche:'', message:null, tournee:[], donneesOuvertes:false };
+const src = () => etat.mode === 'demo' ? ['b-demo','Démo'] : ['b-terrain','Saisi terrain'];
+const badgeSrc = () => { const s = src(); return h('span',{class:'badge '+s[0]}, s[1]); };
+const FILTRES = { tous:null, actif:['actif'], prospect:['prospect'], dormant:['dormant','perdu','inconnu'], risque:['risque'] };
+const visible = g => !FILTRES[etat.filtre] || FILTRES[etat.filtre].includes(g.statut);
+
+// ================= Indicateurs =================
+function rendreKpis(){
+  const g = etat.garages, idf = g.filter(x => x.dep);
+  const n = k => idf.filter(x => x.statut === k).length;
+  const communes = new Set(idf.map(x => x.commune).filter(Boolean)).size;
+  const ca = etat.mode === 'demo' ? idf.reduce((a, x) => a + (x.caMois || 0), 0) : null;
+  const kpi = (ic, l, v, s) => h('div',{class:'kpi'}, h('div',{class:'ic'}, icone(ic)),
+    h('div',{}, h('div',{class:'l'}, l), h('div',{class:'v'+(v==null?' petit':'')}, v==null ? 'Non renseigné' : v), h('div',{class:'s'}, s)));
+  $('#kpis').replaceChildren(
+    kpi('clients','Garages clients', n('actif'), badgeSrc()),
+    kpi('cible','Prospects', n('prospect'), badgeSrc()),
+    kpi('alerte','Risque règlement', n('risque'), [badgeSrc(), '+ ' + pluriel(n('dormant'),'dormant')]),
+    kpi('lieu','Communes couvertes', communes, [h('span',{class:'badge b-confirme'},'Officiel'), pluriel(L0.aClasser(g).length,'à classer')]),
+    kpi('euro','CA du mois', keuros(ca), ca==null ? h('span',{class:'badge b-vide'},'EBP · Lot 3') : badgeSrc()),
+    kpi('fiole','Essais Carsystem', null, h('span',{class:'badge b-vide'},'Lot 3')));
+}
+function rendreFiltres(){
+  if (route().ecran === 'simulation') { $('#filtres').replaceChildren(); return; }
+  const def = [['tous','Tous',null],['actif','Clients','var(--vert)'],['prospect','Prospects','var(--bleu)'],['dormant','Dormants / perdus','var(--orange)'],['risque','Risque règlement','var(--danger)']];
+  const nb = k => etat.garages.filter(x => x.dep && (!FILTRES[k] || FILTRES[k].includes(x.statut))).length;
+  $('#filtres').replaceChildren(...def.map(([k,l,c]) => h('button',{class:'puce'+(k==='tous'?' tous':''), 'aria-pressed':String(etat.filtre===k),
+    onclick:()=>{ etat.filtre = k; rendre(); }}, c ? h('i',{style:`background:${c}`}) : null, `${l} (${nb(k)})`)));
+}
+
+// ================= NIVEAU 1 : la ville de nuit =================
+const TW = 96, TH = 48, N = 10, DEC = 1;
+const iso = (c, r) => [(c - r) * TW / 2, (c + r) * TH / 2];
+const pos = t => [t.grille[0] + DEC, t.grille[1] + DEC];
+const DEPOT_G = [DEPOT.grille[0] + DEC, DEPOT.grille[1] + DEC];
+const losange = (c, r, k=1) => { const [x,y] = iso(c,r), w=TW/2*k, hh=TH/2*k; return `${x},${y-hh} ${x+w},${y} ${x},${y+hh} ${x-w},${y}`; };
+function cheminRoute(a, b){ const t=[]; let [c,r]=a; while(c!==b[0]){t.push([c,r]);c+=Math.sign(b[0]-c);} while(r!==b[1]){t.push([c,r]);r+=Math.sign(b[1]-r);} t.push([c,r]); return t; }
+const pts = a => a.map(p => p.join(',')).join(' ');
+const faceG = (x,yb,hw,ht) => (u,v) => [x-hw+u*hw, yb+u*hw/2-v*ht];
+const faceD = (x,yb,hw,ht) => (u,v) => [x+u*hw, yb+hw/2-u*hw/2-v*ht];
+const quad = (f,u0,u1,v0,v1) => pts([f(u0,v0),f(u1,v0),f(u1,v1),f(u0,v1)]);
+
+function volume(x, yb, hw, ht, pal, opt={}){
+  const g = h('g',{}), hh = hw/2, yt = yb - ht;
+  g.append(
+    h('polygon',{points:`${x-hw},${yb} ${x},${yb+hh} ${x},${yt+hh} ${x-hw},${yt}`, fill:pal.g}),
+    h('polygon',{points:`${x+hw},${yb} ${x},${yb+hh} ${x},${yt+hh} ${x+hw},${yt}`, fill:pal.d}),
+    h('polygon',{points:`${x},${yt-hh} ${x+hw},${yt} ${x},${yt+hh} ${x-hw},${yt}`, fill:pal.t}));
+  const fg = faceG(x,yb,hw,ht), fd = faceD(x,yb,hw,ht);
+  if (opt.porte) {
+    const vp = Math.min(0.62, 20/ht);
+    g.append(h('polygon',{points:quad(fg,0.18,0.62,0,vp), fill:'#3A4049'}));
+    for (let i=1;i<4;i++) g.append(h('polyline',{points:pts([fg(0.18,vp*i/4),fg(0.62,vp*i/4)]), stroke:'#262B33','stroke-width':1, fill:'none'}));
+    g.append(h('polygon',{points:quad(fg,0.18,0.62,0,0.06), fill:'rgba(255,200,115,.35)'}));
+  }
+  if (opt.fenetres) {
+    const a = opt.alea, rangs = Math.max(1, Math.floor(ht/13));
+    for (let r=0;r<rangs;r++) for (let c=0;c<3;c++){
+      const v0 = (r*13+5)/ht, v1 = (r*13+10)/ht; if (v1 > 0.95) continue;
+      const allume = a() < (opt.densite || 0.6);
+      g.append(h('polygon',{points:quad(fd,0.12+c*0.28,0.3+c*0.28,v0,v1), fill: allume ? 'var(--vitre)' : '#1A1E25', opacity: allume ? (0.55 + a()*0.4).toFixed(2) : 1}));
+    }
+  }
+  if (opt.led) g.append(h('polygon',{class:'neon', points:quad(fg,0.05,0.95,0.86,0.96), fill:opt.led, filter:'url(#lueur)'}));
+  if (opt.tenons) {
+    const p = hw/2;
+    [[-1,0],[1,0],[0,-1],[0,1]].forEach(([i,j]) => { const sx = x+(i-j)*p/2, sy = yt+(i+j)*p/4;
+      g.append(h('ellipse',{cx:sx,cy:sy+2.5,rx:p*.4,ry:p*.2,fill:pal.d}), h('rect',{x:sx-p*.4,y:sy,width:p*.8,height:2.5,fill:pal.g}), h('ellipse',{cx:sx,cy:sy,rx:p*.4,ry:p*.2,fill:pal.t,stroke:pal.g,'stroke-width':.5})); });
+  }
+  return g;
+}
+const PAL = { mur:{t:'#5D6573',g:'#414955',d:'#323842'}, maison:{t:'#6A4E4A',g:'#3D424B',d:'#30343C'}, immeuble:{t:'#4A5260',g:'#333A44',d:'#272C35'}, depot:{t:'#16181C',g:'#101215',d:'#0B0C0F'}, blanc:{t:'#E9E6E1',g:'#B9B5AF',d:'#8E8A84'} };
+const toitStatut = { actif:{t:'#39C477',g:'#1F7A47',d:'#18603A'}, prospect:{t:'#4D8FF0',g:'#2A5DB0',d:'#21498A'}, dormant:{t:'#F0A04A',g:'#A8681E',d:'#855118'}, risque:{t:'#F0505A',g:'#A81E27',d:'#84171E'}, perdu:{t:'#7C8088',g:'#50545B',d:'#3E4147'}, inconnu:{t:'#7C8088',g:'#50545B',d:'#3E4147'} };
+const statutDominant = s => s.risque ? 'risque' : s.actif ? 'actif' : s.dormant ? 'dormant' : 'prospect';
+
+// Figurine maison (miniature, pas une copie de marque). Origine = pieds, hauteur ≈ 52.
+// Le métier se lit aux vêtements et à l'accessoire ; le statut à l'anneau au sol et au badge de poitrine.
+function figurine(app, statut, opt={}){
+  const c = STATUTS[statut] ? STATUTS[statut].couleur : '#7C8088', P = app.peau, H = app.cheveux, T = app.tenue, role = app.role || 'responsable';
+  const tenues = {
+    peintre:{ jambes:'#D5D9DF', buste:'#E4E7EB', bras:'#D5D9DF' },
+    responsable:{ jambes:'#262B33', buste:T, bras:T },
+    gerant:{ jambes:'#2B3038', buste:'#F1EFEA', bras:'#F1EFEA' },
+    commercial:{ jambes:'#23272E', buste:'#2B313B', bras:'#2B313B' },
+    direction:{ jambes:'#15171B', buste:'#1C1F25', bras:'#1C1F25' },
+    magasin:{ jambes:'#262B33', buste:T, bras:T }
+  }[role] || { jambes:'#262B33', buste:T, bras:T };
+  const g = h('g',{class:'corps'});
+  if (opt.anneau) g.append(h('ellipse',{cx:0,cy:1,rx:13,ry:4.6,fill:'none',stroke:c,'stroke-width':2.2,filter:'url(#lueur)'}));
+  g.append(h('ellipse',{cx:0,cy:1,rx:10,ry:3.2,fill:'rgba(0,0,0,.5)'}),
+    h('rect',{x:-6,y:-15,width:5,height:14,rx:1,fill:tenues.jambes}), h('rect',{x:1,y:-15,width:5,height:14,rx:1,fill:tenues.jambes}),
+    h('rect',{x:-7,y:-2.5,width:6.2,height:3,rx:1,fill:'#0E0F12'}), h('rect',{x:.8,y:-2.5,width:6.2,height:3,rx:1,fill:'#0E0F12'}),
+    h('rect',{x:-12.5,y:-31,width:4.4,height:14,rx:2,fill:tenues.bras}), h('rect',{x:8.1,y:-31,width:4.4,height:14,rx:2,fill:tenues.bras}),
+    h('polygon',{points:'-9,-15 9,-15 8,-32 -8,-32', fill:tenues.buste}));
+  // détails de tenue par métier
+  if (role === 'peintre') g.append(h('line',{x1:0,y1:-32,x2:0,y2:-16,stroke:'#9AA1AB','stroke-width':.8}),
+    h('rect',{x:-9,y:-24,width:18,height:2.2,fill:c}), h('rect',{x:8.1,y:-27,width:4.4,height:2.2,fill:c}));
+  if (role === 'responsable') g.append(h('polygon',{points:'-8,-32 -2.5,-32 -1.5,-15 -9,-15', fill:c}), h('polygon',{points:'8,-32 2.5,-32 1.5,-15 9,-15', fill:c}),
+    h('rect',{x:-9,y:-22,width:18,height:2,fill:'#F4F2EF',opacity:.85}));
+  if (role === 'gerant') g.append(h('polygon',{points:'-8,-32 -3,-32 -2,-15 -9,-15', fill:T}), h('polygon',{points:'8,-32 3,-32 2,-15 9,-15', fill:T}),
+    h('polygon',{points:'-2,-32 0,-29 2,-32', fill:'#C9C5BE'}));
+  if (role === 'commercial' || role === 'direction') g.append(h('polygon',{points:'-3.2,-32 0,-24 3.2,-32', fill:'#F4F2EF'}),
+    h('polygon',{points:'-1,-31 1,-31 1.4,-22 0,-20.5 -1.4,-22', fill: role==='direction' ? '#8C0F17' : '#D41F2B'}),
+    h('line',{x1:-3.2,y1:-32,x2:-1,y2:-22,stroke:'#14161A','stroke-width':.8}), h('line',{x1:3.2,y1:-32,x2:1,y2:-22,stroke:'#14161A','stroke-width':.8}));
+  if (role === 'magasin') g.append(h('polygon',{points:'-7,-29 7,-29 8.5,-14 -8.5,-14', fill:'#C81E2A'}), h('rect',{x:-3,y:-24,width:6,height:4,rx:.8,fill:'#8C0F17'}));
+  if (role !== 'peintre' && role !== 'responsable') g.append(h('circle',{cx:-4.5,cy:-27,r:1.8,fill:c,stroke:'#0E0F12','stroke-width':.5}));
+  g.append(h('circle',{cx:-10.3,cy:-16.5,r:2.3,fill:P}), h('circle',{cx:10.3,cy:-16.5,r:2.3,fill:P}));
+  // accessoire du métier
+  const acc = {
+    peintre:[h('rect',{x:9,y:-20,width:9,height:3.2,rx:1,fill:'#9AA1AB'}), h('rect',{x:10.5,y:-17.5,width:2.6,height:5,fill:'#6B7280'}), h('rect',{x:13,y:-25,width:4,height:5,rx:1,fill:'#C9CDD3'})],
+    responsable:[h('rect',{x:-17,y:-25,width:7.5,height:10,rx:1,fill:'#F4F2EF'}), h('rect',{x:-15.5,y:-26,width:4.5,height:2,rx:.5,fill:'#6B7280'}), h('rect',{x:-15.8,y:-22,width:5,height:.9,fill:'#9AA1AB'}), h('rect',{x:-15.8,y:-19.5,width:5,height:.9,fill:'#9AA1AB'})],
+    gerant:[h('rect',{x:-17,y:-26,width:8,height:11,rx:1.4,fill:'#14161A'}), h('rect',{x:-16,y:-25,width:6,height:9,rx:.8,fill:'#5FA8F0',opacity:.85})],
+    commercial:[h('rect',{x:8.5,y:-14,width:11,height:8,rx:1.5,fill:'#3A2A20'}), h('rect',{x:12,y:-15.5,width:4,height:2,rx:1,fill:'none',stroke:'#3A2A20','stroke-width':1})],
+    direction:[],
+    magasin:[h('rect',{x:-9,y:-22,width:18,height:9,fill:'#B58B5A'}), h('line',{x1:-9,y1:-19,x2:9,y2:-19,stroke:'#8E6A40','stroke-width':.8})]
+  }[role] || [];
+  g.append(...acc);
+  if (role === 'peintre') g.append(h('rect',{x:-4.5,y:-35,width:9,height:4,rx:2,fill:'#2B2F36'}), h('circle',{cx:-3.5,cy:-33,r:1.6,fill:'#4A5260'}), h('circle',{cx:3.5,cy:-33,r:1.6,fill:'#4A5260'}));
+  else g.append(h('rect',{x:-2,y:-35,width:4,height:3.5,fill:P}));
+  g.append(h('rect',{x:-7.5,y:-48,width:15,height:14.5,rx:4.5,fill:P}));
+  const casque = role === 'peintre' && app.coupe === 'casquette';
+  const hair = casque ? [h('path',{d:'M-8.5,-42 Q-8.5,-52 0,-52 Q8.5,-52 8.5,-42 Z',fill:'#E4E7EB'}), h('rect',{x:-1,y:-43.5,width:12,height:2.6,rx:1.2,fill:'#B9BEC6'})] : ({
+    courte:[h('path',{d:'M-8,-41 Q-8,-50 0,-50 Q8,-50 8,-41 L8,-44 Q6,-46 0,-46 Q-6,-46 -8,-44 Z',fill:H})],
+    rase:[h('path',{d:'M-7.5,-44 Q-7,-49 0,-49 Q7,-49 7.5,-44 Q4,-46.5 0,-46.5 Q-4,-46.5 -7.5,-44 Z',fill:H,opacity:.85})],
+    longue:[h('path',{d:'M-9,-31 L-9,-43 Q-9,-51 0,-51 Q9,-51 9,-43 L9,-31 L6,-31 L6,-43 Q4,-46 0,-46 Q-4,-46 -6,-43 L-6,-31 Z',fill:H})],
+    chignon:[h('circle',{cx:0,cy:-51.5,r:4,fill:H}), h('path',{d:'M-8,-42 Q-8,-50 0,-50 Q8,-50 8,-42 Q5,-46 0,-46 Q-5,-46 -8,-42 Z',fill:H})],
+    casquette:[h('path',{d:'M-8.5,-42 Q-8.5,-52 0,-52 Q8.5,-52 8.5,-42 Z',fill:'#C81E2A'}), h('rect',{x:-1,y:-43.5,width:12,height:2.6,rx:1.2,fill:'#8C0F17'})],
+    boucles:[-6,-3,0,3,6].map((dx,i)=>h('circle',{cx:dx,cy:-48-(i%2)*1.5,r:3.3,fill:H}))
+  }[app.coupe] || []);
+  g.append(...hair);
+  if (app.barbe) g.append(h('path',{d:'M-7.5,-40 Q-7.5,-33.5 0,-33.5 Q7.5,-33.5 7.5,-40 Q5,-37 0,-37 Q-5,-37 -7.5,-40 Z',fill:H,opacity:.92}));
+  g.append(h('circle',{cx:-3,cy:-41,r:1.15,fill:'#15171B'}), h('circle',{cx:3,cy:-41,r:1.15,fill:'#15171B'}),
+    h('path',{d:'M-2.6,-37.6 Q0,-36 2.6,-37.6',stroke:'#7A3B2E','stroke-width':1,fill:'none','stroke-linecap':'round'}));
+  if (app.lunettes) g.append(h('rect',{x:-6,y:-43,width:4.6,height:3.6,rx:1,fill:'rgba(255,255,255,.18)',stroke:'#111','stroke-width':.8}),
+    h('rect',{x:1.4,y:-43,width:4.6,height:3.6,rx:1,fill:'rgba(255,255,255,.18)',stroke:'#111','stroke-width':.8}), h('line',{x1:-1.4,y1:-41.5,x2:1.4,y2:-41.5,stroke:'#111','stroke-width':.8}));
+  return g;
+}
+const METIERS = { peintre:'Peintre', responsable:'Responsable carrosserie', gerant:'Gérant', commercial:'Commercial', direction:'Direction', magasin:'Magasin' };
+// Personnage cliquable dans la ville : zone de clic propre, passe au premier plan au survol
+function persoVille(ga, x, y, s){
+  const app = L0.apparence(ga.id);
+  const titre = ga.nom + ' · ' + METIERS[app.role];
+  const bulleL = Math.max(80, titre.length*5.2 + 16);
+  const el = h('g',{class:'perso', tabindex:0, role:'button', 'aria-label':`${ga.nom}, ${METIERS[app.role]}, ${STATUTS[ga.statut].libelle}. Ouvrir la fiche`,
+      onclick:e=>{ e.stopPropagation(); if (tactile() && ga.territoire) choixGarages(ga.territoire, ga); else ouvrirFiche(ga); }, onkeydown:e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); e.stopPropagation(); ouvrirFiche(ga);} }},
+    h('rect',{class:'zone', x:-10, y:-54, width:20, height:58, rx:6}),
+    h('g',{class:'agent', style:`animation-delay:-${(L0.normNom(ga.id).length*373)%2600}ms`}, figurine(app, ga.statut, {anneau:true})),
+    h('g',{class:'bulle'}, h('rect',{x:-bulleL/2,y:-74,width:bulleL,height:17,rx:4,fill:'rgba(10,11,13,.95)',stroke:STATUTS[ga.statut].couleur}),
+      h('text',{x:0,y:-62,'text-anchor':'middle',style:'font:600 10px var(--f-texte);fill:#F4F2EF'}, titre)));
+  const wrap = h('g',{transform:`translate(${x.toFixed(1)} ${y.toFixed(1)}) scale(${s})`}, el);
+  const devant = () => { const p = wrap.parentNode; if (p && p.lastChild !== wrap) p.append(wrap); };
+  el.addEventListener('pointerenter', devant); el.addEventListener('focus', devant);
+  return wrap;
+}
+// Téléphone : un doigt couvre plusieurs personnages. Un appui ouvre une liste à gros boutons,
+// le personnage touché en premier, ses voisins dessous. Aucun risque d'ouvrir le mauvais garage.
+const tactile = () => { try { return window.matchMedia('(pointer: coarse)').matches; } catch(e) { return false; } };
+function choixGarages(territoireId, touche){
+  const t = TERRITOIRES.find(x=>x.id===territoireId);
+  const gs = etat.garages.filter(x => x.territoire === territoireId && visible(x));
+  const ordre = [touche, ...gs.filter(x => x !== touche)];
+  panneauLateral(btn => h('aside',{class:'fiche feuille', role:'dialog', 'aria-modal':'true', 'aria-labelledby':'choix-titre'},
+    h('div',{class:'feuille-poignee','aria-hidden':'true'}),
+    h('div',{class:'fil-tete', style:'justify-content:space-between'}, h('h2',{id:'choix-titre', style:'font-family:var(--f-titre);font-size:24px;margin:0'}, `${t.nom} · ${pluriel(gs.length,'garage')}`), btn),
+    h('p',{class:'info', style:'margin:4px 0 10px'}, 'Touche le garage à ouvrir.'),
+    h('div',{class:'choix-liste'}, ordre.map((x,i) => { const app = L0.apparence(x.id);
+      return h('button',{class:'choix'+(i===0?' touche':''), onclick:()=>{ ouvrirFiche(x); }},
+        portrait(app, x.statut, 56), h('span',{}, h('b',{}, x.nom), h('small',{}, METIERS[app.role] + ' · ' + (x.commune||'')),
+          h('small',{style:`color:${STATUTS[x.statut].couleur};font-weight:600`}, STATUTS[x.statut].libelle))); }))));
+}
+// Portrait (buste) pour les listes et les fiches
+function portrait(app, statut, taille){
+  return h('svg',{viewBox:'-17 -55 34 34', width:taille, height:taille, class:'portrait', 'aria-hidden':'true'},
+    h('rect',{x:-17,y:-55,width:34,height:34,rx:8,fill:'#1C2027'}), h('circle',{cx:0,cy:-38,r:15,fill:STATUTS[statut] ? STATUTS[statut].couleur : '#7C8088',opacity:.14}), figurine(app, statut));
+}
+function carteLabel(x, y, titre, ligne, alertes, couleur, choisi){
+  const w = Math.max(118, titre.length*7.4 + 34, ligne.length*5.6 + 22), g = h('g',{});
+  g.append(h('line',{x1:x,y1:y+40,x2:x,y2:y+54,stroke:couleur,'stroke-width':1.2,opacity:.8}),
+    h('rect',{x:x-w/2,y,width:w,height:40,rx:6,fill:'rgba(10,11,13,.92)',stroke:choisi?'var(--neon)':'rgba(255,255,255,.12)','stroke-width':choisi?1.8:1}),
+    h('circle',{cx:x+w/2-12,cy:y+12,r:4.5,fill:couleur,filter:'url(#lueur)'}),
+    h('text',{x:x-w/2+10,y:y+17,class:'c-nom'}, titre), h('text',{x:x-w/2+10,y:y+32,class:'c-txt'}, ligne));
+  if (alertes) g.append(h('circle',{cx:x+w/2,cy:y,r:9,fill:'var(--danger)',stroke:'#fff','stroke-width':1.6}), h('text',{x:x+w/2,y:y+4,'text-anchor':'middle',style:'font:800 11px var(--f-titre);fill:#fff'}, String(alertes)));
+  return g;
+}
+
+function dessinerVille(){
+  const alea = L0.mulberry32(11);
+  const svg = h('svg',{viewBox:'-495 -50 990 550', role:'img', 'aria-label':'Ville ODICOLOR de nuit : 8 portes d’entrée vers les départements, autour du dépôt central'});
+  svg.append(h('defs',{},
+    h('filter',{id:'lueur', x:'-50%', y:'-50%', width:'200%', height:'200%'}, h('feGaussianBlur',{stdDeviation:'2.4', result:'f'}), h('feMerge',{}, h('feMergeNode',{in:'f'}), h('feMergeNode',{in:'SourceGraphic'}))),
+    h('radialGradient',{id:'halo'}, h('stop',{offset:'0','stop-color':'#FFC873','stop-opacity':'.5'}), h('stop',{offset:'1','stop-color':'#FFC873','stop-opacity':'0'})),
+    ...['actif','prospect','dormant','risque'].map(k => h('radialGradient',{id:'halo-'+k}, h('stop',{offset:'0','stop-color':STATUTS[k].couleur,'stop-opacity':'.35'}), h('stop',{offset:'1','stop-color':STATUTS[k].couleur,'stop-opacity':'0'}))),
+    h('radialGradient',{id:'halo-rouge'}, h('stop',{offset:'0','stop-color':'#FF2D3D','stop-opacity':'.55'}), h('stop',{offset:'1','stop-color':'#FF2D3D','stop-opacity':'0'}))));
+  const routes = new Set(), chemins = [];
+  TERRITOIRES.forEach(t => { const ch = cheminRoute(DEPOT_G, pos(t)); chemins.push(ch); ch.forEach(([c,r]) => routes.add(c+','+r)); });
+  const occupe = new Set([DEPOT_G.join(','), ...TERRITOIRES.map(t => pos(t).join(','))]);
+  const [xa,ya] = iso(0,N-1), [xb,yb] = iso(N-1,N-1), [xc,yc] = iso(N-1,0);
+  svg.append(h('polygon',{points:`${xa-TW/2},${ya} ${xb},${yb+TH/2} ${xb},${yb+TH/2+22} ${xa-TW/2},${ya+22}`, fill:'#14171C'}),
+             h('polygon',{points:`${xb},${yb+TH/2} ${xc+TW/2},${yc} ${xc+TW/2},${yc+22} ${xb},${yb+TH/2+22}`, fill:'#0F1115'}),
+             h('polyline',{points:`${xa-TW/2},${ya} ${xb},${yb+TH/2} ${xc+TW/2},${yc}`, fill:'none', stroke:'var(--neon)','stroke-width':1.2, opacity:.55, filter:'url(#lueur)'}));
+  const sol = h('g',{}), deco = h('g',{});
+  for (let r=0;r<N;r++) for (let c=0;c<N;c++){
+    const k = c+','+r, estRoute = routes.has(k) && !occupe.has(k), vert = !estRoute && !occupe.has(k) && alea() < 0.35;
+    sol.append(h('polygon',{points:losange(c,r), fill: estRoute ? 'var(--route)' : vert ? 'var(--herbe)' : 'var(--nuit-sol)', stroke:'var(--nuit-bord)','stroke-width':1}));
+  }
+  chemins.forEach(ch => { for (let i=0;i<ch.length-1;i++){ const [x1,y1] = iso(...ch[i]), [x2,y2] = iso(...ch[i+1]);
+    deco.append(h('line',{x1,y1,x2,y2,stroke:'var(--route-bord)','stroke-width':16,'stroke-linecap':'round'}), h('line',{x1,y1,x2,y2,stroke:'#5C6370','stroke-width':1.4,'stroke-dasharray':'7 9'})); } });
+  [...routes].forEach((k,i) => { if (occupe.has(k) || i%2) return; const [c,r] = k.split(',').map(Number), [x,y] = iso(c,r);
+    deco.append(h('circle',{cx:x+16,cy:y-6,r:16,fill:'url(#halo)'}), h('rect',{x:x+15,y:y-20,width:1.6,height:14,fill:'#59606B'}), h('circle',{cx:x+16,cy:y-20,r:2.2,fill:'var(--lampe)'})); });
+  svg.append(sol, deco);
+
+  const objets = [], cartes = h('g',{}), calquePersos = [];
+  for (let r=0;r<N;r++) for (let c=0;c<N;c++){
+    const k = c+','+r; if (occupe.has(k) || routes.has(k)) continue;
+    const [x,y] = iso(c,r), t = alea(), g = h('g',{'aria-hidden':'true'});
+    const centre = Math.abs(c-5)+Math.abs(r-3) < 4;
+    if (t < (centre ? .55 : .32)) {
+      const ht = centre ? 34 + alea()*38 : 16 + alea()*14;
+      g.append(volume(x+(alea()-.5)*10, y+8, TW*(centre?.2:.17), ht, centre?PAL.immeuble:PAL.maison, {fenetres:true, alea, densite:centre?.55:.4}));
+      if (!centre && alea()<.6) g.append(volume(x-22, y+2, TW*.12, 12+alea()*8, PAL.maison, {fenetres:true, alea, densite:.35}));
+    } else if (t < .8) {
+      const n = 2 + Math.floor(alea()*3);
+      for (let i=0;i<n;i++){ const dx=(alea()-.5)*56, dy=(alea()-.5)*22, ht=14+alea()*10;
+        g.append(h('rect',{x:x+dx-1.2,y:y+dy-5,width:2.4,height:6,fill:'#3B2E24'}), h('polygon',{points:`${x+dx},${y+dy-5-ht} ${x+dx+7},${y+dy-3} ${x+dx-7},${y+dy-3}`, fill: i%2?'#1F4A2D':'#27603A'})); }
+    } else g.append(volume(x+10, y+6, TW*.14, 9, {t:'#2A2F37',g:'#1E2228',d:'#171A1F'}, {}));
+    objets.push({p:c+r, el:g});
+  }
+
+  { const [x,y] = iso(...DEPOT_G), g = h('g',{'aria-label':'Dépôt ODICOLOR'});
+    g.append(h('ellipse',{cx:x,cy:y+4,rx:TW*.8,ry:TH*.8,fill:'url(#halo-rouge)'}),
+             h('polygon',{points:losange(...DEPOT_G,.98), fill:'#1A0E10', stroke:'var(--neon)','stroke-width':1.4, filter:'url(#lueur)'}),
+             volume(x+6, y+16, TW*.44, 34, PAL.depot, {porte:true}));
+    const fg = faceG(x+6, y+16, TW*.44, 34), fd = faceD(x+6, y+16, TW*.44, 34);
+    g.append(h('polygon',{class:'neon', points:quad(fd,.06,.94,.48,.84), fill:'#C81E2A', filter:'url(#lueur)'}));
+    const [tx,ty] = fd(.5,.66);
+    g.append(h('text',{x:tx, y:ty+4, 'text-anchor':'middle', transform:`rotate(-26.57 ${tx} ${ty})`, style:'font:800 12px var(--f-titre);fill:#fff;letter-spacing:.08em'},'ODICOLOR'));
+    for (let i=0;i<3;i++){ g.append(h('polygon',{points:quad(fg,.68+i*.1,.74+i*.1,.5,.72), fill:'var(--vitre)', opacity:.7})); }
+    [[-34,24],[-16,32]].forEach(([dx,dy]) => g.append(volume(x+dx, y+dy, 9, 9, PAL.blanc), h('polygon',{points:quad(faceG(x+dx,y+dy,9,9),0,1,.3,.5), fill:'var(--rouge)'})));
+    g.append(h('title',{},'Dépôt ODICOLOR (position symbolique, adresse non renseignée)'));
+    objets.push({p:DEPOT_G[0]+DEPOT_G[1], el:g}); }
+
+  TERRITOIRES.forEach(t => {
+    const s = L0.statsTerritoire(etat.garages.filter(visible), t.id), [c,r] = pos(t), [x,y] = iso(c,r), dom = statutDominant(s);
+    const g = h('g',{class:'terr'+(etat.choix===t.id?' choisi':''), tabindex:0, role:'button',
+      'aria-label':`${t.nom} : ${s.actif} clients et ${s.prospect} prospects dans la commune. Choisir`,
+      onclick:()=>choisir(t.id), onkeydown:e=>{ if(e.key==='Enter'||e.key===' '){e.preventDefault(); choisir(t.id);} }});
+    g.append(h('polygon',{class:'socle', points:losange(c,r,.98), fill:s.niveau?'#1D2229':'#15241A', stroke:'var(--nuit-bord)','stroke-width':1}));
+    const bati = h('g',{class:'bati'}); let haut;
+    if (!s.niveau) {
+      bati.append(h('polygon',{points:losange(c,r,.6), fill:'none', stroke:'#5E7A66','stroke-width':1.4,'stroke-dasharray':'4 4'}),
+        h('rect',{x:x-1.5,y:y-26,width:3,height:26,fill:'#B9B5AF'}), h('polygon',{points:`${x+1.5},${y-26} ${x+18},${y-21} ${x+1.5},${y-16}`, fill:'var(--neon)'}));
+      haut = 26;
+    } else {
+      const hw = [0, TW*.2, TW*.26, TW*.32, TW*.34][s.niveau], ht = [0, 18, 24, 30, 30][s.niveau];
+      bati.append(h('ellipse',{cx:x,cy:y+6,rx:TW*.5,ry:TH*.5,fill:`url(#halo-${dom})`}));
+      bati.append(volume(x, y+hw*.3, hw, ht, PAL.mur, {porte:true, fenetres:true, alea, densite:.85, led:STATUTS[dom].couleur}));
+      { const fg = faceG(x, y+hw*.3, hw, ht); bati.append(h('polygon',{points:quad(fg,.66,.96,.08,.5), fill:'var(--vitre)', opacity:.8, filter:'url(#lueur)'})); }
+      bati.append(volume(x, y+hw*.3-ht, hw*.62, 9, toitStatut[dom], {tenons:true}));
+      haut = ht + 9 + hw*.3;
+      if (s.niveau >= 4) bati.append(volume(x-hw*.95, y+hw*.55, hw*.5, 20, PAL.mur, {fenetres:true, alea, densite:.7, led:STATUTS[dom].couleur}));
+      if (s.niveau >= 3) bati.append(volume(x+hw*.95, y+hw*.6, 8, 7, PAL.blanc));
+    }
+    g.append(bati);
+    const gsCommune = etat.garages.filter(x => x.territoire === t.id && visible(x));
+    // 5 places espacées d'au moins 30 unités : chaque personnage garde sa propre zone de clic
+    const PLACES = [[-48,4],[48,4],[-24,18],[24,18],[0,30]], MAX = PLACES.length;
+    const persos = h('g',{});
+    gsCommune.slice(0,MAX).map((ga,i)=>[ga,PLACES[i]]).sort((a,b)=>a[1][1]-b[1][1]).forEach(([ga,[dx,dy]]) => persos.append(persoVille(ga, x+dx, y+dy, 1.15)));
+    calquePersos.push({p:c+r, el:persos});
+    if (gsCommune.length > MAX) g.append(h('g',{style:'cursor:pointer', onclick:e=>{ e.stopPropagation(); choisir(t.id); }}, h('rect',{x:x+56,y:y+20,width:30,height:18,rx:9,fill:'rgba(10,11,13,.92)',stroke:'rgba(255,255,255,.3)'}),
+      h('text',{x:x+71,y:y+33,'text-anchor':'middle',style:'font:700 12px var(--f-titre);fill:#F4F2EF'}, '+' + (gsCommune.length-MAX))));
+    objets.push({p:c+r, el:g});
+    const ligne2 = `${s.actif} cl. · ${s.prospect} pr.` + (etat.mode==='demo' && s.caMois ? ' · ' + keuros(s.caMois) : '');
+    cartes.append(h('g',{style:'cursor:pointer', onclick:()=>choisir(t.id)}, carteLabel(x + ({massy:46, palaiseau:-20}[t.id]||0), y - haut - 54, t.nom, ligne2, s.alertes, STATUTS[dom].couleur, etat.choix===t.id)));
+  });
+
+  chemins.forEach((ch,i) => { if (i%2 || ch.length < 3) return; const d = 'M' + ch.map(p => iso(...p).join(' ')).join(' L');
+    objets.push({p:98, el:h('g',{class:'vehicule', style:`offset-path:path('${d}');offset-rotate:0deg;--d:${7+i}s;animation-delay:-${i*1.3}s`, 'aria-hidden':'true'},
+      h('rect',{x:-8,y:-12,width:16,height:9,rx:2,fill:i%4?'#E9E6E1':'#C81E2A'}), h('rect',{x:-8,y:-5,width:16,height:2.5,fill:'#111'}),
+      h('circle',{cx:7,cy:-5,r:2,fill:'#FFE7A8',filter:'url(#lueur)'}))}); });
+  objets.sort((a,b)=>a.p-b.p).forEach(o => svg.append(o.el));
+  svg.append(cartes);
+  // personnages au premier plan : rien ne recouvre leur zone de clic
+  calquePersos.sort((a,b)=>a.p-b.p).forEach(o => svg.append(o.el));
+  return svg;
+}
+function legende(){
+  return h('div',{class:'legende'}, ['actif','prospect','dormant','risque'].map(k => h('span',{}, h('i',{style:`background:${STATUTS[k].couleur}`}), STATUTS[k].libelle)),
+    h('span',{}, h('i',{style:'background:#15241A;border:1px dashed #5E7A66;border-radius:2px'}),'Commune à conquérir'),
+    h('span',{style:'margin-left:auto'}, '1 personnage = 1 garage (5 max, survol = nom et métier)'));
+}
+function chiffre(v, l, badge){
+  const vide = v == null;
+  return h('div',{class:'chiffre'}, h('div',{class:'v', style: vide?'color:var(--gris);font-size:17px':''}, vide ? 'Non renseigné' : v),
+    h('div',{class:'l'}, h('span',{},l), vide ? h('span',{class:'badge b-vide'},'EBP Lot 3') : badge));
+}
+function panneauTerritoire(){
+  const t = TERRITOIRES.find(x=>x.id===etat.choix);
+  const s = L0.statsTerritoire(etat.garages, t.id), d = L0.statsDepartement(etat.garages, t.dep);
+  return h('section',{class:'bloc','aria-live':'polite'},
+    h('h2',{},t.nom), h('p',{class:'sous'}, 'Porte d’entrée vers ', h('b',{style:'color:var(--texte)'}, `${t.depNom} (${t.dep})`)),
+    h('div',{class:'chiffres'}, chiffre(s.actif, 'Clients', badgeSrc()), chiffre(s.prospect, 'Prospects', badgeSrc()),
+      chiffre(etat.mode==='demo' ? keuros(s.caMois || 0) : null, 'CA du mois', badgeSrc()), chiffre(s.alertes, 'Alertes', badgeSrc())),
+    h('div',{class:'dep-resume'}, h('b',{}, `Tout le ${t.dep}`), ' : ', pluriel(d.total,'garage'), ' dans ', pluriel(d.communes,'commune'),
+      d.total - s.total > 0 ? h('small',{}, `dont ${d.total - s.total} hors de ${t.nom}`) : null),
+    listePortraits(etat.garages.filter(x => x.territoire === t.id && visible(x)), t.nom),
+    h('button',{class:'btn principal plein', onclick:()=>allerCarte(t.dep, t.id)}, icone('carte'), `Ouvrir le ${t.dep} · ${pluriel(d.total,'garage')}`));
+}
+function listePortraits(gs, nom){
+  if (!gs.length) return h('p',{class:'info', style:'margin:12px 0 0'}, 'Aucun garage à ' + nom + ' pour ce filtre.');
+  return h('div',{class:'portraits'}, h('div',{class:'titre-bloc'}, `Garages à ${nom} · ${gs.length}`),
+    h('div',{class:'portraits-liste'}, gs.slice(0,8).map(x => h('button',{class:'mini', onclick:()=>ouvrirFiche(x), title:x.nom},
+      portrait(L0.apparence(x.id), x.statut, 44), h('span',{}, x.nom.replace(/^Carrosserie démo /,'Démo '), h('small',{style:`color:${STATUTS[x.statut].couleur}`}, STATUTS[x.statut].libelle))))));
+}
+function panneauDepartements(){
+  const reste = L0.aClasser(etat.garages).length;
+  return h('section',{class:'bloc'}, h('div',{class:'titre-bloc'},'Tous les départements'),
+    h('div',{class:'deps'},
+      L0.DEPARTEMENTS.map(d => { const s = L0.statsDepartement(etat.garages, d.dep);
+        return h('button',{class:'dep', onclick:()=>allerCarte(d.dep)}, h('span',{class:'dep-n'}, d.dep), h('span',{class:'dep-nom'}, d.nom),
+          h('span',{class:'dep-c'}, s.total ? `${s.actif} cl. · ${s.prospect} pr.` : '—'),
+          s.alertes ? h('span',{class:'dep-alerte','aria-label':pluriel(s.alertes,'alerte')}, String(s.alertes)) : null); }),
+      h('button',{class:'dep a-classer', onclick:()=>{ location.hash='a-classer'; }, disabled:!reste},
+        h('span',{class:'dep-n'},'?'), h('span',{class:'dep-nom'},'À classer'), h('span',{class:'dep-c'}, reste ? pluriel(reste,'garage') : 'aucun'))));
+}
+const vueVille = () => h('div',{class:'ecran'}, h('div',{class:'maquette'}, h('div',{class:'scene', id:'scene'}, dessinerVille()), legende()), h('div',{class:'panneau'}, panneauTerritoire(), panneauDepartements()));
+
+// ================= NIVEAU 2 : carte réelle par département =================
+const NIV_BADGE = { sur:null, cp:['b-estime','Code postal'], commune:['b-estime','Commune seule'], a_verifier:['b-alerte','À vérifier'], hors_idf:['b-alerte','Hors IDF'], non_classe:['b-alerte','Non classé'] };
+function ligneGarage(x, avecMotif){
+  const nb = NIV_BADGE[x.classement.niveau];
+  return h('button',{class:'ligne', onclick:()=>ouvrirFiche(x)}, h('i',{style:`background:${STATUTS[x.statut].couleur}`}),
+    h('span',{}, x.nom, h('small',{}, (x.commune || x.classement.saisi || 'Commune inconnue') + (x.classement.cp ? ' · ' + x.classement.cp : '') + ' · ' + STATUTS[x.statut].libelle),
+      avecMotif ? h('small',{class:'motif'}, x.classement.motif) : null),
+    nb ? h('span',{class:'badge '+nb[0]}, nb[1]) : null, x.position ? null : h('em',{},'sans GPS'));
+}
+let carte = null, coucheGarages = null, coucheMarcheL = null, rendu = null;
+function vueCarte(D, porte){
+  const tous = L0.garagesDuDepartement(etat.garages, D.dep);
+  const communes = L0.communesDuDepartement(etat.garages, D.dep), nbCommunes = communes.filter(([c])=>!c.startsWith('—')).length;
+  if (etat.commune && !communes.some(([c]) => c === etat.commune)) etat.commune = '';
+  const filtrer = () => tous.filter(visible)
+    .filter(x => !etat.commune || (x.commune || '— commune à préciser') === etat.commune)
+    .filter(x => { const q = L0.normNom(etat.recherche); return !q || L0.normNom(x.nom+' '+(x.commune||'')+' '+x.classement.saisi).includes(q); });
+  const liste = h('div',{class:'liste'}), compteur = h('p',{class:'info', style:'margin:8px 0 0'});
+  const majListe = () => { const v = filtrer(); compteur.textContent = pluriel(v.length,'garage') + ' affiché' + (v.length>1?'s':'');
+    liste.replaceChildren(...(v.length ? v.map(x => ligneGarage(x, x.classement.niveau==='a_verifier')) : [h('p',{class:'info'},'Aucun garage pour ces filtres.')])); };
+  const majCarte = () => { montrerMarche(D.dep, etat.commune || (porte ? porte.nom : '')); montrerGarages(filtrer().filter(x=>x.position)); };
+  majListe();
+  const verif = tous.filter(x=>x.classement.niveau==='a_verifier').length, sansPos = tous.filter(x=>!x.position).length;
+  const cote = h('div',{class:'panneau'},
+    panneauMarche(D, etat.commune || (porte ? porte.nom : '')),
+    h('section',{class:'bloc'}, h('h2',{}, `${D.nom} (${D.dep})`),
+      h('p',{class:'sous'}, `${pluriel(tous.length,'garage')} · ${pluriel(nbCommunes,'commune')}` + (porte ? ` · entrée par ${porte.nom}` : '')),
+      verif ? h('p',{class:'message erreur', style:'margin:10px 0 0'}, `${pluriel(verif,'garage')} à vérifier : code postal et commune ne concordent pas.`) : null,
+      sansPos ? h('p',{class:'info', style:'margin:10px 0 0'}, h('b',{}, `${sansPos} sans GPS`), ' : classés par commune et code postal, présents dans la liste. Aucune position inventée.') : null,
+      h('div',{class:'champs-filtre'},
+        h('select',{class:'recherche', id:'filtre-commune', 'aria-label':'Commune', onchange:e=>{ etat.commune=e.target.value; rendre(); }},
+          h('option',{value:''}, `Toutes les communes (${nbCommunes})`), communes.map(([c,n]) => h('option',{value:c, selected:etat.commune===c}, `${c} · ${n}`))),
+        h('input',{class:'recherche', id:'recherche-garage', type:'search', placeholder:'Chercher dans le ' + D.dep, value:etat.recherche,
+          'aria-label':'Chercher un garage ou une commune', oninput:e=>{ etat.recherche=e.target.value; majListe(); }})),
+      compteur, liste),
+    panneauTournee());
+  const centre = porte ? [porte.lat, porte.lng] : D.centre, zoom = porte ? 12 : D.zoom;
+  setTimeout(() => { monterCarte(centre, zoom, porte); majCarte(); }, 0);
+  return h('div',{class:'ecran'}, h('div',{class:'zone-carte'}, h('div',{id:'carte'})), cote);
+}
+function monterCarte(centre, zoom, porte){
+  if (carte) { carte.remove(); carte = null; }
+  const el = document.getElementById('carte'); if (!el) return;
+  if (!window.L) { el.replaceChildren(h('div',{class:'avis-tuiles'},'La bibliothèque de carte n’a pas pu se charger. Vérifie la connexion.')); return; }
+  carte = L.map(el, {zoomControl:true, preferCanvas:true}).setView(centre, zoom);
+  rendu = L.canvas({padding:.3});
+  let alerte = false;
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, subdomains:'abc', attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'})
+    .on('tileerror', () => { if (alerte) return; alerte = true; el.parentNode.append(h('div',{class:'avis-tuiles', role:'status'},
+      'Le fond de carte ne se charge pas dans cet aperçu protégé. Il s’affichera sur ton hébergement de test. En attendant : ',
+      h('a',{href:`https://www.openstreetmap.org/#map=${zoom}/${centre[0]}/${centre[1]}`, target:'_blank', rel:'noopener'}, 'ouvrir sur OpenStreetMap'), '.')); })
+    .addTo(carte);
+  if (porte) L.marker([porte.lat, porte.lng], {icon:L.divIcon({className:'', html:'<div class="repere-centre"></div>', iconSize:[18,18], iconAnchor:[9,9]}), keyboard:false}).bindTooltip('Centre de ' + porte.nom + ' (commune)').addTo(carte);
+  coucheMarcheL = L.layerGroup().addTo(carte);
+  coucheGarages = L.layerGroup().addTo(carte);
+}
+function montrerGarages(garages){
+  if (!carte || !coucheGarages) return; coucheGarages.clearLayers();
+  garages.forEach(x => L.circleMarker([x.position.lat, x.position.lng], {radius:9, color:'#fff', weight:2, fillColor:STATUTS[x.statut].couleur, fillOpacity:1}).bindTooltip(x.nom).on('click', () => ouvrirFiche(x)).addTo(coucheGarages));
+}
+function panneauTournee(){
+  if (!etat.tournee.length) return null;
+  const g = etat.tournee.map(id => etat.garages.find(x=>x.id===id) || Object.values(etat.marche).flatMap(m=>m.etablissements).find(x=>x.id===id)).filter(Boolean);
+  const msg = h('p',{class:'info', style:'margin:8px 0 0', 'aria-live':'polite'});
+  return h('section',{class:'bloc tournee'}, h('div',{class:'titre-bloc'}, `Visites à planifier · ${g.length}`),
+    h('ol',{}, g.map(x => h('li',{}, x.nom, h('span',{class:'info'}, ' · ' + (x.commune || 'commune ?') + (x.dep ? ' (' + x.dep + ')' : ''))))),
+    h('div',{style:'display:flex;gap:8px;margin-top:10px;flex-wrap:wrap'},
+      h('button',{class:'btn', onclick:async()=>{ const ok = await copier(g.map((x,i)=>`${i+1}. ${x.nom} — ${x.commune||''} ${x.classement.cp||''}`).join('\n')); msg.textContent = ok ? 'Liste copiée.' : 'Copie refusée par le navigateur.'; }}, icone('copier'), 'Copier la liste'),
+      h('button',{class:'btn discret', onclick:()=>{ etat.tournee=[]; rendre(); }}, 'Vider')),
+    msg, h('p',{class:'regle'}, 'Brouillon de cette page seulement : rien n’est envoyé au téléphone ni enregistré. L’ordre de tournée arrive au Lot 2.'));
+}
+function vueAClasser(){
+  const g = L0.aClasser(etat.garages);
+  return h('div',{class:'ecran'},
+    h('section',{class:'bloc'}, h('h2',{},'Garages à classer'),
+      h('p',{class:'sous'}, 'Ils ne sont dans aucun département. Corrige la commune ou le code postal dans l’appli téléphone, puis recharge la sauvegarde.'),
+      [['a_verifier','À vérifier'], ['hors_idf','Hors Île-de-France'], ['non_classe','Non classés']].map(([k,titre]) => { const l = g.filter(x=>x.classement.niveau===k); return l.length ? h('div',{style:'margin-top:16px'},
+        h('div',{class:'titre-bloc'}, `${titre} · ${l.length}`), h('div',{class:'liste', style:'max-height:none'}, l.map(x=>ligneGarage(x,true)))) : null; })),
+    h('div',{class:'panneau'}, panneauDepartements()));
+}
+
+// ================= Simulation : agents visibles, moteur au Lot 5 =================
+const AGENTS = L0.agentsSimulation(2026);
+const fourchette = b => `${new Intl.NumberFormat('fr-FR').format(b.min)} – ${new Intl.NumberFormat('fr-FR').format(b.max)} €`;
+const jauge = (n, couleur) => h('span',{class:'jauge', role:'img', 'aria-label':n+' sur 5'}, [1,2,3,4,5].map(i => h('i',{style: i<=n ? `background:${couleur}` : ''})));
+function vueSimulation(){
+  const scen = (code, titre, couleur) => h('div',{class:'scen', style:`border-color:${couleur}`}, h('h4',{style:`color:${couleur}`}, code), h('p',{}, titre),
+    h('div',{class:'ligne-s'}, h('span',{}, 'Résultats'), h('b',{}, 'Lot 5')));
+  const fam = etat.famille || 'toutes';
+  const liste = AGENTS.filter(a => fam === 'toutes' || a.famille === fam);
+  return h('div',{},
+    h('div',{class:'bandeau-sim'}, h('b',{},'SIMULATION'), h('span',{class:'badge b-sim'},'Agents fictifs · moteur au Lot 5'),
+      h('span',{class:'info'}, 'Aucune donnée réelle ici. Budgets et comportements = hypothèses de départ, modifiables plus tard.')),
+    h('div',{class:'scenarios'}, scen('Base','Situation actuelle','var(--doux)'), scen('Scénario A','Ta décision','var(--vert)'), scen('Scénario B','La décision contraire','var(--danger)'), scen('Scénario C','La meilleure alternative','var(--sim)')),
+    h('section',{class:'bloc', style:'margin-top:14px'},
+      h('div',{class:'fil-tete'}, h('h3',{style:'font-family:var(--f-titre);font-size:22px;margin:0'}, 'Agents clients et prospects'), h('span',{class:'badge b-sim'}, AGENTS.length + ' agents')),
+      h('div',{class:'barre-filtres'}, [['toutes','Toutes',AGENTS.length]].concat(L0.FAMILLES.map(f => [f.id, f.libelle, f.nb])).map(([k,l,n]) =>
+        h('button',{class:'puce'+(k==='toutes'?' tous sim':''), 'aria-pressed':String(fam===k), onclick:()=>{ etat.famille = k; rendre(); }}, `${l} (${n})`))),
+      h('div',{class:'cartes-agents'}, liste.map(a => h('button',{class:'carte-agent', onclick:()=>ficheAgent(a)},
+        portrait(a.apparence, a.statut, 76),
+        h('span',{class:'ca-txt'}, h('b',{}, a.contact), h('small',{}, a.nom), h('span',{class:'pastille-statut petite', style:`background:color-mix(in srgb, ${STATUTS[a.statut].couleur} 22%, transparent);color:${STATUTS[a.statut].couleur}`}, a.famille_libelle),
+          h('small',{class:'budget'}, fourchette(a.budget) + ' / mois ', h('span',{class:'badge b-estime'},'Hypothèse')), h('small',{}, 'Secteur ' + a.secteur)))))),
+    h('section',{class:'bloc', style:'margin-block:14px 20px'},
+      h('div',{class:'fil-tete'}, h('h3',{style:'font-family:var(--f-titre);font-size:22px;margin:0'}, 'Acteurs de l’entreprise et du marché'), h('span',{class:'badge b-sim'}, '8 acteurs')),
+      h('div',{class:'cartes-agents', style:'margin-top:12px'}, L0.ACTEURS.map(a => h('button',{class:'carte-agent', onclick:()=>ficheActeur(a)},
+        portrait(a.apparence, 'inconnu', 76), h('span',{class:'ca-txt'}, h('b',{}, a.nom), h('small',{}, a.role), h('span',{class:'badge '+(a.nature==='Fictif'?'b-sim':'b-estime')}, a.nature)))))));
+}
+function panneauLateral(contenuFn){
+  const couche = $('#couche-fiche'), dernier = document.activeElement;
+  const fermer = () => { couche.hidden = true; couche.replaceChildren(); if (dernier && dernier.isConnected && dernier.focus) dernier.focus(); };
+  const btn = h('button',{class:'fermer', onclick:fermer, 'aria-label':'Fermer'},'×');
+  couche.replaceChildren(h('div',{class:'voile', onclick:e=>{ if(e.target===e.currentTarget) fermer(); }, onkeydown:e=>{ if(e.key==='Escape') fermer(); }}, contenuFn(btn)));
+  couche.hidden = false; btn.focus();
+}
+function ficheAgent(a){
+  const c = STATUTS[a.statut].couleur;
+  const section = (titre, ...contenu) => h('div',{class:'sec-agent'}, h('div',{class:'titre-bloc'}, titre), ...contenu);
+  panneauLateral(btn => h('aside',{class:'fiche sim', role:'dialog', 'aria-modal':'true', 'aria-labelledby':'agent-titre'},
+    h('div',{class:'fiche-tete'}, h('div',{class:'vignette'}, portrait(a.apparence, a.statut, 96)),
+      h('div',{}, h('h2',{id:'agent-titre'}, a.contact), h('div',{class:'lieu', style:'margin-top:2px'}, a.nom + ' · secteur ' + a.secteur),
+        h('span',{class:'pastille-statut', style:`background:color-mix(in srgb, ${c} 22%, transparent);color:${c}`}, a.famille_libelle), ' ', h('span',{class:'badge b-sim'},'Simulation')), btn),
+    section('Ses besoins', h('div',{class:'puces-texte'}, a.besoins.map(b => h('span',{}, b)))),
+    section('Budget mensuel', h('div',{class:'gros'}, fourchette(a.budget), h('small',{}, ' HT / mois')), h('span',{class:'badge b-estime'},'Hypothèse')),
+    h('div',{class:'deux-col'},
+      section('Sensibilité au prix', jauge(a.sensibilitePrix, 'var(--orange)')),
+      section('Fidélité', jauge(a.fidelite, 'var(--vert)'))),
+    section('Règlement', h('p',{}, a.reglement)),
+    section('Fournisseur actuel', h('p',{}, a.fournisseur + ' (fictif)')),
+    section('Ce qui le fait acheter', h('ul',{}, a.declencheurs.map(x => h('li',{}, x)))),
+    section('Ce qui le fait partir', h('ul',{}, a.departs.map(x => h('li',{}, x)))),
+    section('Comportement commercial', h('p',{}, a.comportement)),
+    h('p',{class:'regle'}, 'Agent fictif du jumeau numérique. Ses réactions aux décisions (prix, Carsystem, tournées, conditions de paiement) seront calculées au Lot 5, toujours avec la même graine pour comparer Base, A, B et C.')));
+}
+function ficheActeur(a){
+  panneauLateral(btn => h('aside',{class:'fiche sim', role:'dialog', 'aria-modal':'true', 'aria-labelledby':'acteur-titre'},
+    h('div',{class:'fiche-tete'}, h('div',{class:'vignette'}, portrait(a.apparence, 'inconnu', 96)),
+      h('div',{}, h('h2',{id:'acteur-titre'}, a.nom), h('div',{class:'lieu', style:'margin-top:2px'}, a.role), h('span',{class:'badge '+(a.nature==='Fictif'?'b-sim':'b-estime')}, a.nature)), btn),
+    h('div',{class:'sec-agent'}, h('div',{class:'titre-bloc'},'Rôle dans la simulation'), h('p',{}, a.detail)),
+    h('p',{class:'regle'}, a.nature === 'Fictif' ? 'Personnage inventé pour tester des décisions. Il n’existe pas.' : 'Rôle simulé : ce n’est pas un portrait de la personne, seulement sa fonction dans l’entreprise.')));
+}
+
+// ================= Fil d'actions =================
+function rendreFil(){
+  const zone = $('#fil-actions');
+  if (route().ecran === 'simulation') { zone.hidden = true; return; } zone.hidden = false;
+  const types = { visite:['visite','var(--vert)','Visite client'], devis:['devis','var(--neon)','Devis'], essai:['fiole','var(--orange)','Essai Carsystem'], relance:['relance','var(--danger)','Relance règlement'], prospect:['cible','var(--bleu)','Prospection'], action:['calendrier','var(--doux)','Prochaine action'] };
+  let evts;
+  if (etat.mode === 'demo') {
+    const a = L0.mulberry32(3), g = etat.garages.filter(x=>x.dep); evts = [];
+    for (let i=0;i<8;i++){ const x = g[Math.floor(a()*g.length)];
+      const t = x.statut==='risque' ? 'relance' : x.statut==='prospect' ? 'prospect' : ['visite','devis','essai'][Math.floor(a()*3)];
+      const d = new Date(); d.setDate(d.getDate()-i); evts.push({t, x, quand: i===0 ? 'Aujourd’hui' : i===1 ? 'Hier' : d.toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}); }
+  } else {
+    evts = etat.garages.filter(x=>x.etape).sort((a,b)=>(a.etapeDate||'9999').localeCompare(b.etapeDate||'9999')).slice(0,10)
+      .map(x => ({t:'action', x, quand: x.etapeDate ? new Date(x.etapeDate+'T12:00:00').toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'}) : 'Sans date', texte:x.etape}));
+  }
+  zone.replaceChildren(
+    h('div',{class:'fil-tete'}, h('h3',{}, etat.mode==='demo' ? 'Dernières actions commerciales' : 'Prochaines actions saisies au téléphone'), badgeSrc()),
+    evts.length ? h('div',{class:'fil-liste'}, evts.map(e => { const [ic,c,l] = types[e.t];
+      return h('button',{class:'evt', onclick:()=>ouvrirFiche(e.x)}, h('span',{class:'pastille', style:`background:color-mix(in srgb, ${c} 22%, transparent);color:${c}`}, icone(ic)),
+        h('span',{}, h('small',{}, e.quand), h('b',{}, e.texte || l), h('span',{class:'g'}, e.x.nom + ' · ' + (e.x.commune || '')))); }))
+    : h('p',{class:'info', style:'margin:10px 0 0'}, 'Aucune prochaine action renseignée dans la sauvegarde.'));
+}
+
+// ================= Lot 2 : marché de l'annuaire officiel (couche séparée de la Ville) =================
+const AN = window.Annuaire;
+const CLE_CACHE = 'odicolor-bureau-annuaire-';
+function chargerCache(dep){ try { const v = JSON.parse(localStorage.getItem(CLE_CACHE + dep) || 'null'); return v && Array.isArray(v.etablissements) ? v : null; } catch(e){ return null; } }
+function ecrireCache(dep, v){ try { localStorage.setItem(CLE_CACHE + dep, JSON.stringify(v)); return true; } catch(e){ return false; } }
+etat.marche = {}; // dep -> { etablissements, date, total, pages, doublons }
+etat.coucheMarche = true; etat.annuaire = { phase:'', test:null, progression:null, erreur:'' };
+{ const c = chargerCache('91'); if (c) etat.marche['91'] = c; }
+const marcheDe = dep => (etat.marche[dep] && etat.marche[dep].etablissements) || [];
+const mesGaragesReels = () => etat.mode === 'reel' ? etat.garages : [];
+const TYPES_MARCHE = { carrosserie:['Carrosserie probable','#F4F2EF',6], a_qualifier:['À qualifier','#8A8F98',4.5], mecanique:['Mécanique probable','#5A5F68',3.5] };
+let controleur = null;
+function messageErreur(e){
+  if (e && (e.name === 'TypeError' || /fetch|network|Load failed/i.test(e.message||'')))
+    return 'Connexion impossible depuis cette page. Dans l’aperçu Claude, Internet est bloqué : ouvre le Bureau depuis ton navigateur (test local ou hébergement de test) pour lancer ce test.';
+  return e && e.message ? e.message : 'Erreur inconnue.';
+}
+async function testerAnnuaire(dep){
+  Object.assign(etat.annuaire, {phase:'test', test:null, erreur:''}); rendre();
+  try { etat.annuaire.test = await AN.tester(dep); etat.annuaire.phase = 'teste'; }
+  catch(e){ etat.annuaire.phase = ''; etat.annuaire.erreur = messageErreur(e); }
+  rendre();
+}
+async function importerAnnuaire(dep){
+  controleur = new AbortController();
+  Object.assign(etat.annuaire, {phase:'import', progression:{p:0,n:etat.annuaire.test ? etat.annuaire.test.pages : 1,k:0}, erreur:''}); rendre();
+  try {
+    const r = await AN.importer(dep, { signal:controleur.signal, progression:(p,n,k)=>{ etat.annuaire.progression = {p,n,k}; majProgression(); } });
+    etat.marche[dep] = r; const ok = ecrireCache(dep, r);
+    etat.annuaire.phase = 'fini'; etat.annuaire.memo = ok ? 'Gardé dans ce navigateur pour la prochaine ouverture.' : 'Non gardé dans ce navigateur (stockage refusé) : il faudra recharger.';
+  } catch(e){ etat.annuaire.phase = 'teste'; etat.annuaire.erreur = messageErreur(e); }
+  controleur = null; rendre();
+}
+function majProgression(){
+  const b = document.getElementById('progression-annuaire'); if (!b) return;
+  const {p,n,k} = etat.annuaire.progression; b.querySelector('i').style.width = Math.round(100*p/Math.max(1,n)) + '%';
+  b.querySelector('span').textContent = `Page ${p} sur ${n} · ${k} établissements`;
+}
+function panneauMarche(D, communeChoisie){
+  const badgeA = h('span',{class:'badge b-annuaire'},'Annuaire officiel');
+  if (D.dep !== '91') return h('section',{class:'bloc'}, h('div',{class:'titre-bloc'},'Marché'), h('p',{class:'info', style:'margin:6px 0 0'}, 'Le marché est d’abord importé pour l’Essonne (91). Les autres départements suivront une fois le 91 validé.'));
+  const m = marcheDe('91'), a = etat.annuaire;
+  const tete = h('div',{class:'fil-tete', style:'justify-content:space-between'}, h('div',{class:'titre-bloc'},'Marché du 91'), badgeA);
+  if (!m.length || a.phase === 'test' || a.phase === 'teste' || a.phase === 'import') {
+    const t = a.test;
+    return h('section',{class:'bloc marche'}, tete,
+      h('p',{class:'info', style:'margin:8px 0 0'}, 'Garages actifs du 91 (activité 45.20A : mécanique et carrosserie). Lecture seule. Ils restent sur la carte : la Ville ne change que par tes visites.'),
+      a.erreur ? h('p',{class:'message erreur', style:'margin:10px 0 0'}, a.erreur) : null,
+      a.phase === 'import' ? h('div',{id:'progression-annuaire', class:'progression'}, h('div',{class:'barre'}, h('i',{style:`width:${Math.round(100*a.progression.p/Math.max(1,a.progression.n))}%`})), h('span',{}, `Page ${a.progression.p} sur ${a.progression.n} · ${a.progression.k} établissements`),
+          h('button',{class:'btn discret', onclick:()=>controleur && controleur.abort()}, 'Arrêter')) : null,
+      t ? h('div',{class:'test-ok'},
+          h('div',{}, h('b',{}, t.total), ' établissements annoncés · ', h('b',{}, t.pages), ' pages'),
+          h('div',{}, 'Page 1 : ', t.page1, ' lus · page 2 : ', t.page2, ' lus · pagination ', h('b',{style:`color:${t.paginationOk?'var(--vert)':'var(--danger)'}`}, t.paginationOk ? 'OK' : 'à vérifier')),
+          t.exemple.length ? h('small',{}, 'Exemples : ' + t.exemple.map(e => e.nom + ' (' + e.ville + ')').join(', ')) : null) : null,
+      a.phase !== 'import' ? h('div',{class:'actions-fiche'},
+        h('button',{class:'btn' + (t ? '' : ' principal'), disabled:a.phase==='test', onclick:()=>testerAnnuaire('91')}, a.phase==='test' ? 'Test en cours…' : (t ? 'Refaire le test' : '1. Tester la connexion')),
+        t && t.paginationOk ? h('button',{class:'btn principal', onclick:()=>importerAnnuaire('91')}, `2. Importer ${t.total}`) : null) : null,
+      m.length && a.phase !== 'import' ? h('button',{class:'btn discret', onclick:()=>{ etat.annuaire.phase=''; rendre(); }}, 'Garder l’import existant') : null);
+  }
+  const r = AN.resume(m); AN.rapprocher(m, mesGaragesReels());
+  const ind = communeChoisie ? AN.indicateursCommune(m, mesGaragesReels(), communeChoisie) : null;
+  const top = AN.prioritaires(m, 5);
+  const info = etat.marche['91'];
+  return h('section',{class:'bloc marche'}, tete,
+    h('div',{class:'chiffres'},
+      chiffre(r.total, 'Établissements actifs', badgeA), chiffre(r.carrosserie, 'Carrosseries probables', h('span',{class:'badge b-estime'},'Non qualifiées')),
+      chiffre(r.aQualifier, 'À qualifier', h('span',{class:'badge b-estime'},'Nom seul')), chiffre(r.avecGps, 'Avec GPS officiel', badgeA)),
+    h('p',{class:'info', style:'margin:8px 0 0'}, `${r.mecanique} mécaniques probables · ${r.communes} communes · import du ${new Date(info.date).toLocaleDateString('fr-FR')}` + (info.doublons ? ` · ${info.doublons} doublons écartés` : '')),
+    ind ? h('div',{class:'indic-commune'},
+      h('div',{class:'titre-bloc'}, communeChoisie),
+      h('div',{class:'deux-col', style:'margin-top:6px'},
+        h('div',{}, h('div',{class:'gros-chiffre'}, ind.couverture == null ? '—' : ind.couverture.toLocaleString('fr-FR') + ' %'), h('small',{}, `Couverture : ${ind.travailles} travaillés / ${ind.cibles} ciblés`)),
+        h('div',{}, h('div',{class:'gros-chiffre'}, ind.conquete == null ? '—' : ind.conquete.toLocaleString('fr-FR') + ' %'), h('small',{}, `Conquête : ${ind.clients} clients / ${ind.cibles} ciblés`))),
+      etat.mode !== 'reel' ? h('small',{class:'info'}, 'En démo, tes garages réels ne sont pas chargés : travaillés et clients restent à 0.') : null)
+      : h('p',{class:'info', style:'margin:8px 0 0'}, 'Choisis une commune pour voir sa couverture et sa conquête.'),
+    h('div',{class:'titre-bloc', style:'margin-top:14px'}, '5 garages à visiter en priorité'),
+    h('div',{class:'liste', style:'max-height:none'}, top.map((e,i) => h('button',{class:'ligne', onclick:()=>ficheAnnuaire(e)},
+      h('b',{class:'rang'}, String(i+1)), h('span',{}, e.nom, h('small',{}, `${e.ville} · ${TYPES_MARCHE[e.typeProbable][0]}` + (e.distanceKm != null ? ` · ${e.distanceKm} km` : ''))),
+      h('span',{class:'badge b-estime'}, e.score + '/100')))),
+    h('p',{class:'regle'}, 'Score = indice de priorité de visite (nom, effectif, distance de Massy-Palaiseau). Ce n’est pas une qualification : seule ta visite le confirme.'),
+    h('div',{class:'actions-fiche'},
+      h('button',{class:'btn', 'aria-pressed':String(etat.coucheMarche), onclick:()=>{ etat.coucheMarche = !etat.coucheMarche; rendre(); }}, etat.coucheMarche ? 'Masquer le marché' : 'Afficher le marché'),
+      h('button',{class:'btn discret', onclick:()=>{ etat.annuaire.phase=''; etat.annuaire.test=null; testerAnnuaire('91'); }}, 'Mettre à jour')));
+}
+function montrerMarche(dep, communeChoisie){
+  if (!carte || !coucheMarcheL) return; coucheMarcheL.clearLayers();
+  if (!etat.coucheMarche) return;
+  const c = communeChoisie ? L0.normNom(communeChoisie) : '';
+  marcheDe(dep).filter(e => e.position && (!c || L0.normNom(e.ville) === c)).forEach(e => {
+    const [l,col,r] = TYPES_MARCHE[e.typeProbable];
+    L.circleMarker([e.position.lat, e.position.lng], {renderer:rendu, radius:r, color: e.typeProbable==='carrosserie' ? '#D41F2B' : '#2A2E35', weight: e.typeProbable==='carrosserie' ? 2 : 1, fillColor:col, fillOpacity:.9})
+      .bindTooltip(e.nom + ' · ' + l).on('click', () => ficheAnnuaire(e)).addTo(coucheMarcheL);
+  });
+}
+function ficheAnnuaire(e){
+  const [l,col] = TYPES_MARCHE[e.typeProbable];
+  const sr = ['b-annuaire','Annuaire officiel'];
+  const champ = (n, v, b) => { const vide = v == null || v === ''; return h('div',{class:'champ'+(vide?' vide':'')}, h('div',{class:'n'}, n), h('div',{class:'val'}, vide ? 'Non renseigné' : v), vide ? h('span',{class:'badge b-vide'},'Absent de l’annuaire') : h('span',{class:'badge '+b[0]}, b[1])); };
+  const deja = etat.tournee.includes(e.id);
+  const msg = h('p',{class:'info', style:'margin:6px 0 0', 'aria-live':'polite'});
+  panneauLateral(btn => h('aside',{class:'fiche', role:'dialog', 'aria-modal':'true', 'aria-labelledby':'annuaire-titre'},
+    h('div',{class:'fiche-tete'}, h('div',{class:'vignette annuaire'}, icone('lieu')),
+      h('div',{}, h('h2',{id:'annuaire-titre'}, e.nom), h('span',{class:'pastille-statut', style:'background:rgba(138,143,152,.18);color:#C9CDD3'}, 'Non travaillé'), ' ', h('span',{class:'badge b-annuaire'},'Annuaire officiel'),
+        h('div',{class:'lieu'}, `${e.ville} (${e.cp})`)), btn),
+    h('div',{class:'action', style:'border-color:rgba(158,163,171,.5)'}, h('div',{class:'n', style:'color:var(--doux)'}, l), h('div',{style:'margin-top:4px;font-weight:500'}, e.motifType + '. Non qualifié : à confirmer lors de ta visite.')),
+    h('div',{class:'actions-fiche'},
+      h('button',{class:'btn principal', disabled:deja, onclick:()=>{ etat.tournee.push(e.id); msg.textContent = 'Ajouté aux visites à planifier (brouillon de cette page).'; rendre(); }}, icone('calendrier'), deja ? 'Déjà à planifier' : 'Ajouter à mes visites'),
+      h('a',{class:'btn', href:'https://annuaire-entreprises.data.gouv.fr/etablissement/' + e.siret, target:'_blank', rel:'noopener'}, 'Fiche publique')),
+    msg,
+    h('div',{class:'champs'},
+      champ('Raison sociale', e.raisonSociale, sr), champ('SIRET', e.siret, sr), champ('Adresse', e.adresse, sr),
+      champ('Effectif', AN.TRANCHES[e.tranche] || e.tranche, sr), champ('Activité', e.naf + ' · entretien et réparation de véhicules légers', sr),
+      champ('Position GPS', e.position ? `${e.position.lat.toFixed(5)}, ${e.position.lng.toFixed(5)}` : '', sr),
+      champ('Score de priorité', e.score + '/100 : ' + e.raisons.join(', '), ['b-estime','Calcul']),
+      champ('Déjà dans tes garages', e.dejaTravaille ? 'Oui' : 'Non', ['b-estime','Rapprochement'])),
+    h('p',{class:'regle'}, 'Donnée publique de l’annuaire des entreprises (État). Ce garage n’entre pas dans la Ville : il y apparaîtra quand tu l’auras réellement visité et saisi dans l’appli téléphone.')));
+}
+// ================= NIVEAU 3 : fiche garage =================
+function ouvrirFiche(x){
+  const sr = x.source === 'demo' ? ['b-demo','Démo'] : ['b-terrain','Saisi terrain'];
+  const cl = x.classement, D = L0.depInfo(x.dep);
+  const geo = cl.niveau==='sur' ? ['b-confirme','Liste officielle'] : (cl.niveau==='cp'||cl.niveau==='commune') ? ['b-estime', L0.CLASSEMENTS[cl.niveau]] : ['b-alerte', L0.CLASSEMENTS[cl.niveau]];
+  const champ = (n, v, badge) => { const vide = v == null || v === '';
+    return h('div',{class:'champ'+(vide?' vide':'')}, h('div',{class:'n'}, n), h('div',{class:'val'}, vide ? 'Non renseigné' : v),
+      vide ? h('span',{class:'badge b-vide'}, (badge && badge[2]) || 'À compléter') : h('span',{class:'badge '+badge[0]}, badge[1])); };
+  const prochaine = x.etape ? x.etape + (x.etapeDate ? ' · ' + new Date(x.etapeDate+'T12:00:00').toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'}) : '') : null;
+  const couche = $('#couche-fiche'), dernier = document.activeElement;
+  const fermer = () => { couche.hidden = true; couche.replaceChildren(); if (dernier && dernier.isConnected && dernier.focus) dernier.focus(); };
+  const contenu = h('div',{}), msg = h('p',{class:'info', style:'margin:6px 0 0', 'aria-live':'polite'});
+  const infos = () => h('div',{class:'champs'},
+    h('div',{class:'action'}, h('div',{class:'n'},'Prochaine action'), h('div',{style:'margin-top:4px;font-weight:600'}, prochaine || 'Aucune action prévue.')),
+    champ('Commune', x.commune || (cl.saisi ? cl.saisi + ' (non reconnue)' : ''), x.commune ? geo : ['','','À compléter']),
+    champ('Code postal', cl.cp, sr), champ('Département', D ? `${D.nom} (${D.dep})` : '', geo),
+    cl.niveau !== 'sur' ? h('p',{class:'message erreur', style:'margin:8px 0'}, cl.motif) : null,
+    champ('Position GPS', x.position ? `${x.position.lat.toFixed(5)}, ${x.position.lng.toFixed(5)}` : '', x.position ? sr : ['','','Lot 2']),
+    champ('Fournisseur actuel', x.fournisseur === 'Non renseigné' ? '' : x.fournisseur, sr),
+    champ('Système de peinture', '', ['','','Champ à créer']),
+    champ('Potentiel', x.source==='demo' ? euros(x.potentiel) + ' / mois' : null, x.source==='demo' ? sr : ['','','À estimer']),
+    champ('Risque règlement', x.statut==='risque' ? 'Oui' : x.source==='demo' ? 'Aucun signalé' : '', x.statut==='risque' ? ['b-alerte', sr[1]] : sr),
+    champ('Ancien client Roberlo', x.source==='reel' && !x.exRoberlo ? '' : (x.exRoberlo ? 'Oui' : 'Non'), sr),
+    champ('Décideur', x.decideur, sr), champ('Téléphone', x.tel, sr), champ('Notes terrain', x.notes, sr));
+  const vides = { historique:'Historique des visites et des essais Carsystem : arrive avec l’import complet de l’appli téléphone et d’EBP (Lot 3).',
+    commandes:'Commandes, factures et règlements : lus dans les exports EBP au Lot 3. Le Bureau ne crée jamais de devis.' };
+  const ongletsF = h('div',{class:'sous-onglets', role:'tablist'});
+  const montrer = k => { [...ongletsF.children].forEach(b => b.setAttribute('aria-selected', String(b.dataset.k===k)));
+    contenu.replaceChildren(k==='infos' ? infos() : h('div',{class:'vide-onglet'}, h('span',{class:'badge b-vide'}, k==='commandes'?'EBP · Lot 3':'Lot 3'), h('p',{}, vides[k]))); };
+  [['infos','Informations'],['historique','Historique'],['commandes','Commandes']].forEach(([k,l]) => ongletsF.append(h('button',{role:'tab', 'data-k':k, onclick:()=>montrer(k)}, l)));
+  const dejaLa = etat.tournee.includes(x.id);
+  const btnFermer = h('button',{class:'fermer', onclick:fermer, 'aria-label':'Fermer la fiche'},'×');
+  const c = STATUTS[x.statut].couleur;
+  const fiche = h('aside',{class:'fiche', role:'dialog', 'aria-modal':'true', 'aria-labelledby':'fiche-titre'},
+    h('div',{class:'fiche-tete'}, h('div',{class:'vignette'}, portrait(L0.apparence(x.id), x.statut, 96)),
+      h('div',{}, h('h2',{id:'fiche-titre'}, x.nom), h('span',{class:'pastille-statut', style:`background:color-mix(in srgb, ${c} 22%, transparent);color:${c}`}, STATUTS[x.statut].libelle), ' ', h('span',{class:'badge '+sr[0]}, sr[1]),
+        h('div',{class:'lieu'}, METIERS[L0.apparence(x.id).role] + ' · ' + (x.commune || cl.saisi || 'Commune inconnue') + (D ? ` (${D.dep})` : ''))), btnFermer),
+    h('div',{class:'actions-fiche'},
+      h('button',{class:'btn', disabled:!x.tel, onclick:async()=>{ msg.textContent = await copier(x.tel) ? 'Téléphone copié : ' + x.tel : 'Copie refusée. Numéro : ' + x.tel; }}, icone('tel'), 'Copier le tél.'),
+      h('button',{class:'btn principal', disabled:dejaLa || !x.dep, onclick:()=>{ etat.tournee.push(x.id); fermer(); const r = route(); if (r.ecran==='carte' && r.D.dep===x.dep) rendre(); else allerCarte(x.dep); }},
+        icone('calendrier'), dejaLa ? 'Déjà à planifier' : 'Planifier une visite')),
+    msg, ongletsF, contenu,
+    h('p',{class:'regle'}, 'Confirmé = vérifié dans EBP. Liste officielle = commune et code postal concordants (INSEE / La Poste). Saisi terrain = noté au téléphone, à vérifier. Démo = inventé pour tester.'));
+  montrer('infos');
+  couche.replaceChildren(h('div',{class:'voile', onclick:e=>{ if(e.target===e.currentTarget) fermer(); }, onkeydown:e=>{ if(e.key==='Escape') fermer(); }}, fiche));
+  couche.hidden = false; btnFermer.focus();
+}
+
+// ================= En-tête : onglets, recherche, données =================
+function rendreEntete(){
+  const r = route(), depChoix = TERRITOIRES.find(t=>t.id===etat.choix).dep;
+  const ong = [['ville','Ville','ville','#ville'],['carte','Carte','carte','#carte-' + (r.D ? r.D.dep : depChoix)],['simulation','Simulation','sim','#simulation']];
+  $('#onglets').replaceChildren(...ong.map(([k,l,ic,href]) => h('a',{class:'onglet'+(k==='simulation'?' sim':''), href, 'aria-current': (r.ecran===k || (k==='ville' && r.ecran==='a-classer')) ? 'page' : null}, icone(ic), l)));
+  const mode = $('#mode'); mode.className = 'mode' + (etat.mode==='reel'?' reel':''); mode.textContent = etat.mode==='reel' ? 'Mes garages' : 'Démo';
+  mode.setAttribute('aria-expanded', String(etat.donneesOuvertes));
+  const d = $('#donnees'); d.hidden = !etat.donneesOuvertes; if (etat.donneesOuvertes) d.replaceChildren(panneauDonnees());
+}
+function panneauDonnees(){
+  const input = h('input',{type:'file', id:'fichier-sauvegarde', accept:'.json,application/json', onchange:e=>importer(e.target.files[0])});
+  const r = etat.rapport;
+  return h('section',{class:'bloc import', style:'box-shadow:0 14px 34px rgba(0,0,0,.55)'},
+    h('div',{class:'titre-bloc'},'Données affichées'),
+    h('div',{class:'info'}, etat.mode==='demo'
+      ? [h('b',{},'Démo : '), 'garages et chiffres inventés, communes réelles. Charge la sauvegarde JSON de l’appli téléphone pour voir tes garages. Lecture seule : rien n’est modifié ni envoyé.']
+      : [h('b',{},`${r.classes} garages classés`), ` sur ${r.lus}. ${r.aVerifier} à vérifier, ${r.hors} hors Île-de-France, ${r.nonClasses} non classés. Fermer la page efface tout.`]),
+    h('label',{class:'btn', for:'fichier-sauvegarde'}, etat.mode==='demo' ? 'Charger ma sauvegarde téléphone' : 'Charger une autre sauvegarde', input),
+    etat.mode==='reel' ? h('button',{class:'btn discret', onclick:retourDemo},'Revenir à la démo') : null,
+    etat.message ? h('div',{class:'message'+(etat.message.erreur?' erreur':'')}, etat.message.texte) : null);
+}
+function monterRecherche(){
+  const zone = $('#cherche'), res = h('div',{class:'resultats', hidden:true});
+  const input = h('input',{type:'search', id:'recherche-globale', placeholder:'Garage ou commune…', 'aria-label':'Rechercher un garage ou une commune', autocomplete:'off',
+    oninput:()=>{ const q = L0.normNom(input.value); if (q.length < 2) { res.hidden = true; return; }
+      const t = etat.garages.filter(x => L0.normNom(x.nom+' '+(x.commune||'')+' '+x.classement.saisi).includes(q)).slice(0,8);
+      res.replaceChildren(...(t.length ? t.map(x => ligneGarage(x)) : [h('p',{class:'info', style:'padding:8px;margin:0'}, 'Aucun résultat.')])); res.hidden = false; },
+    onkeydown:e=>{ if (e.key==='Escape') { res.hidden = true; input.value=''; } }});
+  res.addEventListener('click', () => { res.hidden = true; });
+  zone.replaceChildren(icone('loupe'), input, res);
+}
+
+// ================= Navigation =================
+function route(){
+  const hs = location.hash, m = /^#carte-(\d\d)(?:-([a-z]+))?$/.exec(hs);
+  if (m && L0.depInfo(m[1])) { const D = L0.depInfo(m[1]); return {ecran:'carte', D, porte: m[2] ? TERRITOIRES.find(x=>x.id===m[2] && x.dep===D.dep) : null}; }
+  if (hs === '#simulation') return {ecran:'simulation'};
+  if (hs === '#a-classer') return {ecran:'a-classer'};
+  return {ecran:'ville'};
+}
+function choisir(id){ etat.choix = id; rendre(); }
+function allerCarte(dep, porteId){ etat.recherche=''; etat.commune=''; location.hash = 'carte-' + dep + (porteId ? '-' + porteId : ''); }
+function rendre(){
+  const r = route();
+  if (r.porte) etat.choix = r.porte.id;
+  if (r.ecran !== 'carte' && carte) { carte.remove(); carte = null; }
+  rendreEntete(); rendreKpis(); rendreFiltres();
+  $('#kpis').hidden = r.ecran === 'simulation';
+  $('#vue').replaceChildren(r.ecran==='carte' ? vueCarte(r.D, r.porte) : r.ecran==='simulation' ? vueSimulation() : r.ecran==='a-classer' ? vueAClasser() : vueVille());
+  rendreFil();
+  const sc = document.getElementById('scene'); if (sc && sc.scrollWidth > sc.clientWidth) { const t = TERRITOIRES.find(x=>x.id===etat.choix), [px] = iso(...pos(t)); sc.scrollLeft = (px + 495) / 990 * sc.scrollWidth - sc.clientWidth/2; }
+}
+
+// ================= Import (lecture seule) =================
+function importer(f){
+  if (!f) return;
+  if (f.size > 20*1024*1024) { etat.message = {erreur:true, texte:'Fichier trop gros (plus de 20 Mo).'}; return rendre(); }
+  const lecteur = new FileReader();
+  lecteur.onload = () => {
+    try { const r = L0.lireSauvegarde(JSON.parse(String(lecteur.result)));
+      Object.assign(etat, {mode:'reel', garages:r.garages, rapport:r.rapport, tournee:[], filtre:'tous',
+        message:{texte:`Sauvegarde du ${r.rapport.date ? new Date(r.rapport.date).toLocaleDateString('fr-FR') : 'jour inconnu'} lue. ${r.rapport.classes} garages classés.`}});
+    } catch (e) { etat.message = {erreur:true, texte: e instanceof SyntaxError ? 'Ce fichier n’est pas un JSON valide.' : e.message}; }
+    rendre();
+  };
+  lecteur.onerror = () => { etat.message = {erreur:true, texte:'Lecture du fichier impossible.'}; rendre(); };
+  lecteur.readAsText(f);
+}
+function retourDemo(){ const g = L0.garagesDemo(2026); Object.assign(etat,{mode:'demo', garages:g, rapport:L0.rapportClassement(g), tournee:[], message:null}); rendre(); }
+
+$('#mode').addEventListener('click', () => { etat.donneesOuvertes = !etat.donneesOuvertes; rendreEntete(); });
+window.addEventListener('hashchange', () => { const c = $('#couche-fiche'); c.hidden = true; c.replaceChildren(); rendre(); });
+monterRecherche();
+rendre();
+})();
+</script>
+
+</body></html>
