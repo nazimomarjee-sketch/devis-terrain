@@ -1,0 +1,275 @@
+From bc8b791ed3555cd0b3ed20bf06c854b54d6524ac Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 5 Nov 2026 23:57:31 +0000
+Subject: [PATCH] =?UTF-8?q?test(lot1):=20prouver=20hors=20ligne,=20prix=20?=
+ =?UTF-8?q?restaur=C3=A9,=20PDF=20sans=20MIME=20et=20volume?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Essais automatiques ajoutés pour les points restés « non prouvés » lors
+des essais Samsung du 29/10, sans modifier le code de l'application :
+- parcours installé hors connexion (aucune requête serveur) :
+  restauration via Réglages, prix 10,00 au Catalogue, photos et PDF
+  relus octet par octet ;
+- PDF importé sans type MIME conservé par la sauvegarde complète
+  (apport propre de la PR #3) ;
+- volume : 2 000 garages / 105 Mo décodés, restaurés et relus dans
+  IndexedDB (essai long, hors vérification rapide).
+Le nouvel essai rapide est ajouté à la vérification GitHub.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013pZEv8t1WbS6VfZssmKZfc
+---
+ .github/workflows/verification-odicolor.yml |   1 +
+ audit/STABILISATION_LOT1_2026-11-05.md      |  27 ++++
+ tests/stabilisation-lot1-browser.cjs        | 130 ++++++++++++++++++++
+ tests/volume-lot1-browser.cjs               |  53 ++++++++
+ 4 files changed, 211 insertions(+)
+ create mode 100644 audit/STABILISATION_LOT1_2026-11-05.md
+ create mode 100644 tests/stabilisation-lot1-browser.cjs
+ create mode 100644 tests/volume-lot1-browser.cjs
+
+diff --git a/.github/workflows/verification-odicolor.yml b/.github/workflows/verification-odicolor.yml
+index 9f357a1..1fb4d33 100644
+--- a/.github/workflows/verification-odicolor.yml
++++ b/.github/workflows/verification-odicolor.yml
+@@ -56,6 +56,7 @@ jobs:
+           node tests/backup-browser.cjs
+           node tests/pwa-browser.cjs
+           node tests/null-ui-browser.cjs
++          node tests/stabilisation-lot1-browser.cjs
+       - name: Préparer les paquets Samsung (aucun déploiement)
+         run: >-
+           node scripts/preparer-preview-samsung.cjs
+diff --git a/audit/STABILISATION_LOT1_2026-11-05.md b/audit/STABILISATION_LOT1_2026-11-05.md
+new file mode 100644
+index 0000000..8034d25
+--- /dev/null
++++ b/audit/STABILISATION_LOT1_2026-11-05.md
+@@ -0,0 +1,27 @@
++# Lot 1 — stabilisation automatisée (05/11/2026)
++
++Branche `fix/lot1-f01-f03-recuperation` (PR #2, brouillon). Aucune modification du code de l'application :
++uniquement des essais automatiques supplémentaires. Données 100 % synthétiques.
++
++## Points « non prouvés » du bilan Samsung du 29/10, désormais couverts par un essai automatique
++
++| Point du bilan | Essai | Résultat (Chromium, PC) |
++|---|---|---|
++| Tarif dans B non formellement prouvé | `stabilisation-lot1-browser.cjs` : prix SYN-00001 affiché « 10,00 » au Catalogue après restauration | Réussi |
++| Hors connexion : PDF et restauration non vérifiés | Même essai : application installée, **aucune requête serveur**, restauration par Réglages, photos et PDF relus octet par octet | Réussi |
++| PDF sans type MIME (traité dans la PR #3) | `stabilisation-lot1-browser.cjs` : import accepté, type vide et octets conservés après sauvegarde complète | Réussi |
++| Fort volume non testé | `volume-lot1-browser.cjs` : 2 000 garages, 10 000 devis, 200 photos, 105 Mo — décodage 2,2 s, restauration 2,4 s, relecture 0,6 s | Réussi (PC) |
++
++Ticket #4 : fermé le 05/11/2026 (validé sur Samsung). Ticket #5 : libellés `.odicolor`/JSON, visuel synthétique
++et guide PDF corrigés dans le code (commits `7c7aa48`, `b36618b`) ; revalidation visuelle Samsung non refaite.
++
++## Reste à prouver sur l'appareil (non automatisable ici)
++
++- Durée et mémoire de la restauration du jeu « terrain » sur le Samsung (hypothèse : 3 à 6 fois plus lent qu'un PC).
++- Stockage saturé (quota) sur le Samsung.
++
++## PR #3 — pas un doublon intégral
++
++Vérifié le 05/11/2026 : ses 2 commits ne sont pas dans la PR #2 et son format de fichier (JSON v2, pièces en base64)
++est **incompatible** avec le `.odicolor` de la PR #2. Son seul apport propre (PDF sans MIME) est couvert ci-dessus.
++Elle reste ouverte en attendant la décision du propriétaire.
+diff --git a/tests/stabilisation-lot1-browser.cjs b/tests/stabilisation-lot1-browser.cjs
+new file mode 100644
+index 0000000..e2ff688
+--- /dev/null
++++ b/tests/stabilisation-lot1-browser.cjs
+@@ -0,0 +1,130 @@
++'use strict';
++// Stabilisation Lot 1 — points restés « non prouvés » lors des essais Samsung du 29/10/2026 :
++//  - restauration complète HORS CONNEXION via l'écran Réglages (application installée) ;
++//  - prix affiché dans le Catalogue après restauration (« Tarif dans B : non formellement prouvé ») ;
++//  - photos et PDF disponibles hors connexion, octets identiques à l'origine ;
++//  - PDF importé sans type MIME (cas traité par la PR #3) conservé par la sauvegarde complète.
++// Exécution : node tests/stabilisation-lot1-browser.cjs  — serveur local, profil jetable, données synthétiques.
++const { test, before, after } = require('node:test'), assert = require('node:assert/strict');
++const fs = require('node:fs'), path = require('node:path'), http = require('node:http'), crypto = require('node:crypto');
++const { chromium } = require('playwright');
++const B = require('../sauvegarde-locale.js');
++const jeu = require('../scripts/generer-jeu-synthetique.cjs');
++const root = path.resolve(__dirname, '..');
++const sha = b => crypto.createHash('sha256').update(b).digest('hex');
++let browser, server, origin, requetes = 0;
++
++before(async () => {
++  server = http.createServer((req, res) => {
++    requetes++;
++    const p = new URL(req.url, 'http://localhost').pathname, file = path.resolve(root, '.' + (p === '/' ? '/index.html' : p));
++    if (!file.startsWith(root + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) { res.writeHead(404); res.end(); return; }
++    res.setHeader('Content-Type', file.endsWith('.js') ? 'text/javascript' : file.endsWith('.css') ? 'text/css' : file.endsWith('.html') ? 'text/html' : file.endsWith('.webmanifest') ? 'application/manifest+json' : 'application/octet-stream');
++    res.setHeader('Cache-Control', 'no-store'); res.end(fs.readFileSync(file));
++  });
++  await new Promise((r, j) => { server.once('error', j); server.listen(0, '127.0.0.1', r); });
++  origin = 'http://127.0.0.1:' + server.address().port;
++  browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
++});
++after(async () => { await browser?.close(); if (server?.listening) await new Promise(r => server.close(r)); });
++
++// Application installée (service worker actif) dans un profil vierge, au format d'un Samsung.
++async function installer() {
++  const context = await browser.newContext({ viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true });
++  const page = await context.newPage(), erreurs = [];
++  page.on('pageerror', e => erreurs.push(e.message));
++  page.on('dialog', d => d.accept());
++  await page.goto(origin + '/#/reglages');
++  await page.getByRole('button', { name: 'Télécharger une sauvegarde complète', exact: true }).waitFor();
++  await page.evaluate(() => navigator.serviceWorker.ready);
++  await page.reload();
++  await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
++  return { context, page, erreurs };
++}
++
++async function restaurerDepuisReglages(page, chemin) {
++  await page.goto(origin + '/#/reglages');
++  await page.getByRole('button', { name: 'Restaurer après contrôle', exact: true }).waitFor();
++  await page.getByLabel('Fichier de sauvegarde').setInputFiles(chemin);
++  const recharge = page.waitForEvent('load');
++  await page.getByRole('button', { name: 'Restaurer après contrôle', exact: true }).click();
++  await recharge;
++  await page.getByRole('navigation').first().waitFor().catch(() => {});
++}
++
++test('parcours Samsung hors connexion : restauration, prix au Catalogue, photos et PDF intacts', async () => {
++  const dossier = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'odicolor-stab-'));
++  const { stores } = jeu.create('smoke');
++  const pieces = Object.fromEntries(await Promise.all(stores.meta.filter(([, v]) => v && v.blob instanceof Blob)
++    .map(async ([k, v]) => [k, sha(Buffer.from(await v.blob.arrayBuffer()))])));
++  const { file } = await B.encode(stores);
++  const chemin = path.join(dossier, 'jeu-smoke.odicolor');
++  fs.writeFileSync(chemin, Buffer.from(await file.arrayBuffer()));
++
++  const { context, page, erreurs } = await installer();
++  try {
++    await context.setOffline(true);
++    const avant = requetes;
++    await page.reload();
++    await page.getByRole('button', { name: 'Télécharger une sauvegarde complète', exact: true }).waitFor();
++    await restaurerDepuisReglages(page, chemin);
++
++    // Données restaurées (lecture directe d'IndexedDB par les fonctions de l'appli).
++    const etat = await page.evaluate(async () => ({ clients: (await getAll('clients')).length, devis: (await getAll('devis')).length,
++      article: (await getAll('articles')).find(a => a.code === 'SYN-00001') }));
++    assert.equal(etat.clients, 3);
++    assert.equal(etat.devis, 12);
++    assert.equal(etat.article.pu, 1000, 'prix en centimes conservé : 10,00 € HT');
++
++    // Prix visible à l'écran, comme le commercial le verrait (Catalogue → recherche).
++    await page.goto(origin + '/#/catalogue');
++    await page.getByLabel('Chercher dans le catalogue').fill('SYN-00001');
++    await page.waitForSelector('text=SYN-00001');
++    const ligne = await page.locator('a.ligne', { hasText: 'SYN-00001' }).first().textContent();
++    assert.match(ligne.replace(/\s/g, ' '), /10,00/, 'prix 10,00 affiché : ' + ligne);
++
++    // Photos et PDF : présents hors connexion, octets identiques à l'origine.
++    const lus = await page.evaluate(async cles => {
++      const out = {};
++      for (const k of cles) {
++        const v = await get('meta', k);
++        out[k] = v && v.blob ? Array.from(new Uint8Array(await v.blob.arrayBuffer())) : null;
++      }
++      return out;
++    }, Object.keys(pieces));
++    for (const [k, attendu] of Object.entries(pieces)) {
++      assert.ok(lus[k], k + ' absent après restauration');
++      assert.equal(sha(Buffer.from(lus[k])), attendu, k + ' modifié');
++    }
++
++    // Écran Catalogues fournisseurs (PDF) : les 2 documents listés hors connexion.
++    await page.evaluate(() => { location.hash = '#/catalogue'; });
++    const texte = await page.evaluate(async () => (await window.__cataloguesPDFV32.indexPDF()).map(x => x.nom));
++    assert.deepEqual(texte.sort(), ['pdf-synthetique-1.pdf', 'pdf-synthetique-2.pdf']);
++    const doc = await page.evaluate(async () => { const d = await window.__cataloguesPDFV32.obtenirDocument('pdf-synthetique-1'); return d && d.blob.size; });
++    assert.ok(doc > 0, 'PDF ouvrable hors connexion');
++    assert.equal(requetes, avant, 'aucune requête au serveur : tout le parcours s’est fait hors connexion');
++    assert.deepEqual(erreurs, []);
++  } finally { await context.close(); fs.rmSync(dossier, { recursive: true, force: true }); }
++});
++
++test('PDF importé sans type MIME : accepté à l’import, conservé à l’identique par la sauvegarde complète', async () => {
++  const { context, page, erreurs } = await installer();
++  try {
++    const r = await page.evaluate(async () => {
++      const octets = new TextEncoder().encode('%PDF-1.4\n% PDF SYNTHETIQUE SANS MIME\n%%EOF\n');
++      const fichier = new File([octets], 'catalogue-sans-mime.pdf', { type: '' });
++      await window.__cataloguesPDFV32.sauvegarderPDF(fichier, 'FOURNISSEUR SYNTHETIQUE');
++      const index = await window.__cataloguesPDFV32.indexPDF();
++      const stores = await ODICOLOR_BACKUP.read(DB.db);
++      const { file } = await ODICOLOR_BACKUP.encode(stores);
++      const relu = await ODICOLOR_BACKUP.decode(file);
++      const entree = relu.stores.meta.find(([k]) => k === 'pdfFournisseur:' + index[0].id)[1];
++      return { nb: index.length, type: entree.blob.type, identique: new Uint8Array(await entree.blob.arrayBuffer()).join() === octets.join() };
++    });
++    assert.equal(r.nb, 1);
++    assert.equal(r.type, '', 'type vide conservé tel quel');
++    assert.equal(r.identique, true, 'octets du PDF identiques après aller-retour');
++    assert.deepEqual(erreurs, []);
++  } finally { await context.close(); }
++});
+diff --git a/tests/volume-lot1-browser.cjs b/tests/volume-lot1-browser.cjs
+new file mode 100644
+index 0000000..c30eb9c
+--- /dev/null
++++ b/tests/volume-lot1-browser.cjs
+@@ -0,0 +1,53 @@
++'use strict';
++// Volume Lot 1 : décodage + restauration RÉELLE (IndexedDB Chromium) du jeu synthétique « terrain »
++// (2 000 garages, 10 000 devis, 20 000 articles, 200 photos, 6 PDF, ≈ 110 Mo), puis relecture et comparaison.
++// Exécution : node tests/volume-lot1-browser.cjs  (≈ 1 min ; pas dans la vérification rapide).
++// Limite : mesure sur PC ; un Samsung est plus lent et a moins de mémoire — à confirmer sur l'appareil.
++const { test, before, after } = require('node:test'), assert = require('node:assert/strict');
++const fs = require('node:fs'), path = require('node:path'), http = require('node:http'), os = require('node:os');
++const { chromium } = require('playwright');
++const root = path.resolve(__dirname, '..');
++let browser, server, origin, dossier, attendus;
++
++before(async () => {
++  dossier = fs.mkdtempSync(path.join(os.tmpdir(), 'odicolor-volume-'));
++  await require('../scripts/generer-jeu-synthetique.cjs').generate('terrain', path.join(dossier, 'jeu'));
++  attendus = JSON.parse(fs.readFileSync(path.join(dossier, 'jeu', 'attendus-terrain.json'), 'utf8'));
++  server = http.createServer((req, res) => {
++    const p = new URL(req.url, 'http://localhost').pathname;
++    if (p === '/test') { res.setHeader('Content-Type', 'text/html'); res.end('<!doctype html><meta charset="utf-8"><script src="/sauvegarde-locale.js"></script>'); return; }
++    if (p === '/jeu.odicolor') { res.setHeader('Content-Type', 'application/octet-stream'); fs.createReadStream(path.join(dossier, 'jeu', 'jeu-terrain.odicolor')).pipe(res); return; }
++    const file = path.resolve(root, '.' + p);
++    if (!file.startsWith(root + path.sep) || !fs.existsSync(file)) { res.writeHead(404); res.end(); return; }
++    res.setHeader('Content-Type', 'text/javascript'); res.end(fs.readFileSync(file));
++  });
++  await new Promise((r, j) => { server.once('error', j); server.listen(0, '127.0.0.1', r); });
++  origin = 'http://127.0.0.1:' + server.address().port;
++  browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
++});
++after(async () => { await browser?.close(); if (server?.listening) await new Promise(r => server.close(r)); if (dossier) fs.rmSync(dossier, { recursive: true, force: true }); });
++
++test('2 000 garages / 110 Mo : décodage, restauration atomique et relecture complète', { timeout: 300000 }, async () => {
++  const page = await browser.newPage();
++  await page.goto(origin + '/test');
++  const r = await page.evaluate(async () => {
++    const B = ODICOLOR_BACKUP, t0 = performance.now();
++    const fichier = await (await fetch('/jeu.odicolor')).blob();
++    const o = await B.decode(fichier); const t1 = performance.now();
++    const db = await new Promise((ok, ko) => { const q = indexedDB.open('volume-' + crypto.randomUUID(), 2); q.onupgradeneeded = () => B.schema(q.result); q.onsuccess = () => ok(q.result); q.onerror = () => ko(q.error); });
++    await B.restore(db, o); const t2 = performance.now();
++    const s = await B.read(db); const t3 = performance.now();
++    const pieces = s.meta.filter(([k]) => k.startsWith('garage-photo-v38:') || k.startsWith('pdfFournisseur:')).length;
++    const visites = s.clients.reduce((n, c) => n + (c.visites || []).length, 0);
++    return { octets: fichier.size, garages: s.clients.length, devis: s.devis.length, articles: s.articles.length, pieces, visites, archives: s.recuperations.length,
++      decodage: Math.round(t1 - t0), restauration: Math.round(t2 - t1), relecture: Math.round(t3 - t2) };
++  });
++  console.log('# mesures (ms) : décodage ' + r.decodage + ', restauration ' + r.restauration + ', relecture ' + r.relecture + ' — ' + Math.round(r.octets / 1048576) + ' Mo');
++  assert.equal(r.garages, attendus.clients);
++  assert.equal(r.devis, attendus.devis);
++  assert.equal(r.articles, attendus.articles);
++  assert.equal(r.pieces, attendus.photos + attendus.pdf);
++  assert.equal(r.visites, attendus.visites);
++  assert.equal(r.archives, 1, 'l’état précédent (vide) est archivé avant remplacement');
++  await page.close();
++});
+-- 
+2.43.0
+
