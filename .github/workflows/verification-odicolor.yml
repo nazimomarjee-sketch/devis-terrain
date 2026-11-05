@@ -55,6 +55,7 @@ jobs:
         run: |
           node tests/backup-browser.cjs
           node tests/pwa-browser.cjs
+          node tests/null-ui-browser.cjs
       - name: Préparer les paquets Samsung (aucun déploiement)
         run: >-
           node scripts/preparer-preview-samsung.cjs

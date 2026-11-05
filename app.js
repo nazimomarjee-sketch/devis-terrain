@@ -1102,10 +1102,10 @@ function blocCompte(c, sauver) {
   const ech = h('input', { type: 'date', 'aria-label': 'Échéance de la facture' });
   const dessiner = () => {
     const ouvertes = c.factures.filter(f => !f.regleLe), du = ouvertes.reduce((a, f) => a + (f.montant || 0), 0), ret = ouvertes.filter(f => enRetard(f)).reduce((a, f) => a + (f.montant || 0), 0);
-    resume.replaceChildren(
+    resume.replaceChildren(...[
       co.statut === 'bloque' ? h('div', { class: 'bandeau-ko' }, 'COMPTE BLOQUÉ : pas de commande sans règlement au comptant.') : null,
       co.statut === 'encours' ? h('p', { class: 'mut' }, 'Ouverture en cours : récupère Kbis, RIB et conditions signées.') : null,
-      h('div', { class: 'quatre trois' }, h('div', {}, h('strong', {}, eur(du)), h('small', { class: 'mut' }, 'à encaisser')), h('div', {}, h('strong', { class: ret ? 'ko' : '' }, eur(ret)), h('small', { class: 'mut' }, 'en retard')), h('div', {}, h('strong', {}, co.plafond ? Math.round(du / co.plafond * 100) + ' %' : '—'), h('small', { class: 'mut' }, 'du plafond'))));
+      h('div', { class: 'quatre trois' }, h('div', {}, h('strong', {}, eur(du)), h('small', { class: 'mut' }, 'à encaisser')), h('div', {}, h('strong', { class: ret ? 'ko' : '' }, eur(ret)), h('small', { class: 'mut' }, 'en retard')), h('div', {}, h('strong', {}, co.plafond ? Math.round(du / co.plafond * 100) + ' %' : '—'), h('small', { class: 'mut' }, 'du plafond')))].filter(Boolean));
     liste.replaceChildren(...(c.factures.length ? c.factures.slice().sort((a, b) => (a.regleLe ? 1 : 0) - (b.regleLe ? 1 : 0) || String(a.echeance).localeCompare(String(b.echeance))).map(f => {
       const r = enRetard(f), jr = r ? ecartJours(f.echeance) : 0;
       const pr = h('input', { type: 'date', value: f.promesse || '', 'aria-label': 'Promesse de paiement le' });
@@ -1444,10 +1444,10 @@ async function pageTournee() {
   };
   const majItin = () => {
     const sel = ordre.filter(c => coches.has(c.id));
-    itin.replaceChildren(sel.length ? h('button', { class: 'btn gros', onclick: async () => {
+    itin.replaceChildren(...[sel.length ? h('button', { class: 'btn gros', onclick: async () => {
       T[auj] = { ids: ordre.filter(c => coches.has(c.id)).map(c => c.id), res: {}, debut: new Date().toISOString(), termine: false }; await ecrireTournees(T); toast('Tournée démarrée : ' + T[auj].ids.length + ' garages.'); pageTournee();
     } }, '▶ Démarrer ma tournée (' + sel.length + ')') : h('p', { class: 'mut' }, 'Coche au moins un garage.'),
-      sel.length > 10 ? h('p', { class: 'mut' }, 'Google Maps accepte 10 arrêts maximum : l’itinéraire prendra les 10 premiers.') : null);
+      sel.length > 10 ? h('p', { class: 'mut' }, 'Google Maps accepte 10 arrêts maximum : l’itinéraire prendra les 10 premiers.') : null].filter(Boolean));
   };
   const bPos = h('button', { class: 'btn sec', onclick: () => {
     if (!navigator.geolocation) { toast('Position indisponible sur ce navigateur.', true); return; }

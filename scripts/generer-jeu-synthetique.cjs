@@ -23,7 +23,7 @@ function create(profile='smoke'){
   const devis=Array.from({length:p.devis},(_,i)=>({id:i+1,uid:'SYN-DEVIS-'+i,clientId:i%p.clients+1,clientNom:clients[i%p.clients].nom,creeLe:date,statut:'brouillon',lignes:[0,1,2].map(j=>{const a=articles[(i+j)%articles.length];return {code:a.code,des:a.des,q:100,pu:a.pu,r:0}}),notes:'DEVIS SYNTHETIQUE ; aucun usage commercial réel'}));
   const meta=[['settings',{societe:'ODICOLOR — SYNTHETIQUE',vendeur:'TEST UNIQUEMENT',indicatif:'33',tva100:850,remiseMax100:6000,objectifs:[100000,100000,100000],objDepart:'2027-01'}],['jeuSynthetique',{profile,date,usage:'TEST UNIQUEMENT'}]];
   for(let i=1;i<=p.photos;i++){
-    const svg='<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450"><rect width="800" height="450" fill="'+(i%2?'#D41F2B':'#152334')+'"/><text x="25" y="200" fill="white" font-size="32">PHOTO SYNTHETIQUE '+i+'</text><!--'+'.'.repeat(p.photoSize)+'--></svg>';
+    const svg='<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450"><rect width="800" height="450" fill="'+(i%2?'#D41F2B':'#152334')+'"/><text x="25" y="415" fill="white" font-size="32">PHOTO SYNTHETIQUE '+i+'</text><!--'+'.'.repeat(p.photoSize)+'--></svg>';
     meta.push(['garage-photo-v38:'+i,{blob:new Blob([svg],{type:'image/svg+xml'}),date,origine:'SYNTHETIQUE'}]);
   }
   const index=[];for(let i=1;i<=p.pdf;i++){const id='pdf-synthetique-'+i,blob=syntheticPdf('PDF SYNTHETIQUE '+i,p.pdfSize);index.push({id,nom:id+'.pdf',fournisseur:'FOURNISSEUR SYNTHETIQUE',size:blob.size,date});meta.push(['pdfFournisseur:'+id,{id,nom:id+'.pdf',date,blob}]);}
