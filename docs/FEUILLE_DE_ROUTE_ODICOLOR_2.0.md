@@ -5,7 +5,7 @@ l'évolution. Aucune fusion, publication, mise en production, hébergement ou do
 Aucun agent IA ne travaille sans demande explicite ; il propose, il n'exécute jamais sans validation.
 
 Ce document regroupe les orientations du 08/11/2026. Il ne remplace pas les documents existants, il les relie :
-`FEUILLE_DE_ROUTE_TELEPHONE_BUREAU.md`, `OFFRES_DE_CONQUETE.md`, `PARCOURS_COMMANDE_CLIENT.md`, `socle/LISEZ-MOI.md`.
+`FEUILLE_DE_ROUTE_TELEPHONE_BUREAU.md`, `OFFRES_DE_CONQUETE.md`, `PARCOURS_COMMANDE_CLIENT.md`, `ODICOLOR_LAB.md`, `socle/LISEZ-MOI.md`.
 
 ## 1. État réel (vérifié dans le dépôt le 08/11/2026)
 
@@ -22,6 +22,7 @@ Ce document regroupe les orientations du 08/11/2026. Il ne remplace pas les docu
 | Anneau doré « Offre de conquête » dans la Ville | **Maquette** | `docs/maquettes/` |
 | Espace client / parcours de réapprovisionnement | **Document** seulement | `PARCOURS_COMMANDE_CLIENT.md` |
 | Agence 3D, agents Marché/Achats/Logistique/Analyste/Méthodes/Ingénieur/Logiciel | **Inexistant** | — |
+| ODICOLOR LAB (pôle Ingénierie et Innovation), concept WORKSTATION | **Vision** seulement | `ODICOLOR_LAB.md` |
 | « Reproduire une vente réussie », mémoire des ventes | **Inexistant** | — |
 | Canal distribution (distributeurs, revendeurs) séparé dans le cockpit | **Inexistant** (dépend des colonnes EBP) | — |
 | Serveur, accès distant, comptes, authentification forte, chiffrement des sauvegardes | **Inexistant** | — |
@@ -71,10 +72,13 @@ Impact : effet attendu sur CA, marge ou réachat · Coût / difficulté : 1 faib
 | 6 | Hébergement sécurisé, comptes, accès Samsung | Prérequis de l'appli client | 3 | 3 | Résultat de 3, budget |
 | 7 | Prototype appli client (panier, un clic, prise en charge) | Fort si 3 réussit | 2 | 2 | 3 et 6 |
 | 8 | Fiches de mission des 6 autres agents | Variable | 1 | 1 | Une mission demandée |
-| 9 | Études produits (cales, pistolet, ateliers) | Incertain | 2 | 2 | Mission, chiffrage complet |
+| 9 | ODICOLOR LAB : fiche projet WORKSTATION (puis cales, pistolet, ateliers) | Incertain tant que le QR n'est pas prouvé | 2 | 2 | Résultat de 3, mission autorisée, conformité |
 | 10 | Agence 3D | Faible sur les ventes | 2 | 2 | Agents utiles d'abord |
 
 ## 5. Testable vite avec l'existant
+
+- **QR code de réapprovisionnement (LAB)** : une étiquette QR sur les rangements actuels du garage, qui ouvre un message
+  WhatsApp prérempli vers le commercial, dans le test « 5 garages ». Prouve l'usage avant de concevoir la WORKSTATION.
 
 - **Ma Ville + filtres** : trouver des garages proches et du même segment qu'un client gagné (base de « Reproduire une vente »).
 - **Agent 01 + techniques SPIN** : analyser une vente racontée par un commercial, en copier-coller anonymisé.
