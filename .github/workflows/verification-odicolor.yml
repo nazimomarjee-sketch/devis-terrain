@@ -12,7 +12,8 @@ concurrency:
 
 jobs:
   securite-et-syntaxe:
-    runs-on: ubuntu-latest
+    # Figé : ubuntu-latest est passé à 26.04 le 06/11/2026, non pris en charge par Playwright 1.56.1.
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - name: Récupérer le projet
