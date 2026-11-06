@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path'), os = require('node:os');
 const { spawnSync, spawn } = require('node:child_process');
 const { Coffre, FICHIERS, KDF_DEFAUT } = require('../local/coffre.js');
+const { chercherEnClair } = require('./support/en-clair.cjs');
 
 const RAPIDE = { algo: 'scrypt', N: 2 ** 14, r: 8, p: 1 }; // essais rapides ; un test vérifie les paramètres réels
 const MDP = 'Fictif-Coffre-2026!', AUTRE = 'Autre-Mot-De-Passe-99';
@@ -31,7 +32,8 @@ test('2. mauvais mot de passe : refusé, message neutre, aucune donnée lue', ()
 test('3. sur le disque, tout est chiffré : aucun nom, code client ni note en clair', () => {
   const d = dossier(); creer(d).coffre.fermer();
   const contenu = brut(d);
-  for (const mot of ['GARAGE', 'ALPHA', 'Massy', 'C001', 'Visite fictive']) assert.ok(!contenu.includes(mot), mot + ' visible en clair');
+  // Mots longs ou ponctués seulement : un mot court apparaît par hasard dans le chiffré en base64 (voir tests/support/en-clair.cjs).
+  assert.deepEqual(chercherEnClair(contenu, ['GARAGE FICTIF ALPHA', '"commune":"Massy"', '"code":"C001"', 'Visite fictive du 02/11']), []);
 });
 
 test('4. mot de passe trop court refusé ; coffre existant jamais remplacé', () => {

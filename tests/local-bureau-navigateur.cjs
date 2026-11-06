@@ -7,6 +7,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path'), os = require('node:os');
 const { spawn } = require('node:child_process');
 const { chromium } = require('playwright');
+const { chercherEnClair } = require('./support/en-clair.cjs');
 const { demarrer } = require('../local/serveur.js');
 
 const SERVEUR = path.resolve(__dirname, '..', 'local', 'serveur.js');
@@ -115,7 +116,7 @@ test('création du coffre, imports, ARRÊT BRUTAL, redémarrage : cockpit, garag
   await ctx.close(); await tuer(prog);
   // 5. Rien en clair : ni mot de passe, ni noms de garages, ni montants, dans les fichiers du coffre ou le journal du programme.
   const disque = fs.readdirSync(dossier).map(f => fs.readFileSync(path.join(dossier, f), 'latin1')).join('\n') + prog.journal();
-  for (const s of [MDP, 'Mauvais-mot-de-passe', 'GARAGE FICTIF', 'CARROSSERIE', '1 100', 'C001']) assert.ok(!disque.includes(s), s + ' visible en clair');
+  assert.deepEqual(chercherEnClair(disque, [MDP, 'Mauvais-mot-de-passe', 'GARAGE FICTIF ALPHA', 'CARROSSERIE FICTIVE DU PARC', '1 100,00', '"code":"C001"']), [], 'rien en clair');
   } finally { await ctx?.close().catch(() => {}); if (prog.exitCode === null && !prog.signalCode) await tuer(prog); }
 });
 

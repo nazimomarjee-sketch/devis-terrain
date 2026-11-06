@@ -174,7 +174,7 @@ test('2. format tactile (Galaxy) : boutons ≥ 44 px, pas de défilement horizon
   } finally { await ctx.close(); await tuer(prog); }
 });
 
-test('3. sans l’application locale (fichier ouvert directement) : l’écran prévient que rien n’est enregistré', async () => {
+test('3. sans l’application locale (fichier ouvert directement) : décisions INTERDITES (bouton bloqué et fonction qui refuse)', async () => {
   const ctx = await nav.newContext(); await ctx.route(/^https?:/, r => r.abort());
   const p = await ctx.newPage();
   try {
@@ -183,6 +183,10 @@ test('3. sans l’application locale (fichier ouvert directement) : l’écran p
     assert.match(await p.textContent('#vue'), /Aucune décision n’est possible sur la démo/);
     await p.click('#mode'); await p.setInputFiles('#fichier-sauvegarde', path.join(travail, 'sauvegarde.json'));
     await p.waitForSelector('.vf-enreg');
-    assert.match(await p.textContent('.vf-enreg'), /sans l’application locale.*perdues à la fermeture/);
+    assert.match(await p.textContent('.vf-enreg'), /coffre chiffré est inaccessible.*Aucune décision ne peut être enregistrée/);
+    assert.equal(await p.isDisabled('[data-decision="absence"]'), true, 'bouton bloqué, pas seulement un avertissement');
+    const refus = await p.evaluate(() => { try { OdicolorBureau.decisions.decider({ type: 'absence', cible: { tel: 1, nom: 'X', cp: '95190' }, auteur: 'X' }); return null; } catch (e) { return e.message; } });
+    assert.match(refus, /Aucune décision ne peut être enregistrée/);
+    assert.equal(await p.evaluate(() => OdicolorBureau.decisions.journal().decisions.length), 0);
   } finally { await ctx.close(); }
 });

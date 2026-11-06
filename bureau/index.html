@@ -1359,6 +1359,7 @@ function resultatsMaVille(q){
 etat.auteurDeclare = ''; etat.vf = null; // auteur DÉCLARÉ pour la session (texte libre, non authentifié), jamais écrit hors des décisions
 function deciderCompte(e){
   if (etat.mode !== 'reel' || !etat.telephone) throw new Error('Charge d’abord la sauvegarde de ton téléphone : aucune décision sur la démo.');
+  const coffre = etatCoffre(); if (!coffre.ok) throw new Error(coffre.raison);
   if (etat.decisionsAlerte) throw new Error(etat.decisionsAlerte);
   const r = DecisionsComptes.decider(etat.decisions, Object.assign({ exportClientsDu: etat.ebp.clients ? etat.ebp.arrete : null }, e));
   etat.decisions = r.journal; signalerChangement(); return r.decision;
@@ -1376,11 +1377,11 @@ function vueVerifierComptes(){
   if (etat.mode !== 'reel' || !etat.telephone) return h('section',{class:'bloc'}, h('h2',{},'Vérifier les comptes ODICOLOR'),
     h('p',{class:'info'}, 'Cet écran travaille sur tes garages : charge d’abord la sauvegarde de ton téléphone (bouton Démo / Mes garages) et l’export clients EBP. Aucune décision n’est possible sur la démo.'));
   const hote = h('div',{});
-  const coffre = document.documentElement.dataset.coffre;
   VerifierComptes.monter(hote, { donnees: donneesComptes, appliquer: appliquerDecisions, modele: modeleReel, decider: deciderCompte,
     auteur: () => etat.auteurDeclare, definirAuteur: t => { etat.auteurDeclare = String(t || '').slice(0, 60); },
-    enregistrement: () => coffre ? { ok:true, texte:'✓ Chaque décision est enregistrée dans le coffre chiffré de ce PC (auteur déclaré, date, source).' }
-      : { ok:false, texte:'⚠ Bureau ouvert sans l’application locale : les décisions restent en mémoire et seront perdues à la fermeture. Ouvre le Bureau par l’application ODICOLOR.' },
+    peutDecider: etatCoffre, message: () => etat.messageDecisions || '',
+    enregistrement: () => { const c = etatCoffre(); return c.ok ? { ok:true, texte:'✓ Chaque décision est enregistrée dans le coffre chiffré de ce PC (auteur déclaré, date, source).' }
+      : { ok:false, texte:'⛔ ' + c.raison }; },
     rafraichir: S => { etat.vf = S; rendre(); } }, etat.vf);
   return hote;
 }
@@ -1448,9 +1449,28 @@ function signalerChangement(){ window.dispatchEvent(new Event('odicolor-change')
 // Lot A : journal des décisions de compte (liaisons EBP validées, absences vérifiées), enregistré dans le coffre (état version 2).
 // Il ne fait que grandir ; un journal illisible est conservé tel quel (jamais effacé) et bloque les nouvelles décisions.
 etat.decisions = DecisionsComptes.creerJournal(); etat.decisionsAlerte = null;
+etat.decisionsConfirmees = etat.decisions; // dernier journal CONFIRMÉ par le coffre (retour en arrière si un enregistrement échoue)
+// Coffre inaccessible = AUCUNE décision (pas seulement un avertissement). Lu dans data-coffre, posé par bureau/coffre-client.js.
+function etatCoffre(){
+  const c = document.documentElement.dataset.coffre, m = document.documentElement.dataset.coffreMessage;
+  if (c === 'pret' || c === 'enregistre') return { ok:true, raison:'' };
+  if (!c) return { ok:false, raison:'Le Bureau n’est pas ouvert par l’application locale ODICOLOR : le coffre chiffré est inaccessible. Aucune décision ne peut être enregistrée.' };
+  if (c === 'verrouille') return { ok:false, raison:'Le coffre est verrouillé. Aucune décision ne peut être enregistrée.' };
+  return { ok:false, raison: m || 'Le coffre ODICOLOR est inaccessible. Aucune décision ne peut être enregistrée.' };
+}
+// Si un enregistrement échoue, les décisions non confirmées sont ANNULÉES à l'écran : jamais de décision affichée qu'on ne retrouverait pas.
+window.addEventListener('odicolor-coffre-ok', () => { if (etat.journalExporte) etat.decisionsConfirmees = etat.journalExporte; });
+window.addEventListener('odicolor-coffre-echec', () => {
+  const perdues = etat.decisions.decisions.length - etat.decisionsConfirmees.decisions.length;
+  etat.decisions = etat.decisionsConfirmees;
+  etat.messageDecisions = perdues > 0 ? perdues + ' décision(s) NON enregistrée(s) dans le coffre : annulée(s). Refais-les quand le coffre répond.' : null;
+  rendre();
+});
+window.addEventListener('odicolor-coffre-retabli', () => { etat.messageDecisions = null; rendre(); });
 window.OdicolorBureau = Object.freeze({
   exporter(){
     const s = etat.sauvegardeTelephone || null, E = etat.ebp;
+    etat.journalExporte = etat.decisions; // celui qui part dans le coffre : confirmé seulement si l'enregistrement réussit
     return { version:2, telephone: s && s.telephone, garagesTelephone: s && s.garages, rapport: s && s.rapport,
       ebp: { pieces:E.pieces, reglements:E.reglements, clients:E.clients, arrete:E.arrete }, decisionsComptes: etat.decisions };
   },
@@ -1464,7 +1484,7 @@ window.OdicolorBureau = Object.freeze({
     if (!d || (d.version !== 1 && d.version !== 2)) return false;
     // Version 1 (avant le lot A) : aucun journal → journal vide. Version 2 : journal relu et contrôlé, rien n'est jeté.
     const lu = DecisionsComptes.lire(d.version === 2 ? d.decisionsComptes : null);
-    etat.decisions = lu.journal || d.decisionsComptes; etat.decisionsAlerte = lu.erreur ? lu.erreur + ' : conservé tel quel, nouvelles décisions bloquées.'
+    etat.decisions = lu.journal || d.decisionsComptes; etat.decisionsConfirmees = etat.decisions; etat.decisionsAlerte = lu.erreur ? lu.erreur + ' : conservé tel quel, nouvelles décisions bloquées.'
       : lu.illisibles.length ? lu.illisibles.length + ' décision(s) illisible(s) dans le coffre : conservées telles quelles, nouvelles décisions bloquées.' : null;
     if (d.telephone && Array.isArray(d.garagesTelephone)) {
       etat.sauvegardeTelephone = { telephone:d.telephone, garages:d.garagesTelephone, rapport:d.rapport };

@@ -67,3 +67,4 @@
 @media (max-width:860px){.vf-corps{grid-template-columns:1fr}.vf-file{position:static;max-height:none}.vf-compteurs{grid-template-columns:repeat(2,minmax(0,1fr))}
   .vf-actions{grid-template-columns:1fr}.vf-carte{padding:14px}.vf h1{font-size:26px}.vf-fiche-tete{flex-direction:column}}
 .vf-item-seul{grid-template-columns:minmax(0,1fr)}
+.vf-btn[disabled][aria-disabled=true]{opacity:.35}.vf-enreg-non{font-weight:700}

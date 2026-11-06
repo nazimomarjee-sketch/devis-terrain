@@ -60,6 +60,8 @@
     const q = L0.normNom(S.filtre);
     const filtrer = l => q ? l.filter(id => L0.normNom(nomTel(id) + ' ' + (garages.get(id).g.ville || '') + ' ' + (garages.get(id).g.cp || '') + ' ' + id).includes(q)) : l;
     const auteur = ctx.auteur(), enreg = ctx.enregistrement();
+    const peut = ctx.peutDecider ? ctx.peutDecider() : { ok: true }, bloque = peut.ok ? '' : ' disabled aria-disabled="true"'; // coffre inaccessible : aucune décision
+    const msgDec = ctx.message ? ctx.message() : '';
 
     const ligne = id => { const { g, e } = garages.get(id), s = sug.get(id) || [], st = statut(id);
       return `<li class="vf-item${id === S.choisi ? ' vf-actif' : ''}"><label class="vf-coche" title="Sélectionner pour une déclaration groupée"><input type="checkbox" data-coche="${id}"${S.coches.has(id) ? ' checked' : ''}${S.onglet !== 'a_verifier' ? ' hidden' : ''}></label>
@@ -92,10 +94,10 @@
         <datalist id="vf-codes">${D.clientsEbp.slice(0, 2000).map(c => `<option value="${esc(c.code)}">${esc(c.nom)}</option>`).join('')}</datalist>
         <div class="vf-actions">
           <button type="button" class="vf-btn vf-oui" data-decision="liaison" disabled><kbd>1</kbd> C’est ce client EBP</button>
-          <button type="button" class="vf-btn vf-non" data-decision="absence"><kbd>2</kbd> Aucun compte ODICOLOR vérifié</button>
+          <button type="button" class="vf-btn vf-non" data-decision="absence"${bloque}><kbd>2</kbd> Aucun compte ODICOLOR vérifié</button>
           <button type="button" class="vf-btn vf-nsp" data-decision="nsp"><kbd>3</kbd> Je ne sais pas</button>
         </div>
-        ${active && active.decision.type !== 'annulation' ? `<p class="vf-motif">Une décision est déjà en vigueur (${active.decision.id}) : une nouvelle décision la <b>remplace</b>, sans l’effacer. <button type="button" class="vf-lien" data-annuler="${active.decision.id}">Annuler cette décision</button></p>` : ''}
+        ${active && active.decision.type !== 'annulation' ? `<p class="vf-motif">Une décision est déjà en vigueur (${active.decision.id}) : une nouvelle décision la <b>remplace</b>, sans l’effacer. <button type="button" class="vf-lien" data-annuler="${active.decision.id}"${bloque}>Annuler cette décision</button></p>` : ''}
         <h3>Historique des décisions</h3>
         ${hist.length ? `<ol class="vf-hist">${hist.map(t => `<li><b>${fr(t.decision.date)}</b> · ${TYPE_LIB[t.decision.type]}${t.decision.codeEbp ? ' (code ' + esc(t.decision.codeEbp) + ')' : ''}${t.decision.ecarte ? ' · fiche(s) écartée(s) : ' + esc(t.decision.ecarte.join(', ')) : ''} · auteur déclaré : ${esc(t.decision.auteur)} · <i class="vf-b vf-e-${t.etat}">${ETAT_LIB[t.etat]}${t.alerte ? ' · alerte' : ''}</i></li>`).join('')}</ol>` : '<p class="vf-motif">Aucune décision pour ce garage.</p>'}
       </div>`;
@@ -111,14 +113,15 @@
         <div class="vf-cpt vf-c-sans_compte"><span>Sans compte</span><b data-vf="sans_compte">${k.sans_compte}</b></div>
         <div class="vf-cpt vf-c-a_verifier"><span>À vérifier</span><b data-vf="a_verifier">${k.a_verifier}</b></div>
         <div class="vf-cpt"><span>Total</span><b data-vf="total">${k.total}</b></div></div>
-      <p class="vf-enreg vf-enreg-${enreg.ok ? 'ok' : 'non'}" role="status">${esc(enreg.texte)}</p>
+      <p class="vf-enreg vf-enreg-${enreg.ok ? 'ok' : 'non'}" role="${enreg.ok ? 'status' : 'alert'}">${esc(enreg.texte)}</p>
+      ${msgDec ? `<p class="vf-boite vf-boite-alerte" role="alert" data-vf-msg>${esc(msgDec)}</p>` : ''}
       <div class="vf-corps">
         <section class="vf-carte" aria-label="Garage à vérifier">${carte()}</section>
         <aside class="vf-file">
           <div class="vf-onglets" role="tablist">${[['a_verifier', 'À vérifier', aVerifier.length], ['alertes', 'Alertes', alertes.length], ['decides', 'Décidés', decides.length]].map(([o, l, n]) =>
             `<button type="button" role="tab" data-onglet="${o}" aria-selected="${S.onglet === o}">${l} <b>${n}</b></button>`).join('')}</div>
           ${S.onglet !== 'alertes' ? `<input type="search" class="vf-chercher" value="${esc(S.filtre)}" placeholder="Chercher (nom, ville, code postal, n°)" aria-label="Chercher un garage">` : ''}
-          ${S.onglet === 'a_verifier' && S.coches.size ? `<div class="vf-groupe"><b>${S.coches.size} sélectionné(s)</b><button type="button" class="vf-btn vf-non vf-petit" data-groupe>Déclarer « Aucun compte ODICOLOR vérifié »…</button><button type="button" class="vf-lien" data-vider>Tout désélectionner</button></div>` : ''}
+          ${S.onglet === 'a_verifier' && S.coches.size ? `<div class="vf-groupe"><b>${S.coches.size} sélectionné(s)</b><button type="button" class="vf-btn vf-non vf-petit" data-groupe${bloque}>Déclarer « Aucun compte ODICOLOR vérifié »…</button><button type="button" class="vf-lien" data-vider>Tout désélectionner</button></div>` : ''}
           <ul class="vf-liste">${liste.join('') || '<li class="vf-vide">Rien ici.</li>'}</ul>
         </aside></div>
       <div class="vf-couche" hidden></div>`;
@@ -148,7 +151,7 @@
     }
     const cible = id => { const g = garages.get(id).g; return { tel: id, nom: g.nom, cp: String(g.cp || '').trim() }; };
     const codeChoisi = () => { const r = conteneur.querySelector('input[name="vf-code"]:checked'), libre = ($('#vf-code-libre') || {}).value; return (r && r.value) || (libre && libre.trim()) || ''; };
-    const majOui = () => { const b = conteneur.querySelector('[data-decision="liaison"]'); if (b) b.disabled = !codeChoisi(); };
+    const majOui = () => { const b = conteneur.querySelector('[data-decision="liaison"]'); if (b) b.disabled = !codeChoisi() || !peut.ok; };
 
     function liaison() {
       const code = codeChoisi(); if (!code) return;

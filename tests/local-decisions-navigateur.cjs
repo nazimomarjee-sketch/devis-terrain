@@ -7,6 +7,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path'), os = require('node:os');
 const { spawn } = require('node:child_process');
 const { chromium } = require('playwright');
+const { chercherEnClair } = require('./support/en-clair.cjs');
 
 const SERVEUR = path.resolve(__dirname, '..', 'local', 'serveur.js');
 const MDP = 'Phrase-Fictive-Du-Coffre-2026';
@@ -85,7 +86,7 @@ test('1. décisions enregistrées, page fermée, programme ARRÊTÉ BRUTALEMENT,
     assert.deepEqual(erreurs, []);
     await ctx.close(); await tuer(prog);
     const disque = fs.readdirSync(dossier).map(f => fs.readFileSync(path.join(dossier, f), 'latin1')).join('\n') + prog.journal();
-    for (const s of [AUTEUR, 'C10', 'GARAGE FICTIF', 'liaison']) assert.ok(!disque.includes(s), s + ' visible en clair');
+    assert.deepEqual(chercherEnClair(disque, [AUTEUR, '"codeEbp":"C10"', 'GARAGE FICTIF DEUX', 'Liaison EBP validée par une personne', 'Absence de compte vérifiée dans EBP']), [], 'rien en clair');
   } finally { await ctx?.close().catch(() => {}); await tuer(prog); }
 });
 
