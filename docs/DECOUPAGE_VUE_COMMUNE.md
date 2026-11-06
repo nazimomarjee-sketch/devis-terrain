@@ -116,3 +116,36 @@ Non branché : aucune page (Bureau, téléphone) ne le charge encore. Tests : `t
 mais **ne seront pas affichés** tant qu'ils sont vides (exigence du propriétaire).
 Règle plus stricte que la Ville connectée actuelle : un même nom dans la même commune n'est **plus relié automatiquement** ;
 il devient une proposition « à confirmer ». Seuls le SIRET, le code client EBP ou une liaison validée par une personne fusionnent.
+
+**Règle des clients dormants (corrigée)** : 60 jours sans commande → réachat à vérifier ; 90 jours → potentiellement dormant ;
+12 mois → inactif. Ce sont des valeurs de départ réglables. Les seuils s'adaptent au rythme d'achat du client quand on connaît au moins 3 commandes.
+Si l'historique est incomplet, l'établissement est classé « à vérifier ». Les statuts Airtable sont conservés avec leur source.
+Le modèle signale aussi les clients dont les achats ralentissent (`ralentit`) ; les propositions de l'Agent Business Developer ne sont pas encore faites.
+Tests : `tests/ville-modele-commune.test.cjs` (20/20).
+
+## 10. Étape 2 réalisée (dessin de la vue Commune, données fictives)
+
+Fichiers nouveaux, **non branchés au Bureau** :
+- `bureau/ville/dessin-iso.js` : moteur de dessin de la référence ;
+- `bureau/ville/vue-commune.js` ;
+- `bureau/ville/ville-commune.css` : styles séparés, la Ville actuelle n'est pas touchée ;
+- `bureau/ville/fictif-95.js` ;
+- `bureau/ville/demo-commune.html` : page de démonstration.
+
+Tests : `tests/ville-commune-navigateur.cjs` (7/7, Chromium, Internet coupé, PC et Galaxy S9+). Chaque garde-fou retiré volontairement fait échouer au moins un test.
+
+Ce que la vue fait :
+- un bâtiment par établissement, avec les mêmes numéros que dans la liste ;
+- l'agence à Goussainville (emplacement symbolique) et les mentions obligatoires ;
+- le « ? » réservé aux établissements à qualifier ; un métier inconnu affiche un repère gris neutre ;
+- les signaux dormant (☾), réachat (↻) et alerte (!), sans changer les 4 couleurs ;
+- au-delà de 40 établissements, 39 bâtiments plus un îlot « +N · liste » ;
+- au plus 5 personnages ;
+- un 1er geste ouvre l'aperçu, un 2e ouvre la fiche ; au clavier, Entrée ouvre et Échap ferme.
+
+Limites connues :
+- **La fiche n'est pas encore reliée** : la démo affiche seulement « fiche demandée ». Ce sera l'étape 3.
+- **Le zoom** est un simple agrandissement, sans déplacement à la main.
+- **Sur téléphone, l'aperçu recouvre une partie de la scène.** À revoir à l'étape 4 (Samsung), par exemple en panneau qui monte du bas.
+- **Le test de conformité visuelle à la référence** (§7, test 12) n'est pas automatisé : la vérification a été faite à l'œil sur les captures.
+- Emplacements dans la commune : schématiques, jamais réels.

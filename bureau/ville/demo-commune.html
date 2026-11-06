@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Démo vue Commune — données fictives</title>
+<style>
+@font-face{font-family:"Barlow Condensed";font-weight:700;src:url(../../barlow-condensed-latin-700-normal.woff2) format("woff2")}
+@font-face{font-family:"Barlow Condensed";font-weight:800;src:url(../../barlow-condensed-latin-800-normal.woff2) format("woff2")}
+html,body{margin:0;background:#0A0B0D;color:#F4F2EF;font:14px system-ui,sans-serif}
+.barre{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid #272C33}
+.barre b{font:italic 800 20px "Barlow Condensed"}.barre b em{color:#FF2D3D}
+.barre button{min-height:40px;padding:0 12px;border-radius:999px;border:1px solid #272C33;background:#16191E;color:#F4F2EF;font:700 14px "Barlow Condensed";letter-spacing:.04em;cursor:pointer}
+.barre button[aria-pressed=true]{border-color:#FF2D3D;background:rgba(255,45,61,.12)}
+.barre .fx{margin-left:auto;font:700 12px "Barlow Condensed";letter-spacing:.12em;color:#F0952B;border:1px dashed #F0952B;border-radius:8px;padding:5px 9px}
+#vue{height:calc(100vh - 62px)}#fiche{position:fixed;inset:auto 16px 16px auto;max-width:340px;background:#16191E;border:1px solid #2FB86C;border-radius:12px;padding:12px;display:none}
+</style>
+<link rel="stylesheet" href="ville-commune.css">
+</head><body>
+<div class="barre"><b>Ma Ville <em>· vue Commune</em></b><span id="communes"></span><span class="fx">DÉMO · DONNÉES FICTIVES · NON BRANCHÉE AU BUREAU</span></div>
+<div id="vue"></div><div id="fiche" role="status"></div>
+<script src="../communes-idf.js"></script><script src="../bureau-logique.js"></script><script src="../ma-ville.js"></script>
+<script src="modele-commune.js"></script><script src="dessin-iso.js"></script><script src="vue-commune.js"></script><script src="fictif-95.js"></script>
+<script>
+const r = ModeleCommune.construire(FICTIF_95);
+const liste = [...r.communes.values()].sort((a, b) => b.etablissements.length - a.etablissements.length);
+const aff = insee => {
+  document.querySelectorAll('#communes button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.insee === insee)));
+  window.vue = VueCommune.monter(document.getElementById('vue'), ModeleCommune.commune(r, insee), { fictif: true,
+    ouvrirFiche: (uid, e) => { const f = document.getElementById('fiche'); f.style.display = 'block'; f.dataset.uid = uid; f.textContent = 'Fiche demandée : ' + e.nom.valeur + ' (branchement à la fiche du Bureau : étape 3)'; } });
+};
+document.getElementById('communes').innerHTML = liste.map(c => `<button type="button" data-insee="${c.insee}">${c.commune} · ${c.etablissements.length}</button>`).join(' ');
+document.getElementById('communes').onclick = e => { const b = e.target.closest('button'); if (b) aff(b.dataset.insee); };
+aff(new URLSearchParams(location.search).get('insee') || '95280');
+</script></body></html>

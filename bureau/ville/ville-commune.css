@@ -1,0 +1,34 @@
+/* Ma Ville — vue Commune. Fichier séparé : le bloc de styles de la Ville actuelle (verrouillé par son garde-fou) n'est pas touché.
+   Toutes les classes sont préfixées « vc- ». Palette : référence figée. */
+.vc{--vc-fond:#0A0B0D;--vc-carte:#16191E;--vc-trait:#272C33;--vc-texte:#F4F2EF;--vc-doux:#9EA3AB;--vc-rouge:#D41F2B;--vc-neon:#FF2D3D;
+  display:grid;grid-template-columns:minmax(0,1fr) 372px;gap:0;min-height:560px;background:var(--vc-fond);color:var(--vc-texte);font:14px/1.4 system-ui,"Segoe UI",Roboto,sans-serif}
+.vc-carte{position:relative;overflow:hidden;background:radial-gradient(900px 500px at 45% 45%,#141922 0,#0A0B0D 70%)}
+.vc-defile{width:100%;height:100%;overflow:auto;touch-action:pan-x pan-y pinch-zoom}
+.vc-svg{width:100%;height:auto;display:block}
+.vc-cible{cursor:pointer}.vc-cible:focus{outline:none}
+.vc-mention{position:absolute;left:14px;top:12px;z-index:2;font-size:12px;color:var(--vc-doux);background:rgba(10,11,13,.85);border:1px dashed #3A404A;border-radius:8px;padding:5px 9px}
+.vc-fictif{position:absolute;right:14px;top:12px;z-index:2;font:700 12px "Barlow Condensed",system-ui;letter-spacing:.12em;color:#F0952B;border:1px dashed #F0952B;border-radius:8px;padding:5px 9px;background:rgba(10,11,13,.85)}
+.vc-zoom{position:absolute;right:14px;bottom:14px;z-index:2;display:flex;flex-direction:column;gap:8px}
+.vc-zoom button{width:46px;height:46px;border-radius:12px;background:rgba(14,16,20,.92);border:1px solid var(--vc-trait);color:var(--vc-texte);font-size:20px;cursor:pointer}
+.vc-apercu{position:absolute;left:14px;bottom:14px;z-index:3;width:min(330px,calc(100% - 90px));background:rgba(14,16,20,.97);border:1.5px solid var(--vc-neon);border-radius:14px;padding:12px 14px;box-shadow:0 10px 30px rgba(0,0,0,.6)}
+.vc-apercu h4{margin:0;font:800 18px "Barlow Condensed",system-ui;letter-spacing:.02em}.vc-apercu p{margin:5px 0 0;font-size:12.5px;color:var(--vc-doux)}
+.vc-ap-motif{color:#E4E7EB!important}.vc-ap-btns{display:flex;gap:6px;margin-top:10px}
+.vc-ap-btns button{flex:1;min-height:44px;border-radius:10px;font-weight:700;font-size:13px;border:1px solid var(--vc-trait);background:#1C2027;color:var(--vc-texte);cursor:pointer}
+.vc-ap-btns .vc-ouvrir{background:var(--vc-rouge);border-color:var(--vc-rouge);color:#fff}
+.vc-panneau{border-left:1px solid var(--vc-trait);background:#0D0F12;padding:14px;overflow:auto;max-height:100%}
+.vc-tete h2{margin:0;font:800 24px "Barlow Condensed",system-ui;letter-spacing:.02em}.vc-tete h2 small{font:400 13px system-ui;color:var(--vc-doux)}
+.vc-tete p{margin:2px 0 8px;color:var(--vc-doux);font-size:12.5px}
+.vc-comptes{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}.vc-comptes span{padding:4px 9px;border-radius:999px;border:1px solid var(--vc-trait);background:var(--vc-carte);font-size:12px}
+.vc-liste{list-style:none;margin:0;padding:0}
+.vc-ligne{width:100%;min-height:48px;display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:2px 9px;align-items:center;text-align:left;padding:7px 4px;border:0;border-top:1px solid var(--vc-trait);background:none;color:var(--vc-texte);font:inherit;font-size:13px;cursor:pointer;border-radius:8px}
+.vc-ligne[aria-current]{background:rgba(255,45,61,.08);outline:1px solid rgba(255,45,61,.5)}
+.vc-ligne:focus-visible{outline:2px solid var(--vc-neon)}
+.vc-num{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font:800 13px "Barlow Condensed",system-ui;color:#fff}
+.vc-num-q{outline:1.5px dashed #C9CDD3;outline-offset:-1px}.vc-num-x{outline:1px solid #5A606A}
+.vc-nom{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.vc-avert{color:#FFC873;cursor:help}
+.vc-badges{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+.vc-sous{grid-column:2/4;color:var(--vc-doux);font-size:11.5px}
+.vc-b{font:700 10px "Barlow Condensed",system-ui;letter-spacing:.08em;text-transform:uppercase;padding:2px 5px;border-radius:3px;white-space:nowrap}
+.vc-src{background:rgba(62,134,240,.16);color:#8FB6F5}.vc-b-ebp{background:rgba(47,184,108,.16);color:#71DBA0}
+.vc-b-sir{background:rgba(158,163,171,.15);color:#C9CDD3}.vc-b-inc{border:1px dashed #3A404A;color:#6E737B}
+@media (max-width:760px){.vc{grid-template-columns:1fr;grid-template-rows:minmax(300px,48vh) auto}.vc-panneau{border-left:0;border-top:1px solid var(--vc-trait);border-radius:18px 18px 0 0}.vc-mention{right:14px}.vc-fictif{top:auto;bottom:12px;right:auto;left:14px}}
