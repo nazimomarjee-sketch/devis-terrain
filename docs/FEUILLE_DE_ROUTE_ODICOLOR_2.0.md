@@ -117,3 +117,5 @@ Impact : effet attendu sur CA, marge ou réachat · Coût / difficulté : 1 faib
 - **Pointage de visite** (téléphone) et **vue Direction** (ténacité commerciale) : principe validé, maquettes fictives prêtes,
   **rien développé** (`POINTAGE_ET_VUE_DIRECTION.md`). Avatar du commercial affiché uniquement au garage pointé ; aucune
   géolocalisation ; pointage toujours « déclaré ». Dépend de l'accès distant pour une consultation en direct par la direction.
+- **Ma Ville : référence visuelle figée** (validée par le propriétaire) — `maquettes/ma-ville-reference/REFERENCE_VISUELLE.md`.
+  Maquettes sur données fictives ; **aucun développement lancé**. Prochaine décision : quel écran développer en premier.

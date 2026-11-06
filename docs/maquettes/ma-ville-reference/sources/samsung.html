@@ -1,0 +1,102 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Ma Ville Samsung</title>
+<style>
+@font-face{font-family:"Barlow Condensed";font-weight:700;src:url(../../../../barlow-condensed-latin-700-normal.woff2)}
+@font-face{font-family:"Barlow Condensed";font-weight:800;src:url(../../../../barlow-condensed-latin-800-normal.woff2)}
+:root{--fond:#0A0B0D;--carte:#16191E;--trait:#272C33;--texte:#F4F2EF;--doux:#9EA3AB;--rouge:#D41F2B;--neon:#FF2D3D}
+*{box-sizing:border-box}html,body{margin:0;width:1440px;height:1060px;background:radial-gradient(1200px 700px at 50% 0,#1a0c10 0,#07080A 65%);color:var(--texte);font:14px/1.35 system-ui,Roboto,sans-serif;overflow:hidden}
+h1{margin:22px 0 4px;text-align:center;font:800 30px "Barlow Condensed";letter-spacing:.03em}h1 em{color:var(--neon);font-style:normal}
+.sous{text-align:center;color:var(--doux);font-size:14px;margin-bottom:18px}.sous b{color:#F0952B}
+.rangee{display:flex;justify-content:center;gap:56px}
+.col{display:flex;flex-direction:column;align-items:center;gap:10px}.col .t{font:800 18px "Barlow Condensed";letter-spacing:.06em}.col .t span{color:var(--neon)}
+.tel{width:384px;height:832px;border-radius:42px;border:9px solid #1E2127;box-shadow:0 0 0 1.5px #3A3F48,0 30px 60px rgba(0,0,0,.6);background:var(--fond);position:relative;overflow:hidden;display:flex;flex-direction:column}
+.etat{height:26px;display:flex;justify-content:space-between;align-items:center;padding:0 20px;font-size:12px;color:#C9CDD3}.etat i{width:12px;height:12px;border-radius:50%;background:#000;position:absolute;left:50%;top:7px;transform:translateX(-50%)}
+.barre{height:50px;display:flex;align-items:center;gap:10px;padding:0 14px;border-bottom:1px solid var(--trait)}
+.barre .lg{width:28px;height:28px;border-radius:50%;background:radial-gradient(circle,#fff 0 34%,#D41F2B 35%);box-shadow:0 0 12px rgba(255,45,61,.6)}
+.barre b{font:italic 800 19px "Barlow Condensed"}.barre b em{color:var(--neon)}.barre .ic{margin-left:auto;width:44px;height:44px;display:grid;place-items:center;font-size:18px}
+.fx{font:700 10px "Barlow Condensed";letter-spacing:.12em;color:#F0952B;border:1px dashed #F0952B;border-radius:6px;padding:3px 6px}
+.fil{display:flex;gap:6px;padding:8px 12px;overflow:hidden;white-space:nowrap}.fil span{padding:7px 11px;border-radius:999px;border:1px solid var(--trait);font:700 13px "Barlow Condensed";letter-spacing:.04em;color:var(--doux)}.fil span.on{border-color:var(--neon);color:#fff;background:rgba(255,45,61,.12)}
+.carte{position:relative;flex:none;background-color:#0C0E11;background-repeat:no-repeat}
+.carte .approx{position:absolute;left:10px;top:10px;font-size:11px;color:#C9CDD3;background:rgba(10,11,13,.85);border:1px dashed #3A404A;border-radius:7px;padding:4px 7px}
+.carte .zoom{position:absolute;right:10px;bottom:10px;display:flex;flex-direction:column;gap:7px}.carte .zoom span{width:44px;height:44px;border-radius:12px;background:rgba(14,16,20,.92);border:1px solid var(--trait);display:grid;place-items:center;font-size:19px}
+.carte .leg{position:absolute;left:10px;bottom:10px;font-size:11px;color:#C9CDD3;background:rgba(10,11,13,.85);border:1px solid var(--trait);border-radius:8px;padding:6px 8px;display:flex;gap:7px;align-items:center}
+.d{width:8px;height:8px;border-radius:50%;display:inline-block}.d.n{background:#0B0B0D;box-shadow:0 0 0 1.4px #F4F2EF}
+.tiroir{flex:1;background:#121418;border-top:1px solid #2E333B;border-radius:20px 20px 0 0;margin-top:-16px;position:relative;padding:8px 14px 0;overflow:hidden}
+.poignee{width:44px;height:5px;border-radius:3px;background:#3A3F48;margin:0 auto 8px}
+.tiroir h3{margin:0;font:800 21px "Barlow Condensed";letter-spacing:.02em}.tiroir .s{color:var(--doux);font-size:12.5px}
+.kp{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:9px 0}.kp div{background:#1A1D23;border-radius:10px;padding:7px 6px;text-align:center}.kp b{display:block;font-size:17px}.kp small{font-size:10.5px;color:var(--doux)}
+.sug{display:flex;align-items:center;gap:8px;min-height:44px;border:1px solid rgba(255,200,115,.35);border-radius:12px;padding:0 12px;color:#FFC873;font-size:13px}.sug b{color:var(--texte);font-weight:600}.sug span:last-child{margin-left:auto}
+.sel{margin-top:9px;border:1.5px solid var(--neon);border-radius:14px;padding:10px 12px;display:flex;align-items:center;gap:10px}.sel h4{margin:0;font:800 17px "Barlow Condensed"}.sel p{margin:1px 0 0;font-size:12px;color:var(--doux)}
+.btn{min-height:44px;border-radius:11px;display:grid;place-items:center;font-weight:700;font-size:13.5px;background:#1C2027;border:1px solid var(--trait);padding:0 12px}.btn.p{background:var(--rouge);border-color:var(--rouge);color:#fff}
+.li{display:grid;grid-template-columns:28px 1fr auto;gap:0 9px;align-items:center;min-height:48px;border-top:1px solid var(--trait);font-size:13px}.li small{grid-column:2/4;color:var(--doux);font-size:11.5px;margin-top:-6px;padding-bottom:6px}
+.no{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font:800 13px "Barlow Condensed";color:#fff}
+.bg{font:700 9.5px "Barlow Condensed";letter-spacing:.08em;text-transform:uppercase;padding:2px 5px;border-radius:3px;white-space:nowrap}
+.ebp{background:rgba(47,184,108,.16);color:#71DBA0}.air{background:rgba(62,134,240,.16);color:#8FB6F5}.sir{background:rgba(158,163,171,.15);color:#C9CDD3}.inc{border:1px dashed #3A404A;color:#6E737B}
+.ch{display:grid;grid-template-columns:1fr auto;align-items:center;min-height:40px;border-top:1px solid var(--trait);font-size:13px}.ch small{display:block;color:var(--doux);font-size:11px}
+.actions{position:absolute;left:0;right:0;bottom:0;padding:9px 12px 12px;background:linear-gradient(transparent,#0E1013 22%);display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.actions .btn{flex-direction:column;font-size:11px;padding:4px;min-height:52px;gap:0}.actions .btn i{font-style:normal;font-size:17px}
+.nav{height:58px;display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--trait);background:#0D0F12}.nav span{display:grid;place-items:center;font-size:10.5px;color:var(--doux);padding-top:4px}.nav span i{font-style:normal;font-size:18px;display:block;text-align:center}.nav span.on{color:#fff}.nav span.on i{color:var(--neon)}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:11.5px}
+</style></head><body>
+<h1>Ma Ville <em>ODICOLOR</em> sur Samsung — maquette verticale</h1>
+<div class="sous">Même direction visuelle que la version ordinateur · tactile (zones ≥ 44 px) · <b>données fictives</b> · aucun développement</div>
+<div class="rangee">
+<!-- 1 · DÉPARTEMENT -->
+<div class="col"><div class="t"><span>1</span> · DÉPARTEMENT</div><div class="tel">
+ <div class="etat"><span>09:41</span><i></i><span>5G ▮▮▮ 82 %</span></div>
+ <div class="barre"><div class="lg"></div><b>Ma Ville <em>95</em></b><span class="fx">FICTIF</span><span class="ic">⌕</span></div>
+ <div class="fil"><span class="on">95 Val-d’Oise ▾</span><span>94</span><span>91</span><span>77</span><span>93</span><span style="border-style:dashed">+3</span></div>
+ <div class="carte" id="c1" style="height:356px"><div class="approx">📍 Positions approximatives</div><div class="zoom"><span>＋</span><span>－</span></div>
+  <div class="leg"><i class="d" style="background:#D41F2B"></i><i class="d n"></i><i class="d" style="background:#F0952B"></i><i class="d" style="background:#3E86F0"></i>Légende ▾</div></div>
+ <div class="tiroir"><div class="poignee"></div>
+  <h3>95 · Val-d’Oise <span class="s">· l’agence est ici</span></h3>
+  <div class="kp"><div><b>67</b><small>recensés</small></div><div><b>3</b><small>clients · 1 ☾</small></div><div><b>26</b><small>prospects</small></div><div><b style="font-size:13px;padding:3px 0">Inconnu</b><small>CA (EBP)</small></div></div>
+  <div class="sug">💡 <span><b>Suggestion du cockpit</b> · 1 secteur</span><span>▸</span></div>
+  <div class="sel"><div style="flex:1"><h4>GONESSE · 6</h4><p>1 client <span style="color:#F0343F">● alerte</span> · 2 prospects · 3 ? à qualifier</p></div><div class="btn p">Ouvrir ›</div></div>
+ </div>
+ <div class="nav"><span class="on"><i>▦</i>Ma Ville</span><span><i>⇢</i>Tournée</span><span><i>☰</i>Garages</span><span><i>•••</i>Plus</span></div>
+</div></div>
+<!-- 2 · COMMUNE -->
+<div class="col"><div class="t"><span>2</span> · COMMUNE</div><div class="tel">
+ <div class="etat"><span>09:41</span><i></i><span>5G ▮▮▮ 82 %</span></div>
+ <div class="barre"><span class="ic" style="margin:0;width:32px">‹</span><b>Goussainville</b><span class="fx">FICTIF</span><span class="ic">⌕</span></div>
+ <div class="fil"><span>95</span><span class="on">Goussainville</span><span>Garage</span></div>
+ <div class="carte" id="c2" style="height:330px"><div class="approx">🗺 Plan schématique</div><div class="zoom"><span>＋</span><span>－</span></div>
+  <div class="leg"><span>? à qualifier</span><span>⊘ hors cible</span><span style="color:#BDB4F2">☾ dormant</span></div></div>
+ <div class="tiroir"><div class="poignee"></div>
+  <h3>10 établissements <span class="s">· tous listés · 5 personnages max</span></h3>
+  <div class="sug" style="margin:7px 0 4px">💡 <span><b>Suggestion du cockpit</b> · 2 garages</span><span>▸</span></div>
+  <div class="li"><span class="no" style="background:#D41F2B">1</span><b>CARROSSERIE FICTIVE A</b><span class="bg ebp">EBP</span><small>Client · ☾ dormant 7 mois</small></div>
+  <div class="li" style="background:rgba(255,45,61,.07);outline:1px solid rgba(255,45,61,.5);border-radius:10px"><span class="no" style="background:#F0952B">2</span><b>CARROSSERIE FICTIVE B</b><span class="bg air">Airtable</span><small>Prospect · interlocuteur connu</small></div>
+  <div class="li"><span class="no" style="background:#3E86F0">3</span><b>MÉCA FICTIVE C</b><span class="bg air">Terrain</span><small>Prospect · visité le 03/11</small></div>
+  <div class="li"><span class="no" style="background:#5A606A;outline:1.5px dashed #C9CDD3">5</span><b>Établissement SIRENE 1</b><span class="bg sir">? À qualifier</span><small>Activité probable · à vérifier</small></div>
+  <div class="li"><span class="no" style="background:#26292F;outline:1px solid #5A606A">9</span><b>CONTRÔLE TECH. FICTIF</b><span class="bg inc">⊘ Hors cible</span><small>Écarté</small></div>
+ </div>
+ <div class="nav"><span class="on"><i>▦</i>Ma Ville</span><span><i>⇢</i>Tournée</span><span><i>☰</i>Garages</span><span><i>•••</i>Plus</span></div>
+</div></div>
+<!-- 3 · GARAGE -->
+<div class="col"><div class="t"><span>3</span> · GARAGE</div><div class="tel">
+ <div class="etat"><span>09:41</span><i></i><span>5G ▮▮▮ 82 %</span></div>
+ <div class="barre"><span class="ic" style="margin:0;width:32px">‹</span><b>Carrosserie Fictive A</b><span class="fx" style="margin-left:auto">FICTIF</span></div>
+ <div class="carte" id="c3" style="height:270px"><div class="approx">🗺 Plan schématique</div></div>
+ <div class="tiroir" style="padding-bottom:80px"><div class="poignee"></div>
+  <h3>CARROSSERIE FICTIVE A</h3><div class="s">Goussainville (95) · carrosserie-peinture</div>
+  <div style="display:flex;gap:6px;margin:7px 0 4px;flex-wrap:wrap"><span class="pill" style="background:rgba(212,31,43,.15);color:#FF8A92"><i class="d" style="background:#D41F2B"></i>Client carrosserie</span><span class="pill" style="background:rgba(42,36,64,.8);color:#BDB4F2;border:1px solid rgba(139,127,214,.5)">☾ inactif 7 mois</span></div>
+  <div class="ch"><div><b>Inconnu</b><small>CA HT facturé · 12 mois</small></div><span class="bg inc">EBP non importé</span></div>
+  <div class="ch"><div><b>15/04/2026</b><small>Dernière facture</small></div><span class="bg ebp">EBP</span></div>
+  <div class="ch"><div><b>Gérant · interlocuteur connu</b><small>Contact · mise à jour inconnue</small></div><span class="bg air">Airtable</span></div>
+  <div class="ch"><div><b>Motif d’arrêt</b><small>Non renseigné</small></div><span class="bg inc">Inconnu</span></div>
+  <div class="sug" style="margin-top:8px">💡 <span><b>Suggestion</b> · réactiver</span><span>▸</span></div>
+  <div class="btn p" style="margin-top:8px">Ouvrir la fiche commerciale</div>
+  <div class="actions"><div class="btn"><i>📞</i>Appeler</div><div class="btn"><i>🧭</i>Itinéraire</div><div class="btn"><i>✎</i>Visite</div><div class="btn"><i>＋</i>Tournée</div></div>
+ </div>
+</div></div>
+</div>
+<script>
+// Cadrage de chaque scène (rendue à part, même dessin que la version ordinateur) dans l'écran du téléphone.
+const cadre=(id,img,s,fx,fy)=>{const c=document.getElementById(id),w=366,h=c.offsetHeight;
+ c.style.backgroundImage=`url(${img})`;c.style.backgroundSize=`${1068*s}px ${787*s}px`;c.style.backgroundPosition=`${w/2-fx*s}px ${h/2-fy*s}px`;};
+cadre('c1','scene-v1.png',0.56,760,400);
+cadre('c2','scene-v2.png',0.62,600,420);
+cadre('c3','scene-v3.png',0.72,600,380);
+</script>
+</body></html>
