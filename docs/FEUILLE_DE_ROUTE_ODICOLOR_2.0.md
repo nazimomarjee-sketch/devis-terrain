@@ -104,3 +104,13 @@ Impact : effet attendu sur CA, marge ou réachat · Coût / difficulté : 1 faib
   « coffre chiffré » faite et testée sur données fictives (`APPLICATION_LOCALE.md`). Aucune donnée réelle avant les sauvegardes (étape 4).
 - Application locale, étape 2 **faite** sur données fictives : mot de passe → cockpit, garages et Ville retrouvés, même après coupure.
   Prochaine priorité fixée par le propriétaire : **sauvegardes chiffrées et restauration vérifiée** avant tout usage professionnel.
+
+## 8. Décisions définitives du propriétaire
+
+- **Pas de remise à zéro** : téléphone, Bureau, Ville LEGO, coffre et comptes Airtable conservés.
+- **Le téléphone est l'outil principal de saisie terrain.** Reprise contrôlée d'Airtable, sans doublon, avant de le figer.
+- Objectif mesuré en **CA facturé** (EBP), par catégorie : existants, dormants réactivés, développement, nouveaux.
+  Commandes, facturation et encaissements restent distincts.
+- Technique : **uniquement la fiabilité du cockpit** (stockage persistant, sauvegardes, restauration, protection), sur données fictives.
+- ODICOLOR LAB, nouveaux agents, agence 3D, application client : **dans la feuille de route, sans développement**.
+- Plan commercial décembre → février : document personnel, **hors dépôt** (aucune donnée commerciale réelle dans ce dépôt public).
