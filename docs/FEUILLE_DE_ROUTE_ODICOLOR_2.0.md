@@ -114,3 +114,6 @@ Impact : effet attendu sur CA, marge ou réachat · Coût / difficulté : 1 faib
 - Technique : **uniquement la fiabilité du cockpit** (stockage persistant, sauvegardes, restauration, protection), sur données fictives.
 - ODICOLOR LAB, nouveaux agents, agence 3D, application client : **dans la feuille de route, sans développement**.
 - Plan commercial décembre → février : document personnel, **hors dépôt** (aucune donnée commerciale réelle dans ce dépôt public).
+- **Pointage de visite** (téléphone) et **vue Direction** (ténacité commerciale) : principe validé, maquettes fictives prêtes,
+  **rien développé** (`POINTAGE_ET_VUE_DIRECTION.md`). Avatar du commercial affiché uniquement au garage pointé ; aucune
+  géolocalisation ; pointage toujours « déclaré ». Dépend de l'accès distant pour une consultation en direct par la direction.
