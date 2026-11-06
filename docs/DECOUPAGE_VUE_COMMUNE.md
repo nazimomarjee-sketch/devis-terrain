@@ -108,3 +108,11 @@ reconstruction de la liste des fichiers hors ligne et des empreintes d'intégrit
 ## 8. Ordre proposé et validations
 A (modèle + tests) → B (rendu + tests, PC, données fictives) → C (Bureau) → **validation** → D (Samsung) → **validation**.
 Une décision à la fois ; aucune fusion sans accord.
+
+## 9. Étape 1 réalisée (modèle de commune, données fictives) — `bureau/ville/modele-commune.js`
+
+Non branché : aucune page (Bureau, téléphone) ne le charge encore. Tests : `tests/ville-modele-commune.test.cjs` (14/14, 3 passages).
+Écart assumé par rapport au §3-A : les emplacements de suivi (pointage, obstacles, aide de la direction) existent dans le modèle
+mais **ne seront pas affichés** tant qu'ils sont vides (exigence du propriétaire).
+Règle plus stricte que la Ville connectée actuelle : un même nom dans la même commune n'est **plus relié automatiquement** ;
+il devient une proposition « à confirmer ». Seuls le SIRET, le code client EBP ou une liaison validée par une personne fusionnent.
