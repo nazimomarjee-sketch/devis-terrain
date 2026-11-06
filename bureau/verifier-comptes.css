@@ -54,7 +54,7 @@
 .vf-ligne:disabled{cursor:default;opacity:.8}
 .vf-actif .vf-ligne{background:rgba(255,45,61,.08);outline:1px solid rgba(255,45,61,.5)}
 .vf-ligne small{display:block;color:var(--vf-doux);font-size:12px;margin-top:2px}
-.vf-tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:5px}
+.vf-tags{display:flex;gap:4px;flex-wrap:wrap;align-items:flex-start;margin-top:5px}
 .vf-b{font:700 10px var(--f-titre,"Barlow Condensed",system-ui);letter-spacing:.08em;text-transform:uppercase;padding:2px 6px;border-radius:4px;background:rgba(158,163,171,.14);color:#C9CDD3;font-style:normal;white-space:nowrap}
 .vf-b.vf-c-en_compte{background:rgba(47,184,108,.16);color:var(--vf-vert)}.vf-b.vf-c-sans_compte{background:rgba(232,163,59,.16);color:var(--vf-ambre)}.vf-b.vf-c-a_verifier{border:1px dashed #6E737B;background:none}
 .vf-b.vf-sug{background:rgba(62,134,240,.16);color:#8FB6F5}.vf-b.vf-alerte{background:rgba(240,149,43,.18);color:var(--vf-ambre)}.vf-b.vf-passe{background:none;border:1px solid #3A404A}
@@ -66,3 +66,4 @@
 .vf-choix{display:flex;gap:10px;align-items:flex-start;margin:12px 0;font-size:14px;cursor:pointer}.vf-choix input{width:20px;height:20px;margin-top:1px;accent-color:#D41F2B}
 @media (max-width:860px){.vf-corps{grid-template-columns:1fr}.vf-file{position:static;max-height:none}.vf-compteurs{grid-template-columns:repeat(2,minmax(0,1fr))}
   .vf-actions{grid-template-columns:1fr}.vf-carte{padding:14px}.vf h1{font-size:26px}.vf-fiche-tete{flex-direction:column}}
+.vf-item-seul{grid-template-columns:minmax(0,1fr)}

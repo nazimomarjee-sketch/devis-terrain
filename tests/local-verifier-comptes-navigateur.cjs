@@ -123,6 +123,7 @@ test('1. parcours complet avec le vrai coffre : groupé, liaison, absence, je ne
     await p.fill('#vf-code-libre', 'C30'); await p.click('[data-decision="liaison"]'); g0 = await gen(p); await p.click('.vf-modale [data-ok]'); await attendre(p, g0);
     await p.click('[data-onglet="decides"]'); await choisir(p, 'MÉCA FICTIVE TROIS');
     assert.match(await statutCarte(p), /En compte/);
+    assert.match(await p.textContent('.vf-fiche-tete'), /Gonesse \(95500\) · n° 3 au téléphone · déclaré prospect au téléphone.*Fiche EBP reliée : code C30 · GARAGE FICTIF AUTRE · Cergy 95000/s, 'adresse du téléphone et adresse EBP, chacune à sa place');
     let h = await histo(p);
     assert.equal(h.length, 2); assert.match(h[0], /Aucun compte ODICOLOR vérifié · auteur déclaré : Vérificateur fictif · Remplacée/); assert.match(h[1], /C’est ce client EBP \(code C30\).*Appliquée/);
     await capture(p, 'vf-4-correction-historique');
@@ -163,10 +164,11 @@ test('2. format tactile (Galaxy) : boutons ≥ 44 px, pas de défilement horizon
   try {
     await ouvrir(p); await ecran(p);
     await choisir(p, 'ATELIER FICTIF CINQ');
+    await capture(p, 'vf-6-samsung');
     for (const s of ['.vf-btn', '.vf-onglets button', '.vf-ligne']) { const m = await p.$$eval(s, l => Math.min(...l.map(e => e.getBoundingClientRect().height))); assert.ok(m >= 44, s + ' : ' + m); }
     assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
     await p.tap('[data-decision="absence"]'); await p.waitForSelector('.vf-modale');
-    await capture(p, 'vf-6-samsung');
+    await capture(p, 'vf-7-samsung-auteur');
     await p.tap('.vf-modale [data-annuler-modale]');
     assert.deepEqual(erreurs, []);
   } finally { await ctx.close(); await tuer(prog); }

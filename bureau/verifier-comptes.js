@@ -63,20 +63,23 @@
 
     const ligne = id => { const { g, e } = garages.get(id), s = sug.get(id) || [], st = statut(id);
       return `<li class="vf-item${id === S.choisi ? ' vf-actif' : ''}"><label class="vf-coche" title="Sélectionner pour une déclaration groupée"><input type="checkbox" data-coche="${id}"${S.coches.has(id) ? ' checked' : ''}${S.onglet !== 'a_verifier' ? ' hidden' : ''}></label>
-        <button type="button" class="vf-ligne" data-choisir="${id}"><b>${esc(g.nom)}</b><small>${esc((e && e.commune) || g.ville || 'Commune inconnue')} · ${esc(g.cp || '')} · n° ${id}</small>
-        <span class="vf-tags"><i class="vf-b vf-c-${st}">${COMPTE_LIB[st]}</i>${s.length ? `<i class="vf-b vf-sug">${s.length} fiche(s) EBP proche(s)</i>` : ''}${e && e.categorie === 'client' && st === 'a_verifier' ? '<i class="vf-b vf-alerte">Déclaré client au téléphone</i>' : ''}${S.passes.has(id) ? '<i class="vf-b vf-passe">Passé</i>' : ''}</span></button></li>`; };
+        <button type="button" class="vf-ligne" data-choisir="${id}"><b>${esc(g.nom)}</b><small>${esc(g.ville || 'Commune inconnue')} · ${esc(g.cp || '')} · n° ${id}</small>
+        <span class="vf-tags"><i class="vf-b vf-c-${st}">${COMPTE_LIB[st]}</i>${s.length ? `<i class="vf-b vf-sug">${s.length} fiche(s) EBP proche(s)</i>` : ''}${g.statutCrm === 'client' && st === 'a_verifier' ? '<i class="vf-b vf-alerte">Déclaré client au téléphone</i>' : ''}${S.passes.has(id) ? '<i class="vf-b vf-passe">Passé</i>' : ''}</span></button></li>`; };
     const ligneAlerte = x => { const id = x.decision.cible && x.decision.cible.tel;
-      return `<li class="vf-item"><button type="button" class="vf-ligne" ${garages.has(id) ? `data-choisir="${id}"` : 'disabled'}><b>${esc(x.decision.cible ? x.decision.cible.nom : x.decision.id)}</b>
+      return `<li class="vf-item vf-item-seul"><button type="button" class="vf-ligne" ${garages.has(id) ? `data-choisir="${id}"` : 'disabled'}><b>${esc(x.decision.cible ? x.decision.cible.nom : x.decision.id)}</b>
         <small>${esc(x.alerte || x.motif)}</small><span class="vf-tags"><i class="vf-b vf-alerte">${x.alerte ? 'Alerte à examiner' : ETAT_LIB[x.etat]}</i><i class="vf-b">${x.decision.id} · ${fr(x.decision.date)}</i></span></button></li>`; };
     const liste = S.onglet === 'alertes' ? alertes.map(ligneAlerte) : filtrer(S.onglet === 'decides' ? decides : aVerifier).map(ligne);
 
+    // Adresse de la fiche EBP reliée (peut différer de celle saisie au téléphone : les deux restent visibles, rien n'est réécrit).
+    const ficheEbp = e => { if (!e || !e.codesEbp.length) return null; const c = D.clientsEbp.find(x => e.codesEbp.includes(String(x.code).trim())); return c ? 'code ' + c.code + ' · ' + c.nom + ' · ' + (c.ville || '?') + ' ' + (c.cp || '') : 'code ' + e.codesEbp.join(', '); };
     const carte = () => {
       if (S.choisi == null) return '<div class="vf-vide"><h3>Aucun garage à vérifier</h3><p>Charge ta sauvegarde du téléphone et l’export clients EBP.</p></div>';
       const { g, e } = garages.get(S.choisi), s = sug.get(S.choisi) || [], st = statut(S.choisi), hist = parTel.get(S.choisi) || [];
       const active = hist.find(t => ['appliquee', 'a_reverifier', 'conflit', 'en_attente'].includes(t.etat) && t.decision.type !== 'annulation');
       const alerteGar = hist.find(t => t.alerte) || null, revoir = hist.find(t => ['a_reverifier', 'conflit', 'en_attente'].includes(t.etat));
       return `<div class="vf-fiche" data-garage="${S.choisi}">
-        <div class="vf-fiche-tete"><div><h2>${esc(g.nom)}</h2><p>${esc((e && e.commune) || g.ville || 'Commune inconnue')} (${esc(g.cp || '?')}) · n° ${S.choisi} au téléphone · ${e && e.categorie === 'client' ? 'déclaré <b>client</b>' : 'déclaré <b>prospect</b>'} au téléphone</p></div>
+        <div class="vf-fiche-tete"><div><h2>${esc(g.nom)}</h2><p>${esc(g.ville || 'Commune inconnue')} (${esc(g.cp || '?')}) · n° ${S.choisi} au téléphone · déclaré <b>${g.statutCrm === 'client' ? 'client' : 'prospect'}</b> au téléphone</p>
+          ${ficheEbp(e) ? `<p>Fiche EBP reliée : ${esc(ficheEbp(e))}</p>` : ''}</div>
           <span class="vf-statut vf-c-${st}">${COMPTE_LIB[st]}</span></div>
         <p class="vf-motif">${esc(e ? e.compte.motif : '')}</p>
         ${alerteGar ? `<div class="vf-boite vf-boite-alerte" role="alert"><b>⚠ Alerte à examiner</b><p>${esc(alerteGar.alerte)}</p><p>La décision reste en vigueur. Corrige-la si besoin, ou écarte cette fiche.</p></div>` : ''}
