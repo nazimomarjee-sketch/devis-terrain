@@ -91,3 +91,9 @@ Impact : effet attendu sur CA, marge ou réachat · Coût / difficulté : 1 faib
 1. Données EBP réelles (colonnes d'abord, puis essai local avec l'accord de la direction).
 2. « Reproduire une vente réussie » v0 avec les outils existants.
 3. Test de réapprovisionnement auprès de 5 garages volontaires, sans application, après ton autorisation.
+
+## 7. Décisions du 08/11/2026
+
+- ODICOLOR LAB : cadrage **validé**, pôle **en attente**. La WORKSTATION doit être utile techniquement même sans QR code.
+- Priorité : **réveil du cockpit**. Démonstration sur données fictives faite (`REVEIL_COCKPIT.md`) : 14 voyants s'allument
+  avec 3 exports EBP + la sauvegarde du téléphone ; 7 restent éteints faute de donnée ou de décision.

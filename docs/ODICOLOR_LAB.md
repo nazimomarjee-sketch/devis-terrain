@@ -1,4 +1,4 @@
-# ODICOLOR LAB — Pôle Ingénierie et Innovation (vision du 08/11/2026, rien de développé)
+# ODICOLOR LAB — Pôle Ingénierie et Innovation (cadrage validé le 08/11/2026 — EN ATTENTE, rien de développé)
 
 **Mission :** transformer les problèmes et besoins des carrossiers en solutions concrètes, commercialisables sous la marque ODICOLOR.
 **Double objectif :** une utilité quotidienne pour le garage, et davantage de commandes récurrentes pour ODICOLOR.
@@ -61,6 +61,10 @@ fabrication possible en impression 3D, **QR code ODICOLOR** de réapprovisionnem
 complémentaire éventuelle) — même circuit que le réapprovisionnement en un clic (`PARCOURS_COMMANDE_CLIENT.md`).
 Protections : un QR identifie le garage, pas une personne ; il ouvre une **demande**, jamais une commande ; la demande est
 confirmée par une personne autorisée du garage ; anti-doublon (une demande identique récente est signalée).
+
+**Exigence du propriétaire (08/11/2026) :** la WORKSTATION doit avoir une **vraie utilité technique, indépendamment de
+son QR code**. Critère de la fiche projet : le garage l'utiliserait même sans QR (ergonomie, rangement, gain de temps
+mesurable). Si ce critère n'est pas démontré, recommandation « abandonner », quel que soit l'intérêt du QR.
 
 ### Points à challenger avant tout travail de conception
 

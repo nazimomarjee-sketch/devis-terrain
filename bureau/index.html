@@ -340,6 +340,7 @@ select.recherche{appearance:auto}
 <script src="pipeline.js"></script>
 <script src="ma-ville.js"></script>
 <script src="ville-pipeline.js"></script>
+<script src="reveil.js"></script>
 <script src="lecture-sauvegarde.js"></script>
 <script src="annuaire.js"></script>
 <script>
@@ -1130,6 +1131,21 @@ function telechargerPlan(plan){
   const a = h('a',{href:URL.createObjectURL(new Blob([JSON.stringify(plan)],{type:'application/json'})), download:'plan-odicolor-' + plan.arrete + '.json'});
   document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
 }
+// Réveil du cockpit : voyants allumés / partiels / éteints selon les fichiers chargés (bureau/reveil.js, lecture seule).
+function panneauReveil(plan){
+  const r = Reveil.voyants({ garagesTelephone: etat.mode === 'reel' ? etat.garagesTelephone : null, telephone: etat.telephone, pieces: etat.ebp.pieces,
+    reglements: etat.ebp.reglements, clients: etat.ebp.clients, plan, ebpVille: etat.ebpVille, garages: etat.mode === 'reel' ? etat.garages : [] });
+  const C = { allume: ['var(--vert)', 'b-confirme'], partiel: ['var(--orange)', 'b-demo'], eteint: ['var(--trait)', 'b-vide'] };
+  const voyant = x => h('div',{class:'voyant', 'data-id':x.id, 'data-etat':x.etat, style:'display:grid;grid-template-columns:14px minmax(0,1fr) auto;gap:4px 10px;align-items:center;padding:9px 0;border-top:1px solid var(--trait)'},
+    h('i',{'aria-hidden':'true', style:`width:10px;height:10px;border-radius:50%;background:${C[x.etat][0]}` + (x.etat === 'eteint' ? '' : `;box-shadow:0 0 8px ${C[x.etat][0]}`)}),
+    h('div',{style:'min-width:0'}, h('b',{style:'font-size:14px' + (x.etat === 'eteint' ? ';color:var(--doux)' : '')}, x.nom), x.valeur ? h('span',{class:'info'}, ' · ' + x.valeur) : null),
+    h('span',{class:'badge ' + C[x.etat][1]}, Reveil.ETATS[x.etat]),
+    x.manque ? h('small',{class:'info', style:'grid-column:2/4'}, (x.etat === 'eteint' ? 'Il manque : ' : 'Limite : ') + x.manque) : h('small',{class:'info', style:'grid-column:2/4'}, 'Source : ' + x.source));
+  return h('section',{class:'bloc reveil'}, h('div',{class:'titre-bloc'},'Réveil du cockpit'),
+    h('p',{class:'sous'}, r.allumes + ' allumé(s) · ' + r.partiels + ' partiel(s) · ' + r.eteints + ' éteint(s) sur ' + r.total + ' voyants'),
+    r.groupes.map(gr => h('details',{class:'info', open: gr.id !== 'avenir' ? '' : null, style:'margin-top:12px'}, h('summary',{style:'font-weight:700;color:var(--texte)'}, gr.titre + ' · ' + gr.voyants.filter(x => x.etat === 'allume').length + '/' + gr.voyants.length),
+      gr.voyants.map(voyant))));
+}
 function vueBureau(){
   const E = etat.ebp, e2 = v => euros(Math.round(v * 100) / 100);
   const champ = ([type, lib]) => { const r = E[type], id = 'ebp-' + type;
@@ -1148,7 +1164,7 @@ function vueBureau(){
     h('div',{class:'deps'}, EXPORTS.map(champ)));
   let plan = null, erreur = '';
   try { plan = planBureau(); } catch (e) { erreur = e.message; }
-  if (!plan) return h('div',{class:'ecran'}, h('div',{class:'panneau'}, imports, erreur ? h('div',{class:'message erreur'}, erreur) :
+  if (!plan) return h('div',{class:'ecran'}, h('div',{class:'panneau'}, imports, panneauReveil(null), erreur ? h('div',{class:'message erreur'}, erreur) :
     h('section',{class:'bloc'}, h('h2',{},'Ta journée'), h('p',{class:'sous'},'Charge au moins l’export des pièces EBP pour voir tes 3 actions et ton CA réel.'))));
   const k = plan.kpi, top = plan.actions.filter(a => a.prio === 1), suite = plan.actions.filter(a => a.prio > 1);
   const action = (a, i) => h('div',{class:'action'}, h('div',{class:'n'}, (i + 1) + ' · ' + a.tag + ' · ' + a.responsable),
@@ -1160,7 +1176,8 @@ function vueBureau(){
       h('section',{class:'bloc'}, h('h2',{},'Tes 3 actions'), h('p',{class:'sous'}, 'Classées par montant en jeu · export EBP du ' + plan.arrete),
         top.length ? top.map(action) : h('p',{class:'info'},'Aucun retard détecté dans les exports chargés.'),
         suite.length ? h('details',{class:'info', style:'margin-top:12px'}, h('summary',{}, suite.length + ' autre(s) action(s) à suivre'), suite.map((a, i) => action(a, i + 3))) : null),
-      plan.changement ? h('section',{class:'bloc'}, h('div',{class:'titre-bloc'},'Un seul changement cette semaine'), h('p',{}, plan.changement.texte), h('small',{class:'info'}, plan.changement.mesure)) : null),
+      plan.changement ? h('section',{class:'bloc'}, h('div',{class:'titre-bloc'},'Un seul changement cette semaine'), h('p',{}, plan.changement.texte), h('small',{class:'info'}, plan.changement.mesure)) : null,
+      panneauReveil(plan)),
     h('div',{class:'panneau'},
       h('section',{class:'bloc'}, h('div',{class:'titre-bloc'},'Où j’en suis'), h('div',{class:'chiffres'},
         chiffre('CA commandé cette semaine', e2(k.semaine.cmdHt), ebpB, k.semaine.cmdN + ' commande(s)'),
