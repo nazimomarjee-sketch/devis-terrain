@@ -34,7 +34,8 @@
       ['nom', 'Nom', /nom|raison sociale|client/, true],
       ['ville', 'Ville', /ville|commune/, false],
       ['cp', 'Code postal', /code postal|^cp$/, false],
-      ['statut', 'Statut du compte', /statut|bloque|etat|compte/, false]
+      ['statut', 'Statut du compte', /statut|bloque|etat|compte/, false],
+      ['famille', 'Famille / activité (carrosserie, mécanique)', /famille|categorie|activite|type de client|secteur/, false]
     ]
   };
 
@@ -183,7 +184,7 @@
       if (codes.has(code)) return ignorees.push({ ligne: n, motif: 'Code client ' + code + ' en double' });
       codes.add(code);
       const statut = texte(g('statut'), 40);
-      clients.push({ code, nom, ville: texte(g('ville'), 80), cp: texte(g('cp'), 10), statut, bloque: /bloqu|suspendu|interdit|contentieux/.test(norm(statut)) });
+      clients.push({ code, nom, ville: texte(g('ville'), 80), cp: texte(g('cp'), 10), statut, famille: texte(g('famille'), 60), bloque: /bloqu|suspendu|interdit|contentieux/.test(norm(statut)) });
     });
     return { clients, ignorees, correspondance: T.correspondance, lues: T.corps.length };
   }

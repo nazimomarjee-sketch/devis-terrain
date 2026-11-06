@@ -39,6 +39,8 @@
       if (parNomTel.get(k) > 1 || e.codes.size > 1) { rapport.ambigus.push(g.nom); return g; } // homonymes : jamais relié au hasard
       relies.add(k); rapport.relies++;
       const cmd = piecesEbp.filter(p => p.type === 'commande' && norm(p.client) === k && p.date <= arrete);
+      const fac = piecesEbp.filter(p => p.type === 'facture' && norm(p.client) === k && p.date <= arrete);
+      const somme = (l, de) => l.filter(p => p.date >= de).reduce((n, p) => n + p.htCents, 0) / 100;
       const actions = plan.actions.filter(a => norm(a.client) === k).sort((a, b) => a.prio - b.prio);
       const fiche = plan.clients.find(c => norm(c.nom) === k);
       const signaux = (fiche && fiche.signaux) || [];
@@ -47,8 +49,10 @@
       g.statut = echue || bloques.has(k) ? 'risque'
         : signaux.some(s => s.type === 'reconquete') ? 'dormant'
         : cmd.some(p => p.date > an) ? 'actif' : g0.statut;
-      g.caMois = cmd.filter(p => p.date >= mois).reduce((n, p) => n + p.htCents, 0) / 100;
-      g.ebp = { code: [...e.codes][0] || '', ca12: cmd.filter(p => p.date > an).reduce((n, p) => n + p.htCents, 0) / 100,
+      // Commandes et facturé ne sont JAMAIS confondus : caMois (champ de la Ville) = montant HT des COMMANDES EBP du mois.
+      g.caMois = somme(cmd, mois); g.factureMois = somme(fac, mois);
+      g.ebp = { code: [...e.codes][0] || '', arrete, ca12: cmd.filter(p => p.date > an).reduce((n, p) => n + p.htCents, 0) / 100, facture12: fac.filter(p => p.date > an).reduce((n, p) => n + p.htCents, 0) / 100,
+        commandesMois: cmd.filter(p => p.date >= mois).map(p => p.no), facturesMois: fac.filter(p => p.date >= mois).map(p => p.no),
         derniereCommande: cmd.map(p => p.date).sort().pop() || '', signaux, lignes: fiche ? fiche.lignes : [], compteBloque: bloques.has(k) };
       g.actionsEbp = actions.map(a => ({ id: a.id, prio: a.prio, rang: plan.actions.indexOf(a), t: a.t, d: a.d, preuve: a.preuve, source: a.source, picto: PICTO[a.tag] || 'action', responsable: a.responsable }));
       return g;

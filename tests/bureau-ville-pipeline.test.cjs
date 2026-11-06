@@ -49,6 +49,11 @@ test('CA du mois : commandes EBP du mois (euros), jamais inventé', () => {
   assert.equal(g('ALPHA').caMois, 0);
   assert.equal(g('NU').caMois, null, 'pas de donnée EBP : rien affiché');
   assert.equal(g('OMEGA').ebp.ca12, 7200);
+  // Commandes et facturé jamais confondus, chaque montant justifié par ses pièces EBP.
+  assert.deepEqual([g('BETA').caMois, g('BETA').factureMois, g('BETA').ebp.commandesMois], [2100, 0, ['CC-2001']]);
+  assert.deepEqual([g('ZETA') && g('ZETA').caMois], [null]);
+  const e = r.garages.find(x => x.nom === 'GARAGE FICTIF EPSILON');
+  assert.deepEqual([e.caMois, e.factureMois, e.ebp.ca12, e.ebp.facture12, e.ebp.arrete], [0, 0, 3000, 3000, '2026-11-06']);
   assert.equal(g('OMEGA').ebp.derniereCommande, '2026-07-15');
 });
 

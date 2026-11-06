@@ -59,3 +59,10 @@ Une donnée = une source : terrain → téléphone ; transactions, prix, marge �
    `importStats`, `clients[].signaux` reconquête/baisse ; fiabilité seulement si 12 mois d'historique et aucune pièce écartée).
 2. Téléphone (commercial-v22.js, PR #2) : avant midi, l'export du jour comptait « -1 jours » → opportunités suspendues le matin. Corrigé (1 ligne).
 Les 3 fonctions (opportunités, ligne EBP de l'accueil, garage présélectionné) sont vérifiées de bout en bout dans le vrai téléphone.
+
+## Décisions du 07/11/2026
+
+- Socle 0 : matrice des droits **validée** (voir `socle/LISEZ-MOI.md`).
+- Ville LEGO : P1–P5 **validées et appliquées** (commandes et facturé jamais confondus, chiffres datés et justifiés par EBP,
+  graphisme verrouillé par `tests/bureau-ville-invariance.test.cjs`).
+- Ma Ville en 4 couleurs : logique faite, **maquette en attente d'accord** (`docs/maquettes/VILLE_4_COULEURS.md`).

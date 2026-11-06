@@ -14,7 +14,10 @@ Le téléphone, le Bureau et la Ville LEGO ne sont pas modifiés et n'utilisent 
 | `migration.js` | Sauvegarde du téléphone (`.odicolor` / V47) et pièces EBP → modèle commun ; retour vers le téléphone sans perte. |
 | `pilotage.js` | Cockpit (3 priorités, demandes de la direction, décisions, conflits, résultats) et supervision (décisions à trancher, résultats, activité). |
 
-## Matrice des droits (à valider par le propriétaire et la direction)
+## Matrice des droits — **validée par le propriétaire le 07/11/2026**
+
+Pilotage et coordination opérationnelle : responsable du développement · direction, supervision et validation : direction ·
+comptes et rôles attribués par la direction · archivage plutôt que suppression · futurs collaborateurs limités à leur métier.
 
 | | Responsable du développement | Direction |
 |---|---|---|
