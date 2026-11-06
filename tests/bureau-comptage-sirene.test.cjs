@@ -12,7 +12,7 @@ const ent = (siren, code, etabs, o = {}) => Object.assign({ siren, activite_prin
 
 // Fausse API : filtre au niveau ENTREPRISE (code principal) et renvoie, par entreprise, les établissements du département (tous codes, tous états),
 // exactement comme l'API officielle (vérifié le 07/11/2026).
-function api(entreprises, { echecs = 0, ratePage = null, perPage = 25 } = {}) {
+function api(entreprises, { echecs = 0, ratePage = null, perPage = 25, repeter = false } = {}) {
   let appels = 0;
   const f = async url => {
     appels++;
@@ -23,6 +23,8 @@ function api(entreprises, { echecs = 0, ratePage = null, perPage = 25 } = {}) {
     const total = liste.length, pages = Math.max(1, Math.ceil(total / perPage));
     if (ratePage === page) liste = [];                                   // page manquante
     else liste = liste.slice((page - 1) * perPage, page * perPage);
+    if (repeter === 'ajout' && page > 1) liste = [entreprises[0]].concat(liste);                  // une entreprise réapparaît, aucune n'est perdue
+    else if (repeter && page > 1) liste = [entreprises[0]].concat(liste.slice(0, perPage - 1));  // elle réapparaît ET en pousse une autre hors de la page
     const results = liste.map(e => { const { _etabs, ...base } = e; return { ...base, matching_etablissements: _etabs.filter(x => x.commune.startsWith(dep)).slice((pe - 1) * lim, pe * lim) }; });
     return { ok: true, status: 200, json: async () => ({ results, total_results: total, page, per_page: perPage, total_pages: pages }) };
   };
@@ -38,7 +40,7 @@ test('1. seuls les établissements 45.20A, actifs, du département sont comptés
   const r = await C.compterDepartement('95', { ...opts(f), sansCodesVoisins: true });
   assert.equal(r.statut, 'complet'); assert.equal(r.etablissementsActifs, 3);
   assert.deepEqual(r.ecartes, { fermes: 1, autreCode: 1, horsDepartement: 0 }, 'ce qui est écarté est compté et visible, jamais perdu');
-  assert.equal(r.entreprisesLues, 2);
+  assert.equal(r.entreprisesDistinctesLues, 2);
 });
 
 test('2. un même SIRET vu deux fois (entreprise répétée, pages qui se recouvrent) n’est compté qu’une fois', async () => {
@@ -46,7 +48,7 @@ test('2. un même SIRET vu deux fois (entreprise répétée, pages qui se recouv
   const f = api([partage, { ...partage, siren: '200000002' }]);   // même établissement rattaché à deux entreprises de la fausse API
   const r = await C.compterDepartement('94', { ...opts(f), sansCodesVoisins: true });
   assert.equal(r.etablissementsActifs, 2, 'les 2 établissements apparaissent chacun deux fois : comptés une fois');
-  assert.equal(r.entreprisesLues, 2); assert.equal(r.etablissementsExamines, 4);
+  assert.equal(r.entreprisesDistinctesLues, 2); assert.equal(r.etablissementsExamines, 4);
 });
 
 test('3. codes voisins : établissement 45.20A d’une entreprise d’un autre code compté À PART, sans doublon avec le chiffre principal', async () => {
@@ -80,7 +82,7 @@ test('6. BLOCAGE : source injoignable → « incomplet », AUCUN nombre (ni 0, n
 test('7. page manquante en cours de route : « incomplet », jamais un total partiel', async () => {
   const entreprises = Array.from({ length: 60 }, (_, i) => ent('6000000' + String(i).padStart(2, '0'), '45.20A', [etab('95280')]));
   const r = await C.compterDepartement('95', { ...opts(api(entreprises, { ratePage: 2 })), sansCodesVoisins: true });
-  assert.equal(r.statut, 'incomplet'); assert.equal(r.etablissementsActifs, null); assert.match(r.motif, /différentes du total annoncé/);
+  assert.equal(r.statut, 'incomplet'); assert.equal(r.etablissementsActifs, null); assert.match(r.motif, /inférieures au total annoncé/);
 });
 
 test('8. réponse au format inattendu : refusée', async () => {
@@ -115,4 +117,16 @@ test('11. la requête interroge bien le département et l’activité, en répon
   const p = new URL(C.url('94', [C.NAF], 3)).searchParams;
   assert.equal(p.get('departement'), '94'); assert.equal(p.get('activite_principale'), '45.20A'); assert.equal(p.get('page'), '3');
   assert.equal(p.get('etat_administratif'), 'A'); assert.equal(p.get('minimal'), 'true'); assert.equal(p.get('limite_matching_etablissements'), '100');
+});
+
+test('12. la source bouge pendant la lecture : une entreprise réapparaît sur une autre page → comptée une fois ; une entreprise manquée → incomplet', async () => {
+  const entreprises = Array.from({ length: 60 }, (_, i) => ent('9000000' + String(i).padStart(2, '0'), '45.20A', [etab('95280')]));
+  // Réapparition d'une entreprise sur les pages suivantes : les 60 lignes sont lues avec des doublons, mais les entreprises distinctes sont décalées.
+  const r = await C.compterDepartement('95', { ...opts(api(entreprises, { repeter: 'ajout' })), sansCodesVoisins: true });
+  assert.equal(r.statut, 'complet'); assert.equal(r.etablissementsActifs, 60, 'établissements dédoublonnés');
+  assert.ok(r.entreprisesReapparues > 0, 'les réapparitions sont signalées, pas cachées');
+  const decalee = api(entreprises, { repeter: true });
+  const r2 = await C.compterDepartement('95', { ...opts(decalee), sansCodesVoisins: true });
+  assert.equal(r2.statut, 'incomplet', 'une entreprise a disparu de la lecture (remplacée par une réapparition) : refusé, jamais un total présenté comme complet');
+  assert.match(r2.motif, /inférieures au total annoncé/);
 });

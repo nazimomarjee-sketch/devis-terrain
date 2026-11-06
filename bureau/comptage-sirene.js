@@ -70,12 +70,12 @@
 
   // Compte les établissements d'un département pour une liste de codes principaux d'entreprise. Renvoie des nombres, ou « incomplet » sans nombre.
   async function compterGroupe(dep, codes, opts = {}) {
-    const f = opts.fetch, pause = opts.pause ?? PAUSE_MS, base = opts.reprise ?? 1000, sirets = new Set();
+    const f = opts.fetch, pause = opts.pause ?? PAUSE_MS, base = opts.reprise ?? 1000, sirets = new Set(), sirens = new Set();
     const vus = { entreprises: 0, etabs: 0, fermes: 0, autreCode: 0, horsDepartement: 0, tronques: 0, majInsee: null };
     const premiere = await lire(f, url(dep, codes, 1), opts.signal, base), total = premiere.total_results, pages = premiere.total_pages;
     const traiter = async j => {
       for (const ent of j.results) {
-        vus.entreprises++;
+        vus.entreprises++; sirens.add(String(ent.siren));
         const maj = dateDe(ent.date_mise_a_jour_insee); if (maj && (!vus.majInsee || maj > vus.majInsee)) vus.majInsee = maj;
         let liste = Array.isArray(ent.matching_etablissements) ? ent.matching_etablissements.slice() : [];
         // Plus de 100 établissements dans le département pour une même entreprise : on lit les pages suivantes, sinon on le signale.
@@ -97,8 +97,10 @@
     };
     await traiter(premiere);
     for (let p = 2; p <= pages; p++) { await attendre(pause); await traiter(await lire(f, url(dep, codes, p), opts.signal, base)); if (opts.progression) opts.progression(dep, p, pages); }
-    // Contrôle de complétude : toutes les entreprises annoncées ont été lues (une page manquante ou un décalage = résultat incomplet).
-    if (vus.entreprises !== total) throw new Error('Entreprises lues (' + vus.entreprises + ') différentes du total annoncé (' + total + ') : comptage incomplet.');
+    // Contrôle de complétude : au moins autant d'entreprises DISTINCTES lues que d'entreprises annoncées. La source est mise à jour pendant la lecture :
+    // une même entreprise peut réapparaître d'une page à l'autre (comptée une fois, SIRET dédoublonnés). Moins d'entreprises distinctes = page manquée = INCOMPLET.
+    if (sirens.size < total) throw new Error('Entreprises distinctes lues (' + sirens.size + ') inférieures au total annoncé (' + total + ') : comptage incomplet.');
+    vus.distinctes = sirens.size; vus.reapparues = vus.entreprises - sirens.size; vus.ecartTotal = sirens.size - total;
     return { sirets, totalEntreprises: total, pages, vus };
   }
 
@@ -111,7 +113,7 @@
       const dansB = B ? [...B.sirets].filter(s => !A.sirets.has(s)).length : 0;
       return { departement: dep, statut: 'complet', debut, fin: new Date().toISOString(), source: 'API Recherche d’entreprises (DINUM) · base SIRENE (INSEE)', naf: NAF,
         etablissementsActifs: A.sirets.size + dansB, dontEntreprisesCode452A: A.sirets.size, dontEntreprisesCodesVoisins: B ? dansB : null, codesVoisinsInterroges: B ? CODES_VOISINS.slice() : [],
-        entreprisesLues: A.vus.entreprises + (B ? B.vus.entreprises : 0), etablissementsExamines: A.vus.etabs + (B ? B.vus.etabs : 0),
+        entreprisesDistinctesLues: A.vus.distinctes + (B ? B.vus.distinctes : 0), entreprisesReapparues: A.vus.reapparues + (B ? B.vus.reapparues : 0), ecartAvecTotalAnnonce: A.vus.ecartTotal + (B ? B.vus.ecartTotal : 0), etablissementsExamines: A.vus.etabs + (B ? B.vus.etabs : 0),
         ecartes: { fermes: A.vus.fermes + (B ? B.vus.fermes : 0), autreCode: A.vus.autreCode + (B ? B.vus.autreCode : 0), horsDepartement: A.vus.horsDepartement + (B ? B.vus.horsDepartement : 0) },
         troncatures: A.vus.tronques + (B ? B.vus.tronques : 0), donneesInseeAuPlusTard: [A.vus.majInsee, B && B.vus.majInsee].filter(Boolean).sort().pop() || null,
         limites: LIMITES, avertissement: AVERTISSEMENT };
