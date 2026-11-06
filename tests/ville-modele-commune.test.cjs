@@ -253,3 +253,64 @@ test('20. seuils réglables (valeurs de départ, pas des vérités absolues)', (
   const s = signal([['P', [50]]], { parametres: { seuils: { reachat: 45 } } });
   assert.equal(s.P.niveau, 'reachat');
 });
+
+// ---------- Étape 3 : compte ODICOLOR (EN COMPTE | SANS COMPTE | À VÉRIFIER), filtre indépendant des 4 couleurs ----------
+const F = require('../bureau/ville/fictif-idf.js');
+const R = () => M.construire(F);
+const nomme = (r, n) => [...r.communes.values(), { etablissements: r.aClasser }].flatMap(c => c.etablissements).filter(e => e.nom.valeur === n);
+
+test('21. EN COMPTE = code client EBP, dormants et comptes bloqués compris, alertes conservées', () => {
+  const r = R(), [a] = nomme(r, 'CARROSSERIE FICTIVE A'), [f] = nomme(r, 'CARROSSERIE FICTIVE F');
+  assert.equal(a.compte.statut, 'en_compte'); assert.ok(a.dormant, 'le dormant reste en compte');
+  assert.equal(f.compte.statut, 'en_compte'); assert.deepEqual(f.alertes.map(x => x.type), ['compte_bloque'], 'le compte bloqué garde son alerte');
+  assert.equal(a.segment, 'client-carrosserie', 'la couleur ne change pas');
+  const k = M.commune(r, '95280').comptes.compte;
+  assert.equal(k.enCompteDormants, 1); assert.equal(k.enCompteBloques, 1);
+});
+
+test('22. SANS COMPTE seulement avec une vérification enregistrée (auteur + date) ; jamais par défaut', () => {
+  const r = R(), [b] = nomme(r, 'CARROSSERIE FICTIVE B'), [d] = nomme(r, 'CARROSSERIE FICTIVE D'), [s1] = nomme(r, 'ÉTABLISSEMENT SIRENE 1');
+  assert.equal(b.compte.statut, 'sans_compte'); assert.equal(b.compte.date, '2026-11-04'); assert.match(b.compte.source, /Vérification EBP/);
+  assert.equal(s1.compte.statut, 'sans_compte', 'vérification par SIRET');
+  assert.equal(d.compte.statut, 'a_verifier', 'vérification sans auteur : refusée'); assert.match(d.compte.motif, /non vérifiée/);
+  assert.equal(nomme(r, 'GARAGE FICTIF SANS INDICE')[0].compte.statut, 'a_verifier', 'vérification sans date : refusée');
+  const sansVerif = M.construire(Object.assign({}, F, { verificationsCompte: [] }));
+  const tous = [...sansVerif.communes.values()].flatMap(c => c.etablissements);
+  assert.equal(tous.filter(e => e.compte.statut === 'sans_compte').length, 0, 'sans vérification, personne n’est « sans compte »');
+});
+
+test('23. rapprochement EBP incertain ou client déclaré absent d’EBP → À VÉRIFIER, même avec une vérification', () => {
+  const r = R(), g = nomme(r, 'CARROSSERIE FICTIVE G');
+  assert.equal(g.length, 2, 'homonymes non fusionnés');
+  assert.deepEqual(g.map(e => e.compte.statut).sort(), ['a_verifier', 'en_compte']);
+  assert.match(g.find(e => e.compte.statut === 'a_verifier').compte.motif, /Rapprochement EBP incertain/);
+  const [c] = nomme(r, 'CARROSSERIE FICTIVE DÉCLARÉE CLIENTE');
+  assert.equal(c.compte.statut, 'a_verifier'); assert.match(c.compte.motif, /non retrouvé dans EBP/);
+});
+
+test('24. compteurs sans doublon : chaque établissement dans une seule case, commune → département → Île-de-France', () => {
+  const r = R(), a = M.agreger(r);
+  for (const c of r.communes.values()) { const k = c.comptes.compte; assert.equal(k.en_compte + k.sans_compte + k.a_verifier, c.comptes.total, c.commune); }
+  const somme = (l, k) => l.reduce((n, x) => n + x[k], 0);
+  for (const k of ['total', 'en_compte', 'sans_compte', 'a_verifier']) {
+    assert.equal(somme(a.parDep, k), a.idf[k], 'départements → IDF : ' + k);
+    assert.equal(somme(a.parCommune, k), a.idf[k], 'communes → IDF : ' + k);
+  }
+  assert.equal(a.idf.total + a.aClasser.total, r.bilan.etablissements, 'à classer comptés à part, aucun oubli');
+  assert.equal(a.aClasser.en_compte, 1, 'client EBP sans adresse : en compte, à classer');
+  const uids = [...r.communes.values()].flatMap(c => c.etablissements.map(e => e.uid)).concat(r.aClasser.map(e => e.uid));
+  assert.equal(new Set(uids).size, uids.length, 'aucun établissement compté deux fois');
+  assert.ok(r.bilan.conservation);
+});
+
+test('25. recherche : commune, code postal, département, nom de garage, SIRET', () => {
+  const r = R();
+  assert.deepEqual(M.rechercher(r, 'sarcel').communes.map(c => c.insee), ['95585']);
+  assert.deepEqual(M.rechercher(r, '95585').communes.map(c => c.commune), ['Sarcelles']);
+  assert.deepEqual(M.rechercher(r, '93').departements.map(d => d.dep), ['93']);
+  assert.deepEqual(M.rechercher(r, 'val d oise').departements.map(d => d.dep), ['95']);
+  assert.deepEqual(M.rechercher(r, '44444444400317').etablissements.map(e => e.nom.valeur), ['ATELIER FICTIF SARCELLES 318']);
+  const q = M.rechercher(r, 'atelier fictif sarcelles');
+  assert.equal(q.nbEtablissements, 320); assert.equal(q.etablissements.length, 8, 'résultats limités, total annoncé');
+  assert.deepEqual(M.rechercher(r, 'x'), { communes: [], departements: [], etablissements: [] });
+});

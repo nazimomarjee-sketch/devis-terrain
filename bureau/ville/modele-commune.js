@@ -16,6 +16,11 @@
    - Rien n'est inventé : une information absente vaut null (« Inconnu » à l'affichage), jamais zéro deviné.
    - Chaque information garde sa source et sa date quand elles existent.
    - Pointage, obstacles et vue Direction : champs prévus (suivi), null tant que la fonction n'existe pas.
+   - Compte ODICOLOR (règle du propriétaire, étape 3) : filtre INDÉPENDANT des 4 couleurs.
+     EN COMPTE = compte client confirmé dans EBP (code client EBP), dormants et comptes bloqués compris.
+     SANS COMPTE = absence de compte CONFIRMÉE par une vérification enregistrée (personne, date, source).
+     À VÉRIFIER = tout le reste : situation inconnue, client déclaré non retrouvé dans EBP, rapprochement EBP incertain.
+     Un établissement n'est JAMAIS classé « sans compte » automatiquement.
    Lecture seule : ce module ne modifie aucune de ses entrées. */
 (function (racine) {
   'use strict';
@@ -30,6 +35,7 @@
   const GRAVITE = { alerte: 0, potentiellement_dormant: 1, reachat: 2, inactif: 3, a_verifier: 4, actif: 5 };
   const SOURCES = Object.freeze(['EBP', 'Airtable', 'Terrain', 'SIRENE']);
   const RANG_CATEGORIE = { client: 0, prospect: 1, a_qualifier: 2, hors_cible: 3 };
+  const COMPTES = Object.freeze(['en_compte', 'sans_compte', 'a_verifier']);
   const AIRTABLE = { prospect: 'prospect', dormant: 'dormant', a_exclure: 'hors_cible', hors_cible: 'hors_cible', a_verifier: 'a_verifier' };
 
   const txt = (v, n = 200) => String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, n);
@@ -186,7 +192,7 @@
     return {
       uid, nom: val(ref.nom, ref.source, ref.date), siret: siret ? val(siret, (g.find(f => f.siret) || {}).source, (g.find(f => f.siretDate) || {}).siretDate || null) : null,
       codesEbp, insee: cl.insee || null, commune: cl.commune || null, dep: cl.dep || null,
-      rattachement: { niveau: cl.niveau, motif: cl.motif },
+      rattachement: { niveau: cl.niveau, motif: cl.motif, cp: cl.cp || null },
       categorie, qualification, segment, activite, achat, dormant, statutsHistoriques, confirmeEbp, alertes,
       dernierAchat: dernierAchat ? { type: dernierAchat.type, no: dernierAchat.no, date: dernierAchat.date, source: 'EBP', exportDu: ctx.dates.EBP } : null,
       interlocuteur: interlocuteur ? val(true, interlocuteur.source, interlocuteur.date) : null,
@@ -212,6 +218,29 @@
     return out;
   }
 
+  // ---------- 4 bis. Compte ODICOLOR : en compte / sans compte / à vérifier (jamais « sans compte » par défaut) ----------
+  // verificationsCompte = [{ ref: 'tel:12' | siret: '…', resultat: 'aucun_compte', par, date, source }] : vérifications faites par une personne.
+  function indexVerifications(l) {
+    const m = new Map();
+    for (const v of l || []) {
+      if (!v || v.resultat !== 'aucun_compte' || !txt(v.par) || !iso(v.date)) continue; // une vérification sans auteur ni date ne compte pas
+      const r = { par: txt(v.par, 60), date: iso(v.date), source: txt(v.source, 60) || 'Vérification EBP' };
+      if (v.ref) m.set('ref:' + v.ref, r);
+      if (siretValide(v.siret)) m.set('siret:' + siretDe(v.siret), r);
+    }
+    return m;
+  }
+  function statutCompte(x, verifs, props) {
+    if (x.confirmeEbp) return { statut: 'en_compte', motif: 'Code client EBP ' + x.codesEbp.join(', ') + (x.dormant ? ' · ' + (x.dormant.niveau === 'inactif' ? 'inactif' : 'potentiellement dormant') : '') +
+      (x.alertes.some(a => a.type === 'compte_bloque') ? ' · compte bloqué' : ''), source: 'EBP', date: (x.sources.find(s => s.source === 'EBP') || {}).date || null };
+    const enAttente = props.find(p => p.uids.includes(x.uid));
+    if (enAttente) return { statut: 'a_verifier', motif: 'Rapprochement EBP incertain (' + enAttente.motif + ')', source: null, date: null };
+    if (x.categorie === 'client') return { statut: 'a_verifier', motif: 'Déclaré client (' + x.sources.map(s => s.source).join(', ') + ') mais non retrouvé dans EBP', source: null, date: null };
+    const v = x.sources.map(s => verifs.get('ref:' + s.ref)).find(Boolean) || (x.siret && verifs.get('siret:' + x.siret.valeur));
+    if (v) return { statut: 'sans_compte', motif: 'Absence de compte vérifiée par ' + v.par, source: v.source, date: v.date };
+    return { statut: 'a_verifier', motif: 'Absence de compte ODICOLOR non vérifiée', source: null, date: null };
+  }
+
   // ---------- 5. Comptes d'une commune (règles de la référence) ----------
   function comptes(l) {
     const n = f => l.filter(f).length;
@@ -221,6 +250,12 @@
       dontClientsNonConfirmesEbp: n(e => e.categorie === 'client' && !e.confirmeEbp), prospects: n(e => e.categorie === 'prospect'),
       aQualifier: n(e => e.categorie === 'a_qualifier'), horsCible: n(e => e.categorie === 'hors_cible'),
       alertes: n(e => e.alertes.length > 0), avecInterlocuteur: n(e => !!e.interlocuteur) };
+    // Compte ODICOLOR : chaque établissement dans UNE seule case (somme = total).
+    c.compte = { en_compte: n(e => e.compte && e.compte.statut === 'en_compte'), sans_compte: n(e => e.compte && e.compte.statut === 'sans_compte'),
+      a_verifier: n(e => !e.compte || e.compte.statut === 'a_verifier'),
+      enCompteDormants: n(e => e.compte && e.compte.statut === 'en_compte' && !!e.dormant),
+      enCompteBloques: n(e => e.compte && e.compte.statut === 'en_compte' && e.alertes.some(a => a.type === 'compte_bloque')),
+      sansCompteHorsCible: n(e => e.compte && e.compte.statut === 'sans_compte' && e.categorie === 'hors_cible') };
     c.parSegment = {}; for (const s of Object.keys(MV.SEGMENTS).filter(k => /^(client|prospect)-(carrosserie|mecanique)$/.test(k))) c.parSegment[s] = n(e => e.segment === s);
     return c;
   }
@@ -247,10 +282,14 @@
       if (!communes.has(x.insee)) communes.set(x.insee, { insee: x.insee, commune: x.commune, dep: x.dep, etablissements: [] });
       communes.get(x.insee).etablissements.push(x);
     }
-    for (const c of communes.values()) { c.etablissements.sort(comparer); c.etablissements.forEach((x, i) => { x.numero = i + 1; }); c.comptes = comptes(c.etablissements); }
+    for (const c of communes.values()) { c.etablissements.sort(comparer); c.etablissements.forEach((x, i) => { x.numero = i + 1; }); }
+    const verifs = indexVerifications(e.verificationsCompte);
     const entrees = {}; for (const s of SOURCES) entrees[s] = fr.filter(f => f.source === s).length + ecartees.filter(f => f.source === s).length;
     const fragmentsPlaces = etabs.reduce((n, x) => n + x.sources.length, 0);
-    return { version: VERSION, arrete: ctx.arrete, dates, parametres, debutHistorique: ctx.debutHistorique, communes, aClasser, ecartees, propositions: propositions(etabs), conflits,
+    const props = propositions(etabs);
+    etabs.forEach(x => { x.compte = statutCompte(x, verifs, props); });
+    for (const c of communes.values()) c.comptes = comptes(c.etablissements);
+    return { version: VERSION, arrete: ctx.arrete, dates, parametres, debutHistorique: ctx.debutHistorique, communes, aClasser, ecartees, propositions: props, conflits,
       bilan: { entrees, fragments: fr.length, ecartees: ecartees.length, fragmentsPlaces, etablissements: etabs.length,
         conservation: fragmentsPlaces + ecartees.length === Object.values(entrees).reduce((a, b) => a + b, 0) } };
   }
@@ -258,6 +297,38 @@
   // Une commune par code INSEE (ou null), avec ses établissements numérotés dans l'ordre de la liste.
   const commune = (r, insee) => r.communes.get(insee) || null;
 
-  const api = { VERSION, DEFAUTS, SOURCES, construire, commune };
+  // Comptes Île-de-France, par département et par commune : chaque établissement compté UNE fois (pas de doublon).
+  // Les établissements sans commune (« à classer ») sont comptés à part, jamais oubliés.
+  function agreger(r) {
+    const vide = () => ({ total: 0, en_compte: 0, sans_compte: 0, a_verifier: 0, enCompteDormants: 0, enCompteBloques: 0, sansCompteHorsCible: 0 });
+    const CLES = Object.keys(vide()), ajouter = (a, k) => { for (const c of CLES) a[c] += k[c] || 0; };
+    const idf = vide(), parDep = new Map(), parCommune = [];
+    for (const c of r.communes.values()) {
+      if (!parDep.has(c.dep)) parDep.set(c.dep, Object.assign(vide(), { dep: c.dep, communes: 0 }));
+      const d = parDep.get(c.dep); d.communes++;
+      ajouter(d, Object.assign({ total: c.comptes.total }, c.comptes.compte)); ajouter(idf, Object.assign({ total: c.comptes.total }, c.comptes.compte));
+      parCommune.push({ insee: c.insee, commune: c.commune, dep: c.dep, total: c.comptes.total, ...c.comptes.compte });
+    }
+    const aClasser = vide(); r.aClasser.forEach(x => { aClasser.total++; aClasser[x.compte.statut]++; });
+    return { idf, parDep: [...parDep.values()].sort((a, b) => a.dep.localeCompare(b.dep)), parCommune: parCommune.sort((a, b) => a.dep.localeCompare(b.dep) || a.commune.localeCompare(b.commune)), aClasser };
+  }
+
+  // Recherche : commune (nom, code postal, INSEE), département, nom d'établissement ou SIRET. Rien n'est inventé ni fusionné.
+  function rechercher(r, q, max = 8) {
+    const brut = String(q || '').trim(), chiffres = brut.replace(/\s/g, ''), n = L0.normNom(brut);
+    if (n.length < 2 && !/^\d{2,}$/.test(chiffres)) return { communes: [], departements: [], etablissements: [] };
+    const toutes = [...r.communes.values()];
+    const communes = toutes.filter(c => L0.normNom(c.commune).includes(n) || (/^\d{5}$/.test(chiffres) && c.insee === chiffres)).slice(0, max);
+    const deps = [...new Set(toutes.map(c => c.dep))].map(d => L0.depInfo(d)).filter(Boolean)
+      .filter(D => D.dep === chiffres || (n.length >= 3 && L0.normNom(D.nom).includes(n)));
+    const etabs = [];
+    for (const c of toutes) for (const e of c.etablissements) {
+      if ((/^\d{9,14}$/.test(chiffres) && e.siret && e.siret.valeur.startsWith(chiffres)) || (n.length >= 2 && L0.normNom(e.nom.valeur).includes(n))) etabs.push(e);
+    }
+    etabs.sort((a, b) => a.nom.valeur.localeCompare(b.nom.valeur) || a.uid.localeCompare(b.uid));
+    return { communes, departements: deps, etablissements: etabs.slice(0, max), nbEtablissements: etabs.length };
+  }
+
+  const api = { VERSION, DEFAUTS, SOURCES, COMPTES, construire, commune, agreger, rechercher };
   if (node) module.exports = api; else racine.ModeleCommune = api;
 })(typeof self !== 'undefined' ? self : this);

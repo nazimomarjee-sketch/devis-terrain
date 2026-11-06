@@ -149,3 +149,46 @@ Limites connues :
 - **Sur téléphone, l'aperçu recouvre une partie de la scène.** À revoir à l'étape 4 (Samsung), par exemple en panneau qui monte du bas.
 - **Le test de conformité visuelle à la référence** (§7, test 12) n'est pas automatisé : la vérification a été faite à l'œil sur les captures.
 - Emplacements dans la commune : schématiques, jamais réels.
+
+## 11. Cadrage Ma Ville : sélecteur commercial EN COMPTE | SANS COMPTE (décision du propriétaire)
+
+Le sélecteur est très visible et disponible dans les vues **Île-de-France, Département et Commune**, sur PC et sur Samsung.
+C'est un **filtre indépendant** : les 4 couleurs commerciales ne changent pas.
+
+| Choix | Contenu | Règle |
+|---|---|---|
+| **EN COMPTE** | Garages ayant un compte client ODICOLOR confirmé dans EBP (code client EBP) | Les dormants et les comptes bloqués sont compris, avec leurs alertes distinctes |
+| **SANS COMPTE** | Garages dont l'absence de compte est **confirmée**, à prospecter pour une ouverture de compte | Il faut une vérification enregistrée : qui, quand, quelle source. Sans auteur ou sans date, la vérification est refusée |
+| **À VÉRIFIER** | Situation inconnue, rapprochement EBP incertain (même nom sans identifiant commun), client déclaré mais non retrouvé dans EBP | **Jamais classé « sans compte » automatiquement**, même si une vérification existe |
+| **TOUT** | Tous les établissements | — |
+
+- Les compteurs sont sans doublon : chaque établissement est dans une seule case.
+- La somme des communes donne le département, et la somme des départements donne l'Île-de-France.
+- Les établissements sans commune (« à classer ») sont comptés à part.
+- Les numéros d'un établissement restent les mêmes quel que soit le choix.
+- **Conséquence sur les données réelles** : EBP ne contient pas de SIRET. Au départ, presque tous les prospects seront donc « à vérifier ». La colonne SANS COMPTE se remplira au fil des vérifications. Il faudra un écran de vérification, à décider.
+
+## 12. Étape 3 réalisée (vue Commune dans le Bureau, données fictives)
+
+**Fichiers**
+- `bureau/index.html` : ajouts de logique seulement.
+  - Nouvelles adresses `#communes`, `#communes-DD` et `#commune-INSEE`.
+  - La recherche trouve aussi une commune, un code postal, un département, un nom de garage ou un SIRET.
+  - Les établissements de Ma Ville s'ouvrent dans la fiche commerciale existante, complétée par un bloc Ma Ville : compte, catégorie, signal d'achat, alertes, SIRET, statuts historiques et sources datées.
+- `bureau/ville/fictif-idf.js` : données fictives des départements 75, 77, 78, 91, 92, 93, 94 et 95.
+  - Sarcelles compte 334 établissements.
+  - Ce fichier inclut aussi les 58 garages de démo du Bureau. Chacun est relié à son compte EBP fictif par une liaison validée : aucun doublon.
+
+**Tests**
+- Modèle : `tests/ville-modele-commune.test.cjs`, 25/25.
+- Parcours complet : `tests/ville-commune-bureau-navigateur.cjs`, 8/8 (Bureau → Recherche → Commune → Garage → Fiche ; sélecteur dans les vues Département et Commune ; PC et Galaxy S9+ ; préservation).
+- Les suites existantes sont toutes vertes : garde-fou de la Ville, coffre, application téléphone.
+- Chaque garde-fou retiré volontairement fait échouer au moins un test.
+
+**Limites**
+- **Données fictives seulement.** En mode « Mes garages », la vue Commune affiche un message et aucune donnée fictive.
+- **La vue Département est une liste.** La vue LEGO en tours de la référence n'est pas encore construite.
+- **L'onglet « Commandes » de la fiche** reste vide pour les établissements de Ma Ville qui ne viennent pas de la démo du Bureau.
+- **Le bouton « Planifier une visite »** est désactivé sur un établissement fictif.
+- **Pas d'onglet dans l'en-tête.** On accède à la vue par la recherche, puis par le fil d'Ariane. C'est un choix fait pour ne pas modifier le design.
+- **Application Samsung** : non modifiée. Elle sera traitée à l'étape 4.

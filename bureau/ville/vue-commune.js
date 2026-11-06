@@ -6,7 +6,9 @@
    - au plus 5 personnages ; agence ODICOLOR seulement à Goussainville, emplacement symbolique ;
    - à qualifier (gris pointillé, « ? ») ≠ hors cible (sombre hachuré, « ⊘ ») ; dormant = petite pastille, couleur client conservée ;
    - mentions « plan schématique » (et « données fictives » si demandé) ; aucune rubrique vide (pointage, obstacles : rien affiché).
-   Gestes : 1er clic / toucher = aperçu ; 2e clic, Entrée ou bouton = fiche (rappel options.ouvrirFiche) ; Échap = fermer. */
+   Gestes : 1er clic / toucher = aperçu ; 2e clic, Entrée ou bouton = fiche (rappel options.ouvrirFiche) ; Échap = fermer.
+   Étape 3 : sélecteur EN COMPTE | SANS COMPTE | À VÉRIFIER | TOUT (options.compte), filtre indépendant des 4 couleurs :
+   la scène et la liste ne montrent que la sélection, les numéros restent ceux de la liste complète. */
 (function (racine) {
   'use strict';
   const AGENCE_INSEE = '95280'; // Goussainville
@@ -14,6 +16,7 @@
   const CAT = { client: 'Client', prospect: 'Prospect', a_qualifier: 'À qualifier', hors_cible: 'Hors cible' };
   const METIER = { carrosserie: 'carrosserie', mecanique: 'mécanique' };
   const ACHAT = { actif: '', reachat: 'réachat à vérifier', potentiellement_dormant: 'potentiellement dormant', inactif: 'inactif', a_verifier: 'achats à vérifier' };
+  const COMPTE = { en_compte: 'En compte', sans_compte: 'Sans compte', a_verifier: 'À vérifier', tous: 'Tout' };
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   const fr = d => d ? d.slice(8, 10) + '/' + d.slice(5, 7) + '/' + d.slice(0, 4) : '';
 
@@ -85,7 +88,7 @@
       const [c, r] = lots[i0 + dessines.length], x = 0.75 + c * LOT[0], y = -0.2 + r * LOT[1];
       for (let k = 0; k < 6; k++) sc.boite(x + (k % 3) * 1.1, y + Math.floor(k / 3) * 1.1, 0.9, 0.8, 0.35 + (k % 2) * 0.2, { haut: '#3A414D', gauche: '#2A3039', droite: '#1F242C' });
       const [cx, cy] = sc.P(x + 1.6, y + 1, 1.8);
-      sc.add(9500, `<g class="vc-ilot"><rect x="${cx - 46}" y="${cy - 14}" width="92" height="28" rx="14" fill="rgba(10,11,13,.92)" stroke="#C9CDD3"/><text x="${cx}" y="${cy + 5}" text-anchor="middle" font-family="Barlow Condensed" font-weight="800" font-size="15" fill="#fff">+${reste} · liste</text></g>`);
+      sc.add(9500, `<g class="vc-ilot"><rect x="${cx - 46}" y="${cy - 14}" width="92" height="28" rx="14" fill="rgba(10,11,13,.92)" stroke="#C9CDD3"/><text x="${cx}" y="${cy + 5}" text-anchor="middle" font-family="VC Barlow, Barlow Condensed, system-ui" font-weight="800" font-size="15" fill="#fff">+${reste} · liste</text></g>`);
     }
     for (let c = 0; c <= COLONNES; c++) { sc.lampe(-0.3 + c * LOT[0], 5.7); }
     const w = maxX - minX + 40, h = maxY - minY;
@@ -93,12 +96,27 @@
       positions: plus, dessines: dessines.length, reste, personnages: persos, agence };
   }
 
+  // Sélecteur commercial (aussi utilisé par la vue Département du Bureau). k = { total, en_compte, sans_compte, a_verifier, enCompteDormants, enCompteBloques, sansCompteHorsCible }.
+  function selecteur(k, actif = 'tous') {
+    const det = { en_compte: [k.enCompteDormants && k.enCompteDormants + ' dormant' + (k.enCompteDormants > 1 ? 's' : ''), k.enCompteBloques && k.enCompteBloques + ' bloqué' + (k.enCompteBloques > 1 ? 's' : '')],
+      sans_compte: [k.sansCompteHorsCible && k.sansCompteHorsCible + ' hors cible'], a_verifier: ['jamais classés sans compte'], tous: [] };
+    return `<div class="vc-compte" role="group" aria-label="Compte ODICOLOR">${['en_compte', 'sans_compte', 'a_verifier', 'tous'].map(c =>
+      `<button type="button" class="vc-cpt vc-cpt-${c}" data-compte="${c}" aria-pressed="${c === actif}"><b>${COMPTE[c]}</b><span class="vc-cpt-n">${c === 'tous' ? k.total : k[c]}</span>${det[c].filter(Boolean).length ? `<small>${det[c].filter(Boolean).join(' · ')}</small>` : ''}</button>`).join('')}</div>`;
+  }
+  const garde = c => COMPTE[c] ? c : 'tous';
+
   // ---------- Montage dans la page ----------
-  function monter(conteneur, commune, opts = {}) {
+  function monter(conteneur, communeComplete, opts = {}) {
     const ouvrir = typeof opts.ouvrirFiche === 'function' ? opts.ouvrirFiche : () => {};
-    const sc = scene(commune, opts), k = commune.comptes, l = commune.etablissements;
+    const filtre = garde(opts.compte), kc = communeComplete.comptes;
+    const l = communeComplete.etablissements.filter(e => filtre === 'tous' || (e.compte ? e.compte.statut : 'a_verifier') === filtre);
+    const commune = Object.assign({}, communeComplete, { etablissements: l });
+    const sc = scene(commune, opts), k = kc;
+    const cptK = Object.assign({ total: kc.total }, kc.compte || { en_compte: 0, sans_compte: 0, a_verifier: kc.total });
     const parUid = new Map(l.map(e => [e.uid, e])), pos = new Map(sc.positions.map(p => [p.uid, p]));
     const sources = e => [...new Set(e.sources.map(s => s.source))].map(s => { const d = e.sources.find(x => x.source === s).date; return `<span class="vc-b vc-src" title="${esc(s + (d ? ' · ' + fr(d) : ''))}">${esc(s)}</span>`; }).join('');
+    const fil = (opts.fil || []).map(f => f.href ? `<a href="${esc(f.href)}">${esc(f.libelle)}</a>` : `<span>${esc(f.libelle)}</span>`).join(' › ');
+    const badgeCompte = e => { const c = e.compte ? e.compte.statut : 'a_verifier'; return `<span class="vc-b vc-bc-${c}" title="${esc(e.compte ? e.compte.motif : '')}">${COMPTE[c]}</span>`; };
     conteneur.classList.add('vc');
     conteneur.innerHTML = `
       <div class="vc-carte">
@@ -109,16 +127,21 @@
         <div class="vc-apercu" hidden role="dialog" aria-live="polite"></div>
       </div>
       <aside class="vc-panneau">
+        ${fil ? `<nav class="vc-fil" aria-label="Où je suis">${fil}</nav>` : ''}
+        ${selecteur(cptK, filtre)}
         <div class="vc-tete"><h2>${esc(commune.commune)} <small>· ${commune.dep}</small></h2>
           <p>${k.total} établissement${k.total > 1 ? 's' : ''} · tous listés${sc.reste ? ' · ' + sc.dessines + ' dessinés' : ''}</p>
           <div class="vc-comptes"><span><b>${k.clients}</b> clients${k.dontDormants ? ' · dont ' + k.dontDormants + ' dormant' + (k.dontDormants > 1 ? 's' : '') + '/inactif' + (k.dontDormants > 1 ? 's' : '') : ''}</span>
-          <span><b>${k.prospects}</b> prospects</span><span><b>${k.aQualifier}</b> ? à qualifier</span><span><b>${k.horsCible}</b> ⊘ hors cible</span></div></div>
+          <span><b>${k.prospects}</b> prospects</span><span><b>${k.aQualifier}</b> ? à qualifier</span><span><b>${k.horsCible}</b> ⊘ hors cible</span></div>
+          ${filtre !== 'tous' ? `<p class="vc-filtre-etat">Sélection <b>${COMPTE[filtre].toUpperCase()}</b> : ${l.length} sur ${k.total} affiché${l.length > 1 ? 's' : ''}${l.length ? '' : ' · aucun établissement dans cette sélection'}</p>` : ''}
+          ${l.length > 12 ? `<input type="search" class="vc-chercher" placeholder="Chercher dans la liste (nom, n°, SIRET)" aria-label="Chercher dans la liste">` : ''}</div>
         <ol class="vc-liste">${l.map(e => { const q = qualif(e);
           return `<li><button type="button" class="vc-ligne" data-uid="${esc(e.uid)}" data-num="${e.numero}">
             <span class="vc-num vc-num-${sorte(e) === 'g' ? 'n' : sorte(e)}" style="background:${couleurRepere(e)}${e.segment === 'client-mecanique' ? ';box-shadow:0 0 0 1.6px #F4F2EF' : ''}">${e.numero}</span>
-            <span class="vc-nom">${esc(e.nom.valeur)}${e.avertissements.length ? ` <span class="vc-avert" title="${esc(e.avertissements.join(' · '))}">⚠</span>` : ''}</span>
-            <span class="vc-badges">${sources(e)}<span class="vc-b ${q[0]}">${q[1]}</span></span>
+            <span class="vc-nom" title="${esc(e.nom.valeur)}">${esc(e.nom.valeur)}${e.avertissements.length ? ` <span class="vc-avert" title="${esc(e.avertissements.join(' · '))}">⚠</span>` : ''}</span>
+            <span class="vc-badges">${sources(e)}<span class="vc-b ${q[0]}">${q[1]}</span>${badgeCompte(e)}</span>
             <span class="vc-sous">${esc(sousTitre(e))}</span></button></li>`; }).join('')}</ol>
+        <p class="vc-aucun" hidden>Aucun établissement ne correspond.</p>
       </aside>`;
     const svg = conteneur.querySelector('.vc-svg'), ap = conteneur.querySelector('.vc-apercu'), sel = conteneur.querySelector('.vc-selection');
     let choisi = null, zoom = 1;
@@ -132,6 +155,7 @@
       const q = qualif(e);
       ap.innerHTML = `<h4>${e.numero} · ${esc(e.nom.valeur)}</h4><p>${esc(sousTitre(e))}</p>
         <p class="vc-ap-src">${sources(e)} <span class="vc-b ${q[0]}">${q[1]}</span>${p ? '' : ' <span class="vc-b vc-b-inc">dans la liste (îlot)</span>'}</p>
+        <p class="vc-ap-compte">${badgeCompte(e)} ${esc(e.compte ? e.compte.motif : '')}${e.compte && e.compte.source ? ` <span class="vc-b vc-src">${esc(e.compte.source)}${e.compte.date ? ' · ' + fr(e.compte.date) : ''}</span>` : ''}</p>
         ${e.achat && e.achat.motif && e.achat.niveau !== 'actif' ? `<p class="vc-ap-motif">${esc(e.achat.motif)} <span class="vc-b vc-src">${esc(e.achat.source)}${e.achat.date ? ' · ' + fr(e.achat.date) : ''}</span></p>` : ''}
         <div class="vc-ap-btns"><button type="button" class="vc-ouvrir">Ouvrir la fiche ›</button><button type="button" class="vc-fermer">Fermer</button></div>`;
       ap.hidden = false;
@@ -141,16 +165,29 @@
     conteneur.addEventListener('click', ev => {
       const z = ev.target.closest('[data-zoom]');
       if (z) { zoom = Math.min(3, Math.max(1, zoom + Number(z.dataset.zoom) * 0.5)); svg.style.width = (zoom * 100) + '%'; return; }
+      const b = ev.target.closest('[data-compte]');
+      if (b) { const v = garde(b.dataset.compte); if (typeof opts.surCompte === 'function') opts.surCompte(v); else conteneur._vc = monter(conteneur, communeComplete, Object.assign({}, opts, { compte: v, choisir: null })); return; }
       const c = ev.target.closest('.vc-cible, .vc-ligne'); if (c) choisir(c.dataset.uid);
+    });
+    const champ = conteneur.querySelector('.vc-chercher');
+    if (champ) champ.addEventListener('input', () => {
+      const q = champ.value.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); let n = 0;
+      conteneur.querySelectorAll('.vc-liste li').forEach(li => { const e = parUid.get(li.firstElementChild.dataset.uid);
+        const t = (e.numero + ' ' + e.nom.valeur + ' ' + (e.siret ? e.siret.valeur : '')).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        li.hidden = !!q && !t.includes(q); if (!li.hidden) n++; });
+      conteneur.querySelector('.vc-aucun').hidden = n > 0;
     });
     // Échap ferme l'aperçu où que soit le focus (après un clic sur la scène, le focus n'est pas dans la vue).
     const doc = conteneur.ownerDocument;
     if (conteneur._vcEchap) doc.removeEventListener('keydown', conteneur._vcEchap);
-    conteneur._vcEchap = ev => { if (ev.key === 'Escape' && choisi) fermer(); };
+    conteneur._vcEchap = ev => { if (ev.key === 'Escape' && choisi && !(ev.target.closest && ev.target.closest('[aria-modal="true"]'))) fermer(); }; // une fiche ouverte par-dessus se ferme seule
     doc.addEventListener('keydown', conteneur._vcEchap);
-    return { fermer, choisir, stats: { dessines: sc.dessines, reste: sc.reste, personnages: sc.personnages, agence: sc.agence } };
+    const vue = { fermer, choisir, compte: filtre, stats: { dessines: sc.dessines, reste: sc.reste, personnages: sc.personnages, agence: sc.agence, affiches: l.length } };
+    conteneur._vc = vue;
+    if (opts.choisir && parUid.has(opts.choisir)) { choisir(opts.choisir); const li = conteneur.querySelector(`.vc-ligne[data-uid="${CSS.escape(opts.choisir)}"]`); if (li && li.scrollIntoView) li.scrollIntoView({ block: 'nearest' }); }
+    return vue;
   }
 
-  const api = { monter, AGENCE_INSEE, MAX_BATIMENTS, MAX_PERSONNAGES };
+  const api = { monter, selecteur, COMPTE, AGENCE_INSEE, MAX_BATIMENTS, MAX_PERSONNAGES };
   if (typeof module === 'object' && module.exports) module.exports = api; else racine.VueCommune = api;
 })(typeof self !== 'undefined' ? self : this);

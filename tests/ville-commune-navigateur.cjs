@@ -83,7 +83,7 @@ test('3. gestes : 1er clic = aperçu, 2e clic = fiche ; clavier Entrée ; Échap
 test('4. commune dense (60 établissements) : 39 bâtiments + îlot « +21 », les 60 dans la liste et accessibles', async () => {
   const { ctx, p, erreurs } = await ouvrir('95127');
   try {
-    assert.deepEqual(await p.evaluate(() => vue.stats), { dessines: 39, reste: 21, personnages: 5, agence: false });
+    assert.deepEqual(await p.evaluate(() => vue.stats), { dessines: 39, reste: 21, personnages: 5, agence: false, affiches: 60 });
     assert.equal(await p.$$eval('.vc-ligne', l => l.length), 60);
     assert.equal(await p.$$eval('.vc-cible', l => l.length), 39);
     assert.match(await p.textContent('.vc-ilot'), /\+21 · liste/);

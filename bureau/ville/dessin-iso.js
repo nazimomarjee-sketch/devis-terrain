@@ -36,7 +36,7 @@ function Scene(S, ox, oy) {
       add(prof ?? (x + w + y + d) + z * 0.01 + 0.02, base + `<polyline points="${p}" fill="none" stroke="${couleur}" stroke-width="${epais}" stroke-linejoin="round" ${lisere ? '' : 'filter="url(#lueur)"'}/>`);
     },
     // Texte posé sur la face avant-gauche (+y) ou avant-droite (+x).
-    texteFace(face, x, y, z, txt, { taille = 12, couleur = '#F4F2EF', poids = 700, police = 'Barlow Condensed', lueur = false, prof, ancre = 'start' } = {}) {
+    texteFace(face, x, y, z, txt, { taille = 12, couleur = '#F4F2EF', poids = 700, police = 'VC Barlow, Barlow Condensed, system-ui', lueur = false, prof, ancre = 'start' } = {}) {
       const [sx, sy] = P(x, y, z), m = face === 'gauche' ? `matrix(${C30},${S30},0,1,${sx},${sy})` : `matrix(${C30},${-S30},0,1,${sx},${sy})`;
       add(prof ?? x + y + 4.2, `<text transform="${m}" font-family="${police}" font-weight="${poids}" font-size="${taille}" fill="${couleur}" text-anchor="${ancre}" letter-spacing=".04em" ${lueur ? 'filter="url(#lueur)"' : ''}>${txt}</text>`);
     },
@@ -120,7 +120,7 @@ const DEFS = `<defs><filter id="lueur" x="-50%" y="-50%" width="200%" height="20
 // Texte posé au sol (comme un nom de rue), le long de l'axe x.
 Scene.texteSol = (sc, x, y, txt, { taille = 9, couleur = '#9EA3AB', prof = -500 } = {}) => {
   const [sx, sy] = sc.P(x, y, 0);
-  sc.add(prof, `<text transform="matrix(${C30},${S30},${-C30},${S30},${sx},${sy})" font-family="Barlow Condensed" font-weight="700" font-size="${taille}" fill="${couleur}" letter-spacing=".08em">${txt}</text>`);
+  sc.add(prof, `<text transform="matrix(${C30},${S30},${-C30},${S30},${sx},${sy})" font-family="VC Barlow, Barlow Condensed, system-ui" font-weight="700" font-size="${taille}" fill="${couleur}" letter-spacing=".08em">${txt}</text>`);
 };
 
 // Bâtiments métier des MAQUETTES : 1 bâtiment = 1 établissement. Couleur commerciale = néon du toit + bandeau d'enseigne.
@@ -172,7 +172,7 @@ function repere(sc, b, num, seg, { alerte = '' } = {}) { // marqueur numéroté 
   const [cx, cy] = sc.P(b.x + b.w * 0.5, b.y + b.d * 0.5, b.h + 1.3), c = SEG[seg];
   sc.add(9000 + cy / 1000, `<g><line x1="${cx}" y1="${cy + 10}" x2="${cx}" y2="${sc.P(b.x + b.w * 0.5, b.y + b.d * 0.5, b.h + 0.2)[1]}" stroke="#4A5160" stroke-width="1"/>` +
     `<circle cx="${cx}" cy="${cy}" r="11" fill="${c.lisere ? '#0B0B0D' : c.c}" stroke="${c.lisere ? '#F4F2EF' : 'rgba(0,0,0,.5)'}" stroke-width="${c.lisere ? 2 : 1}"/>` +
-    `<text x="${cx}" y="${cy + 4}" text-anchor="middle" font-family="Barlow Condensed" font-weight="800" font-size="12" fill="#fff">${num}</text>` +
+    `<text x="${cx}" y="${cy + 4}" text-anchor="middle" font-family="VC Barlow, Barlow Condensed, system-ui" font-weight="800" font-size="12" fill="#fff">${num}</text>` +
     (alerte ? `<circle cx="${cx + 10}" cy="${cy - 9}" r="6" fill="#F0343F" stroke="#0A0B0D" stroke-width="1.5"/><text x="${cx + 10}" y="${cy - 6}" text-anchor="middle" font-family="system-ui" font-weight="800" font-size="8" fill="#fff">!</text>` : '') + `</g>`);
 }
 function etiquette(sc, b, nom, seg, { alerte = '', taille = 11, selection = false } = {}) {
@@ -181,7 +181,7 @@ function etiquette(sc, b, nom, seg, { alerte = '', taille = 11, selection = fals
   const pastille = SEG[seg].lisere ? `<circle cx="${cx - L / 2 + 12}" cy="${cy}" r="5" fill="#0B0B0D" stroke="#F4F2EF" stroke-width="1.6"/>` : `<circle cx="${cx - L / 2 + 12}" cy="${cy}" r="5" fill="${c}"/>`;
   sc.add(9000 + cy / 1000, `<g><line x1="${cx}" y1="${cy + 11}" x2="${cx}" y2="${sc.P(b.x + b.w * 0.5, b.y + b.d * 0.5, b.h + 0.2)[1]}" stroke="${selection ? '#FF2D3D' : '#4A5160'}" stroke-width="1"/>` +
     `<rect x="${cx - L / 2}" y="${cy - 11}" width="${L}" height="22" rx="6" fill="rgba(10,11,13,.88)" stroke="${selection ? '#FF2D3D' : '#2E343E'}" stroke-width="${selection ? 1.6 : 1}"/>${pastille}` +
-    `<text x="${cx - L / 2 + 22}" y="${cy + 4}" font-family="Barlow Condensed" font-weight="700" font-size="${taille}" fill="#F4F2EF" letter-spacing=".03em">${nom}</text>` +
+    `<text x="${cx - L / 2 + 22}" y="${cy + 4}" font-family="VC Barlow, Barlow Condensed, system-ui" font-weight="700" font-size="${taille}" fill="#F4F2EF" letter-spacing=".03em">${nom}</text>` +
     (alerte ? `<circle cx="${cx + L / 2 - 2}" cy="${cy - 10}" r="8" fill="#F0343F"/><text x="${cx + L / 2 - 2}" y="${cy - 6.5}" text-anchor="middle" font-family="system-ui" font-weight="800" font-size="10" fill="#fff">${alerte}</text>` : '') + `</g>`);
 }
 // L'agence ODICOLOR : entrepôt + showroom vitré + enseigne néon géante + quais de chargement + fourgons.
@@ -238,7 +238,7 @@ function miniGarage(sc, x, y, g, k = 1) {
 // Petite agence (vue géographique) : même identité que la grande.
 function panneauCommune(sc, x, y, z, txt, { taille = 10.5, prof } = {}) {
   const [cx, cy] = sc.P(x, y, z), L = txt.length * taille * 0.5 + 14;
-  sc.add(prof ?? 8500 + cy / 1000, `<g><rect x="${cx - L / 2}" y="${cy - 10}" width="${L}" height="18" rx="4" fill="rgba(10,11,13,.85)" stroke="#3A414D"/><text x="${cx}" y="${cy + 3.5}" text-anchor="middle" font-family="Barlow Condensed" font-weight="700" font-size="${taille}" fill="#DADDE2" letter-spacing=".04em">${txt}</text></g>`);
+  sc.add(prof ?? 8500 + cy / 1000, `<g><rect x="${cx - L / 2}" y="${cy - 10}" width="${L}" height="18" rx="4" fill="rgba(10,11,13,.85)" stroke="#3A414D"/><text x="${cx}" y="${cy + 3.5}" text-anchor="middle" font-family="VC Barlow, Barlow Condensed, system-ui" font-weight="700" font-size="${taille}" fill="#DADDE2" letter-spacing=".04em">${txt}</text></g>`);
 }
 
 // Établissement SIRENE non qualifié : bâtiment gris, sans néon commercial, contour pointillé (activité probable, jamais confirmée).
@@ -279,7 +279,7 @@ function repereQualif(sc, b, num, sorte) {
   const fond = sorte === 'q' ? '#5A606A' : '#26292F', bord = sorte === 'q' ? '#C9CDD3' : '#5A606A', sym = sorte === 'q' ? '?' : '⊘';
   sc.add(9000 + cy / 1000, `<g><line x1="${cx}" y1="${cy + 10}" x2="${cx}" y2="${sc.P(b.x + b.w * 0.5, b.y + b.d * 0.5, b.h + 0.2)[1]}" stroke="#4A5160"/>` +
     `<circle cx="${cx}" cy="${cy}" r="11" fill="${fond}" stroke="${bord}" stroke-width="1.5" ${sorte === 'q' ? 'stroke-dasharray="3 2"' : ''}/>` +
-    `<text x="${cx}" y="${cy + 4}" text-anchor="middle" font-family="Barlow Condensed" font-weight="800" font-size="12" fill="#fff">${num}</text>` +
+    `<text x="${cx}" y="${cy + 4}" text-anchor="middle" font-family="VC Barlow, Barlow Condensed, system-ui" font-weight="800" font-size="12" fill="#fff">${num}</text>` +
     `<circle cx="${cx + 10}" cy="${cy - 9}" r="6.5" fill="#0A0B0D" stroke="${bord}"/><text x="${cx + 10}" y="${cy - 5.8}" text-anchor="middle" font-family="system-ui" font-weight="800" font-size="8.5" fill="${bord}">${sym}</text></g>`);
 }
 // Tour de briques LEGO : 1 brique par catégorie, hauteur = nombre d'établissements (vue département, agrégée).

@@ -331,6 +331,7 @@ select.recherche{appearance:auto}
   <section class="fil-actions" id="fil-actions" aria-label="Actions commerciales"></section>
 </div>
 <div id="couche-fiche" hidden></div>
+<link rel="stylesheet" href="ville/ville-commune.css">
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="communes-idf.js"></script>
@@ -343,6 +344,11 @@ select.recherche{appearance:auto}
 <script src="reveil.js"></script>
 <script src="lecture-sauvegarde.js"></script>
 <script src="annuaire.js"></script>
+<script src="ville/modele-commune.js"></script>
+<script src="ville/dessin-iso.js"></script>
+<script src="ville/vue-commune.js"></script>
+<script src="ville/fictif-95.js"></script>
+<script src="ville/fictif-idf.js"></script>
 <script>
 (function(){
 'use strict';
@@ -406,7 +412,7 @@ function rendreKpis(){
     kpi('fiole','Essais Carsystem', null, h('span',{class:'badge b-vide'},'Lot 3')));
 }
 function rendreFiltres(){
-  if (['simulation','bureau'].includes(route().ecran)) { $('#filtres').replaceChildren(); return; }
+  if (['simulation','bureau','commune','communes'].includes(route().ecran)) { $('#filtres').replaceChildren(); return; }
   const seg = etat.garages.some(g => g.segment);
   const def = seg ? [['tous','Tous',null], ...L0.SEGMENTS.map(k => ['seg:' + k, STATUTS[k].libelle, STATUTS[k].couleur]), ['alertes','Alertes (règlement, dormant, inactif)','var(--danger)']]
     : [['tous','Tous',null],['actif','Clients','var(--vert)'],['prospect','Prospects','var(--bleu)'],['dormant','Dormants / perdus','var(--orange)'],['risque','Risque règlement','var(--danger)']];
@@ -858,7 +864,7 @@ function ficheActeur(a){
 // ================= Fil d'actions =================
 function rendreFil(){
   const zone = $('#fil-actions');
-  if (['simulation','bureau'].includes(route().ecran)) { zone.hidden = true; return; } zone.hidden = false;
+  if (['simulation','bureau','commune','communes'].includes(route().ecran)) { zone.hidden = true; return; } zone.hidden = false;
   const types = { visite:['visite','var(--vert)','Visite client'], devis:['devis','var(--neon)','Devis'], essai:['fiole','var(--orange)','Essai Carsystem'], relance:['relance','var(--danger)','Relance règlement'], prospect:['cible','var(--bleu)','Prospection'], action:['calendrier','var(--doux)','Prochaine action'] };
   let evts;
   if (etat.mode === 'demo') {
@@ -998,7 +1004,7 @@ function ficheAnnuaire(e){
 }
 // ================= NIVEAU 3 : fiche garage =================
 function ouvrirFiche(x){
-  const sr = x.source === 'demo' ? ['b-demo','Démo'] : ['b-terrain','Saisi terrain'];
+  const sr = x.source === 'demo' ? ['b-demo','Démo'] : x.source === 'fictif' ? ['b-demo','Fictif'] : ['b-terrain','Saisi terrain'];
   const cl = x.classement, D = L0.depInfo(x.dep);
   const geo = cl.niveau==='sur' ? ['b-confirme','Liste officielle'] : (cl.niveau==='cp'||cl.niveau==='commune') ? ['b-estime', L0.CLASSEMENTS[cl.niveau]] : ['b-alerte', L0.CLASSEMENTS[cl.niveau]];
   const champ = (n, v, badge) => { const vide = v == null || v === '';
@@ -1011,6 +1017,7 @@ function ouvrirFiche(x){
   const contenu = h('div',{}), msg = h('p',{class:'info', style:'margin:6px 0 0', 'aria-live':'polite'});
   const infos = () => h('div',{class:'champs'},
     h('div',{class:'action'}, h('div',{class:'n'},'Prochaine action'), h('div',{style:'margin-top:4px;font-weight:600'}, prochaine || 'Aucune action prévue.')),
+    x.maVille ? champsMaVille(x.maVille, champ) : null,
     champ('Commune', x.commune || (cl.saisi ? cl.saisi + ' (non reconnue)' : ''), x.commune ? geo : ['','','À compléter']),
     champ('Code postal', cl.cp, sr), champ('Département', D ? `${D.nom} (${D.dep})` : '', geo),
     cl.niveau !== 'sur' ? h('p',{class:'message erreur', style:'margin:8px 0'}, cl.motif) : null,
@@ -1019,7 +1026,7 @@ function ouvrirFiche(x){
     champ('Système de peinture', '', ['','','Champ à créer']),
     champ('Potentiel', x.source==='demo' ? euros(x.potentiel) + ' / mois' : null, x.source==='demo' ? sr : ['','','À estimer']),
     champ('Risque règlement', x.statut==='risque' ? 'Oui' : x.source==='demo' ? 'Aucun signalé' : '', x.statut==='risque' ? ['b-alerte', sr[1]] : sr),
-    champ('Ancien client Roberlo', x.source==='reel' && !x.exRoberlo ? '' : (x.exRoberlo ? 'Oui' : 'Non'), sr),
+    champ('Ancien client Roberlo', x.source!=='demo' && !x.exRoberlo ? '' : (x.exRoberlo ? 'Oui' : 'Non'), sr),
     champ('Décideur', x.decideur, sr), champ('Téléphone', x.tel, sr), champ('Notes terrain', x.notes, sr));
   const vides = { historique:'Historique des visites et des essais Carsystem : arrive avec l’import complet de l’appli téléphone et d’EBP (Lot 3).',
     commandes:'Commandes, factures et règlements : lus dans les exports EBP au Lot 3. Le Bureau ne crée jamais de devis.' };
@@ -1035,16 +1042,16 @@ function ouvrirFiche(x){
   [['infos','Informations'],['historique','Historique'],['commandes','Commandes']].forEach(([k,l]) => ongletsF.append(h('button',{role:'tab', 'data-k':k, onclick:()=>montrer(k)}, l)));
   const dejaLa = etat.tournee.includes(x.id);
   const btnFermer = h('button',{class:'fermer', onclick:fermer, 'aria-label':'Fermer la fiche'},'×');
-  const c = STATUTS[teinte(x)].lisere ? '#F4F2EF' : STATUTS[teinte(x)].couleur;
+  const c = x.pastille ? x.pastille.couleur : STATUTS[teinte(x)].lisere ? '#F4F2EF' : STATUTS[teinte(x)].couleur;
   const fiche = h('aside',{class:'fiche', role:'dialog', 'aria-modal':'true', 'aria-labelledby':'fiche-titre'},
     h('div',{class:'fiche-tete'}, h('div',{class:'vignette'}, portrait(L0.apparence(x.id), x.statut, 96)),
-      h('div',{}, h('h2',{id:'fiche-titre'}, x.nom), h('span',{class:'pastille-statut', style:`background:color-mix(in srgb, ${c} 22%, transparent);color:${c}`}, STATUTS[teinte(x)].libelle), ' ',
+      h('div',{}, h('h2',{id:'fiche-titre'}, x.nom), h('span',{class:'pastille-statut', style:`background:color-mix(in srgb, ${c} 22%, transparent);color:${c}`}, x.pastille ? x.pastille.libelle : STATUTS[teinte(x)].libelle), ' ',
         teinte(x) !== x.statut && ['risque','dormant','perdu'].includes(x.statut) ? [h('span',{class:'badge b-alerte'}, STATUTS[x.statut].libelle), ' '] : null,
         x.inactifEbp ? [h('span',{class:'badge b-alerte'}, 'Client EBP inactif'), ' '] : null, h('span',{class:'badge '+sr[0]}, sr[1]),
         h('div',{class:'lieu'}, METIERS[L0.apparence(x.id).role] + ' · ' + (x.commune || cl.saisi || 'Commune inconnue') + (D ? ` (${D.dep})` : ''))), btnFermer),
     h('div',{class:'actions-fiche'},
       h('button',{class:'btn', disabled:!x.tel, onclick:async()=>{ msg.textContent = await copier(x.tel) ? 'Téléphone copié : ' + x.tel : 'Copie refusée. Numéro : ' + x.tel; }}, icone('tel'), 'Copier le tél.'),
-      h('button',{class:'btn principal', disabled:dejaLa || !x.dep, onclick:()=>{ etat.tournee.push(x.id); fermer(); const r = route(); if (r.ecran==='carte' && r.D.dep===x.dep) rendre(); else allerCarte(x.dep); }},
+      h('button',{class:'btn principal', disabled:dejaLa || !x.dep || x.source==='fictif', onclick:()=>{ etat.tournee.push(x.id); fermer(); const r = route(); if (r.ecran==='carte' && r.D.dep===x.dep) rendre(); else allerCarte(x.dep); }},
         icone('calendrier'), dejaLa ? 'Déjà à planifier' : 'Planifier une visite')),
     msg, ongletsF, contenu,
     h('p',{class:'regle'}, 'Confirmé = vérifié dans EBP. Liste officielle = commune et code postal concordants (INSEE / La Poste). Saisi terrain = noté au téléphone, à vérifier. Démo = inventé pour tester.'));
@@ -1077,10 +1084,10 @@ function panneauDonnees(){
 }
 function monterRecherche(){
   const zone = $('#cherche'), res = h('div',{class:'resultats', hidden:true});
-  const input = h('input',{type:'search', id:'recherche-globale', placeholder:'Garage ou commune…', 'aria-label':'Rechercher un garage ou une commune', autocomplete:'off',
+  const input = h('input',{type:'search', id:'recherche-globale', placeholder:'Garage, commune ou SIRET…', 'aria-label':'Rechercher un garage, une commune ou un SIRET', autocomplete:'off',
     oninput:()=>{ const q = L0.normNom(input.value); if (q.length < 2) { res.hidden = true; return; }
-      const t = etat.garages.filter(x => L0.normNom(x.nom+' '+(x.commune||'')+' '+x.classement.saisi).includes(q)).slice(0,8);
-      res.replaceChildren(...(t.length ? t.map(x => ligneGarage(x)) : [h('p',{class:'info', style:'padding:8px;margin:0'}, 'Aucun résultat.')])); res.hidden = false; },
+      const t = etat.garages.filter(x => L0.normNom(x.nom+' '+(x.commune||'')+' '+x.classement.saisi).includes(q)).slice(0,8), mv = resultatsMaVille(input.value);
+      res.replaceChildren(...(t.length || mv.length ? [...t.map(x => ligneGarage(x)), ...mv] : [h('p',{class:'info', style:'padding:8px;margin:0'}, 'Aucun résultat.')])); res.hidden = false; },
     onkeydown:e=>{ if (e.key==='Escape') { res.hidden = true; input.value=''; } }});
   res.addEventListener('click', () => { res.hidden = true; });
   zone.replaceChildren(icone('loupe'), input, res);
@@ -1194,6 +1201,104 @@ function vueBureau(){
       imports));
 }
 
+// ================= Ma Ville · vue Commune (étape 3) : DONNÉES FICTIVES uniquement =================
+// Modèle : bureau/ville/modele-commune.js · dessin : bureau/ville/vue-commune.js · styles séparés : bureau/ville/ville-commune.css.
+// Lecture seule : rien n'est écrit (coffre, téléphone, EBP). Les données réelles ne sont PAS branchées à cette étape.
+let mvModele = null;
+const modeleMV = () => mvModele || (mvModele = ModeleCommune.construire(window.FICTIF_IDF.avecDemoBureau(L0.garagesDemo(2026))));
+etat.mvCompte = 'tous'; etat.mvChoix = null;
+const CAT_MV = { client:'Client', prospect:'Prospect', a_qualifier:'À qualifier', hors_cible:'Hors cible' };
+const ACHAT_MV = { actif:'Achats réguliers', reachat:'Réachat à vérifier', potentiellement_dormant:'Potentiellement dormant', inactif:'Inactif', a_verifier:'Achats à vérifier' };
+const frDate = d => d ? new Date(d.slice(0,10)+'T12:00:00').toLocaleDateString('fr-FR') : '';
+// Établissement Ma Ville → objet attendu par la fiche commerciale existante (ouvrirFiche). Rien n'est inventé : absent = « Non renseigné ».
+function garageMaVille(e){
+  const bloque = e.alertes.some(a => a.type === 'compte_bloque');
+  const statut = e.categorie === 'prospect' ? 'prospect' : e.categorie === 'client' ? (bloque ? 'risque' : e.dormant ? 'dormant' : e.qualification === 'a_verifier' ? 'inconnu' : 'actif') : 'inconnu';
+  const segment = e.segment || (e.categorie === 'client' || e.categorie === 'prospect' ? e.categorie + '-a_qualifier' : null);
+  const pastille = e.categorie === 'a_qualifier' ? { libelle:'? À qualifier', couleur:'#C9CDD3' } : e.categorie === 'hors_cible' ? { libelle:'⊘ Hors cible', couleur:'#9EA3AB' } : null;
+  return { id:'mv:' + e.uid, nom:e.nom.valeur, source:'fictif', statut, segment, pastille, dep:e.dep, commune:e.commune,
+    classement:{ niveau:e.rattachement.niveau, motif:e.rattachement.motif, cp:e.rattachement.cp, saisi:e.commune || '' },
+    inactifEbp: !!(e.achat && e.achat.niveau === 'inactif'), position:null, fournisseur:'Non renseigné', tel:null, decideur:null, notes:null,
+    etape: e.etapeTerrain ? e.etapeTerrain.valeur : null, etapeDate:null, maVille:e };
+}
+// Garage de démo du Bureau : sa fiche d'origine (mêmes données que la Ville), complétée par le bloc Ma Ville.
+function ficheDe(e){
+  const g = etat.mode === 'demo' && etat.garages.find(x => e.sources.some(s => s.ref === 'tel:' + x.id));
+  return g ? Object.assign({}, g, { maVille:e }) : garageMaVille(e);
+}
+// Mêmes statuts, alertes et sources que la scène et la liste de la vue Commune (même objet du modèle).
+function champsMaVille(e, champ){
+  const c = e.compte, src = (s, d) => s + (d ? ' du ' + frDate(d) : '');
+  const bc = c.statut === 'en_compte' ? ['b-confirme', src(c.source, c.date)] : c.statut === 'sans_compte' ? ['b-estime', src(c.source, c.date)] : ['b-alerte','À vérifier'];
+  return [
+    champ('Compte ODICOLOR', VueCommune.COMPTE[c.statut] + ' · ' + c.motif, bc),
+    champ('Catégorie (Ma Ville)', CAT_MV[e.categorie] + (e.activite ? ' · ' + e.activite.valeur + (e.activite.probable ? ' (probable)' : '') : ' · métier inconnu'),
+      e.activite ? ['b-estime', src(e.activite.source, e.activite.date)] : ['','','À qualifier']),
+    e.achat ? champ('Signal d’achat', ACHAT_MV[e.achat.niveau] + ' · ' + e.achat.motif, [e.achat.niveau === 'actif' ? 'b-confirme' : 'b-alerte', src(e.achat.source, e.achat.date)]) : null,
+    ...e.alertes.map(a => champ('Alerte', a.type === 'compte_bloque' ? 'Compte bloqué dans EBP' : a.type, ['b-alerte', src(a.source, a.date)])),
+    e.siret ? champ('SIRET', e.siret.valeur, ['b-estime', src(e.siret.source, e.siret.date)]) : null,
+    e.codesEbp.length ? champ('Code client EBP', e.codesEbp.join(', '), ['b-confirme','EBP']) : null,
+    ...e.statutsHistoriques.map(st => champ('Statut historique', st.valeur, ['b-estime', src(st.source, st.date)])),
+    champ('Sources', e.sources.map(x => src(x.source, x.date)).join(' · '), ['b-demo','Fictif']),
+    e.avertissements.length ? h('p',{class:'message erreur', style:'margin:8px 0'}, e.avertissements.join(' · ')) : null];
+}
+const reelSansMV = () => etat.mode !== 'demo' ? h('section',{class:'bloc'}, h('h2',{},'Ma Ville · vue Commune'),
+  h('p',{class:'info'}, 'À cette étape, la vue Commune fonctionne seulement sur des données fictives. Tes garages réels y seront branchés après validation (sauvegardes du coffre, écran de validation des liaisons EBP). Reviens à la démo pour l’essayer.'),
+  h('button',{class:'btn discret', onclick:retourDemo}, 'Revenir à la démo')) : null;
+function changerCompteMV(v){ etat.mvCompte = v; etat.mvChoix = null; rendre(); }
+// Vue Département (liste) : Île-de-France ou un département, sélecteur EN COMPTE | SANS COMPTE et compteurs sans doublon.
+function vueCommunesMV(dep){
+  const r = modeleMV(), a = ModeleCommune.agreger(r), D = dep ? L0.depInfo(dep) : null, f = etat.mvCompte;
+  const k = D ? a.parDep.find(x => x.dep === dep) || { total:0, en_compte:0, sans_compte:0, a_verifier:0 } : a.idf;
+  const n = x => f === 'tous' ? x.total : x[f];
+  const hote = h('div',{class:'vc vc-dep'});
+  const ligne = (href, titre, sous, x) => `<a class="vc-dep-ligne" href="${href}"><span><b>${titre}</b><small>${sous}</small></span>
+    <span class="vc-dep-n"><b>${n(x)}</b><small>${f === 'tous' ? 'établissements' : VueCommune.COMPTE[f].toLowerCase()}</small></span>
+    <span class="vc-dep-detail"><i class="vc-b vc-bc-en_compte">${x.en_compte} en compte</i><i class="vc-b vc-bc-sans_compte">${x.sans_compte} sans compte</i><i class="vc-b vc-bc-a_verifier">${x.a_verifier} à vérifier</i></span></a>`;
+  const lignes = D
+    ? a.parCommune.filter(c => c.dep === dep && n(c) > 0).sort((x, y) => n(y) - n(x) || x.commune.localeCompare(y.commune)).map(c => ligne('#commune-' + c.insee, c.commune, c.insee + ' · ' + c.total + ' établissement(s)', c))
+    : a.parDep.filter(d => n(d) > 0).map(d => ligne('#communes-' + d.dep, L0.depInfo(d.dep).nom + ' (' + d.dep + ')', d.communes + ' commune(s)', d));
+  hote.innerHTML = `<div class="vc-dep-corps">
+    <nav class="vc-fil" aria-label="Où je suis">${D ? '<a href="#communes">Île-de-France</a> › <span>' + D.nom + ' (' + D.dep + ')</span>' : '<span>Île-de-France</span>'}</nav>
+    <div class="vc-dep-tete"><h2>${D ? D.nom + ' <small>· ' + D.dep + '</small>' : 'Île-de-France'}</h2><span class="vc-fictif-txt">DONNÉES FICTIVES</span></div>
+    ${VueCommune.selecteur(k, f)}
+    <p class="vc-dep-note">Chaque établissement est compté une seule fois. « À vérifier » n’est jamais classé « sans compte » automatiquement.${D ? '' : ' Départements prioritaires 95, 94, 91, 77, 93 : sans ordre entre eux.'}</p>
+    <div class="vc-dep-liste">${lignes.join('') || '<p class="vc-dep-note">Aucun établissement dans cette sélection.</p>'}</div>
+    ${!D && a.aClasser.total ? `<details class="vc-dep-note"><summary>${a.aClasser.total} établissement(s) sans commune (à classer), comptés à part</summary><ul>${r.aClasser.map(e => '<li>' + e.nom.valeur.replace(/</g, '&lt;') + ' · ' + VueCommune.COMPTE[e.compte.statut] + '</li>').join('')}</ul></details>` : ''}
+  </div>`;
+  hote.addEventListener('click', ev => { const b = ev.target.closest('[data-compte]'); if (b) changerCompteMV(b.dataset.compte); });
+  return hote;
+}
+function vueCommuneMV(insee){
+  const r = modeleMV(), c = ModeleCommune.commune(r, insee);
+  if (!c) return h('section',{class:'bloc'}, h('h2',{},'Commune sans établissement'), h('p',{class:'info'}, 'Aucun établissement (fictif) dans cette commune.'), h('a',{class:'btn', href:'#communes'}, 'Île-de-France'));
+  const D = L0.depInfo(c.dep), hote = h('div',{class:'vc-hote'});
+  const vue = VueCommune.monter(hote, c, { fictif:true, compte:etat.mvCompte, choisir:etat.mvChoix, surCompte:changerCompteMV,
+    fil:[{ libelle:'Île-de-France', href:'#communes' }, { libelle:(D ? D.nom : c.dep) + ' (' + c.dep + ')', href:'#communes-' + c.dep }, { libelle:c.commune }],
+    ouvrirFiche:(uid, e) => ouvrirFiche(ficheDe(e)) });
+  window.vueCommuneBureau = vue; // pour les essais automatiques
+  return hote;
+}
+function allerMaVille(hash){ if (location.hash === '#' + hash) rendre(); else location.hash = hash; }
+function resultatsMaVille(q){
+  if (etat.mode !== 'demo' || !window.ModeleCommune) return [];
+  const t = ModeleCommune.rechercher(modeleMV(), q, 5), out = [];
+  if (!t.communes.length && !t.departements.length && !t.etablissements.length) return [];
+  out.push(h('small',{class:'info', style:'padding:6px 8px 0'}, 'Ma Ville · vue Commune (données fictives)'));
+  t.departements.forEach(D => out.push(h('button',{class:'ligne mv-res', 'data-mv':'dep', onclick:()=>{ etat.mvChoix = null; allerMaVille('communes-' + D.dep); }},
+    h('i',{style:'background:var(--doux)'}), h('span',{}, D.nom + ' (' + D.dep + ')', h('small',{}, 'Département')))));
+  t.communes.forEach(c => out.push(h('button',{class:'ligne mv-res', 'data-mv':'commune', onclick:()=>{ etat.mvChoix = null; allerMaVille('commune-' + c.insee); }},
+    h('i',{style:'background:var(--rouge)'}), h('span',{}, c.commune, h('small',{}, 'Commune · ' + c.insee + ' · ' + c.comptes.total + ' établissement(s)')))));
+  t.etablissements.forEach(e => out.push(h('button',{class:'ligne mv-res', 'data-mv':'garage', onclick:()=>{
+      if (!e.insee) return ouvrirFiche(ficheDe(e));
+      if (etat.mvCompte !== 'tous' && e.compte.statut !== etat.mvCompte) etat.mvCompte = 'tous'; // le garage cherché est toujours visible
+      etat.mvChoix = e.uid; allerMaVille('commune-' + e.insee); }},
+    h('i',{style:`background:${e.segment && STATUTS[e.segment] ? STATUTS[e.segment].couleur : '#6E737B'}` + (e.segment === 'client-mecanique' ? ';box-shadow:0 0 0 1.5px #F4F2EF' : '')}),
+    h('span',{}, e.nom.valeur, h('small',{}, (e.commune || 'À classer') + ' · n° ' + (e.numero || '—') + (e.siret ? ' · SIRET ' + e.siret.valeur : '') + ' · ' + VueCommune.COMPTE[e.compte.statut])))));
+  if (t.nbEtablissements > t.etablissements.length) out.push(h('small',{class:'info', style:'padding:2px 8px 6px'}, (t.nbEtablissements - t.etablissements.length) + ' autre(s) établissement(s) : précise la recherche ou ouvre la commune.'));
+  return out;
+}
+
 // ================= Navigation =================
 function route(){
   const hs = location.hash, m = /^#carte-(\d\d)(?:-([a-z]+))?$/.exec(hs);
@@ -1201,6 +1306,8 @@ function route(){
   if (hs === '#simulation') return {ecran:'simulation'};
   if (hs === '#bureau') return {ecran:'bureau'};
   if (hs === '#a-classer') return {ecran:'a-classer'};
+  const mv = /^#commune-(\d{5})$/.exec(hs); if (mv) return {ecran:'commune', insee:mv[1]};
+  const md = /^#communes(?:-(\d\d))?$/.exec(hs); if (md && (!md[1] || L0.depInfo(md[1]))) return {ecran:'communes', dep:md[1] || null};
   return {ecran:'ville'};
 }
 function choisir(id){ etat.choix = id; rendre(); }
@@ -1210,8 +1317,9 @@ function rendre(){
   if (r.porte) etat.choix = r.porte.id;
   if (r.ecran !== 'carte' && carte) { carte.remove(); carte = null; }
   rendreEntete(); rendreKpis(); rendreFiltres();
-  $('#kpis').hidden = r.ecran === 'simulation' || r.ecran === 'bureau';
-  $('#vue').replaceChildren(r.ecran==='carte' ? vueCarte(r.D, r.porte) : r.ecran==='simulation' ? vueSimulation() : r.ecran==='bureau' ? vueBureau() : r.ecran==='a-classer' ? vueAClasser() : vueVille());
+  $('#kpis').hidden = ['simulation','bureau','commune','communes'].includes(r.ecran);
+  $('#vue').replaceChildren(['commune','communes'].includes(r.ecran) ? (reelSansMV() || (r.ecran === 'commune' ? vueCommuneMV(r.insee) : vueCommunesMV(r.dep)))
+    : r.ecran==='carte' ? vueCarte(r.D, r.porte) : r.ecran==='simulation' ? vueSimulation() : r.ecran==='bureau' ? vueBureau() : r.ecran==='a-classer' ? vueAClasser() : vueVille());
   rendreFil();
   const sc = document.getElementById('scene'); if (sc && sc.scrollWidth > sc.clientWidth) { const t = TERRITOIRES.find(x=>x.id===etat.choix), [px] = iso(...pos(t)); sc.scrollLeft = (px + 495) / 990 * sc.scrollWidth - sc.clientWidth/2; }
 }
