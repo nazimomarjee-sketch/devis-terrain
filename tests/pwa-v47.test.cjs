@@ -1,30 +1,15 @@
 'use strict';
-const {test}=require('node:test');
-const assert=require('node:assert/strict');
-const {readFileSync,existsSync}=require('node:fs');
-const {join}=require('node:path');
-const root=join(__dirname,'..');
-const html=readFileSync(join(root,'index.html'),'utf8');
-const sw=readFileSync(join(root,'sw.js'),'utf8');
-const scripts=[...html.matchAll(/<script\s+src="([^"]+)"/g)].map(x=>x[1]);
-const css=[...html.matchAll(/<link\s+rel="stylesheet"\s+href="([^"]+)"/g)].map(x=>x[1]);
-const manifest=[...html.matchAll(/<link\s+rel="manifest"\s+href="([^"]+)"/g)].map(x=>x[1]);
-const shellBlock=sw.match(/const SHELL=\[([\s\S]*?)\];/);
-assert.ok(shellBlock,'Liste SHELL du service worker absente');
-const shell=[...shellBlock[1].matchAll(/'([^']+)'/g)].map(x=>x[1].replace(/^\.\//,''));
-test('tous les fichiers HTML essentiels existent',()=>{
- for(const p of [...scripts,...css,...manifest])assert.ok(existsSync(join(root,p)),p+' absent');
-});
-test('tous les fichiers du cache hors ligne existent',()=>{
- for(const p of shell)if(p!=='.')assert.ok(existsSync(join(root,p)),p+' absent');
-});
-test('toutes les feuilles de style et tous les scripts sont accessibles hors ligne',()=>{
- for(const p of [...scripts,...css,...manifest])assert.ok(shell.includes(p),p+' non inclus dans SHELL');
-});
-test('pas de doublon dans les ressources hors ligne',()=>{
- assert.equal(new Set(shell).size,shell.length);
-});
-test('version cache et afficheur préparés pour V47',()=>{
- assert.match(sw,/const CACHE='terrain-v47'/);
- assert.match(readFileSync(join(root,'imports-centralises-v40.js'),'utf8'),/ODICOLOR Solution · v47/);
-});
+const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
+const root=path.join(__dirname,'..'),read=p=>fs.readFileSync(path.join(root,p),'utf8');
+const manifest=JSON.parse(read('pwa-release.json')),html=read('index.html'),sw=read('sw.js');
+const refs=[...html.matchAll(/(?:src|href)="([^"#]+)"/g)].map(m=>m[1]);
+const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
+test('toutes les ressources versionnées existent et correspondent à leur empreinte',()=>{for(const e of manifest.assets){assert.equal(sha(fs.readFileSync(path.join(root,e.path))),e.sha256,e.path)}});
+test('toutes les références HTML locales sont incluses dans le lot exact',()=>{for(const r of refs){const u=new URL(r,'https://audit.invalid/'),e=manifest.assets.find(e=>'/'+e.path===u.pathname);assert.ok(e,r);assert.equal(u.searchParams.get('odicolor'),e.sha256)}});
+test('tous les scripts et styles possèdent une intégrité navigateur',()=>{for(const t of html.matchAll(/<(?:script|link)[^>]+>/g)){if(t[0].startsWith('<script')||t[0].includes('rel="stylesheet"'))assert.match(t[0],/integrity="sha256-[A-Za-z0-9+/=]+"/);}});
+test('pas de doublon dans les ressources',()=>assert.equal(new Set(manifest.assets.map(e=>e.path)).size,manifest.assets.length));
+test('cache indépendant de terrain-v47 et aucune activation imposée',()=>{assert.match(sw,/odicolor-shell-/);assert.doesNotMatch(sw,/skipWaiting\s*\(|clients\.claim\s*\(/);assert.doesNotMatch(sw,/terrain-v47/);});
+test('le worker embarque exactement le manifeste vérifié',()=>{assert.ok(sw.includes('const RELEASE_MANIFEST='+JSON.stringify(manifest)+';'));});
+test('le chargeur Excel utilise l’URL et l’intégrité de la version de sa page',()=>{const app=read('app.js');assert.match(app,/ODICOLOR_PWA.asset\('xlsx.mini.min.js'\)/);assert.match(app,/ODICOLOR_PWA.integrity\('xlsx.mini.min.js'\)/);});
+test('construction reproductible et artefacts à jour',()=>require('../scripts/build-pwa.cjs')(root,true));
+test('version commerciale conservée et aucun rechargement automatique de mise à jour',()=>{assert.match(read('imports-centralises-v40.js'),/ODICOLOR Solution · v47/);assert.doesNotMatch(read('correctif-v25.js'),/location.reload/);});
