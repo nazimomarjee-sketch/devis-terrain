@@ -234,3 +234,46 @@ C'est un **filtre indépendant** : les 4 couleurs commerciales ne changent pas.
 - **Stocks et palettes :** données vérifiées quand elles seront disponibles. Sinon, « Non renseigné ».
 
 **La référence Ma Ville reste figée.** La maquette se trouve hors du dépôt.
+
+## 15. Lot C réalisé le 07/11/2026 : vue Commune avec « Mes garages » (données fictives, vrai coffre)
+
+**Ce qui est fait**
+- **« Mes garages » dans les vues Île-de-France, Département et Commune.**
+  - Les données viennent de la sauvegarde du téléphone, des exports EBP et des **décisions de compte du coffre** (lots A et B).
+  - Le modèle est celui de la démo : même dessin LEGO, mêmes 4 couleurs, mêmes numéros.
+  - L'étiquette « DONNÉES FICTIVES » devient « MES GARAGES ». La démo et « Mes garages » ne se mélangent jamais.
+- **Identifiants fiables.** Un garage du téléphone est relié à un client EBP seulement par :
+  - son SIRET ;
+  - son code client EBP ;
+  - ou une liaison validée par une personne (lot B).
+  Un même nom ne fusionne jamais, y compris avec un établissement du marché.
+- **Deux informations séparées.** Dans la liste, l'aperçu et la fiche :
+  - « Téléphone : client / prospect / absent du téléphone », avec sa date ;
+  - « Compte EBP : en compte / sans compte / à vérifier », avec sa source.
+  Un garage déclaré client au téléphone mais absent d'EBP reste « à vérifier ».
+- **Périmètre « Mes garages | Marché à prospecter | Tous ».**
+  - « Mes garages » est le choix par défaut ; la démo montre tout.
+  - Le marché (annuaire officiel) porte un badge, un texte « Annuaire officiel seul : jamais travaillé » et une couleur grise : jamais une couleur commerciale.
+  - Le périmètre est indépendant du filtre en compte / sans compte. Les numéros restent identiques dans chaque périmètre.
+- **Tous les garages sont listés**, même quand il y en a trop pour le LEGO. Test : une commune de 60 garages du téléphone + 250 du marché affiche 39 bâtiments, un îlot « +21 · liste », et les 310 lignes accessibles (recherche dans la liste, recherche globale par nom ou SIRET).
+- **Sources et dates affichées** : téléphone, clients EBP, pièces EBP, annuaire officiel, nombre de décisions du coffre.
+- **CA du mois et accueil** : calculés par le même modèle (« un seul système »). Le CA est rattaché par code client EBP, avec un « non attribué » séparé.
+- **En-tête de la fiche** : sa couleur et son statut viennent du même modèle que la liste. L'ancien rapprochement par le nom, qui contredisait la liste, n'est plus utilisé pour cet en-tête.
+- **Les compteurs de l'écran « Vérifier les comptes »** ne comptent que Mes garages ; le marché n'y entre pas.
+
+**Coffre inaccessible : aucune décision** (point 2 de la demande)
+- Coffre arrêté, verrouillé, ou Bureau ouvert sans l'application locale : la fonction refuse et les boutons sont bloqués. Un avertissement seul ne suffisait pas.
+- Si un enregistrement échoue après une décision, **la décision est annulée à l'écran** avec un message. Il n'y a jamais de décision affichée qui ne serait pas retrouvée.
+- Le retour du coffre est détecté (toutes les 3 s), puis les décisions redeviennent possibles.
+
+**Tests**
+- `tests/local-mes-garages-navigateur.cjs` : 5/5. Il couvre le vrai coffre, l'arrêt brutal puis la réouverture, la commune dense, les vues département et accueil, le format Samsung et l'absence de données fictives.
+- `tests/local-coffre-inaccessible-navigateur.cjs` : 3/3.
+- 7 erreurs volontaires sur le lot C et 3 sur le coffre inaccessible : toutes repérées.
+
+**Limites**
+- **Le marché est lu dans le cache du navigateur** (import du 91 existant), pas dans le coffre. Il n'est donc pas sauvegardé avec lui. Le recensement des 5 départements est un chantier à part (cadrage : `CADRAGE_AGENT_BD_RECENSEMENT_CARROSSERIES.md`). Ce lot ne le remplace pas.
+- **Aucun avis Google, aucun Pappers** : rien de cela n'est branché.
+- **L'écran Département reste une liste**, pas les tours LEGO de la référence.
+- **Application Samsung non modifiée** : l'étape 4 reste à faire.
+- **Rien n'a été essayé avec tes données réelles** : elles attendent les sauvegardes chiffrées hors du PC.

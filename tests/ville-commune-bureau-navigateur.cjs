@@ -54,7 +54,7 @@ test('1. parcours complet PC : Bureau → recherche « Goussainville » → comm
     await p.waitForSelector('#couche-fiche .fiche');
     assert.equal(await p.textContent('#fiche-titre'), 'CARROSSERIE FICTIVE A', '2e clic : la fiche commerciale existante');
     assert.match(await p.textContent('#couche-fiche .pastille-statut'), /Client ODICOLOR carrosserie/);
-    assert.match(await champ(p, 'Compte ODICOLOR'), /En compte · Code client EBP F01 · potentiellement dormant/);
+    assert.match(await champ(p, 'Compte ODICOLOR (EBP)'), /En compte · Code client EBP F01 · potentiellement dormant/);
     assert.match(await champ(p, 'Signal d’achat'), /Potentiellement dormant.*75 j/);
     assert.ok(!!await p.$('#couche-fiche [role="tab"]'), 'onglets de la fiche existante');
     await capture(p, 'parcours-4-fiche');
@@ -73,7 +73,7 @@ test('2. garage de démo du Bureau : même fiche que dans la Ville, complétée 
     await p.click('.vc-ligne:has(.vc-nom:text-is("Carrosserie démo 047"))'); await p.click('.vc-apercu .vc-ouvrir');
     await p.waitForSelector('#couche-fiche .fiche');
     assert.match(await champ(p, 'Potentiel'), /€ \/ mois/, 'fiche d’origine du garage de démo (mêmes données que la Ville)');
-    assert.match(await champ(p, 'Compte ODICOLOR'), /En compte/);
+    assert.match(await champ(p, 'Compte ODICOLOR (EBP)'), /En compte/);
     assert.match(await p.textContent('#couche-fiche .pastille-statut'), /Client ODICOLOR carrosserie/);
   } finally { await ctx.close(); }
 });
@@ -126,7 +126,7 @@ test('4. statuts, alertes et sources identiques entre scène, liste, aperçu et 
     for (const [nom, compte, pastille] of cas) {
       await p.click(`.vc-ligne:has(.vc-nom:text-is("${nom}"))`); await p.click('.vc-apercu .vc-ouvrir');
       await p.waitForSelector('#couche-fiche .fiche');
-      assert.match(await champ(p, 'Compte ODICOLOR'), compte, nom);
+      assert.match(await champ(p, 'Compte ODICOLOR (EBP)'), compte, nom);
       assert.match(await p.textContent('#couche-fiche .pastille-statut'), pastille, nom);
       if (nom === 'CARROSSERIE FICTIVE F') { assert.match(await champ(p, 'Alerte'), /Compte bloqué dans EBP.*EBP/); assert.match(await p.textContent('#couche-fiche .fiche-tete'), /Risque de règlement/); }
       assert.match(await champ(p, 'Sources'), /du \d\d\/\d\d\/2026/, nom + ' : sources datées');
@@ -137,7 +137,7 @@ test('4. statuts, alertes et sources identiques entre scène, liste, aperçu et 
     assert.deepEqual(g.map(e => e.compte).sort(), ['en_compte', 'sans_compte']);
     const u = g.find(e => e.compte === 'sans_compte');
     await p.click(`.vc-ligne[data-uid="${u.uid}"]`); await p.click('.vc-apercu .vc-ouvrir'); await p.waitForSelector('#couche-fiche .fiche');
-    assert.match(await champ(p, 'Compte ODICOLOR'), /Sans compte · .*⚠ Fiche proche : même nom dans la même commune/);
+    assert.match(await champ(p, 'Compte ODICOLOR (EBP)'), /Sans compte · .*⚠ Fiche proche : même nom dans la même commune/);
   } finally { await ctx.close(); }
 });
 
@@ -233,7 +233,7 @@ test('8. préservation : Ville actuelle intacte, rien écrit, données réelles 
     await p.click('#mode'); await p.setInputFiles('#fichier-sauvegarde', f);
     await p.waitForFunction(() => document.querySelector('#mode').textContent === 'Mes garages');
     await p.evaluate(() => { location.hash = '#commune-95280'; }); await p.waitForSelector('#vue .bloc');
-    assert.equal(await p.$$eval('.vc-ligne', l => l.length), 0); assert.match(await p.textContent('#vue'), /seulement sur des données fictives/);
+    assert.equal(await p.$$eval('.vc-ligne', l => l.length), 0); assert.match(await p.textContent('#vue'), /de tes garages ni du marché importé/, 'pas de garage fictif dans « Mes garages »');
     await chercher(p, 'Goussainv');
     assert.equal(await p.$$eval('.mv-res', l => l.length), 0, 'pas de résultat fictif dans la recherche en mode réel');
     assert.deepEqual(erreurs, []);

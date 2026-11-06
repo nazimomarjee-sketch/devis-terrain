@@ -75,3 +75,15 @@
 .vc-ap-ca{color:#E4E7EB!important}.vc-ap-ca b{color:#71DBA0}
 .vc-dep-ca{color:#71DBA0;font-size:12px}
 .vc-dep-na{margin:0 0 12px;padding:9px 12px;border-radius:12px;border:1px dashed #6E737B;color:#C9CDD3;font-size:12.5px}
+/* Lot C : périmètre « Mes garages | Marché à prospecter », statut du téléphone séparé du compte EBP, sources et dates */
+.vc-portee{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:0 0 8px}
+.vc-por{min-height:64px;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:2px;padding:6px 10px;text-align:left;border-radius:12px;border:1.5px solid #272C33;background:#16191E;color:#F4F2EF;cursor:pointer;font:inherit}
+.vc-por b{font:800 13.5px "VC Barlow","Barlow Condensed",system-ui;letter-spacing:.05em;text-transform:uppercase}.vc-por span{font:800 20px "VC Barlow","Barlow Condensed",system-ui}
+.vc-por[aria-pressed=true]{border-color:#5BE3FF;background:rgba(91,227,255,.09);box-shadow:0 0 12px rgba(91,227,255,.25)}
+.vc-por:focus-visible{outline:2px solid #FF2D3D;outline-offset:2px}
+.vc-b-marche{background:rgba(158,163,171,.12);color:#C9CDD3;border:1px solid #3A404A}
+.vc-deux{color:#B8BDC5!important;font-size:11.5px}.vc-ap-sep{color:#E4E7EB!important}
+.vc-src-ligne{font-size:11.5px;color:#9EA3AB;margin:0 0 8px}
+.vc-fictif.vc-reel{color:#71DBA0;border-color:#71DBA0}
+@media (max-width:760px){.vc-por b{font-size:12px}.vc-por{padding:6px 8px}}
+.vc-dep .vc-portee{max-width:560px;margin:10px 0}

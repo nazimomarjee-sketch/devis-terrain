@@ -40,7 +40,7 @@
   function monter(conteneur, ctx, etatVue) {
     const S = etatVue || {}; S.onglet = S.onglet || 'a_verifier'; S.passes = S.passes || new Set(); S.coches = S.coches || new Set(); S.filtre = S.filtre || '';
     const D = ctx.donnees(), A = ctx.appliquer(), m = ctx.modele(A);
-    const tous = [...m.communes.values()].flatMap(c => c.etablissements).concat(m.aClasser);
+    const tous = [...m.communes.values()].flatMap(c => c.etablissements).concat(m.aClasser).filter(e => e.portee === 'mes_garages'); // le marché à prospecter n'entre pas dans cet écran
     const garages = new Map(); // n° téléphone → { g (fiche téléphone), e (établissement du modèle) }
     for (const g of D.terrain) garages.set(g.id, { g, e: tous.find(x => x.sources.some(s => s.ref === 'tel:' + g.id)) });
     const parTel = new Map(); A.etats.filter(x => x.decision.cible && x.decision.cible.tel != null).forEach(x => { if (!parTel.has(x.decision.cible.tel)) parTel.set(x.decision.cible.tel, []); parTel.get(x.decision.cible.tel).push(x); });

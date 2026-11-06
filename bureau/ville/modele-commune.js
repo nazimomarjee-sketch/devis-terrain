@@ -21,6 +21,8 @@
      SANS COMPTE = absence de compte CONFIRMÉE par une vérification enregistrée (personne, date, source).
      À VÉRIFIER = tout le reste : situation inconnue, client déclaré non retrouvé dans EBP, rapprochement EBP incertain.
      Un établissement n'est JAMAIS classé « sans compte » automatiquement.
+   - Périmètre (lot C) : « mes_garages » = au moins une source propre (téléphone, EBP, Airtable) ; « marche » = annuaire officiel (SIRENE)
+     seul, à prospecter. Le statut commercial DÉCLARÉ au téléphone (statutTelephone) reste séparé de la situation du compte EBP (compte).
    Lecture seule : ce module ne modifie aucune de ses entrées. */
 (function (racine) {
   'use strict';
@@ -188,12 +190,15 @@
     const alertes = [];
     if (ebp.some(f => f.bloque)) alertes.push({ type: 'compte_bloque', source: 'EBP', date: ctx.dates.EBP });
     const interlocuteur = (tel.find(f => f.interlocuteur) || air.find(f => f.interlocuteur) || null);
+    // Statut commercial DÉCLARÉ au téléphone : une information du terrain, qui ne dit rien du compte EBP (séparé dans `compte`).
+    const statutTelephone = tel.length ? { valeur: (tel.find(f => f.statutTerrain) || {}).statutTerrain || null, source: 'Terrain', date: tel[0].date || null } : null;
+    const portee = g.some(f => f.source !== 'SIRENE') ? 'mes_garages' : 'marche';
 
     return {
       uid, nom: val(ref.nom, ref.source, ref.date), siret: siret ? val(siret, (g.find(f => f.siret) || {}).source, (g.find(f => f.siretDate) || {}).siretDate || null) : null,
       codesEbp, insee: cl.insee || null, commune: cl.commune || null, dep: cl.dep || null,
       rattachement: { niveau: cl.niveau, motif: cl.motif, cp: cl.cp || null },
-      categorie, qualification, segment, activite, achat, dormant, statutsHistoriques, confirmeEbp, alertes,
+      categorie, qualification, segment, activite, achat, dormant, statutsHistoriques, confirmeEbp, alertes, statutTelephone, portee,
       dernierAchat: dernierAchat ? { type: dernierAchat.type, no: dernierAchat.no, date: dernierAchat.date, source: 'EBP', exportDu: ctx.dates.EBP } : null,
       interlocuteur: interlocuteur ? val(true, interlocuteur.source, interlocuteur.date) : null,
       etapeTerrain: (tel.find(f => f.etape) || {}).etape || null,
@@ -265,6 +270,7 @@
       enCompteDormants: n(e => e.compte && e.compte.statut === 'en_compte' && !!e.dormant),
       enCompteBloques: n(e => e.compte && e.compte.statut === 'en_compte' && e.alertes.some(a => a.type === 'compte_bloque')),
       sansCompteHorsCible: n(e => e.compte && e.compte.statut === 'sans_compte' && e.categorie === 'hors_cible') };
+    c.portee = { mes_garages: n(e => e.portee === 'mes_garages'), marche: n(e => e.portee === 'marche') };
     c.parSegment = {}; for (const s of Object.keys(MV.SEGMENTS).filter(k => /^(client|prospect)-(carrosserie|mecanique)$/.test(k))) c.parSegment[s] = n(e => e.segment === s);
     return c;
   }
@@ -309,17 +315,19 @@
 
   // Comptes Île-de-France, par département et par commune : chaque établissement compté UNE fois (pas de doublon).
   // Les établissements sans commune (« à classer ») sont comptés à part, jamais oubliés.
-  function agreger(r) {
+  function agreger(r, { portee = 'tous' } = {}) {
     const vide = () => ({ total: 0, en_compte: 0, sans_compte: 0, a_verifier: 0, enCompteDormants: 0, enCompteBloques: 0, sansCompteHorsCible: 0 });
     const CLES = Object.keys(vide()), ajouter = (a, k) => { for (const c of CLES) a[c] += k[c] || 0; };
+    const garder = l => portee === 'tous' ? l : l.filter(e => e.portee === portee); // périmètre : mes garages, marché à prospecter, ou tous
     const idf = vide(), parDep = new Map(), parCommune = [];
     for (const c of r.communes.values()) {
+      const l = garder(c.etablissements), cm = comptes(l), k = Object.assign({ total: l.length }, cm.compte);
       if (!parDep.has(c.dep)) parDep.set(c.dep, Object.assign(vide(), { dep: c.dep, communes: 0 }));
-      const d = parDep.get(c.dep); d.communes++;
-      ajouter(d, Object.assign({ total: c.comptes.total }, c.comptes.compte)); ajouter(idf, Object.assign({ total: c.comptes.total }, c.comptes.compte));
-      parCommune.push({ insee: c.insee, commune: c.commune, dep: c.dep, total: c.comptes.total, ...c.comptes.compte });
+      const d = parDep.get(c.dep); if (l.length) d.communes++;
+      ajouter(d, k); ajouter(idf, k);
+      parCommune.push({ insee: c.insee, commune: c.commune, dep: c.dep, total: l.length, ...cm.compte });
     }
-    const aClasser = vide(); r.aClasser.forEach(x => { aClasser.total++; aClasser[x.compte.statut]++; });
+    const aClasser = vide(); garder(r.aClasser).forEach(x => { aClasser.total++; aClasser[x.compte.statut]++; });
     return { idf, parDep: [...parDep.values()].sort((a, b) => a.dep.localeCompare(b.dep)), parCommune: parCommune.sort((a, b) => a.dep.localeCompare(b.dep) || a.commune.localeCompare(b.commune)), aClasser };
   }
 
@@ -339,6 +347,6 @@
     return { communes, departements: deps, etablissements: etabs.slice(0, max), nbEtablissements: etabs.length };
   }
 
-  const api = { VERSION, DEFAUTS, SOURCES, COMPTES, construire, commune, agreger, rechercher };
+  const api = { VERSION, DEFAUTS, SOURCES, COMPTES, construire, commune, agreger, rechercher, comptesDe: comptes };
   if (node) module.exports = api; else racine.ModeleCommune = api;
 })(typeof self !== 'undefined' ? self : this);

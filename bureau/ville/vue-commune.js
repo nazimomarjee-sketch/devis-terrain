@@ -8,7 +8,9 @@
    - mentions « plan schématique » (et « données fictives » si demandé) ; aucune rubrique vide (pointage, obstacles : rien affiché).
    Gestes : 1er clic / toucher = aperçu ; 2e clic, Entrée ou bouton = fiche (rappel options.ouvrirFiche) ; Échap = fermer.
    Étape 3 : sélecteur EN COMPTE | SANS COMPTE | À VÉRIFIER | TOUT (options.compte), filtre indépendant des 4 couleurs :
-   la scène et la liste ne montrent que la sélection, les numéros restent ceux de la liste complète. */
+   la scène et la liste ne montrent que la sélection, les numéros restent ceux de la liste complète.
+   Lot C : sélecteur de périmètre « Mes garages | Marché à prospecter | Tous » (options.portee), indépendant du compte et des couleurs ;
+   statut du téléphone et situation du compte EBP affichés séparément ; sources et dates (options.sources, options.etiquette). */
 (function (racine) {
   'use strict';
   const AGENCE_INSEE = '95280'; // Goussainville
@@ -104,15 +106,31 @@
       `<button type="button" class="vc-cpt vc-cpt-${c}" data-compte="${c}" aria-pressed="${c === actif}"><b>${COMPTE[c]}</b><span class="vc-cpt-n">${c === 'tous' ? k.total : k[c]}</span>${det[c].filter(Boolean).length ? `<small>${det[c].filter(Boolean).join(' · ')}</small>` : ''}</button>`).join('')}</div>`;
   }
   const garde = c => COMPTE[c] ? c : 'tous';
+  const PORTEE = { mes_garages: 'Mes garages', marche: 'Marché à prospecter', tous: 'Tous' };
+  const gardeP = c => PORTEE[c] ? c : 'tous';
+  function selecteurPortee(n, actif) {
+    return `<div class="vc-portee" role="group" aria-label="Périmètre : mes garages ou marché à prospecter">${['mes_garages', 'marche', 'tous'].map(c =>
+      `<button type="button" class="vc-por vc-por-${c}" data-portee="${c}" aria-pressed="${c === actif}"><b>${PORTEE[c]}</b><span>${n[c]}</span></button>`).join('')}</div>`;
+  }
+  const TEL = { client: 'client', prospect: 'prospect' };
+  // Deux informations DISTINCTES : ce que le téléphone déclare, et la situation du compte dans EBP (jamais fusionnées).
+  function deux(e) {
+    if (e.portee === 'marche') return 'Annuaire officiel seul : jamais travaillé, à prospecter';
+    const t = e.statutTelephone, tel = !t ? 'absent du téléphone' : (t.valeur ? TEL[t.valeur] : 'statut non renseigné');
+    return 'Téléphone : ' + tel + (t && t.date ? ' (' + fr(t.date) + ')' : '') + ' · Compte EBP : ' + COMPTE[e.compte ? e.compte.statut : 'a_verifier'].toLowerCase();
+  }
 
   // ---------- Montage dans la page ----------
   function monter(conteneur, communeComplete, opts = {}) {
     const ouvrir = typeof opts.ouvrirFiche === 'function' ? opts.ouvrirFiche : () => {};
-    const filtre = garde(opts.compte), kc = communeComplete.comptes;
-    const l = communeComplete.etablissements.filter(e => filtre === 'tous' || (e.compte ? e.compte.statut : 'a_verifier') === filtre);
+    const filtre = garde(opts.compte), portee = gardeP(opts.portee);
+    const toutes = communeComplete.etablissements, l0 = portee === 'tous' ? toutes : toutes.filter(e => e.portee === portee);
+    const k = racine.ModeleCommune.comptesDe(l0); // compteurs du périmètre choisi : chaque établissement compté une seule fois
+    const l = l0.filter(e => filtre === 'tous' || (e.compte ? e.compte.statut : 'a_verifier') === filtre);
     const commune = Object.assign({}, communeComplete, { etablissements: l });
-    const sc = scene(commune, opts), k = kc;
-    const cptK = Object.assign({ total: kc.total }, kc.compte || { en_compte: 0, sans_compte: 0, a_verifier: kc.total });
+    const sc = scene(commune, opts);
+    const cptK = Object.assign({ total: k.total }, k.compte);
+    const nPortee = { mes_garages: toutes.filter(e => e.portee === 'mes_garages').length, marche: toutes.filter(e => e.portee === 'marche').length, tous: toutes.length };
     const parUid = new Map(l.map(e => [e.uid, e])), pos = new Map(sc.positions.map(p => [p.uid, p]));
     const sources = e => [...new Set(e.sources.map(s => s.source))].map(s => { const d = e.sources.find(x => x.source === s).date; return `<span class="vc-b vc-src" title="${esc(s + (d ? ' · ' + fr(d) : ''))}">${esc(s)}</span>`; }).join('');
     const fil = (opts.fil || []).map(f => f.href ? `<a href="${esc(f.href)}">${esc(f.libelle)}</a>` : `<span>${esc(f.libelle)}</span>`).join(' › ');
@@ -121,16 +139,18 @@
     conteneur.innerHTML = `
       <div class="vc-carte">
         <div class="vc-mention">🗺 Plan schématique de la commune : emplacements non réels${sc.agence ? ' · agence : emplacement symbolique' : ''}</div>
-        ${opts.fictif ? '<div class="vc-fictif">DONNÉES FICTIVES</div>' : ''}
+        ${opts.fictif ? '<div class="vc-fictif">DONNÉES FICTIVES</div>' : opts.etiquette ? `<div class="vc-fictif vc-reel">${esc(opts.etiquette)}</div>` : ''}
         <div class="vc-zoom"><button type="button" data-zoom="1" aria-label="Zoomer">＋</button><button type="button" data-zoom="-1" aria-label="Dézoomer">－</button></div>
         <div class="vc-defile">${sc.svg}</div>
         <div class="vc-apercu" hidden role="dialog" aria-live="polite"></div>
       </div>
       <aside class="vc-panneau">
         ${fil ? `<nav class="vc-fil" aria-label="Où je suis">${fil}</nav>` : ''}
+        ${selecteurPortee(nPortee, portee)}
         ${selecteur(cptK, filtre)}
         <div class="vc-tete"><h2>${esc(commune.commune)} <small>· ${commune.dep}</small></h2>
           <p>${k.total} établissement${k.total > 1 ? 's' : ''} · tous listés${sc.reste ? ' · ' + sc.dessines + ' dessinés' : ''}</p>
+          ${opts.sources && opts.sources.length ? `<p class="vc-src-ligne">Sources : ${opts.sources.map(esc).join(' · ')}</p>` : ''}
           <div class="vc-comptes"><span><b>${k.clients}</b> clients${k.dontDormants ? ' · dont ' + k.dontDormants + ' dormant' + (k.dontDormants > 1 ? 's' : '') + '/inactif' + (k.dontDormants > 1 ? 's' : '') : ''}</span>
           <span><b>${k.prospects}</b> prospects</span><span><b>${k.aQualifier}</b> ? à qualifier</span><span><b>${k.horsCible}</b> ⊘ hors cible</span></div>
           ${opts.ca ? `<div class="vc-ca"><span>${esc(opts.ca.libelle)}</span><b>${esc(opts.ca.commune)}</b><small>${esc(opts.ca.fraicheur)}</small></div>` : ''}
@@ -140,8 +160,8 @@
           return `<li><button type="button" class="vc-ligne" data-uid="${esc(e.uid)}" data-num="${e.numero}">
             <span class="vc-num vc-num-${sorte(e) === 'g' ? 'n' : sorte(e)}" style="background:${couleurRepere(e)}${e.segment === 'client-mecanique' ? ';box-shadow:0 0 0 1.6px #F4F2EF' : ''}">${e.numero}</span>
             <span class="vc-nom" title="${esc(e.nom.valeur)}">${esc(e.nom.valeur)}${e.avertissements.length ? ` <span class="vc-avert" title="${esc(e.avertissements.join(' · '))}">⚠</span>` : ''}</span>
-            <span class="vc-badges">${sources(e)}<span class="vc-b ${q[0]}">${q[1]}</span>${badgeCompte(e)}</span>
-            <span class="vc-sous">${esc(sousTitre(e))}</span></button></li>`; }).join('')}</ol>
+            <span class="vc-badges">${sources(e)}<span class="vc-b ${q[0]}">${q[1]}</span>${badgeCompte(e)}${e.portee === 'marche' ? '<span class="vc-b vc-b-marche">Marché à prospecter</span>' : ''}</span>
+            <span class="vc-sous">${esc(sousTitre(e))}</span><span class="vc-sous vc-deux">${esc(deux(e))}</span></button></li>`; }).join('')}</ol>
         <p class="vc-aucun" hidden>Aucun établissement ne correspond.</p>
       </aside>`;
     const svg = conteneur.querySelector('.vc-svg'), ap = conteneur.querySelector('.vc-apercu'), sel = conteneur.querySelector('.vc-selection');
@@ -155,6 +175,7 @@
       sel.innerHTML = p ? `<circle cx="${p.px}" cy="${p.py}" r="17" fill="none" stroke="#FF2D3D" stroke-width="2.5" filter="url(#lueur)"/>` : '';
       const q = qualif(e);
       ap.innerHTML = `<h4>${e.numero} · ${esc(e.nom.valeur)}</h4><p>${esc(sousTitre(e))}</p>
+        <p class="vc-ap-sep"><span class="vc-b ${e.portee === 'marche' ? 'vc-b-marche' : 'vc-b-ebp'}">${PORTEE[e.portee]}</span> ${esc(deux(e))}</p>
         <p class="vc-ap-src">${sources(e)} <span class="vc-b ${q[0]}">${q[1]}</span>${p ? '' : ' <span class="vc-b vc-b-inc">dans la liste (îlot)</span>'}</p>
         <p class="vc-ap-compte">${badgeCompte(e)} ${esc(e.compte ? e.compte.motif : '')}${e.compte && e.compte.source ? ` <span class="vc-b vc-src">${esc(e.compte.source)}${e.compte.date ? ' · ' + fr(e.compte.date) : ''}</span>` : ''}</p>
         ${opts.ca ? `<p class="vc-ap-ca">${esc(opts.ca.libelle)} : <b>${esc(opts.ca.etablissement(e))}</b></p>` : ''}
@@ -169,6 +190,8 @@
       if (z) { zoom = Math.min(3, Math.max(1, zoom + Number(z.dataset.zoom) * 0.5)); svg.style.width = (zoom * 100) + '%'; return; }
       const b = ev.target.closest('[data-compte]');
       if (b) { const v = garde(b.dataset.compte); if (typeof opts.surCompte === 'function') opts.surCompte(v); else conteneur._vc = monter(conteneur, communeComplete, Object.assign({}, opts, { compte: v, choisir: null })); return; }
+      const bp = ev.target.closest('[data-portee]');
+      if (bp) { const v = gardeP(bp.dataset.portee); if (typeof opts.surPortee === 'function') opts.surPortee(v); else conteneur._vc = monter(conteneur, communeComplete, Object.assign({}, opts, { portee: v, choisir: null })); return; }
       const c = ev.target.closest('.vc-cible, .vc-ligne'); if (c) choisir(c.dataset.uid);
     });
     const champ = conteneur.querySelector('.vc-chercher');
@@ -184,12 +207,12 @@
     if (conteneur._vcEchap) doc.removeEventListener('keydown', conteneur._vcEchap);
     conteneur._vcEchap = ev => { if (ev.key === 'Escape' && choisi && !(ev.target.closest && ev.target.closest('[aria-modal="true"]'))) fermer(); }; // une fiche ouverte par-dessus se ferme seule
     doc.addEventListener('keydown', conteneur._vcEchap);
-    const vue = { fermer, choisir, compte: filtre, stats: { dessines: sc.dessines, reste: sc.reste, personnages: sc.personnages, agence: sc.agence, affiches: l.length } };
+    const vue = { fermer, choisir, compte: filtre, portee, stats: { dessines: sc.dessines, reste: sc.reste, personnages: sc.personnages, agence: sc.agence, affiches: l.length } };
     conteneur._vc = vue;
     if (opts.choisir && parUid.has(opts.choisir)) { choisir(opts.choisir); const li = conteneur.querySelector(`.vc-ligne[data-uid="${CSS.escape(opts.choisir)}"]`); if (li && li.scrollIntoView) li.scrollIntoView({ block: 'nearest' }); }
     return vue;
   }
 
-  const api = { monter, selecteur, COMPTE, AGENCE_INSEE, MAX_BATIMENTS, MAX_PERSONNAGES };
+  const api = { monter, selecteur, selecteurPortee, COMPTE, PORTEE, AGENCE_INSEE, MAX_BATIMENTS, MAX_PERSONNAGES };
   if (typeof module === 'object' && module.exports) module.exports = api; else racine.VueCommune = api;
 })(typeof self !== 'undefined' ? self : this);

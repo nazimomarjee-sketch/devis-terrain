@@ -1009,7 +1009,7 @@ function ficheAnnuaire(e){
 }
 // ================= NIVEAU 3 : fiche garage =================
 function ouvrirFiche(x){
-  const sr = x.source === 'demo' ? ['b-demo','Démo'] : x.source === 'fictif' ? ['b-demo','Fictif'] : ['b-terrain','Saisi terrain'];
+  const sr = x.source === 'demo' ? ['b-demo','Démo'] : x.source === 'fictif' ? ['b-demo','Fictif'] : x.source === 'ebp' ? ['b-confirme','EBP'] : x.source === 'marche' ? ['b-annuaire','Annuaire officiel'] : ['b-terrain','Saisi terrain'];
   const cl = x.classement, D = L0.depInfo(x.dep);
   const geo = cl.niveau==='sur' ? ['b-confirme','Liste officielle'] : (cl.niveau==='cp'||cl.niveau==='commune') ? ['b-estime', L0.CLASSEMENTS[cl.niveau]] : ['b-alerte', L0.CLASSEMENTS[cl.niveau]];
   const champ = (n, v, badge) => { const vide = v == null || v === '';
@@ -1223,6 +1223,7 @@ function caMV(){ // Ma Ville (données fictives) : mêmes pièces que le modèle
 }
 function caAccueil(){ // Accueil : exports EBP réels s'ils sont chargés ; sinon la démo fictive ; sinon « Non renseigné »
   const E = etat.ebp;
+  if (etat.mode === 'reel' && etat.telephone) return caReel(modeleReel()); // un seul système : mêmes données que Ma Ville et que l'écran de vérification
   if (E.pieces) {
     const clients = E.clients ? E.clients.clients : [];
     const modele = ModeleCommune.construire({ clientsEbp:clients, piecesEbp:E.pieces.pieces, arrete:E.arrete }); // rattachement par code client et référentiel officiel des communes
@@ -1259,29 +1260,41 @@ const CAT_MV = { client:'Client', prospect:'Prospect', a_qualifier:'À qualifier
 const ACHAT_MV = { actif:'Achats réguliers', reachat:'Réachat à vérifier', potentiellement_dormant:'Potentiellement dormant', inactif:'Inactif', a_verifier:'Achats à vérifier' };
 const frDate = d => d ? new Date(d.slice(0,10)+'T12:00:00').toLocaleDateString('fr-FR') : '';
 // Établissement Ma Ville → objet attendu par la fiche commerciale existante (ouvrirFiche). Rien n'est inventé : absent = « Non renseigné ».
-function garageMaVille(e){
+function garageMaVille(e, reel){
   const bloque = e.alertes.some(a => a.type === 'compte_bloque');
   const statut = e.categorie === 'prospect' ? 'prospect' : e.categorie === 'client' ? (bloque ? 'risque' : e.dormant ? 'dormant' : e.qualification === 'a_verifier' ? 'inconnu' : 'actif') : 'inconnu';
   const segment = e.segment || (e.categorie === 'client' || e.categorie === 'prospect' ? e.categorie + '-a_qualifier' : null);
   const pastille = e.categorie === 'a_qualifier' ? { libelle:'? À qualifier', couleur:'#C9CDD3' } : e.categorie === 'hors_cible' ? { libelle:'⊘ Hors cible', couleur:'#9EA3AB' } : null;
-  return { id:'mv:' + e.uid, nom:e.nom.valeur, source:'fictif', statut, segment, pastille, dep:e.dep, commune:e.commune,
+  return { id:'mv:' + e.uid, nom:e.nom.valeur, source: reel ? (e.portee === 'marche' ? 'marche' : 'ebp') : 'fictif', statut, segment, pastille, dep:e.dep, commune:e.commune,
     classement:{ niveau:e.rattachement.niveau, motif:e.rattachement.motif, cp:e.rattachement.cp, saisi:e.commune || '' },
     inactifEbp: !!(e.achat && e.achat.niveau === 'inactif'), position:null, fournisseur:'Non renseigné', tel:null, decideur:null, notes:null,
     etape: e.etapeTerrain ? e.etapeTerrain.valeur : null, etapeDate:null, maVille:e };
 }
-// Garage de démo du Bureau : sa fiche d'origine (mêmes données que la Ville), complétée par le bloc Ma Ville.
+// Fiche d'origine du garage (même fiche que dans la Ville), complétée par le bloc Ma Ville. Démo : garage de démo du Bureau.
+// Mes garages : fiche issue de la sauvegarde du téléphone, retrouvée par l'IDENTIFIANT du téléphone (jamais par le nom) ; sinon fiche Ma Ville.
 function ficheDe(e){
-  const g = etat.mode === 'demo' && etat.garages.find(x => e.sources.some(s => s.ref === 'tel:' + x.id));
-  return g ? Object.assign({}, g, { maVille:e }) : garageMaVille(e);
+  const reel = etat.mode === 'reel' && !!etat.telephone;
+  let g = null;
+  if (!reel) g = etat.mode === 'demo' && etat.garages.find(x => e.sources.some(s => s.ref === 'tel:' + x.id));
+  else { const ref = e.sources.find(s => /^tel:/.test(s.ref)); if (ref) { const i = etat.telephone.clients.findIndex(c => c && 'tel:' + c.id === ref.ref); g = i >= 0 ? etat.garages.find(x => x.id === 'r' + i) : null; } }
+  if (g && reel) { // Mes garages : statut, couleur et alertes de l'en-tête = ceux de la liste (même modèle) ; coordonnées, notes et étapes = celles du téléphone
+    const m = garageMaVille(e, true);
+    return Object.assign({}, g, { statut:m.statut, segment:m.segment, pastille:m.pastille, inactifEbp:m.inactifEbp, maVille:e });
+  }
+  return g ? Object.assign({}, g, { maVille:e }) : garageMaVille(e, reel);
 }
 // Mêmes statuts, alertes et sources que la scène et la liste de la vue Commune (même objet du modèle).
 function champsMaVille(e, champ){
   const c = e.compte, src = (s, d) => s + (d ? ' du ' + frDate(d) : '');
   const bc = c.statut === 'en_compte' ? ['b-confirme', src(c.source, c.date)] : c.statut === 'sans_compte' ? ['b-estime', src(c.source, c.date)] : ['b-alerte','À vérifier'];
-  const ca = caMV(), vca = CaFacture.valeur(ca, 'etablissement', e);
+  const SV = sourceMV(), ca = SV.ca, vca = CaFacture.valeur(ca, 'etablissement', e);
   return [
-    champ(titreCA(ca), vca.cents == null ? '' : CaFacture.euros(vca.cents), vca.cents == null ? ['','', vca.motif || 'Non renseigné'] : ['b-demo', CaFacture.fraicheur(ca)]),
-    champ('Compte ODICOLOR', VueCommune.COMPTE[c.statut] + ' · ' + c.motif, bc),
+    champ(titreCA(ca), vca.cents == null ? '' : CaFacture.euros(vca.cents), vca.cents == null ? ['','', vca.motif || 'Non renseigné'] : [SV.fictif ? 'b-demo' : 'b-confirme', CaFacture.fraicheur(ca)]),
+    champ('Périmètre', VueCommune.PORTEE[e.portee], e.portee === 'marche' ? ['b-annuaire','Annuaire officiel'] : ['b-confirme','Mes garages']),
+    // Deux informations DISTINCTES : ce que dit le téléphone, et la situation du compte dans EBP.
+    champ('Statut commercial déclaré (téléphone)', e.statutTelephone ? (e.statutTelephone.valeur ? ({client:'Client', prospect:'Prospect'})[e.statutTelephone.valeur] : 'Statut non renseigné') : '',
+      e.statutTelephone ? ['b-terrain', 'Terrain' + (e.statutTelephone.date ? ' du ' + frDate(e.statutTelephone.date) : '')] : ['','','Absent du téléphone']),
+    champ('Compte ODICOLOR (EBP)', VueCommune.COMPTE[c.statut] + ' · ' + c.motif, bc),
     champ('Catégorie (Ma Ville)', CAT_MV[e.categorie] + (e.activite ? ' · ' + e.activite.valeur + (e.activite.probable ? ' (probable)' : '') : ' · métier inconnu'),
       e.activite ? ['b-estime', src(e.activite.source, e.activite.date)] : ['','','À qualifier']),
     e.achat ? champ('Signal d’achat', ACHAT_MV[e.achat.niveau] + ' · ' + e.achat.motif, [e.achat.niveau === 'actif' ? 'b-confirme' : 'b-alerte', src(e.achat.source, e.achat.date)]) : null,
@@ -1289,19 +1302,22 @@ function champsMaVille(e, champ){
     e.siret ? champ('SIRET', e.siret.valeur, ['b-estime', src(e.siret.source, e.siret.date)]) : null,
     e.codesEbp.length ? champ('Code client EBP', e.codesEbp.join(', '), ['b-confirme','EBP']) : null,
     ...e.statutsHistoriques.map(st => champ('Statut historique', st.valeur, ['b-estime', src(st.source, st.date)])),
-    champ('Sources', e.sources.map(x => src(x.source, x.date)).join(' · '), ['b-demo','Fictif']),
+    champ('Sources', e.sources.map(x => src(x.source, x.date)).join(' · '), SV.fictif ? ['b-demo','Fictif'] : ['b-confirme','Sources datées']),
     e.avertissements.length ? h('p',{class:'message erreur', style:'margin:8px 0'}, e.avertissements.join(' · ')) : null];
 }
-const reelSansMV = () => etat.mode !== 'demo' ? h('section',{class:'bloc'}, h('h2',{},'Ma Ville · vue Commune'),
-  h('p',{class:'info'}, 'À cette étape, la vue Commune fonctionne seulement sur des données fictives. Tes garages réels y seront branchés après validation (sauvegardes du coffre, écran de validation des liaisons EBP). Reviens à la démo pour l’essayer.'),
-  h('button',{class:'btn discret', onclick:retourDemo}, 'Revenir à la démo')) : null;
+const sansSourceMV = () => !sourceMV() ? h('section',{class:'bloc'}, h('h2',{},'Ma Ville · vue Commune'),
+  h('p',{class:'info'}, 'Cette vue travaille sur tes garages : charge d’abord la sauvegarde de ton téléphone (bouton Démo / Mes garages), puis l’export clients EBP. Aucun mélange avec la démo.')) : null;
 function changerCompteMV(v){ etat.mvCompte = v; etat.mvChoix = null; rendre(); }
+function changerPorteeMV(v){ etat.mvPortee = { mode:etat.mode, v }; etat.mvChoix = null; rendre(); }
+const porteeMV = () => (etat.mvPortee && etat.mvPortee.mode === etat.mode) ? etat.mvPortee.v : (etat.mode === 'reel' ? 'mes_garages' : 'tous'); // « Mes garages » d'abord ; la démo montre tout
 // Vue Département (liste) : Île-de-France ou un département, sélecteur EN COMPTE | SANS COMPTE et compteurs sans doublon.
 function vueCommunesMV(dep){
-  const r = modeleMV(), a = ModeleCommune.agreger(r), D = dep ? L0.depInfo(dep) : null, f = etat.mvCompte;
+  const SV = sourceMV(), r = SV.modele, por = porteeMV(), a = ModeleCommune.agreger(r, { portee:por }), D = dep ? L0.depInfo(dep) : null, f = etat.mvCompte;
+  const nP = q => { const t = ModeleCommune.agreger(r, { portee:q }); return D ? (t.parDep.find(x => x.dep === dep) || { total:0 }).total : t.idf.total; };
+  const nPortee = { mes_garages:nP('mes_garages'), marche:nP('marche'), tous:nP('tous') };
   const k = D ? a.parDep.find(x => x.dep === dep) || { total:0, en_compte:0, sans_compte:0, a_verifier:0 } : a.idf;
   const n = x => f === 'tous' ? x.total : x[f];
-  const ca = caMV(), eu = CaFacture.euros, caDe = (niv, cle) => eu(CaFacture.valeur(ca, niv, cle).cents);
+  const ca = SV.ca, eu = CaFacture.euros, caDe = (niv, cle) => eu(CaFacture.valeur(ca, niv, cle).cents);
   const hote = h('div',{class:'vc vc-dep'});
   const ligne = (href, titre, sous, x) => `<a class="vc-dep-ligne" href="${href}"><span><b>${titre}</b><small>${sous}</small></span>
     <span class="vc-dep-n"><b>${n(x)}</b><small>${f === 'tous' ? 'établissements' : VueCommune.COMPTE[f].toLowerCase()}</small></span>
@@ -1311,7 +1327,9 @@ function vueCommunesMV(dep){
     : a.parDep.filter(d => n(d) > 0).map(d => ligne('#communes-' + d.dep, L0.depInfo(d.dep).nom + ' (' + d.dep + ')', d.communes + ' commune(s)', d));
   hote.innerHTML = `<div class="vc-dep-corps">
     <nav class="vc-fil" aria-label="Où je suis">${D ? '<a href="#communes">Île-de-France</a> › <span>' + D.nom + ' (' + D.dep + ')</span>' : '<span>Île-de-France</span>'}</nav>
-    <div class="vc-dep-tete"><h2>${D ? D.nom + ' <small>· ' + D.dep + '</small>' : 'Île-de-France'}</h2><span class="vc-fictif-txt">DONNÉES FICTIVES</span></div>
+    <div class="vc-dep-tete"><h2>${D ? D.nom + ' <small>· ' + D.dep + '</small>' : 'Île-de-France'}</h2><span class="vc-fictif-txt${SV.fictif ? '' : ' vc-reel'}">${SV.fictif ? 'DONNÉES FICTIVES' : 'MES GARAGES'}</span></div>
+    ${SV.sources.length ? '<p class="vc-src-ligne">Sources : ' + SV.sources.join(' · ') + '</p>' : ''}
+    ${VueCommune.selecteurPortee(nPortee, por)}
     ${VueCommune.selecteur(k, f)}
     <div class="vc-ca"><span>${titreCA(ca)} · ${D ? 'garages rattachés au ' + D.dep : 'garages attribués à une commune d’Île-de-France'}</span><b data-ca="${D ? 'dep-' + D.dep : 'idf'}">${D ? caDe('dep', D.dep) : caDe('idf')}</b><small>${CaFacture.fraicheur(ca)} · sélecteur sans effet sur le CA (toutes catégories)</small></div>
     ${!D && ca.statut === 'renseigne' ? `<p class="vc-dep-na">Non attribué géographiquement (à part, hors totaux des départements) : <b data-ca="non-attribue">${eu(ca.nonAttribue.cents)}</b> · total global <b data-ca="global">${eu(ca.totalCents)}</b></p>` : ''}
@@ -1319,14 +1337,14 @@ function vueCommunesMV(dep){
     <div class="vc-dep-liste">${lignes.join('') || '<p class="vc-dep-note">Aucun établissement dans cette sélection.</p>'}</div>
     ${!D && a.aClasser.total ? `<details class="vc-dep-note"><summary>${a.aClasser.total} établissement(s) sans commune (à classer), comptés à part</summary><ul>${r.aClasser.map(e => '<li>' + e.nom.valeur.replace(/</g, '&lt;') + ' · ' + VueCommune.COMPTE[e.compte.statut] + '</li>').join('')}</ul></details>` : ''}
   </div>`;
-  hote.addEventListener('click', ev => { const b = ev.target.closest('[data-compte]'); if (b) changerCompteMV(b.dataset.compte); });
+  hote.addEventListener('click', ev => { const b = ev.target.closest('[data-compte]'); if (b) return changerCompteMV(b.dataset.compte); const q = ev.target.closest('[data-portee]'); if (q) changerPorteeMV(q.dataset.portee); });
   return hote;
 }
 function vueCommuneMV(insee){
-  const r = modeleMV(), c = ModeleCommune.commune(r, insee);
-  if (!c) return h('section',{class:'bloc'}, h('h2',{},'Commune sans établissement'), h('p',{class:'info'}, 'Aucun établissement (fictif) dans cette commune.'), h('a',{class:'btn', href:'#communes'}, 'Île-de-France'));
-  const D = L0.depInfo(c.dep), hote = h('div',{class:'vc-hote'}), ca = caMV();
-  const vue = VueCommune.monter(hote, c, { fictif:true,
+  const SV = sourceMV(), r = SV.modele, c = ModeleCommune.commune(r, insee);
+  if (!c) return h('section',{class:'bloc'}, h('h2',{},'Commune sans établissement'), h('p',{class:'info'}, 'Aucun établissement ' + (SV.fictif ? '(fictif) ' : 'de tes garages ni du marché importé ') + 'dans cette commune.'), h('a',{class:'btn', href:'#communes'}, 'Île-de-France'));
+  const D = L0.depInfo(c.dep), hote = h('div',{class:'vc-hote'}), ca = SV.ca;
+  const vue = VueCommune.monter(hote, c, { fictif:SV.fictif, etiquette:SV.etiquette, sources:SV.sources, portee:porteeMV(), surPortee:changerPorteeMV,
     ca:{ libelle:titreCA(ca), commune:CaFacture.euros(CaFacture.valeur(ca, 'commune', c.insee).cents), fraicheur:CaFacture.fraicheur(ca),
       etablissement:e => { const v = CaFacture.valeur(ca, 'etablissement', e); return v.cents == null ? 'Non renseigné' + (v.motif ? ' (' + v.motif.toLowerCase() + ')' : '') : CaFacture.euros(v.cents); } }, compte:etat.mvCompte, choisir:etat.mvChoix, surCompte:changerCompteMV,
     fil:[{ libelle:'Île-de-France', href:'#communes' }, { libelle:(D ? D.nom : c.dep) + ' (' + c.dep + ')', href:'#communes-' + c.dep }, { libelle:c.commune }],
@@ -1336,10 +1354,10 @@ function vueCommuneMV(insee){
 }
 function allerMaVille(hash){ if (location.hash === '#' + hash) rendre(); else location.hash = hash; }
 function resultatsMaVille(q){
-  if (etat.mode !== 'demo' || !window.ModeleCommune) return [];
-  const t = ModeleCommune.rechercher(modeleMV(), q, 5), out = [];
+  const SV = window.ModeleCommune ? sourceMV() : null; if (!SV) return [];
+  const t = ModeleCommune.rechercher(SV.modele, q, 5), out = [];
   if (!t.communes.length && !t.departements.length && !t.etablissements.length) return [];
-  out.push(h('small',{class:'info', style:'padding:6px 8px 0'}, 'Ma Ville · vue Commune (données fictives)'));
+  out.push(h('small',{class:'info', style:'padding:6px 8px 0'}, SV.fictif ? 'Ma Ville · vue Commune (données fictives)' : 'Ma Ville · Mes garages et marché importé'));
   t.departements.forEach(D => out.push(h('button',{class:'ligne mv-res', 'data-mv':'dep', onclick:()=>{ etat.mvChoix = null; allerMaVille('communes-' + D.dep); }},
     h('i',{style:'background:var(--doux)'}), h('span',{}, D.nom + ' (' + D.dep + ')', h('small',{}, 'Département')))));
   t.communes.forEach(c => out.push(h('button',{class:'ligne mv-res', 'data-mv':'commune', onclick:()=>{ etat.mvChoix = null; allerMaVille('commune-' + c.insee); }},
@@ -1347,9 +1365,10 @@ function resultatsMaVille(q){
   t.etablissements.forEach(e => out.push(h('button',{class:'ligne mv-res', 'data-mv':'garage', onclick:()=>{
       if (!e.insee) return ouvrirFiche(ficheDe(e));
       if (etat.mvCompte !== 'tous' && e.compte.statut !== etat.mvCompte) etat.mvCompte = 'tous'; // le garage cherché est toujours visible
+      if (porteeMV() !== 'tous' && e.portee !== porteeMV()) etat.mvPortee = { mode:etat.mode, v:'tous' };
       etat.mvChoix = e.uid; allerMaVille('commune-' + e.insee); }},
     h('i',{style:`background:${e.segment && STATUTS[e.segment] ? STATUTS[e.segment].couleur : '#6E737B'}` + (e.segment === 'client-mecanique' ? ';box-shadow:0 0 0 1.5px #F4F2EF' : '')}),
-    h('span',{}, e.nom.valeur, h('small',{}, (e.commune || 'À classer') + ' · n° ' + (e.numero || '—') + (e.siret ? ' · SIRET ' + e.siret.valeur : '') + ' · ' + VueCommune.COMPTE[e.compte.statut])))));
+    h('span',{}, e.nom.valeur, h('small',{}, (e.commune || 'À classer') + ' · n° ' + (e.numero || '—') + (e.siret ? ' · SIRET ' + e.siret.valeur : '') + ' · ' + VueCommune.COMPTE[e.compte.statut] + (e.portee === 'marche' ? ' · marché à prospecter' : ''))))));
   if (t.nbEtablissements > t.etablissements.length) out.push(h('small',{class:'info', style:'padding:2px 8px 6px'}, (t.nbEtablissements - t.etablissements.length) + ' autre(s) établissement(s) : précise la recherche ou ouvre la commune.'));
   return out;
 }
@@ -1367,11 +1386,38 @@ function deciderCompte(e){
 const donneesComptes = () => ({ terrain: etat.telephone ? etat.telephone.clients : [], clientsEbp: etat.ebp.clients ? etat.ebp.clients.clients : [],
   piecesEbp: etat.ebp.pieces ? etat.ebp.pieces.pieces : [], arrete: etat.ebp.arrete, exportClientsDu: etat.ebp.clients ? etat.ebp.arrete : null, dateTelephone: etat.telephone ? etat.telephone.date : null });
 const appliquerDecisions = () => { const d = donneesComptes(); return DecisionsComptes.appliquer(etat.decisions, { terrain:d.terrain, clientsEbp:d.clientsEbp, piecesEbp:d.piecesEbp, exportClientsDu:d.exportClientsDu }); };
-// Modèle « Mes garages » : téléphone + EBP + décisions humaines (le même modèle que Ma Ville ; branché à la vue Commune au lot C).
-function modeleReel(a = appliquerDecisions()){
-  const d = donneesComptes();
-  return ModeleCommune.construire({ arrete:d.arrete, dates:{ EBP:d.arrete, Terrain:d.dateTelephone ? String(d.dateTelephone).slice(0,10) : null }, terrain:d.terrain, clientsEbp:d.clientsEbp, piecesEbp:d.piecesEbp,
-    liaisonsValidees:a.liaisonsValidees, verificationsCompte:a.verificationsCompte, aRevoir:a.aRevoir });
+// Marché à prospecter : établissements de l'annuaire officiel importés (couche séparée). Ils ne deviennent jamais « mes garages » seuls.
+const marcheAnnuaire = () => Object.values(etat.marche).flatMap(r => (r.etablissements || []).map(e => ({ siret:e.siret, nom:e.nom, ville:e.ville, cp:e.cp, naf:e.naf, importeLe:String(r.date || '').slice(0,10) || null })));
+const dateMarche = () => Object.values(etat.marche).map(r => String(r.date || '').slice(0,10)).filter(Boolean).sort().pop() || null;
+// Mémoire de calcul : même entrées (mêmes objets) = même résultat, sans reconstruire le modèle à chaque affichage.
+function memoriser(cache, cles, calcul){ if (cache.cles && cache.cles.length === cles.length && cache.cles.every((c, i) => c === cles[i])) return cache.val; cache.val = calcul(); cache.cles = cles; return cache.val; }
+const memoModele = {}, memoCA = {};
+// Modèle « Mes garages » : téléphone + EBP + décisions humaines + marché importé (le même modèle que Ma Ville).
+function modeleReel(a){
+  const d = donneesComptes(), mA = marcheAnnuaire(), dM = dateMarche();
+  return memoriser(memoModele, [d.terrain, d.clientsEbp, d.piecesEbp, d.arrete, etat.decisions, dM, mA.length, etat.ebp.clients, etat.ebp.pieces], () => {
+    const ap = a || appliquerDecisions();
+    return ModeleCommune.construire({ arrete:d.arrete, dates:{ EBP:d.arrete, Terrain:d.dateTelephone ? String(d.dateTelephone).slice(0,10) : null, SIRENE:dM }, terrain:d.terrain, clientsEbp:d.clientsEbp, piecesEbp:d.piecesEbp,
+      annuaire:mA, liaisonsValidees:ap.liaisonsValidees, verificationsCompte:ap.verificationsCompte, aRevoir:ap.aRevoir });
+  });
+}
+// CA du mois sur « Mes garages » : mêmes exports EBP, même modèle (rattachement par code client EBP, jamais par le nom).
+function caReel(m){
+  const E = etat.ebp, j = jourIso();
+  return memoriser(memoCA, [m, E.pieces, E.clients, E.arrete, j, etat.monCommercial], () => E.pieces
+    ? CaFacture.calculer({ pieces:E.pieces.pieces, avoirs:E.pieces.avoirs, ignorees:E.pieces.ignorees, clientsEbp:E.clients ? E.clients.clients : [], modele:m, arrete:E.arrete, aujourdhui:j, monCommercial:etat.monCommercial })
+    : CaFacture.calculer({ aujourdhui:j }));
+}
+// Source de la vue Ma Ville : « Mes garages » (téléphone + EBP + coffre) ou la démo fictive. Jamais un mélange des deux.
+function sourceMV(){
+  if (etat.mode === 'reel' && etat.telephone) {
+    const m = modeleReel(), E = etat.ebp, dM = dateMarche();
+    return { reel:true, fictif:false, etiquette:'MES GARAGES', modele:m, ca:caReel(m),
+      sources:[ 'Téléphone du ' + frDate(String(etat.telephone.date || '').slice(0,10)), E.clients ? 'Clients EBP du ' + frDate(E.arrete) : 'Clients EBP non chargés', E.pieces ? 'Pièces EBP du ' + frDate(E.arrete) : 'Pièces EBP non chargées',
+        dM ? 'Annuaire officiel du ' + frDate(dM) : 'Marché non importé', etat.decisions.decisions.length + ' décision(s) de compte (coffre)' ] };
+  }
+  if (etat.mode === 'demo') return { reel:false, fictif:true, etiquette:null, modele:modeleMV(), ca:caMV(), sources:[] };
+  return null;
 }
 function vueVerifierComptes(){
   if (etat.mode !== 'reel' || !etat.telephone) return h('section',{class:'bloc'}, h('h2',{},'Vérifier les comptes ODICOLOR'),
@@ -1387,7 +1433,7 @@ function vueVerifierComptes(){
 }
 function blocComptes(){
   if (etat.mode !== 'reel' || !etat.telephone) return null;
-  let k; try { const t = [...modeleReel().communes.values()].flatMap(c => c.etablissements); k = s => t.filter(e => e.compte.statut === s).length; } catch (e) { return null; }
+  let k; try { const t = [...modeleReel().communes.values()].flatMap(c => c.etablissements).filter(e => e.portee === 'mes_garages'); k = s => t.filter(e => e.compte.statut === s).length; } catch (e) { return null; }
   return h('section',{class:'bloc', id:'bloc-comptes'}, h('div',{class:'titre-bloc'},'Comptes ODICOLOR'),
     h('p',{class:'info'}, k('en_compte') + ' en compte · ' + k('sans_compte') + ' sans compte · ' + k('a_verifier') + ' à vérifier'),
     h('a',{class:'btn', href:'#verifier-comptes'}, 'Vérifier les comptes'));
@@ -1413,7 +1459,7 @@ function rendre(){
   if (r.ecran !== 'carte' && carte) { carte.remove(); carte = null; }
   rendreEntete(); rendreKpis(); rendreFiltres();
   $('#kpis').hidden = ['simulation','bureau','commune','communes','verifier-comptes'].includes(r.ecran);
-  $('#vue').replaceChildren(r.ecran === 'verifier-comptes' ? vueVerifierComptes() : ['commune','communes'].includes(r.ecran) ? (reelSansMV() || (r.ecran === 'commune' ? vueCommuneMV(r.insee) : vueCommunesMV(r.dep)))
+  $('#vue').replaceChildren(r.ecran === 'verifier-comptes' ? vueVerifierComptes() : ['commune','communes'].includes(r.ecran) ? (sansSourceMV() || (r.ecran === 'commune' ? vueCommuneMV(r.insee) : vueCommunesMV(r.dep)))
     : r.ecran==='carte' ? vueCarte(r.D, r.porte) : r.ecran==='simulation' ? vueSimulation() : r.ecran==='bureau' ? vueBureau() : r.ecran==='a-classer' ? vueAClasser() : vueVille());
   rendreFil();
   const sc = document.getElementById('scene'); if (sc && sc.scrollWidth > sc.clientWidth) { const t = TERRITOIRES.find(x=>x.id===etat.choix), [px] = iso(...pos(t)); sc.scrollLeft = (px + 495) / 990 * sc.scrollWidth - sc.clientWidth/2; }
