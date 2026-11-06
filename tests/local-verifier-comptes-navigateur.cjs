@@ -26,7 +26,7 @@ before(async () => {
   fs.writeFileSync(path.join(travail, 'sauvegarde.json'), JSON.stringify({ appli: 'devis-terrain', version: 1, date: '2026-11-06T06:00:00.000Z', clients: GARAGES, devis: [] }));
   nav = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
 });
-after(async () => { await nav?.close(); fs.rmSync(travail, { recursive: true, force: true }); });
+after(async () => { await tuer(prog); await nav?.close(); fs.rmSync(travail, { recursive: true, force: true }); }); // le programme local est toujours arrêté, même après un échec
 
 function lancer(dossier) {
   return new Promise((ok, ko) => {
@@ -42,6 +42,7 @@ async function page(adresse, opts = { viewport: { width: 1440, height: 900 } }) 
   const ctx = await nav.newContext({ ...opts, deviceScaleFactor: process.env.CAPTURES ? 2 : (opts.deviceScaleFactor || 1) });
   await ctx.route(/^https?:\/\/(?!127\.0\.0\.1)/, r => r.abort());
   const p = await ctx.newPage(), erreurs = [];
+  if (process.env.DELAI_MS) p.setDefaultTimeout(Number(process.env.DELAI_MS)); // vérifications par sabotage : échec rapide
   p.on('pageerror', e => erreurs.push(e.message));
   await p.clock.setFixedTime(new Date('2026-11-07T09:00:00'));
   await p.goto(adresse);
