@@ -338,6 +338,7 @@ select.recherche{appearance:auto}
 <script src="../xlsx.mini.min.js"></script>
 <script src="ebp-import.js"></script>
 <script src="pipeline.js"></script>
+<script src="ma-ville.js"></script>
 <script src="ville-pipeline.js"></script>
 <script src="lecture-sauvegarde.js"></script>
 <script src="annuaire.js"></script>
@@ -346,6 +347,7 @@ select.recherche{appearance:auto}
 'use strict';
 const L0 = window.BureauLogique;
 const {TERRITOIRES, DEPOT, STATUTS} = L0;
+const teinte = L0.teinte; // couleur d'un garage = son segment (Ma Ville), sinon son statut
 const $ = s => document.querySelector(s);
 const SVGT = new Set(['svg','g','path','polygon','polyline','ellipse','circle','text','rect','line','title','defs','filter','feGaussianBlur','feMerge','feMergeNode','radialGradient','stop']);
 function h(tag, attrs, ...enfants){
@@ -382,7 +384,7 @@ const etat = { mode:'demo', garages:demo0, rapport:L0.rapportClassement(demo0), 
 const src = () => etat.mode === 'demo' ? ['b-demo','Démo'] : ['b-terrain','Saisi terrain'];
 const badgeSrc = () => { const s = src(); return h('span',{class:'badge '+s[0]}, s[1]); };
 const FILTRES = { tous:null, actif:['actif'], prospect:['prospect'], dormant:['dormant','perdu','inconnu'], risque:['risque'] };
-const visible = g => !FILTRES[etat.filtre] || FILTRES[etat.filtre].includes(g.statut);
+const visible = g => etat.filtre.startsWith('seg:') ? teinte(g) === etat.filtre.slice(4) : etat.filtre === 'alertes' ? ['risque','dormant'].includes(g.statut) || !!g.inactifEbp : !FILTRES[etat.filtre] || FILTRES[etat.filtre].includes(g.statut);
 
 // ================= Indicateurs =================
 function rendreKpis(){
@@ -404,10 +406,12 @@ function rendreKpis(){
 }
 function rendreFiltres(){
   if (['simulation','bureau'].includes(route().ecran)) { $('#filtres').replaceChildren(); return; }
-  const def = [['tous','Tous',null],['actif','Clients','var(--vert)'],['prospect','Prospects','var(--bleu)'],['dormant','Dormants / perdus','var(--orange)'],['risque','Risque règlement','var(--danger)']];
-  const nb = k => etat.garages.filter(x => x.dep && (!FILTRES[k] || FILTRES[k].includes(x.statut))).length;
+  const seg = etat.garages.some(g => g.segment);
+  const def = seg ? [['tous','Tous',null], ...L0.SEGMENTS.map(k => ['seg:' + k, STATUTS[k].libelle, STATUTS[k].couleur]), ['alertes','Alertes (règlement, dormant, inactif)','var(--danger)']]
+    : [['tous','Tous',null],['actif','Clients','var(--vert)'],['prospect','Prospects','var(--bleu)'],['dormant','Dormants / perdus','var(--orange)'],['risque','Risque règlement','var(--danger)']];
+  const nb = k => { const f = etat.filtre; etat.filtre = k; const n = etat.garages.filter(x => x.dep && visible(x)).length; etat.filtre = f; return n; };
   $('#filtres').replaceChildren(...def.map(([k,l,c]) => h('button',{class:'puce'+(k==='tous'?' tous':''), 'aria-pressed':String(etat.filtre===k),
-    onclick:()=>{ etat.filtre = k; rendre(); }}, c ? h('i',{style:`background:${c}`}) : null, `${l} (${nb(k)})`)));
+    onclick:()=>{ etat.filtre = k; rendre(); }}, c ? h('i',{style:`background:${c}` + (k === 'seg:client-mecanique' ? ';box-shadow:0 0 0 1.5px #F4F2EF' : '')}) : null, `${l} (${nb(k)})`)));
 }
 
 // ================= NIVEAU 1 : la ville de nuit =================
@@ -469,6 +473,7 @@ function figurine(app, statut, opt={}){
   }[role] || { jambes:'#262B33', buste:T, bras:T };
   const g = h('g',{class:'corps'});
   if (opt.anneau) g.append(h('ellipse',{cx:0,cy:1,rx:13,ry:4.6,fill:'none',stroke:c,'stroke-width':2.2,filter:'url(#lueur)'}));
+  if (opt.anneau && STATUTS[statut] && STATUTS[statut].lisere) g.append(h('ellipse',{class:'lisere',cx:0,cy:1,rx:14.4,ry:5.2,fill:'none',stroke:'#F4F2EF','stroke-width':.7,opacity:.9,filter:'url(#lueur)'}));
   g.append(h('ellipse',{cx:0,cy:1,rx:10,ry:3.2,fill:'rgba(0,0,0,.5)'}),
     h('rect',{x:-6,y:-15,width:5,height:14,rx:1,fill:tenues.jambes}), h('rect',{x:1,y:-15,width:5,height:14,rx:1,fill:tenues.jambes}),
     h('rect',{x:-7,y:-2.5,width:6.2,height:3,rx:1,fill:'#0E0F12'}), h('rect',{x:.8,y:-2.5,width:6.2,height:3,rx:1,fill:'#0E0F12'}),
@@ -485,7 +490,7 @@ function figurine(app, statut, opt={}){
     h('polygon',{points:'-1,-31 1,-31 1.4,-22 0,-20.5 -1.4,-22', fill: role==='direction' ? '#8C0F17' : '#D41F2B'}),
     h('line',{x1:-3.2,y1:-32,x2:-1,y2:-22,stroke:'#14161A','stroke-width':.8}), h('line',{x1:3.2,y1:-32,x2:1,y2:-22,stroke:'#14161A','stroke-width':.8}));
   if (role === 'magasin') g.append(h('polygon',{points:'-7,-29 7,-29 8.5,-14 -8.5,-14', fill:'#C81E2A'}), h('rect',{x:-3,y:-24,width:6,height:4,rx:.8,fill:'#8C0F17'}));
-  if (role !== 'peintre' && role !== 'responsable') g.append(h('circle',{cx:-4.5,cy:-27,r:1.8,fill:c,stroke:'#0E0F12','stroke-width':.5}));
+  if (role !== 'peintre' && role !== 'responsable') g.append(h('circle',{cx:-4.5,cy:-27,r:1.8,fill:c,stroke:STATUTS[statut] && STATUTS[statut].lisere ? '#F4F2EF' : '#0E0F12','stroke-width':.5}));
   g.append(h('circle',{cx:-10.3,cy:-16.5,r:2.3,fill:P}), h('circle',{cx:10.3,cy:-16.5,r:2.3,fill:P}));
   // accessoire du métier
   const acc = {
@@ -523,11 +528,11 @@ function persoVille(ga, x, y, s){
   const app = L0.apparence(ga.id);
   const titre = ga.nom + ' · ' + METIERS[app.role];
   const bulleL = Math.max(80, titre.length*5.2 + 16);
-  const el = h('g',{class:'perso', tabindex:0, role:'button', 'aria-label':`${ga.nom}, ${METIERS[app.role]}, ${STATUTS[ga.statut].libelle}. Ouvrir la fiche`,
+  const el = h('g',{class:'perso', tabindex:0, role:'button', 'aria-label':`${ga.nom}, ${METIERS[app.role]}, ${STATUTS[teinte(ga)].libelle}${teinte(ga) !== ga.statut ? ', ' + STATUTS[ga.statut].libelle : ''}. Ouvrir la fiche`,
       onclick:e=>{ e.stopPropagation(); if (tactile() && ga.territoire) choixGarages(ga.territoire, ga); else ouvrirFiche(ga); }, onkeydown:e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); e.stopPropagation(); ouvrirFiche(ga);} }},
     h('rect',{class:'zone', x:-10, y:-54, width:20, height:58, rx:6}),
-    h('g',{class:'agent', style:`animation-delay:-${(L0.normNom(ga.id).length*373)%2600}ms`}, figurine(app, ga.statut, {anneau:true})),
-    h('g',{class:'bulle'}, h('rect',{x:-bulleL/2,y:-74,width:bulleL,height:17,rx:4,fill:'rgba(10,11,13,.95)',stroke:STATUTS[ga.statut].couleur}),
+    h('g',{class:'agent', style:`animation-delay:-${(L0.normNom(ga.id).length*373)%2600}ms`}, figurine(app, teinte(ga), {anneau:true})),
+    h('g',{class:'bulle'}, h('rect',{x:-bulleL/2,y:-74,width:bulleL,height:17,rx:4,fill:'rgba(10,11,13,.95)',stroke:STATUTS[teinte(ga)].lisere ? '#F4F2EF' : STATUTS[teinte(ga)].couleur}),
       h('text',{x:0,y:-62,'text-anchor':'middle',style:'font:600 10px var(--f-texte);fill:#F4F2EF'}, titre)));
   const wrap = h('g',{transform:`translate(${x.toFixed(1)} ${y.toFixed(1)}) scale(${s})`}, el);
   const devant = () => { const p = wrap.parentNode; if (p && p.lastChild !== wrap) p.append(wrap); };
@@ -547,8 +552,8 @@ function choixGarages(territoireId, touche){
     h('p',{class:'info', style:'margin:4px 0 10px'}, 'Touche le garage à ouvrir.'),
     h('div',{class:'choix-liste'}, ordre.map((x,i) => { const app = L0.apparence(x.id);
       return h('button',{class:'choix'+(i===0?' touche':''), onclick:()=>{ ouvrirFiche(x); }},
-        portrait(app, x.statut, 56), h('span',{}, h('b',{}, x.nom), h('small',{}, METIERS[app.role] + ' · ' + (x.commune||'')),
-          h('small',{style:`color:${STATUTS[x.statut].couleur};font-weight:600`}, STATUTS[x.statut].libelle))); }))));
+        portrait(app, teinte(x), 56), h('span',{}, h('b',{}, x.nom), h('small',{}, METIERS[app.role] + ' · ' + (x.commune||'')),
+          h('small',{style:`color:${STATUTS[teinte(x)].lisere ? 'var(--texte)' : STATUTS[teinte(x)].couleur};font-weight:600`}, STATUTS[teinte(x)].libelle))); }))));
 }
 // Portrait (buste) pour les listes et les fiches
 function portrait(app, statut, taille){
@@ -667,7 +672,8 @@ function dessinerVille(){
   return svg;
 }
 function legende(){
-  return h('div',{class:'legende'}, ['actif','prospect','dormant','risque'].map(k => h('span',{}, h('i',{style:`background:${STATUTS[k].couleur}`}), STATUTS[k].libelle)),
+  const seg = etat.garages.some(g => g.segment);
+  return h('div',{class:'legende'}, (seg ? L0.SEGMENTS : ['actif','prospect','dormant','risque']).map(k => h('span',{}, h('i',{style:`background:${STATUTS[k].couleur}` + (STATUTS[k].lisere ? ';box-shadow:0 0 0 1.5px #F4F2EF, 0 0 6px rgba(244,242,239,.6)' : '')}), STATUTS[k].libelle)),
     h('span',{}, h('i',{style:'background:#15241A;border:1px dashed #5E7A66;border-radius:2px'}),'Commune à conquérir'),
     h('span',{style:'margin-left:auto'}, '1 personnage = 1 garage (5 max, survol = nom et métier)'));
 }
@@ -692,7 +698,7 @@ function listePortraits(gs, nom){
   if (!gs.length) return h('p',{class:'info', style:'margin:12px 0 0'}, 'Aucun garage à ' + nom + ' pour ce filtre.');
   return h('div',{class:'portraits'}, h('div',{class:'titre-bloc'}, `Garages à ${nom} · ${gs.length}`),
     h('div',{class:'portraits-liste'}, gs.slice(0,8).map(x => h('button',{class:'mini', onclick:()=>ouvrirFiche(x), title:x.nom},
-      portrait(L0.apparence(x.id), x.statut, 44), h('span',{}, x.nom.replace(/^Carrosserie démo /,'Démo '), h('small',{style:`color:${STATUTS[x.statut].couleur}`}, STATUTS[x.statut].libelle))))));
+      portrait(L0.apparence(x.id), teinte(x), 44), h('span',{}, x.nom.replace(/^Carrosserie démo /,'Démo '), h('small',{style:`color:${STATUTS[teinte(x)].lisere ? 'var(--texte)' : STATUTS[teinte(x)].couleur}`}, STATUTS[teinte(x)].libelle))))));
 }
 function panneauDepartements(){
   const reste = L0.aClasser(etat.garages).length;
@@ -711,8 +717,8 @@ const vueVille = () => h('div',{class:'ecran'}, h('div',{class:'maquette'}, h('d
 const NIV_BADGE = { sur:null, cp:['b-estime','Code postal'], commune:['b-estime','Commune seule'], a_verifier:['b-alerte','À vérifier'], hors_idf:['b-alerte','Hors IDF'], non_classe:['b-alerte','Non classé'] };
 function ligneGarage(x, avecMotif){
   const nb = NIV_BADGE[x.classement.niveau];
-  return h('button',{class:'ligne', onclick:()=>ouvrirFiche(x)}, h('i',{style:`background:${STATUTS[x.statut].couleur}`}),
-    h('span',{}, x.nom, h('small',{}, (x.commune || x.classement.saisi || 'Commune inconnue') + (x.classement.cp ? ' · ' + x.classement.cp : '') + ' · ' + STATUTS[x.statut].libelle),
+  return h('button',{class:'ligne', onclick:()=>ouvrirFiche(x)}, h('i',{style:`background:${STATUTS[teinte(x)].couleur}` + (STATUTS[teinte(x)].lisere ? ';box-shadow:0 0 0 1.5px #F4F2EF' : '')}),
+    h('span',{}, x.nom, h('small',{}, (x.commune || x.classement.saisi || 'Commune inconnue') + (x.classement.cp ? ' · ' + x.classement.cp : '') + ' · ' + STATUTS[teinte(x)].libelle),
       avecMotif ? h('small',{class:'motif'}, x.classement.motif) : null),
     nb ? h('span',{class:'badge '+nb[0]}, nb[1]) : null, x.position ? null : h('em',{},'sans GPS'));
 }
@@ -765,7 +771,7 @@ function monterCarte(centre, zoom, porte){
 }
 function montrerGarages(garages){
   if (!carte || !coucheGarages) return; coucheGarages.clearLayers();
-  garages.forEach(x => L.circleMarker([x.position.lat, x.position.lng], {radius:9, color:'#fff', weight:2, fillColor:STATUTS[x.statut].couleur, fillOpacity:1}).bindTooltip(x.nom).on('click', () => ouvrirFiche(x)).addTo(coucheGarages));
+  garages.forEach(x => L.circleMarker([x.position.lat, x.position.lng], {radius:9, color:'#fff', weight:2, fillColor:STATUTS[teinte(x)].couleur, fillOpacity:1}).bindTooltip(x.nom).on('click', () => ouvrirFiche(x)).addTo(coucheGarages));
 }
 function panneauTournee(){
   if (!etat.tournee.length) return null;
@@ -1028,10 +1034,12 @@ function ouvrirFiche(x){
   [['infos','Informations'],['historique','Historique'],['commandes','Commandes']].forEach(([k,l]) => ongletsF.append(h('button',{role:'tab', 'data-k':k, onclick:()=>montrer(k)}, l)));
   const dejaLa = etat.tournee.includes(x.id);
   const btnFermer = h('button',{class:'fermer', onclick:fermer, 'aria-label':'Fermer la fiche'},'×');
-  const c = STATUTS[x.statut].couleur;
+  const c = STATUTS[teinte(x)].lisere ? '#F4F2EF' : STATUTS[teinte(x)].couleur;
   const fiche = h('aside',{class:'fiche', role:'dialog', 'aria-modal':'true', 'aria-labelledby':'fiche-titre'},
     h('div',{class:'fiche-tete'}, h('div',{class:'vignette'}, portrait(L0.apparence(x.id), x.statut, 96)),
-      h('div',{}, h('h2',{id:'fiche-titre'}, x.nom), h('span',{class:'pastille-statut', style:`background:color-mix(in srgb, ${c} 22%, transparent);color:${c}`}, STATUTS[x.statut].libelle), ' ', h('span',{class:'badge '+sr[0]}, sr[1]),
+      h('div',{}, h('h2',{id:'fiche-titre'}, x.nom), h('span',{class:'pastille-statut', style:`background:color-mix(in srgb, ${c} 22%, transparent);color:${c}`}, STATUTS[teinte(x)].libelle), ' ',
+        teinte(x) !== x.statut && ['risque','dormant','perdu'].includes(x.statut) ? [h('span',{class:'badge b-alerte'}, STATUTS[x.statut].libelle), ' '] : null,
+        x.inactifEbp ? [h('span',{class:'badge b-alerte'}, 'Client EBP inactif'), ' '] : null, h('span',{class:'badge '+sr[0]}, sr[1]),
         h('div',{class:'lieu'}, METIERS[L0.apparence(x.id).role] + ' · ' + (x.commune || cl.saisi || 'Commune inconnue') + (D ? ` (${D.dep})` : ''))), btnFermer),
     h('div',{class:'actions-fiche'},
       h('button',{class:'btn', disabled:!x.tel, onclick:async()=>{ msg.textContent = await copier(x.tel) ? 'Téléphone copié : ' + x.tel : 'Copie refusée. Numéro : ' + x.tel; }}, icone('tel'), 'Copier le tél.'),
@@ -1104,10 +1112,10 @@ async function importerEbp(type, f){
 function connecterVille(){
   etat.ebpVille = null;
   if (etat.mode !== 'reel' || !etat.garagesTelephone) return;
-  etat.garages = etat.garagesTelephone;
+  etat.garages = VillePipeline.segmentsVille(etat.garagesTelephone, { clientsEbp: etat.ebp.clients ? etat.ebp.clients.clients : [], piecesEbp: etat.ebp.pieces ? etat.ebp.pieces.pieces : [], arrete: etat.ebp.arrete });
   let plan = null; try { plan = planBureau(); } catch (e) { plan = null; }
   if (plan) {
-    const r = VillePipeline.alimenterVille(etat.garagesTelephone, { plan, piecesEbp: etat.ebp.pieces.pieces, clientsEbp: etat.ebp.clients ? etat.ebp.clients.clients : [], arrete: plan.arrete });
+    const r = VillePipeline.alimenterVille(etat.garages, { plan, piecesEbp: etat.ebp.pieces.pieces, clientsEbp: etat.ebp.clients ? etat.ebp.clients.clients : [], arrete: plan.arrete });
     etat.garages = r.garages; etat.ebpVille = { arrete: plan.arrete, rapport: r.rapport };
   }
   etat.rapport = L0.rapportClassement(etat.garages);

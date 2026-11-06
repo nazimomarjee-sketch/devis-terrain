@@ -1,11 +1,17 @@
-# Maquette — Ma Ville en 4 couleurs (07/11/2026) — en attente d'accord
+# Ma Ville en 4 couleurs — option A validée le 07/11/2026, appliquée sur données fictives (non fusionnée)
 
 Règle du propriétaire : rouge = client ODICOLOR carrosserie · noir = client ODICOLOR mécanique · orange = prospect carrosserie ·
 bleu = prospect mécanique. Sources : EBP, SIRENE (annuaire officiel), prospection terrain. Aucun doublon automatique.
 Un client EBP inactif reste identifiable comme tel.
 
-**État :** la logique est faite et testée (`bureau/ma-ville.js`, `tests/bureau-ma-ville.test.cjs`). La Ville réelle n'affiche
-pas encore ces couleurs : `ville-4-couleurs.png` et `ville-4-couleurs-zoom.png` sont une maquette (dossier temporaire).
+**État :** appliquée à la Ville (`bureau/index.html`) sur données fictives. Décision du 07/11/2026 : **option A** — noir avec un
+fin liseré blanc lumineux pour les clients ODICOLOR Mécan. Capture : `ville-4-couleurs-appliquee.png`. Tests :
+`tests/bureau-ville-4-couleurs-navigateur.cjs` (démo et Ville connectée à EBP fictif) et `tests/bureau-ville-invariance.test.cjs`
+(seules les lignes « teinte » et « liseré » sont admises dans les personnages ; bâtiments, LED, animations et styles inchangés).
+Les anciennes captures `ville-4-couleurs.png` et `ville-4-couleurs-zoom.png` restent comme trace de la maquette.
+
+Résolution des constats : (1) liseré blanc ajouté (option A) ; (2) filtres et compteurs par segment + filtre « Alertes » ;
+(3) alertes conservées par les pastilles, le texte lu par les lecteurs d'écran et la fiche (« Client EBP inactif »).
 
 ## Constats de la maquette
 

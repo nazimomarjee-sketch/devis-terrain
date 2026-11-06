@@ -65,8 +65,13 @@ Les 3 fonctions (opportunités, ligne EBP de l'accueil, garage présélectionné
 - Socle 0 : matrice des droits **validée** (voir `socle/LISEZ-MOI.md`).
 - Ville LEGO : P1–P5 **validées et appliquées** (commandes et facturé jamais confondus, chiffres datés et justifiés par EBP,
   graphisme verrouillé par `tests/bureau-ville-invariance.test.cjs`).
-- Ma Ville en 4 couleurs : logique faite, **maquette en attente d'accord** (`docs/maquettes/VILLE_4_COULEURS.md`).
+- Ma Ville en 4 couleurs : **option A validée** (noir + fin liseré blanc lumineux pour les clients ODICOLOR Mécan) et **appliquée
+  à la Ville sur données fictives**, style LEGO Premium et animations conservés ; testée (`tests/bureau-ville-4-couleurs-navigateur.cjs`).
+  Non fusionnée, non publiée.
 - **Offres de conquête** : logique intégrée au modèle commercial (`docs/OFFRES_DE_CONQUETE.md`) ; anneau doré dans la Ville
   en **maquette** seulement.
 - **Espace client et parcours de commande** : ajoutés à la feuille de route (`docs/PARCOURS_COMMANDE_CLIENT.md`),
   **aucun développement avant validation du parcours**.
+- **Réapprovisionnement client en un clic** : inscrit à la feuille de route — demande reçue par le commercial → proposition
+  éventuelle (produits complémentaires ou Offre de conquête) → confirmation du client → traitement dans EBP.
+  **Pas de développement pour l'instant** (`docs/PARCOURS_COMMANDE_CLIENT.md`).

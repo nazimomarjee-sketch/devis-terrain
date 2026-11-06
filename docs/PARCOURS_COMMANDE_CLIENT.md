@@ -1,9 +1,20 @@
-# Feuille de route — Espace client et parcours de commande (proposé le 07/11/2026, à valider, rien de développé)
+# Feuille de route — Espace client et parcours de commande (parcours de réapprovisionnement inscrit le 07/11/2026 — rien de développé)
 
 Objectif : faciliter le **réachat régulier** et augmenter le **panier moyen et la marge**, avec le minimum de clics pour le
 client et sans démarche supplémentaire pour lui. EBP reste l'outil où la commande définitive est saisie.
 
-## Parcours
+## Réapprovisionnement client en un clic — inscrit à la feuille de route (décision du 07/11/2026)
+
+**Ne pas développer pour l'instant.** Parcours retenu, dans cet ordre :
+
+1. **Demande reçue par le commercial** : le client envoie son réapprovisionnement en un clic ; la demande arrive chez son commercial.
+2. **Proposition éventuelle** : le commercial peut proposer des produits complémentaires ou une **Offre de conquête** (rien d'obligatoire).
+3. **Confirmation du client** : le client confirme la commande finale (avec ou sans les ajouts proposés).
+4. **Traitement dans EBP** : le commercial saisit la commande dans EBP ; jamais de commande créée automatiquement dans EBP.
+
+Le tableau détaillé ci-dessous décrit le même parcours (étape 4 du tableau = proposition **et** confirmation du client).
+
+## Parcours (détail)
 
 | Étape | Qui | Ce qui se passe | Garde-fous |
 |---|---|---|---|
@@ -31,3 +42,5 @@ direction) · cadre RGPD pour les contacts clients.
 1. Identification du client : lien personnel sécurisé sans mot de passe, ou compte avec mot de passe.
 2. Un clic strict (panier habituel tel quel) ou possibilité d'ajuster les quantités avant l'envoi (un geste de plus).
 3. Prévenir le commercial : dans son espace seulement, ou aussi par message (SMS / WhatsApp).
+4. Forme de la confirmation du client (étape 3 du parcours) : accord oral ou écrit noté par le commercial, ou bouton
+   « Je confirme » dans l'espace client. À trancher : le tableau prévoyait « le client n'a rien à refaire dans l'appli ».

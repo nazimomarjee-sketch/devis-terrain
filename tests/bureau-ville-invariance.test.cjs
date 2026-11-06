@@ -27,14 +27,42 @@ const ORIGINE = {
   vueSimulation: 'bfa91ef9f128bf25f04ea7ebfb8ba6718686d3e31f493baac2c34fca1a819abd'
 };
 
-test('dessin des bâtiments, personnages, fiches de choix, carte et simulation : identiques à l’origine', () => {
-  for (const [n, empreinte] of Object.entries(ORIGINE)) assert.equal(h(fonction(n)), empreinte, n + ' a été modifiée');
+test('dessin des bâtiments, carte et simulation : identiques à l’origine', () => {
+  for (const n of ['volume', 'portrait', 'carteLabel', 'vueCarte', 'vueSimulation']) assert.equal(h(fonction(n)), ORIGINE[n], n + ' a été modifiée');
   assert.equal(h(ligne('const vueVille =')), '865518d37db8f781d3372df46499e41b1812a871054d57480d6c75f2b16d9692', 'vueVille a été modifiée');
+});
+
+// Personnages : seules les retouches APPROUVÉES sont admises, ligne par ligne, par rapport à la Ville d'origine
+// (tests/fixtures/bureau/ville-origine-2026-10-31.html, version récupérée du 31/10/2026) :
+//   - « teinte( » : couleur du personnage = segment Ma Ville (4 couleurs, validées le 07/11/2026) ;
+//   - « lisere » : fin liseré blanc lumineux autour du noir des clients Mécan (option A, validée le 07/11/2026) ;
+//   - « P2 » : étiquette des villes (validée le 07/11/2026).
+const origine = readFileSync(join(__dirname, 'fixtures', 'bureau', 'ville-origine-2026-10-31.html'), 'utf8');
+const fonctionDe = (src, n) => { const i = src.indexOf('function ' + n + '('); return src.slice(i, src.indexOf('\n}\n', i) + 2).split('\n'); };
+const APPROUVE = /teinte\(|lisere|\/\* P2 \*\//;
+// Comparaison par plus longue sous-suite commune : lignes d'origine conservées, lignes ajoutées, lignes retirées.
+function seulementApprouve(n) {
+  const A = fonctionDe(origine, n), B = fonctionDe(page, n), L = Array.from({ length: A.length + 1 }, () => new Array(B.length + 1).fill(0));
+  for (let i = A.length - 1; i >= 0; i--) for (let j = B.length - 1; j >= 0; j--) L[i][j] = A[i] === B[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  const ajoutees = [], retirees = []; let i = 0, j = 0;
+  while (i < A.length && j < B.length) { if (A[i] === B[j]) { i++; j++; } else if (L[i + 1][j] >= L[i][j + 1]) retirees.push(A[i++]); else ajoutees.push(B[j++]); }
+  retirees.push(...A.slice(i)); ajoutees.push(...B.slice(j));
+  for (const l of ajoutees) assert.match(l, APPROUVE, n + ' : ligne ajoutée ou modifiée hors retouche approuvée : ' + l.trim().slice(0, 90));
+  assert.ok(retirees.length <= ajoutees.length, n + ' : ligne d’origine supprimée sans remplacement approuvé');
+  return ajoutees.length - retirees.length;
+}
+
+test('personnages (figurine, ville, choix) : origine conservée, seules les retouches approuvées', () => {
+  assert.equal(seulementApprouve('figurine'), 1, 'une seule ligne ajoutée : le liseré');
+  for (const n of ['persoVille', 'choixGarages', 'dessinerVille']) assert.equal(seulementApprouve(n), 0, n);
+  assert.match(fonction('figurine').split('\n').find(l => l.includes("class:'lisere'")), /stroke:'#F4F2EF','stroke-width':\.7/, 'liseré fin et clair');
 });
 
 test('scène de la Ville : identique, hormis la ligne d’étiquette des villes (P2 approuvée)', () => {
   const sansEtiquette = fonction('dessinerVille').split('\n').filter(l => !l.includes('const ligne2 =')).join('\n');
   assert.equal(h(sansEtiquette), '2820866cceda145e434afb59085206b30393b1a1e0287d66491ef8df1f132d77');
+  assert.equal(h(origine), createHash('sha256').update(readFileSync(join(__dirname, 'fixtures', 'bureau', 'ville-origine-2026-10-31.html'))).digest('hex'));
+  assert.match(h(origine), /^7dfe6016/, 'référence = version récupérée du 31/10/2026');
 });
 
 test('styles (couleurs, animations, mise en page) : identiques, hormis la règle mobile des onglets approuvée', () => {

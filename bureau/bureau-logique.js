@@ -40,8 +40,18 @@
     dormant: { libelle: 'Dormant / à relancer', couleur: '#E8922B' },
     risque: { libelle: 'Risque de règlement', couleur: '#E5333F' },
     perdu: { libelle: 'Client perdu', couleur: '#7C8088' },
-    inconnu: { libelle: 'Statut non renseigné', couleur: '#5A5E66' }
+    inconnu: { libelle: 'Statut non renseigné', couleur: '#5A5E66' },
+    // Ma Ville : 4 segments (couleur du personnage). Les statuts ci-dessus restent ceux des alertes (risque, dormant…).
+    'client-carrosserie': { libelle: 'Client ODICOLOR carrosserie', couleur: '#D41F2B' },
+    'client-mecanique': { libelle: 'Client ODICOLOR Mécan', couleur: '#0B0B0D', lisere: true },
+    'prospect-carrosserie': { libelle: 'Prospect carrosserie', couleur: '#F0952B' },
+    'prospect-mecanique': { libelle: 'Prospect mécanique', couleur: '#3E86F0' },
+    'client-a_qualifier': { libelle: 'Client, activité à qualifier', couleur: '#6E737B' },
+    'prospect-a_qualifier': { libelle: 'Prospect, activité à qualifier', couleur: '#6E737B' }
   });
+  const SEGMENTS = Object.freeze(['client-carrosserie', 'client-mecanique', 'prospect-carrosserie', 'prospect-mecanique']);
+  // Clé de couleur d'un garage : son segment s'il est connu, sinon son statut (comportement d'origine).
+  const teinte = g => (g && g.segment && STATUTS[g.segment] ? g.segment : g.statut);
 
   // Qualité du classement, du plus sûr au moins sûr.
   const CLASSEMENTS = Object.freeze({
@@ -241,7 +251,7 @@
     ['Chartres', '28000', 0, 1]         // hors Île-de-France
   ];
   function garagesDemo(graine = 2026) {
-    const r = mulberry32(graine);
+    const r = mulberry32(graine), ra = mulberry32(graine + 1); // ra : activité fictive, sans changer le tirage d'origine
     const fourn = ['Concurrent A', 'Concurrent B', 'Concurrent C', 'Non renseigné'];
     const out = []; let n = 0;
     PLAN_DEMO.forEach(([ville, cp, clients, prospects]) => {
@@ -254,7 +264,8 @@
           ville, cp, adresse: '', tel: '', decideur: '', etape: '', etapeDate: '', notes: '',
           fournisseur: fourn[Math.floor(r() * fourn.length)], exRoberlo: r() < 0.4, statut, position: null,
           caMois: statut === 'prospect' ? null : Math.round((300 + r() * 2200) / 10) * 10,
-          potentiel: Math.round((800 + r() * 3200) / 10) * 10
+          potentiel: Math.round((800 + r() * 3200) / 10) * 10,
+          segment: (statut === 'prospect' ? 'prospect' : 'client') + (ra() < 0.6 ? '-carrosserie' : '-mecanique')
         }));
       }
     });
@@ -340,7 +351,7 @@
 
   const api = { apparence, agentsSimulation, FAMILLES, ACTEURS, DEPARTEMENTS, depInfo, TERRITOIRES, DEPOT, STATUTS, CLASSEMENTS, normNom, normCommune, classer, statutGarage,
     lireSauvegarde, lireClients, rapportClassement, statsTerritoire, statsDepartement, garagesDuDepartement, communesDuDepartement, aClasser,
-    garagesDemo, mulberry32, nbCommunes: COMMUNES.length };
+    garagesDemo, mulberry32, SEGMENTS, teinte, nbCommunes: COMMUNES.length };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else racine.BureauLogique = api;
 })(typeof self !== 'undefined' ? self : this);

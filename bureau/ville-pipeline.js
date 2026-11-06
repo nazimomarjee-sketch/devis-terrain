@@ -1,5 +1,5 @@
-/* ODICOLOR Bureau — alimenter la Ville LEGO avec le pipeline commercial (MAQUETTE, en attente d'accord).
-   Ce module N'EST PAS chargé par bureau/index.html : la Ville reste inchangée tant que le propriétaire n'a pas validé.
+/* ODICOLOR Bureau — alimenter la Ville LEGO avec le pipeline commercial (P1–P5 validées et 4 couleurs, option A, le 07/11/2026).
+   Chargé par bureau/index.html (Ville connectée) ; graphisme verrouillé par tests/bureau-ville-invariance.test.cjs.
    Principe : aucun nouveau dessin. On remplit les états visuels que la Ville sait déjà afficher :
    - statut du personnage : actif (vert) · prospect (bleu) · dormant (orange) · risque (rouge) ;
    - caMois (CA du mois) déjà prévu dans les chiffres de la Ville ;
@@ -85,7 +85,19 @@
     });
   }
 
-  const api = { alimenterVille, filActions, offresParGarage, PICTO };
+  // Ma Ville : segment (couleur) de chaque garage du téléphone, à partir d'EBP (clients, famille, commandes) et du terrain.
+  // Un client EBP inactif reste client (marqué « inactifEbp ») ; les homonymes non reliés restent « à qualifier ».
+  function segmentsVille(garages, { clientsEbp = [], piecesEbp = [], arrete }) {
+    const MV = (typeof module === 'object' && module.exports) ? require('./ma-ville.js') : racine.MaVille;
+    const r = MV.construire({ terrain: garages, clientsEbp, piecesEbp, arrete });
+    const parId = new Map(r.etablissements.filter(e => e.terrainId != null).map(e => [e.terrainId, e]));
+    return garages.map(g => {
+      const e = parId.get(g.id); if (!e) return g;
+      return Object.assign({}, g, { segment: e.segment, activite: e.activite, inactifEbp: e.inactif && e.client, compteBloque: e.compteBloque || g.compteBloque });
+    });
+  }
+
+  const api = { alimenterVille, filActions, offresParGarage, segmentsVille, PICTO };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else racine.VillePipeline = api;
 })(typeof self !== 'undefined' ? self : this);
