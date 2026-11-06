@@ -58,6 +58,7 @@ jobs:
           node tests/pwa-browser.cjs
           node tests/null-ui-browser.cjs
           node tests/stabilisation-lot1-browser.cjs
+          node tests/plan-pc-matin-browser.cjs
       - name: Préparer les paquets Samsung (aucun déploiement)
         run: >-
           node scripts/preparer-preview-samsung.cjs

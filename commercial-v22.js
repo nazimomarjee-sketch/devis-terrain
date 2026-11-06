@@ -48,7 +48,8 @@ var pageOpportunites;
   function fiabilite(pc) {
     if (!pc) return {ok:false,raison:'Aucun plan du PC importé sur ce téléphone.'};
     if (!pc.arrete || !iso(pc.arrete)) return {ok:false,raison:'Date de l’export EBP absente.'};
-    const jours=Math.floor((Date.now()-new Date(pc.arrete+'T12:00:00').getTime())/864e5);
+    // Écart en jours calendaires locaux (ecartJours, app.js) : l'export du jour reste valable dès minuit.
+    const jours=ecartJours(pc.arrete);
     if(jours<0 || jours>7) return {ok:false,raison:'Export EBP daté de '+jours+' jours : les opportunités sont suspendues (seuil provisoire : 7 jours).'};
     if(pc.chiffre?.source!=='import') return {ok:false,raison:'Export réel EBP non déclaré : démonstration ou données incomplètes.'};
     if(pc.sources?.commercial?.fiable!==true || pc.sources.importIgnorees>0)
