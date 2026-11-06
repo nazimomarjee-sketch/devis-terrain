@@ -119,3 +119,5 @@ Impact : effet attendu sur CA, marge ou réachat · Coût / difficulté : 1 faib
   géolocalisation ; pointage toujours « déclaré ». Dépend de l'accès distant pour une consultation en direct par la direction.
 - **Ma Ville : référence visuelle figée** (validée par le propriétaire) — `maquettes/ma-ville-reference/REFERENCE_VISUELLE.md`.
   Maquettes sur données fictives ; **aucun développement lancé**. Prochaine décision : quel écran développer en premier.
+- **Premier écran choisi : vue Commune** (PC et Samsung). Découpage technique minimal proposé (`DECOUPAGE_VUE_COMMUNE.md`) :
+  modèle → rendu → Bureau → Samsung, en lecture seule, chacun validé. **Aucun développement avant validation.**
