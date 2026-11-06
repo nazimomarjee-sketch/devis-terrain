@@ -100,3 +100,5 @@ Impact : effet attendu sur CA, marge ou réachat · Coût / difficulté : 1 faib
 - Guide d'extraction EBP **validé** (`GUIDE_EXTRACTION_EBP.md`).
 - **Stockage local chiffré et persistant** demandé : proposition prête (`PROPOSITION_STOCKAGE_LOCAL.md`), **rien développé**
   avant validation de l'option.
+- Stockage : page par double-clic **non retenue** ; **application locale** (Node.js, sans serveur externe) — étape 1
+  « coffre chiffré » faite et testée sur données fictives (`APPLICATION_LOCALE.md`). Aucune donnée réelle avant les sauvegardes (étape 4).

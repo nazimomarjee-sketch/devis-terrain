@@ -1,6 +1,8 @@
 # Proposition — Stockage local chiffré et persistant du Bureau ODICOLOR 2.0 (08/11/2026)
 
-**Statut : proposition, rien développé.** Aucun développement, fusion ou déploiement avant validation du propriétaire.
+**Statut (08/11/2026) : option A (page ouverte par double-clic) NON retenue comme solution définitive.** Remplacée par
+l'application locale : `APPLICATION_LOCALE.md` (étape 1 « coffre » faite sur données fictives). Les règles anti-perte et
+anti-doublon ci-dessous restent valables. Historique : Aucun développement, fusion ou déploiement avant validation du propriétaire.
 Contraintes : PC indépendant d'EBP et du réseau interne · aucune donnée envoyée sur Internet · données fictives pour tous les essais.
 
 ## 1. Le besoin
