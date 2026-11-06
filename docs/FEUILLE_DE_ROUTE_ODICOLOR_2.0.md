@@ -97,3 +97,6 @@ Impact : effet attendu sur CA, marge ou réachat · Coût / difficulté : 1 faib
 - ODICOLOR LAB : cadrage **validé**, pôle **en attente**. La WORKSTATION doit être utile techniquement même sans QR code.
 - Priorité : **réveil du cockpit**. Démonstration sur données fictives faite (`REVEIL_COCKPIT.md`) : 14 voyants s'allument
   avec 3 exports EBP + la sauvegarde du téléphone ; 7 restent éteints faute de donnée ou de décision.
+- Guide d'extraction EBP **validé** (`GUIDE_EXTRACTION_EBP.md`).
+- **Stockage local chiffré et persistant** demandé : proposition prête (`PROPOSITION_STOCKAGE_LOCAL.md`), **rien développé**
+  avant validation de l'option.
