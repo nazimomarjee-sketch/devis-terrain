@@ -113,6 +113,11 @@ test('réveil du cockpit : 5 étapes, chaque import allume ses voyants, rien n�
 
     // Étape 4 : fichier clients avec famille → 4 couleurs fiables et comptes bloqués.
     await charger(page, 'clients', 'clients.csv');
+    // Un mauvais fichier ensuite est refusé SANS faire perdre le fichier clients déjà chargé.
+    fs.writeFileSync(path.join(dossier, 'mauvais.csv'), 'x;y\r\n1;2\r\n');
+    await page.setInputFiles('#ebp-clients', path.join(dossier, 'mauvais.csv'));
+    await page.waitForSelector('text=reste utilisé');
+    assert.match(await page.textContent('.message.erreur'), /Refusé : .*clients\.csv\) reste utilisé/);
     e = await etats(page);
     for (const id of ['couleurs', 'bloques']) assert.equal(e[id], 'allume', id);
     assert.match(await page.textContent('.reveil [data-id="bloques"]'), /1 compte/);

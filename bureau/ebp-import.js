@@ -30,11 +30,11 @@
       ['reste', 'Reste à payer', /reste|solde|impaye|du$/, false]
     ],
     clients: [
-      ['code', 'Code client', /code/, true],
-      ['nom', 'Nom', /nom|raison sociale|client/, true],
+      ['code', 'Code client', /^code$|code.*(client|tiers)|^(n°|no|numero) client$/, true], // jamais « Code postal »
+      ['nom', 'Nom', /nom|raison sociale|^client$/, true],
       ['ville', 'Ville', /ville|commune/, false],
       ['cp', 'Code postal', /code postal|^cp$/, false],
-      ['statut', 'Statut du compte', /statut|bloque|etat|compte/, false],
+      ['statut', 'Statut du compte', /statut|bloque|sommeil|^etat|^actif$/, false], // jamais « Compte comptable »
       ['famille', 'Famille / activité (carrosserie, mécanique)', /famille|categorie|activite|type de client|secteur/, false]
     ]
   };
@@ -183,7 +183,11 @@
       if (!code || !nom) return ignorees.push({ ligne: n, motif: 'Code ou nom absent' });
       if (codes.has(code)) return ignorees.push({ ligne: n, motif: 'Code client ' + code + ' en double' });
       codes.add(code);
-      const statut = texte(g('statut'), 40);
+      // Colonne case à cocher (« Bloqué », « En sommeil » : Oui / Non) : la valeur « Oui » prend le sens du titre.
+      const titre = norm(T.entetes[T.carte.statut] || ''), brut = texte(g('statut'), 40);
+      const statut = /^(bloque|sommeil|en sommeil)/.test(titre) && /^(oui|vrai|1|x)$/.test(norm(brut)) ? (/bloque/.test(titre) ? 'Bloqué' : 'En sommeil')
+        : /^(bloque|sommeil|en sommeil)/.test(titre) && /^(non|faux|0)?$/.test(norm(brut)) ? 'Actif'
+        : titre === 'actif' && /^(non|faux|0)$/.test(norm(brut)) ? 'Inactif' : titre === 'actif' && /^(oui|vrai|1|x)$/.test(norm(brut)) ? 'Actif' : brut;
       clients.push({ code, nom, ville: texte(g('ville'), 80), cp: texte(g('cp'), 10), statut, famille: texte(g('famille'), 60), bloque: /bloqu|suspendu|interdit|contentieux/.test(norm(statut)) });
     });
     return { clients, ignorees, correspondance: T.correspondance, lues: T.corps.length };

@@ -116,3 +116,17 @@ test('aucune donnée réelle dans les fichiers d’essai', () => {
     assert.doesNotMatch(t, /@|\b0[1-9](\s?\d{2}){4}\b|\b\d{14}\b/, n + ' : ni e-mail, ni téléphone, ni SIRET');
   }
 });
+
+// Corrections du 08/11/2026 (guide d'extraction EBP) : confusions de colonnes et cases à cocher Oui / Non.
+test('fichier clients : « Code postal » et « Compte comptable » ne sont jamais pris pour le code ou le statut', () => {
+  const E = require('../bureau/ebp-import.js');
+  const c = h => Object.fromEntries(E.associerColonnes('clients', h).correspondance.map(x => [x.cle, x.colonne]));
+  assert.deepEqual(c(['Code postal', 'Code client', 'Nom', 'Compte comptable', 'Famille']), { code: 'Code client', nom: 'Nom', cp: 'Code postal', famille: 'Famille' });
+  assert.equal(c(['Code', 'Nom', 'Code postal', 'Compte comptable', 'En sommeil']).statut, 'En sommeil');
+});
+test('fichier clients : colonnes « Bloqué » / « En sommeil » en Oui / Non comprises', () => {
+  const E = require('../bureau/ebp-import.js');
+  const b = E.lireClientsEbp([['Code', 'Nom', 'Bloqué'], ['C1', 'A', 'Oui'], ['C2', 'B', 'Non'], ['C3', 'C', '']]).clients;
+  assert.deepEqual(b.map(x => x.bloque), [true, false, false]);
+  assert.equal(E.lireClientsEbp([['Code', 'Nom', 'En sommeil'], ['C1', 'A', 'Oui']]).clients[0].statut, 'En sommeil');
+});

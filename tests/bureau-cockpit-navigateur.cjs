@@ -148,6 +148,7 @@ test('Historique EBP 14 mois → Bureau → téléphone : page Opportunités (re
   try {
     await page.clock.setFixedTime(new Date('2026-11-06T14:00:00'));
     await page.goto(origine + '/#/reglages');
+    await page.waitForFunction(() => typeof DB !== 'undefined' && DB.db); // la base locale du téléphone doit être ouverte avant d'écrire
     await page.evaluate(() => putMany('clients', [{ id: 1, nom: 'GARAGE FICTIF OMEGA', statutCrm: 'client' }, { id: 2, nom: 'GARAGE FICTIF SIGMA', statutCrm: 'client' }, { id: 3, nom: 'GARAGE FICTIF KAPPA', statutCrm: 'client' }]));
     await page.click('text=Plan commercial du PC');
     await page.getByLabel('Plan PC à importer').setInputFiles(path.join(dossier, 'plan-historique.json'));

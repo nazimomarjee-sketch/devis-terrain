@@ -48,3 +48,11 @@ supervision de la direction (écran et comptes, après accord d'hébergement) ·
 Le **fichier clients EBP est indispensable**, pas facultatif : sans lui, deux voyants restent partiels et la Ville ne
 peut pas repérer les clients inactifs. Les 3 exports actuels (pièces avec n° d'origine sur 12 mois, échéancier,
 clients avec famille et statut) suffisent pour allumer les 14 voyants opérationnels.
+
+## Corrections du 08/11/2026 (préparation des données réelles, aucune fonction ajoutée)
+
+- Un fichier EBP refusé ne fait plus perdre le fichier du même type déjà chargé (il était effacé).
+- Fichier clients : « Code postal » n'est plus pris pour le code client, ni « Compte comptable » pour le statut ;
+  colonnes « Bloqué » / « En sommeil » en Oui / Non comprises.
+- Test cockpit instable (1 fois sur 3) : le test écrivait dans la base du téléphone avant son ouverture. Test corrigé, téléphone inchangé.
+- Guide pas à pas : `GUIDE_EXTRACTION_EBP.md`.

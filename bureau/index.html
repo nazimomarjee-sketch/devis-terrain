@@ -1106,7 +1106,7 @@ async function importerEbp(type, f){
     if (f.size > 50*1024*1024) throw new Error('Fichier trop gros (50 Mo maximum).');
     const fn = EXPORTS.find(x => x[0] === type)[2];
     etat.ebp[type] = Object.assign(EbpImport[fn](await lireTableau(f)), {fichier: f.name});
-  } catch (e) { etat.ebp[type] = null; etat.ebp.erreur[type] = e.message; }
+  } catch (e) { etat.ebp.erreur[type] = e.message + (etat.ebp[type] ? ' Le fichier chargé avant (' + etat.ebp[type].fichier + ') reste utilisé.' : ''); } // un fichier refusé ne fait jamais perdre le précédent
   connecterVille(); rendre();
 }
 // Ville connectée (P1–P5) : seulement si la sauvegarde du téléphone ET l'export des pièces EBP sont chargés.
