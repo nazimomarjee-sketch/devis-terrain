@@ -87,3 +87,50 @@ Statut : à valider par le propriétaire avant toute programmation. Préalable �
 | Export clients EBP incomplet | Il ne sert qu'à **suggérer** ; il n'est jamais une preuve |
 | Plusieurs personnes vérifient | L'auteur est enregistré à chaque décision. La gestion des droits est à décider plus tard |
 | Données réelles avant les sauvegardes hors du PC | Import réel bloqué jusqu'à l'étape 4 de l'application locale |
+
+---
+
+## Lot A réalisé le 07/11/2026 (données fictives, aucune donnée réelle)
+
+**1. État réel de la connexion Bureau ↔ coffre, vérifié avant de programmer**
+- Prouvée par tests automatiques dans ce dépôt (`tests/local-bureau-navigateur.cjs`, 3/3). Le programme local tourne en processus séparé, il est arrêté brutalement puis relancé, et tout est retrouvé après le mot de passe.
+- Les tests du coffre (15/15) et du serveur (9/9) sont verts.
+- **Jamais essayée sur ton PC.** L'étape 4 (sauvegardes chiffrées hors du PC, restauration vérifiée) n'est pas faite.
+- **Ce que le coffre enregistrait avant le lot A :** sauvegarde du téléphone (fiches telles quelles), garages du Bureau, exports EBP et date d'export.
+- **Ce qu'il n'enregistre pas :** l'objectif mensuel et le code représentant (gardés dans le navigateur de ce PC), et la tournée en cours.
+- **Écart constaté :** la police des nouvelles vues (fichiers à la racine du dépôt) n'est pas servie par le programme local. La police de secours s'affiche. À corriger au lot C.
+
+**2. Ce qui est fait**
+- `bureau/decisions-comptes.js` : journal des décisions, qui ne fait que grandir. Trois types : liaison EBP validée, absence vérifiée, annulation.
+  - Chaque décision porte un auteur, une date, une source, la date de l'export clients consulté et les clés du garage (n° téléphone, nom, code postal, SIRET).
+  - **Une liaison n'est jamais créée par le programme :** seule une décision humaine en crée une.
+  - **Annuler ne réactive jamais une décision plus ancienne :** le garage redevient « à vérifier ».
+  - **Une décision n'est pas appliquée** dans six cas, et l'état est affiché avec son motif :
+    - **à revérifier :** même n° de téléphone mais autre nom ou autre code postal ;
+    - **contredite :** absence déclarée alors qu'une fiche EBP au même nom et au même code postal existe ;
+    - **conflit :** un même code EBP relié à deux garages ;
+    - **en attente :** code EBP absent des exports chargés ;
+    - **orpheline :** garage absent de la sauvegarde chargée ;
+    - **remplacée :** une décision plus récente existe pour le même garage.
+- `bureau/ville/modele-commune.js` : accepte `aRevoir`. Un garage dont la décision est contredite ou douteuse redevient « à vérifier », avec le motif.
+- `bureau/index.html` (logique seulement, aucun affichage nouveau) :
+  - état du coffre en **version 2**, qui contient le journal ;
+  - un ancien coffre (version 1) s'ouvre avec un journal vide ;
+  - un journal illisible est conservé tel quel et bloque les nouvelles décisions ;
+  - aucune décision n'est possible sur la démo.
+- `local/serveur.js` : accepte les états en version 1 et 2, refuse tout autre format.
+
+**3. Tests**
+- `tests/bureau-decisions-comptes.test.cjs` : 10/10.
+- `tests/local-decisions-navigateur.cjs` : 4/4 avec le vrai programme local. Les scénarios couverts sont :
+  - fermeture, arrêt brutal, relance ;
+  - contradiction après un nouvel import ;
+  - ancien coffre version 1 ;
+  - aucune décision possible sur la démo.
+- **Erreurs volontaires :** 9 introduites, chacune repérée par au moins un test.
+- **Non-régression :** toutes les suites existantes sont vertes (Ville LEGO, coffre, application téléphone). Aucun fichier de l'application téléphone n'est modifié.
+
+**4. Limites**
+- **Pas d'écran.** Les décisions ne sont accessibles que par programme ; l'écran est le lot B.
+- **Contradiction détectée seulement** quand une fiche EBP a exactement le même nom (normalisé) et le même code postal. Une « SARL … » ou un nom abrégé ne déclenche rien : ces cas seront montrés comme suggestions dans l'écran du lot B.
+- **Un seul auteur par décision**, en texte libre, sans gestion des droits.

@@ -14,7 +14,7 @@ Mise à jour : 07/11/2026.
 | Factures émises (brut) | Détail « N factures émises X € HT » | `facN`, `facHt` | **Identiques**, vérifié par `tests/bureau-ca-facture.test.cjs` (test 6) |
 | Rattachement géographique | Par code client EBP → établissement → commune → département ; le reste est « non attribué », à part | Aucun découpage géographique | À ajouter seulement si le propriétaire le demande |
 | CA personnel / agence | Personnel seulement si le fichier clients EBP indique le représentant et si le code du commercial est saisi | Non distingué | À ajouter avec le même calcul (champ du plan) |
-| Objectif | Objectif mensuel de **CA facturé** saisi dans le Bureau (gardé sur ce PC, jamais écrit dans le code public) | L'objectif existant porte sur les **commandes envoyées** (MOI), pas sur le facturé | **Deux objectifs différents.** À trancher : lequel suivre sur le téléphone, ou les deux, clairement nommés |
+| Objectif | Objectif mensuel de **CA facturé** saisi dans le Bureau (gardé sur ce PC, jamais écrit dans le code public) | L'objectif existant porte sur les **commandes envoyées** (MOI), pas sur le facturé | **Tranché le 07/11/2026 : l'objectif officiel est le CA HT facturé** (exports EBP datés). Les commandes restent visibles **à part**. À aligner à l'étape Samsung |
 | Fraîcheur | « Export EBP du JJ/MM/AAAA · pas en temps réel » | « EBP du … », « Il n'est pas en direct » | Concordant |
 | Absence de données | « Non renseigné » (pas d'export, ou export d'un mois passé) | « pas d'export » (`pasExport`) | Concordant |
 

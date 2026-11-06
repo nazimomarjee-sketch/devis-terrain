@@ -346,6 +346,7 @@ select.recherche{appearance:auto}
 <script src="lecture-sauvegarde.js"></script>
 <script src="annuaire.js"></script>
 <script src="ca-facture.js"></script>
+<script src="decisions-comptes.js"></script>
 <script src="ville/modele-commune.js"></script>
 <script src="ville/dessin-iso.js"></script>
 <script src="ville/vue-commune.js"></script>
@@ -1403,14 +1404,33 @@ window.addEventListener('hashchange', () => { const c = $('#couche-fiche'); c.hi
 // Pont vers bureau/coffre-client.js : état réel à enregistrer, état retrouvé à l'ouverture.
 // Sans l'application locale (fichier ouvert directement, tests), rien ne change. La démo n'est jamais enregistrée.
 function signalerChangement(){ window.dispatchEvent(new Event('odicolor-change')); }
+// Lot A : journal des décisions de compte (liaisons EBP validées, absences vérifiées), enregistré dans le coffre (état version 2).
+// Il ne fait que grandir ; un journal illisible est conservé tel quel (jamais effacé) et bloque les nouvelles décisions.
+etat.decisions = DecisionsComptes.creerJournal(); etat.decisionsAlerte = null;
 window.OdicolorBureau = Object.freeze({
   exporter(){
     const s = etat.sauvegardeTelephone || null, E = etat.ebp;
-    return { version:1, telephone: s && s.telephone, garagesTelephone: s && s.garages, rapport: s && s.rapport,
-      ebp: { pieces:E.pieces, reglements:E.reglements, clients:E.clients, arrete:E.arrete } };
+    return { version:2, telephone: s && s.telephone, garagesTelephone: s && s.garages, rapport: s && s.rapport,
+      ebp: { pieces:E.pieces, reglements:E.reglements, clients:E.clients, arrete:E.arrete }, decisionsComptes: etat.decisions };
   },
+  // Décisions (sans écran au lot A ; l'écran « Vérifier les comptes » du lot B utilisera ces mêmes fonctions).
+  decisions: Object.freeze({
+    journal: () => JSON.parse(JSON.stringify(etat.decisions)),
+    decider(e){
+      if (etat.mode !== 'reel' || !etat.telephone) throw new Error('Charge d’abord la sauvegarde de ton téléphone : aucune décision sur la démo.');
+      if (etat.decisionsAlerte) throw new Error(etat.decisionsAlerte);
+      const r = DecisionsComptes.decider(etat.decisions, Object.assign({ exportClientsDu: etat.ebp.clients ? etat.ebp.arrete : null }, e));
+      etat.decisions = r.journal; signalerChangement(); return r.decision;
+    },
+    appliquer: () => DecisionsComptes.appliquer(etat.decisions, { terrain: etat.telephone ? etat.telephone.clients : [], clientsEbp: etat.ebp.clients ? etat.ebp.clients.clients : [],
+      piecesEbp: etat.ebp.pieces ? etat.ebp.pieces.pieces : [], exportClientsDu: etat.ebp.clients ? etat.ebp.arrete : null })
+  }),
   restaurer(d, enregistreLe){
-    if (!d || d.version !== 1) return false;
+    if (!d || (d.version !== 1 && d.version !== 2)) return false;
+    // Version 1 (avant le lot A) : aucun journal → journal vide. Version 2 : journal relu et contrôlé, rien n'est jeté.
+    const lu = DecisionsComptes.lire(d.version === 2 ? d.decisionsComptes : null);
+    etat.decisions = lu.journal || d.decisionsComptes; etat.decisionsAlerte = lu.erreur ? lu.erreur + ' : conservé tel quel, nouvelles décisions bloquées.'
+      : lu.illisibles.length ? lu.illisibles.length + ' décision(s) illisible(s) dans le coffre : conservées telles quelles, nouvelles décisions bloquées.' : null;
     if (d.telephone && Array.isArray(d.garagesTelephone)) {
       etat.sauvegardeTelephone = { telephone:d.telephone, garages:d.garagesTelephone, rapport:d.rapport };
       Object.assign(etat, {telephone:d.telephone, garagesTelephone:d.garagesTelephone, mode:'reel', garages:d.garagesTelephone,
@@ -1419,7 +1439,8 @@ window.OdicolorBureau = Object.freeze({
     const E = d.ebp || {};
     for (const k of ['pieces','reglements','clients']) etat.ebp[k] = E[k] || null;
     if (/^\d{4}-\d{2}-\d{2}$/.test(E.arrete || '')) etat.ebp.arrete = E.arrete;
-    etat.message = {texte:'Données retrouvées dans le coffre ODICOLOR' + (enregistreLe ? ' (dernier enregistrement : ' + new Date(enregistreLe).toLocaleString('fr-FR') + ')' : '') + '.'};
+    etat.message = {erreur: !!etat.decisionsAlerte, texte:'Données retrouvées dans le coffre ODICOLOR' + (enregistreLe ? ' (dernier enregistrement : ' + new Date(enregistreLe).toLocaleString('fr-FR') + ')' : '') + '.'
+      + ' ' + (etat.decisions && Array.isArray(etat.decisions.decisions) ? etat.decisions.decisions.length : '?') + ' décision(s) de compte retrouvée(s).' + (etat.decisionsAlerte ? ' ' + etat.decisionsAlerte : '')};
     connecterVille(); rendre(); return true;
   }
 });

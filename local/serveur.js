@@ -118,7 +118,7 @@ function demarrer({ dossier, port = 4747, delaiVerrouillageMs = 10 * 60 * 1000, 
       if (req.method === 'GET') { const d = coffre.lire(); return envoyer(res, 200, { etat: d.bureau || null, enregistreLe: d.enregistreLe || '', generation: coffre.generation, alerte: coffre.alerte || '' }); }
       if (req.method === 'PUT') {
         const etat = await lireCorps(req);
-        if (etat.version !== 1) return envoyer(res, 400, { erreur: 'Format d’état inconnu.' });
+        if (etat.version !== 1 && etat.version !== 2) return envoyer(res, 400, { erreur: 'Format d’état inconnu.' }); // 2 = avec le journal des décisions de compte (lot A)
         const enregistreLe = new Date().toISOString();
         const generation = coffre.ecrire({ bureau: etat, enregistreLe });
         return envoyer(res, 200, { enregistre: true, generation, enregistreLe });

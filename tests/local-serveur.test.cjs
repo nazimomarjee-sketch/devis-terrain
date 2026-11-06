@@ -77,7 +77,7 @@ test('état : illisible sans session, enregistré et relu avec la session', asyn
   assert.equal(w.statut, 200);
   const r = await requete('GET', '/api/etat', { entetes: API({ Cookie: session }) });
   assert.deepEqual(r.json.etat, etat);
-  assert.equal((await requete('PUT', '/api/etat', { corps: { version: 2 }, entetes: API({ Cookie: session }) })).statut, 400);
+  assert.equal((await requete('PUT', '/api/etat', { corps: { version: 3 }, entetes: API({ Cookie: session }) })).statut, 400);
   assert.equal((await requete('PUT', '/api/etat', { corps: '{abîmé', entetes: API({ Cookie: session }) })).statut, 400);
 });
 

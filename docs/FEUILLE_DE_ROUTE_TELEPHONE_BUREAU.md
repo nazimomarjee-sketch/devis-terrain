@@ -75,3 +75,15 @@ Les 3 fonctions (opportunités, ligne EBP de l'accueil, garage présélectionné
 - **Réapprovisionnement client en un clic** : inscrit à la feuille de route — demande reçue par le commercial → proposition
   éventuelle (produits complémentaires ou Offre de conquête) → confirmation du client → traitement dans EBP.
   **Pas de développement pour l'instant** (`docs/PARCOURS_COMMANDE_CLIENT.md`).
+
+## Décisions du 07/11/2026 (suite)
+
+- **Objectif officiel = CA HT facturé** (exports EBP datés).
+  - Les commandes restent visibles, **séparément**.
+  - L'objectif actuel du téléphone, qui porte sur les commandes envoyées, devra être aligné à l'étape Samsung.
+- **Un seul système cohérent** pour le Bureau, Ma Ville et le téléphone, pas trois bases commerciales.
+  - Les chiffres sont calculés une fois par le Bureau à partir des exports EBP, puis transmis au téléphone avec leur date.
+  - Le téléphone ne recalcule pas et n'est jamais présenté comme en temps réel.
+- **Vérification des comptes** :
+  - lot A (mémoire des décisions dans le coffre) **fait sur données fictives** ;
+  - lots B (écran) et C (vue Commune avec « Mes garages ») **en attente de validation** (`docs/PROPOSITION_VERIFICATION_COMPTES.md`).

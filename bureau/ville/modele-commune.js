@@ -230,9 +230,12 @@
     }
     return m;
   }
-  function statutCompte(x, verifs, props) {
+  function statutCompte(x, verifs, props, revoir = new Map()) {
     if (x.confirmeEbp) return { statut: 'en_compte', motif: 'Code client EBP ' + x.codesEbp.join(', ') + (x.dormant ? ' · ' + (x.dormant.niveau === 'inactif' ? 'inactif' : 'potentiellement dormant') : '') +
       (x.alertes.some(a => a.type === 'compte_bloque') ? ' · compte bloqué' : ''), source: 'EBP', date: (x.sources.find(s => s.source === 'EBP') || {}).date || null };
+    // Décision humaine contredite ou devenue douteuse (bureau/decisions-comptes.js) : à revérifier, motif affiché.
+    const r = x.sources.map(s => revoir.get('ref:' + s.ref)).find(Boolean) || (x.siret && revoir.get('siret:' + x.siret.valeur));
+    if (r) return { statut: 'a_verifier', motif: r.motif, source: null, date: null, decision: r.decision };
     const enAttente = props.find(p => p.uids.includes(x.uid));
     if (enAttente) return { statut: 'a_verifier', motif: 'Rapprochement EBP incertain (' + enAttente.motif + ')', source: null, date: null };
     if (x.categorie === 'client') return { statut: 'a_verifier', motif: 'Déclaré client (' + x.sources.map(s => s.source).join(', ') + ') mais non retrouvé dans EBP', source: null, date: null };
@@ -264,7 +267,7 @@
   const comparer = (a, b) => { const x = rang(a), y = rang(b); for (let i = 0; i < x.length; i++) { if (x[i] < y[i]) return -1; if (x[i] > y[i]) return 1; } return 0; };
 
   // ---------- Point d'entrée ----------
-  // e = { terrain, clientsEbp, piecesEbp, airtable, annuaire, liaisonsValidees, arrete, dates:{EBP,Terrain,Airtable,SIRENE}, parametres }
+  // e = { terrain, clientsEbp, piecesEbp, airtable, annuaire, liaisonsValidees, verificationsCompte, aRevoir, arrete, dates:{EBP,Terrain,Airtable,SIRENE}, parametres }
   function construire(e = {}) {
     if (!iso(e.arrete)) throw new Error('Date d’arrêté (export EBP) obligatoire au format AAAA-MM-JJ.');
     const dates = Object.assign({ EBP: e.arrete, Terrain: null, Airtable: null, SIRENE: null }, e.dates || {});
@@ -286,8 +289,9 @@
     const verifs = indexVerifications(e.verificationsCompte);
     const entrees = {}; for (const s of SOURCES) entrees[s] = fr.filter(f => f.source === s).length + ecartees.filter(f => f.source === s).length;
     const fragmentsPlaces = etabs.reduce((n, x) => n + x.sources.length, 0);
-    const props = propositions(etabs);
-    etabs.forEach(x => { x.compte = statutCompte(x, verifs, props); });
+    const props = propositions(etabs), revoir = new Map();
+    for (const r of e.aRevoir || []) { if (r.ref) revoir.set('ref:' + r.ref, r); if (r.siret) revoir.set('siret:' + r.siret, r); }
+    etabs.forEach(x => { x.compte = statutCompte(x, verifs, props, revoir); });
     for (const c of communes.values()) c.comptes = comptes(c.etablissements);
     return { version: VERSION, arrete: ctx.arrete, dates, parametres, debutHistorique: ctx.debutHistorique, communes, aClasser, ecartees, propositions: props, conflits,
       bilan: { entrees, fragments: fr.length, ecartees: ecartees.length, fragmentsPlaces, etablissements: etabs.length,
