@@ -48,6 +48,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .mode.reel{border-color:var(--vert);color:var(--vert)}
 .donnees{position:absolute;right:max(16px,env(safe-area-inset-right,0px));top:calc(100% + 6px);width:min(360px,calc(100vw - 32px));z-index:70}
 @media (max-width:720px){.onglets{order:3;width:100%;margin-left:0}.onglet{flex:1;justify-content:center;padding:0 8px}.cherche input{width:40vw}}
+@media (max-width:480px){.onglet svg{display:none}.onglet{padding:0 4px;font-size:14px}}
 
 /* Indicateurs */
 .kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;padding-block:14px 4px}
@@ -334,6 +335,9 @@ select.recherche{appearance:auto}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="communes-idf.js"></script>
 <script src="bureau-logique.js"></script>
+<script src="../xlsx.mini.min.js"></script>
+<script src="ebp-import.js"></script>
+<script src="pipeline.js"></script>
 <script src="lecture-sauvegarde.js"></script>
 <script src="annuaire.js"></script>
 <script>
@@ -396,7 +400,7 @@ function rendreKpis(){
     kpi('fiole','Essais Carsystem', null, h('span',{class:'badge b-vide'},'Lot 3')));
 }
 function rendreFiltres(){
-  if (route().ecran === 'simulation') { $('#filtres').replaceChildren(); return; }
+  if (['simulation','bureau'].includes(route().ecran)) { $('#filtres').replaceChildren(); return; }
   const def = [['tous','Tous',null],['actif','Clients','var(--vert)'],['prospect','Prospects','var(--bleu)'],['dormant','Dormants / perdus','var(--orange)'],['risque','Risque règlement','var(--danger)']];
   const nb = k => etat.garages.filter(x => x.dep && (!FILTRES[k] || FILTRES[k].includes(x.statut))).length;
   $('#filtres').replaceChildren(...def.map(([k,l,c]) => h('button',{class:'puce'+(k==='tous'?' tous':''), 'aria-pressed':String(etat.filtre===k),
@@ -844,7 +848,7 @@ function ficheActeur(a){
 // ================= Fil d'actions =================
 function rendreFil(){
   const zone = $('#fil-actions');
-  if (route().ecran === 'simulation') { zone.hidden = true; return; } zone.hidden = false;
+  if (['simulation','bureau'].includes(route().ecran)) { zone.hidden = true; return; } zone.hidden = false;
   const types = { visite:['visite','var(--vert)','Visite client'], devis:['devis','var(--neon)','Devis'], essai:['fiole','var(--orange)','Essai Carsystem'], relance:['relance','var(--danger)','Relance règlement'], prospect:['cible','var(--bleu)','Prospection'], action:['calendrier','var(--doux)','Prochaine action'] };
   let evts;
   if (etat.mode === 'demo') {
@@ -1032,7 +1036,7 @@ function ouvrirFiche(x){
 // ================= En-tête : onglets, recherche, données =================
 function rendreEntete(){
   const r = route(), depChoix = TERRITOIRES.find(t=>t.id===etat.choix).dep;
-  const ong = [['ville','Ville','ville','#ville'],['carte','Carte','carte','#carte-' + (r.D ? r.D.dep : depChoix)],['simulation','Simulation','sim','#simulation']];
+  const ong = [['bureau','Bureau','devis','#bureau'],['ville','Ville','ville','#ville'],['carte','Carte','carte','#carte-' + (r.D ? r.D.dep : depChoix)],['simulation','Simulation','sim','#simulation']];
   $('#onglets').replaceChildren(...ong.map(([k,l,ic,href]) => h('a',{class:'onglet'+(k==='simulation'?' sim':''), href, 'aria-current': (r.ecran===k || (k==='ville' && r.ecran==='a-classer')) ? 'page' : null}, icone(ic), l)));
   const mode = $('#mode'); mode.className = 'mode' + (etat.mode==='reel'?' reel':''); mode.textContent = etat.mode==='reel' ? 'Mes garages' : 'Démo';
   mode.setAttribute('aria-expanded', String(etat.donneesOuvertes));
@@ -1062,11 +1066,90 @@ function monterRecherche(){
   zone.replaceChildren(icone('loupe'), input, res);
 }
 
+// ================= Bureau : exports EBP → pipeline → 3 actions → plan du matin pour le téléphone =================
+// Logique : ebp-import.js et pipeline.js (testés). Tout reste en mémoire : rien n'est envoyé ni enregistré.
+const jourIso = (d = new Date()) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+etat.ebp = { pieces:null, reglements:null, clients:null, arrete: jourIso(), erreur:{} };
+const EXPORTS = [['pieces','Pièces (devis, commandes, BL, factures)','lirePieces'],['reglements','Échéancier des règlements','lireReglements'],['clients','Fichier clients','lireClientsEbp']];
+async function lireTableau(f){
+  const buf = await f.arrayBuffer();
+  if (/\.xlsx?$/i.test(f.name)) {
+    if (!window.XLSX) throw new Error('Lecteur Excel indisponible : exporte en CSV.');
+    const wb = XLSX.read(buf, {type:'array'}); return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, raw:true, defval:''});
+  }
+  return EbpImport.lireCsv(EbpImport.decoderTexte(buf).texte);
+}
+async function importerEbp(type, f){
+  if (!f) return;
+  delete etat.ebp.erreur[type];
+  try {
+    if (f.size > 50*1024*1024) throw new Error('Fichier trop gros (50 Mo maximum).');
+    const fn = EXPORTS.find(x => x[0] === type)[2];
+    etat.ebp[type] = Object.assign(EbpImport[fn](await lireTableau(f)), {fichier: f.name});
+  } catch (e) { etat.ebp[type] = null; etat.ebp.erreur[type] = e.message; }
+  rendre();
+}
+function planBureau(){
+  const E = etat.ebp; if (!E.pieces) return null;
+  const ignorees = ['pieces','reglements','clients'].reduce((n,k) => n + (E[k] ? E[k].ignorees.length : 0), 0);
+  return Pipeline.construirePlan({ piecesEbp:E.pieces.pieces, reglements:E.reglements ? E.reglements.reglements : [], clientsEbp:E.clients ? E.clients.clients : [],
+    devisTelephone: etat.telephone ? etat.telephone.devis : [], arrete:E.arrete, aujourdhui: jourIso(), ignorees });
+}
+function telechargerPlan(plan){
+  const a = h('a',{href:URL.createObjectURL(new Blob([JSON.stringify(plan)],{type:'application/json'})), download:'plan-odicolor-' + plan.arrete + '.json'});
+  document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+function vueBureau(){
+  const E = etat.ebp, e2 = v => euros(Math.round(v * 100) / 100);
+  const champ = ([type, lib]) => { const r = E[type], id = 'ebp-' + type;
+    return h('div',{class:'champ-ebp'},
+      h('label',{class:'btn', for:id}, (r ? '✓ ' : '') + lib, h('input',{type:'file', id, accept:'.csv,.txt,.xlsx,.xls', hidden:true, onchange:ev => { const f = ev.target.files[0]; ev.target.value = ''; importerEbp(type, f); }})),
+      E.erreur[type] ? h('div',{class:'message erreur'}, 'Refusé : ' + E.erreur[type]) : null,
+      r ? h('details',{class:'info'}, h('summary',{}, `${r.fichier} : ${r.lues} ligne(s) lue(s), ${r.ignorees.length} écartée(s)`),
+        h('p',{}, 'Colonnes retenues : ' + r.correspondance.map(c => c.libelle + ' ← « ' + c.colonne + ' »').join(' · ')),
+        r.ignorees.length ? h('ul',{}, r.ignorees.slice(0, 50).map(x => h('li',{}, 'Ligne ' + x.ligne + ' : ' + x.motif))) : null) : null); };
+  const imports = h('section',{class:'bloc'}, h('div',{class:'titre-bloc'},'Exports EBP'),
+    h('p',{class:'info'}, 'Charge tes exports EBP (CSV ou Excel). Lecture seule : rien n’est modifié ni envoyé. ',
+      etat.telephone ? h('b',{}, (etat.telephone.devis || []).length + ' devis du téléphone pris en compte.') : 'Charge aussi ta sauvegarde téléphone (bouton Démo / Mes garages) pour relier tes devis.'),
+    h('label',{class:'info', for:'ebp-arrete'}, 'Date de l’export EBP '), h('input',{type:'date', id:'ebp-arrete', class:'recherche', value:E.arrete, max:jourIso(), onchange:ev => { E.arrete = ev.target.value; rendre(); }}),
+    h('div',{class:'deps'}, EXPORTS.map(champ)));
+  let plan = null, erreur = '';
+  try { plan = planBureau(); } catch (e) { erreur = e.message; }
+  if (!plan) return h('div',{class:'ecran'}, h('div',{class:'panneau'}, imports, erreur ? h('div',{class:'message erreur'}, erreur) :
+    h('section',{class:'bloc'}, h('h2',{},'Ta journée'), h('p',{class:'sous'},'Charge au moins l’export des pièces EBP pour voir tes 3 actions et ton CA réel.'))));
+  const k = plan.kpi, top = plan.actions.filter(a => a.prio === 1), suite = plan.actions.filter(a => a.prio > 1);
+  const action = (a, i) => h('div',{class:'action'}, h('div',{class:'n'}, (i + 1) + ' · ' + a.tag + ' · ' + a.responsable),
+    h('b',{}, a.t), h('p',{class:'info', style:'margin:4px 0 0'}, a.d), h('details',{class:'info'}, h('summary',{},'Preuve'), h('p',{}, a.preuve), h('p',{}, a.source + ' · ' + a.qualite)));
+  const chiffre = (l, v, b, s) => h('div',{class:'chiffre'}, h('div',{class:'v'}, v), h('div',{class:'l'}, l, h('span',{class:'badge ' + b[0]}, b[1])), s ? h('small',{class:'info'}, s) : null);
+  const ebpB = ['b-confirme','EBP'];
+  return h('div',{class:'ecran'},
+    h('div',{class:'panneau'},
+      h('section',{class:'bloc'}, h('h2',{},'Tes 3 actions'), h('p',{class:'sous'}, 'Classées par montant en jeu · export EBP du ' + plan.arrete),
+        top.length ? top.map(action) : h('p',{class:'info'},'Aucun retard détecté dans les exports chargés.'),
+        suite.length ? h('details',{class:'info', style:'margin-top:12px'}, h('summary',{}, suite.length + ' autre(s) action(s) à suivre'), suite.map((a, i) => action(a, i + 3))) : null),
+      plan.changement ? h('section',{class:'bloc'}, h('div',{class:'titre-bloc'},'Un seul changement cette semaine'), h('p',{}, plan.changement.texte), h('small',{class:'info'}, plan.changement.mesure)) : null),
+    h('div',{class:'panneau'},
+      h('section',{class:'bloc'}, h('div',{class:'titre-bloc'},'Où j’en suis'), h('div',{class:'chiffres'},
+        chiffre('CA commandé cette semaine', e2(k.semaine.cmdHt), ebpB, k.semaine.cmdN + ' commande(s)'),
+        chiffre('CA commandé ce mois', e2(k.mois.cmdHt), ebpB, k.mois.cmdN + ' commande(s)'),
+        chiffre('Facturé ce mois', e2(k.mois.facHt), ebpB, k.mois.facN + ' facture(s)'),
+        k.echu ? chiffre('Échu non réglé', e2(k.echu.reste), ebpB, k.echu.n + ' facture(s)' + (k.echu.aVerifier ? ' · ' + k.echu.aVerifier + ' à vérifier' : ''))
+               : chiffre('Échu non réglé', '—', ['b-vide','Non vérifiable'], 'Charge l’échéancier EBP')),
+        h('p',{class:'regle'}, 'Objectif : à fixer avec Faizal (non renseigné). Marge : non calculable sans les prix d’achat EBP.')),
+      h('section',{class:'bloc'}, h('div',{class:'titre-bloc'},'Plan du matin pour le téléphone'),
+        h('p',{class:'info'}, plan.actions.length + ' action(s), ' + plan.clients.length + ' fiche(s) client, chiffres EBP. Sur le téléphone : Réglages → Imports → Plan PC.'),
+        plan.rapprochements.length ? h('p',{class:'info'}, plan.rapprochements.length + ' pièce(s) du téléphone reconnue(s) dans EBP (non comptées deux fois) : ' + plan.rapprochements.map(r => r.telephone + ' = ' + r.ebp).join(', ') + '.') : null,
+        plan.sources.commercial.restrictions.map(t => h('div',{class:'message erreur'}, t)),
+        h('button',{class:'btn principal plein', onclick:() => telechargerPlan(plan)}, 'Télécharger le plan du matin')),
+      imports));
+}
+
 // ================= Navigation =================
 function route(){
   const hs = location.hash, m = /^#carte-(\d\d)(?:-([a-z]+))?$/.exec(hs);
   if (m && L0.depInfo(m[1])) { const D = L0.depInfo(m[1]); return {ecran:'carte', D, porte: m[2] ? TERRITOIRES.find(x=>x.id===m[2] && x.dep===D.dep) : null}; }
   if (hs === '#simulation') return {ecran:'simulation'};
+  if (hs === '#bureau') return {ecran:'bureau'};
   if (hs === '#a-classer') return {ecran:'a-classer'};
   return {ecran:'ville'};
 }
@@ -1077,8 +1160,8 @@ function rendre(){
   if (r.porte) etat.choix = r.porte.id;
   if (r.ecran !== 'carte' && carte) { carte.remove(); carte = null; }
   rendreEntete(); rendreKpis(); rendreFiltres();
-  $('#kpis').hidden = r.ecran === 'simulation';
-  $('#vue').replaceChildren(r.ecran==='carte' ? vueCarte(r.D, r.porte) : r.ecran==='simulation' ? vueSimulation() : r.ecran==='a-classer' ? vueAClasser() : vueVille());
+  $('#kpis').hidden = r.ecran === 'simulation' || r.ecran === 'bureau';
+  $('#vue').replaceChildren(r.ecran==='carte' ? vueCarte(r.D, r.porte) : r.ecran==='simulation' ? vueSimulation() : r.ecran==='bureau' ? vueBureau() : r.ecran==='a-classer' ? vueAClasser() : vueVille());
   rendreFil();
   const sc = document.getElementById('scene'); if (sc && sc.scrollWidth > sc.clientWidth) { const t = TERRITOIRES.find(x=>x.id===etat.choix), [px] = iso(...pos(t)); sc.scrollLeft = (px + 495) / 990 * sc.scrollWidth - sc.clientWidth/2; }
 }
@@ -1091,6 +1174,7 @@ async function importer(f){
   etat.lecture = true; etat.message = {texte:'Vérification de « ' + f.name + ' »…'}; rendre();
   try {
     const r = await window.LectureSauvegarde.lire(f);
+    etat.telephone = r.telephone; // devis du téléphone : utilisés par l'écran Bureau (pipeline)
     Object.assign(etat, {mode:'reel', garages:r.garages, rapport:r.rapport, tournee:[], filtre:'tous',
       message:{texte: window.LectureSauvegarde.message(r.rapport)}});
   } catch (e) {

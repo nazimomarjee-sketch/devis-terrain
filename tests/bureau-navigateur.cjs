@@ -150,7 +150,7 @@ test('Bureau dans le navigateur', async (t) => {
       for (const h of ['', 'simulation', 'carte-91']) {
         await page.evaluate(x => { location.hash = x; }, h);
         await page.waitForTimeout(250);
-        const [large, ecran] = await page.evaluate(() => [document.documentElement.scrollWidth, window.innerWidth]);
+        const [large, ecran] = await page.evaluate(() => [Math.max(document.documentElement.scrollWidth, window.innerWidth), document.documentElement.clientWidth]);
         assert.ok(large <= ecran + 1, `écran « ${h || 'ville'} » : ${large}px pour ${ecran}px`);
       }
       assert.deepEqual(erreurs, []);

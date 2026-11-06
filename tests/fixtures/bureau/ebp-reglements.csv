@@ -1,0 +1,4 @@
+N° facture;Date d'échéance;Date de règlement;Montant TTC;Reste à payer
+FA-4001;16/11/2026;;2 160,00;2 160,00
+FA-4002;31/10/2026;;3 600,00;3 600,00
+FA-4003;03/12/2026;05/11/2026;840,00;0,00

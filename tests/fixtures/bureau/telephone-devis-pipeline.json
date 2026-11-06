@@ -1,0 +1,69 @@
+{
+ "devis": [
+  {
+   "id": 11,
+   "clientId": 1,
+   "clientNom": "GARAGE FICTIF ALPHA",
+   "creeLe": "2026-10-29T09:00:00.000Z",
+   "statut": "envoye",
+   "lignes": [
+    {
+     "code": "SYN-1",
+     "des": "ARTICLE FICTIF",
+     "q": 100,
+     "pu": 125000,
+     "r": 0
+    }
+   ]
+  },
+  {
+   "id": 12,
+   "clientId": 7,
+   "clientNom": "GARAGE FICTIF THETA",
+   "creeLe": "2026-11-04T09:00:00.000Z",
+   "statut": "accepte",
+   "lignes": [
+    {
+     "code": "SYN-1",
+     "des": "ARTICLE FICTIF",
+     "q": 100,
+     "pu": 65000,
+     "r": 0
+    }
+   ]
+  },
+  {
+   "id": 13,
+   "clientId": 2,
+   "clientNom": "GARAGE FICTIF BETA",
+   "creeLe": "2026-10-30T09:00:00.000Z",
+   "statut": "accepte",
+   "commandeLe": "2026-11-03",
+   "lignes": [
+    {
+     "code": "SYN-1",
+     "des": "ARTICLE FICTIF",
+     "q": 100,
+     "pu": 210000,
+     "r": 0
+    }
+   ]
+  },
+  {
+   "id": 14,
+   "clientId": 2,
+   "clientNom": "GARAGE FICTIF BETA",
+   "creeLe": "2026-11-05T09:00:00.000Z",
+   "statut": "brouillon",
+   "lignes": [
+    {
+     "code": "SYN-1",
+     "des": "ARTICLE FICTIF",
+     "q": 100,
+     "pu": 99900,
+     "r": 0
+    }
+   ]
+  }
+ ]
+}

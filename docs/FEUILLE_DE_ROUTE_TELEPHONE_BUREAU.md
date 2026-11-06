@@ -34,3 +34,19 @@ avant tout essai sur Samsung. Rien n'est fusionné, publié ou mis en production
 - Le Bureau sera servi au même endroit que le téléphone (`/bureau/`) : vérifier que le cache hors ligne du téléphone (`sw.js`) ne le sert pas de travers.
 - Ajouter l'essai navigateur du Bureau à la vérification GitHub (nécessite Playwright).
 - Le dépôt est public : toute donnée réelle reste sur l'appareil ou dans un stockage privé.
+
+## Cockpit ODICOLOR 2.0 (décidé le 06/11/2026)
+
+4 espaces : Terrain (téléphone) · Bureau (pipeline EBP) · Ma Ville (`bureau/`, carte et marché) · Mon Business (CA, marge, objectifs).
+Une donnée = une source : terrain → téléphone ; transactions, prix, marge → exports EBP ; marché → annuaire/SIRENE ; objectifs → validés avec Faizal.
+
+| Étape | État |
+|---|---|
+| 1. Pipeline EBP dans le dépôt + plan du matin v2 vers le téléphone | **Fait sur données fictives (06/11)** — bout en bout testé jusqu'aux écrans du téléphone |
+| 2. Référentiel garages unique (téléphone ↔ code EBP ↔ SIRET, rapprochement validé à la main) | À faire |
+| 3. Cockpit du matin (où j'en suis, 3 actions, garages à visiter, blocages, ce qui rapporte) | À faire |
+| 4. Ma Ville → tournées vers le téléphone | À faire |
+| 5. Mon Business (marge, encaissements, rentabilité) | Bloqué : prix d'achat EBP et objectifs validés |
+
+Écart connu côté téléphone : `nettoyerPlan` (app.js) efface `chiffre` et `sources` ; les écrans qui en dépendent
+(opportunités, ligne EBP de l'accueil, présélection de garage) ne peuvent pas s'activer. Correction = modification de l'appli téléphone (accord requis).

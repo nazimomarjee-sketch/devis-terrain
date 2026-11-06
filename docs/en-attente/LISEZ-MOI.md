@@ -7,3 +7,5 @@ du propriétaire** :
     git checkout fix/lot1-f01-f03-recuperation && git am docs/en-attente/lot1-stabilisation-tests.patch
 
 Copie de sécurité uniquement : rien ici n'est exécuté ni publié.
+
+**Mise à jour 06/11/2026 : appliqué** sur `fix/lot1-f01-f03-recuperation` (commit `bc8b791`) avec l'accord du propriétaire. Copie conservée pour mémoire.

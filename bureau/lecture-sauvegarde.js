@@ -97,7 +97,7 @@
       photos: meta.filter(e => e[0].startsWith('garage-photo-v38:')).length,
       pdf: meta.filter(e => e[0].startsWith('pdfFournisseur:')).length
     };
-    return { format: 'odicolor-2', date: h.date, clients: magasins.clients, resume,
+    return { format: 'odicolor-2', date: h.date, clients: magasins.clients, devis: Array.isArray(magasins.devis) ? magasins.devis : [], resume,
       controle: { entete: true, pieces: pieces.length, octets: fichier.size } };
   }
 
@@ -108,7 +108,7 @@
       refus('Fichier non reconnu : ni une sauvegarde complète .odicolor, ni une sauvegarde JSON lisible (fichier tronqué ?).');
     }
     const lu = L0.lireSauvegarde(o); // contrôles de format et de version V47
-    return { format: 'json-v47', date: typeof o.date === 'string' ? o.date : '', clients: o.clients, resume: null, controle: null, lu };
+    return { format: 'json-v47', date: typeof o.date === 'string' ? o.date : '', clients: o.clients, devis: Array.isArray(o.devis) ? o.devis : [], resume: null, controle: null, lu };
   }
 
   // Point d'entrée. fichier = Blob ou File (navigateur ou Node 18+). Retourne { garages, rapport }.
@@ -126,6 +126,8 @@
     r.rapport.contenu = lu.resume;
     r.rapport.controle = lu.controle;
     r.rapport.octets = fichier.size;
+    // Fiches et devis du téléphone tels quels (lecture seule) : utilisés par le pipeline du Bureau (pipeline.js).
+    r.telephone = { date: lu.date, clients: lu.clients, devis: lu.devis };
     return r;
   }
 

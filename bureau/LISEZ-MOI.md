@@ -36,6 +36,20 @@ Recréés le 05/11/2026 (perdus avec la branche locale) :
 Contrôle du 05/11/2026 : aucun e-mail, téléphone, SIRET, IBAN, montant réel ni clé dans ces fichiers.
 ⚠️ Le dépôt GitHub est **public** : n'y mettre aucune donnée client.
 
+## Écran Bureau : exports EBP → 3 actions → plan du matin (étape 1 du cockpit, 06/11/2026)
+
+Onglet **Bureau**. Charge les exports EBP (CSV ou Excel) : pièces (obligatoire), échéancier des règlements, clients.
+- `ebp-import.js` : lecture des exports (Windows-1252/UTF-8, dates et montants français, centimes exacts). Toute ligne
+  écartée l'est avec son motif ; les avoirs sont signalés, jamais mélangés. **Hypothèse** : noms de colonnes EBP réels
+  inconnus — la correspondance retenue est affichée et l'import est refusé s'il manque une colonne obligatoire.
+- `pipeline.js` : fonctions utiles reprises de la page « Chaîne Odicolor » (22/10), **sans son interface** : affaires
+  devis → commande → livraison → facture → règlement, délais en jours ouvrés (fériés), 3 actions classées par montant en jeu
+  avec preuve et source, levier de la semaine, CA EBP par période. Le téléphone ne compte jamais en double une affaire déjà dans EBP.
+- Garde-fous : aucun impayé sans échéancier EBP ; pas de TTC « × 1,2 » ; aucun objectif ni marge inventés ;
+  compte bloqué = jamais d'action de vente.
+- **Plan du matin** : fichier `plan-odicolor-AAAA-MM-JJ.json` à importer sur le téléphone (Réglages → Imports → Plan PC).
+  Format « plan-pc » v2 vérifié avec le **vrai code d'import du téléphone**.
+
 ## Charger une sauvegarde du téléphone
 
 Bouton « Mes garages / Démo » → « Charger ma sauvegarde téléphone ».
@@ -54,8 +68,9 @@ Bouton « Mes garages / Démo » → « Charger ma sauvegarde téléphone ».
 ## Tester
 
 ```
-node --test tests/bureau-*.test.cjs        # logique, lecture des sauvegardes, annuaire simulé, communes (sans réseau)
+node --test tests/bureau-*.test.cjs        # logique, sauvegardes, EBP, pipeline, annuaire simulé, communes (sans réseau)
 node tests/bureau-navigateur.cjs           # vrai navigateur, Internet coupé, largeur Samsung
+node tests/bureau-cockpit-navigateur.cjs   # bout en bout : EBP → Bureau → plan → vraie appli téléphone
 ```
 Contrôles croisés facultatifs : `TELEPHONE_LOT1=<copie de la branche Lot 1>` (même verdict que le téléphone
 sur plus de 1 800 fichiers sains ou abîmés) et `ETALAB_PACKAGE=<paquet etalab>` (liste des communes).
