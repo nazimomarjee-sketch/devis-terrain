@@ -121,7 +121,7 @@ test('4. statuts, alertes et sources identiques entre scène, liste, aperçu et 
       assert.ok(!!await p.$(`.vc-cible[data-uid="${e.uid}"][data-num="${e.numero}"]`), e.nom + ' : même numéro sur la scène');
     }
     const cas = [['CARROSSERIE FICTIVE F', /En compte · Code client EBP F03 · compte bloqué/, /Client ODICOLOR carrosserie/],
-      ['CARROSSERIE FICTIVE B', /Sans compte · Absence de compte vérifiée par Vérificateur fictif/, /Prospect carrosserie/],
+      ['CARROSSERIE FICTIVE B', /Sans compte · Absence de compte vérifiée, déclarée par Vérificateur fictif \(auteur déclaré, non authentifié\)/, /Prospect carrosserie/],
       ['CONTRÔLE TECHNIQUE FICTIF', /Sans compte/, /⊘ Hors cible/]];
     for (const [nom, compte, pastille] of cas) {
       await p.click(`.vc-ligne:has(.vc-nom:text-is("${nom}"))`); await p.click('.vc-apercu .vc-ouvrir');
@@ -132,12 +132,12 @@ test('4. statuts, alertes et sources identiques entre scène, liste, aperçu et 
       assert.match(await champ(p, 'Sources'), /du \d\d\/\d\d\/2026/, nom + ' : sources datées');
       await p.click('#couche-fiche .fermer');
     }
-    // Homonyme incertain : deux lignes séparées, l'une en compte (EBP), l'autre à vérifier (jamais sans compte).
+    // Homonyme : deux lignes séparées ; l'absence vérifiée par une personne est conservée, avec une alerte à examiner.
     const g = m.etabs.filter(e => e.nom === 'CARROSSERIE FICTIVE G');
-    assert.deepEqual(g.map(e => e.compte).sort(), ['a_verifier', 'en_compte']);
-    const u = g.find(e => e.compte === 'a_verifier');
+    assert.deepEqual(g.map(e => e.compte).sort(), ['en_compte', 'sans_compte']);
+    const u = g.find(e => e.compte === 'sans_compte');
     await p.click(`.vc-ligne[data-uid="${u.uid}"]`); await p.click('.vc-apercu .vc-ouvrir'); await p.waitForSelector('#couche-fiche .fiche');
-    assert.match(await champ(p, 'Compte ODICOLOR'), /À vérifier · Rapprochement EBP incertain/);
+    assert.match(await champ(p, 'Compte ODICOLOR'), /Sans compte · .*⚠ Fiche proche : même nom dans la même commune/);
   } finally { await ctx.close(); }
 });
 

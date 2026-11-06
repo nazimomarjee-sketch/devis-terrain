@@ -134,3 +134,29 @@ Statut : à valider par le propriétaire avant toute programmation. Préalable �
 - **Pas d'écran.** Les décisions ne sont accessibles que par programme ; l'écran est le lot B.
 - **Contradiction détectée seulement** quand une fiche EBP a exactement le même nom (normalisé) et le même code postal. Une « SARL … » ou un nom abrégé ne déclenche rien : ces cas seront montrés comme suggestions dans l'écran du lot B.
 - **Un seul auteur par décision**, en texte libre, sans gestion des droits.
+
+## Lot B réalisé le 07/11/2026 (données fictives)
+
+**Écran** : adresse `#verifier-comptes` du Bureau. On y accède par le bloc « Comptes ODICOLOR » de l'écran Bureau, qui n'apparaît qu'avec ta sauvegarde téléphone.
+- **Fichiers** :
+  - `bureau/verifier-comptes.js` ;
+  - `bureau/verifier-comptes.css` (styles séparés) ;
+  - `bureau/index.html` : route, bloc « Comptes ODICOLOR », et une seule fonction de décision partagée par l'écran et les tests.
+- **Compteurs** En compte / Sans compte / À vérifier / Total : calculés sur le même modèle que Ma Ville, chaque garage une seule fois. Un garage relié à son client EBP ne compte plus qu'une fois.
+- **Trois décisions** :
+  - « C'est ce client EBP » : inactif tant qu'aucune fiche n'est choisie, puis confirmation ;
+  - « Aucun compte ODICOLOR vérifié » : confirmation. Si une fiche EBP ressemble au garage, il faut cocher « aucune de ces fiches n'est ce garage », et les fiches sont notées « écartées » dans la décision ;
+  - « Je ne sais pas » : rien n'est enregistré, le garage est marqué « passé » pour la session.
+- **Suggestions EBP** : il faut le même code postal ou la même ville, et un mot significatif commun ou un nom identique. Les formes juridiques et les mots génériques (« SARL », « garage », « carrosserie »…) sont ignorés. Une suggestion n'est **jamais cochée d'avance**, et le motif de la ressemblance est affiché.
+- **Déclaration groupée « sans compte »** : une case de confirmation explicite est obligatoire. Les garages avec une fiche EBP proche, ou déclarés clients au téléphone, sont **exclus** et doivent être traités un par un.
+- **Auteur déclaré** : saisi une fois par session et marqué « non authentifié ». Il n'est pas retenu d'une session à l'autre.
+- **Correction** : une nouvelle décision remplace l'ancienne, qui reste visible dans l'historique comme « remplacée ». Une annulation est elle-même une décision.
+- **Alertes** : un onglet regroupe les ressemblances apparues après une décision, les garages modifiés, les conflits, les décisions orphelines et celles en attente.
+- **Règle 9** : une ressemblance de nom **n'annule jamais** une décision. Le garage reste « sans compte », avec une alerte « à examiner ». Le lot A a été ajusté dans ce sens : la décision est appliquée avec une alerte.
+- **Enregistrement** : l'écran indique si les décisions vont dans le coffre chiffré. Si le Bureau est ouvert sans l'application locale, il prévient que les décisions seront perdues à la fermeture.
+
+**Tests**
+- `tests/bureau-verifier-comptes.test.cjs` : 2/2.
+- `tests/local-verifier-comptes-navigateur.cjs` : 3/3, avec le vrai coffre. Le parcours complet est testé : groupé, liaison, absence, « je ne sais pas », correction, annulation, arrêt brutal, réouverture, alerte après un nouvel export. Le format tactile est vérifié, ainsi que l'avertissement sans application locale.
+- Le lot A est mis à jour : 10/10, 4/4.
+- Toutes les suites existantes restent vertes.

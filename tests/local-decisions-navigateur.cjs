@@ -74,7 +74,8 @@ test('1. décisions enregistrées, page fermée, programme ARRÊTÉ BRUTALEMENT,
     await decider(p, { type: 'absence', cible: g(4), auteur: AUTEUR });
     assert.equal(d1.source, 'Liaison EBP validée par une personne'); assert.equal(d1.exportClientsDu, '2026-11-07', 'date de l’export clients consulté');
     const avant = await photo(p);
-    assert.deepEqual(avant.etats, [['D000001', 'appliquee'], ['D000002', 'appliquee'], ['D000003', 'contredite']], 'G4 : fiche EBP au même nom → contradiction');
+    assert.deepEqual(avant.etats, [['D000001', 'appliquee'], ['D000002', 'appliquee'], ['D000003', 'appliquee']], 'une ressemblance de nom n’annule pas la décision');
+    assert.match(await p.evaluate(() => OdicolorBureau.decisions.appliquer().etats[2].alerte), /C20.*à examiner/, 'G4 : alerte visible');
     await ctx.close();
     await tuer(prog); prog = await lancer(dossier);
     ({ ctx, p, erreurs } = await page(prog.adresse)); await ouvrirCoffre(p);

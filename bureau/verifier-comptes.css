@@ -1,0 +1,68 @@
+/* Lot B — écran « Vérifier les comptes ». Fichier séparé (le bloc de styles verrouillé du Bureau n'est pas touché). Classes « vf- ». */
+.vf{--vf-fond:#0D0F12;--vf-carte:#16191E;--vf-trait:#272C33;--vf-texte:#F4F2EF;--vf-doux:#9EA3AB;--vf-rouge:#D41F2B;--vf-neon:#FF2D3D;--vf-vert:#71DBA0;--vf-ambre:#FFC873;
+  display:block;margin:12px 0;color:var(--vf-texte);font:14px/1.45 system-ui,"Segoe UI",Roboto,sans-serif}
+.vf h1{margin:0;font:800 30px var(--f-titre,"Barlow Condensed",system-ui);letter-spacing:.01em}
+.vf h2{margin:0;font:800 26px var(--f-titre,"Barlow Condensed",system-ui);line-height:1.05}
+.vf h3{margin:18px 0 8px;font:800 15px var(--f-titre,"Barlow Condensed",system-ui);letter-spacing:.08em;text-transform:uppercase;color:var(--vf-doux)}
+.vf h3 small{font:400 12px system-ui;letter-spacing:0;text-transform:none;margin-left:6px}
+.vf-entete{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start}
+.vf-entete p{margin:4px 0 0;color:var(--vf-doux);font-size:13px}
+.vf-auteur{padding:8px 12px;border:1px dashed #3A404A;border-radius:10px;font-size:13px}.vf-auteur small{color:var(--vf-doux)}
+.vf-compteurs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:14px 0 6px}
+.vf-cpt{border:1px solid var(--vf-trait);border-radius:14px;background:var(--vf-carte);padding:10px 14px;display:flex;justify-content:space-between;align-items:center}
+.vf-cpt span{font:800 15px var(--f-titre,"Barlow Condensed",system-ui);letter-spacing:.08em;text-transform:uppercase;color:var(--vf-doux)}
+.vf-cpt b{font:800 30px var(--f-titre,"Barlow Condensed",system-ui)}
+.vf-cpt.vf-c-en_compte span{color:var(--vf-vert)}.vf-cpt.vf-c-sans_compte span{color:var(--vf-ambre)}.vf-cpt.vf-c-a_verifier span{color:#C9CDD3}
+.vf-enreg{margin:0 0 10px;font-size:12.5px}.vf-enreg-ok{color:var(--vf-vert)}.vf-enreg-non{color:var(--vf-ambre)}
+.vf-corps{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:12px;align-items:start}
+.vf-carte{border:1px solid var(--vf-trait);border-radius:16px;background:var(--vf-carte);padding:18px 20px;min-height:420px}
+.vf-fiche-tete{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.vf-fiche-tete p{margin:6px 0 0;color:var(--vf-doux);font-size:13.5px}.vf-fiche-tete b{color:var(--vf-texte)}
+.vf-statut{flex:none;padding:6px 12px;border-radius:999px;font:800 14px var(--f-titre,"Barlow Condensed",system-ui);letter-spacing:.08em;text-transform:uppercase;border:1px solid}
+.vf-statut.vf-c-en_compte{color:var(--vf-vert);border-color:rgba(47,184,108,.5);background:rgba(47,184,108,.1)}
+.vf-statut.vf-c-sans_compte{color:var(--vf-ambre);border-color:rgba(232,163,59,.5);background:rgba(232,163,59,.1)}
+.vf-statut.vf-c-a_verifier{color:#C9CDD3;border:1px dashed #6E737B}
+.vf-motif{color:var(--vf-doux);font-size:13px;margin:8px 0}
+.vf-boite{border-radius:12px;padding:10px 12px;margin:10px 0;font-size:13px}.vf-boite p{margin:4px 0 0}.vf-boite ul{margin:6px 0 0;padding-left:18px}
+.vf-boite-alerte{background:rgba(240,149,43,.09);border:1px solid rgba(240,149,43,.45);color:#FFE2BD}
+.vf-sugs{display:flex;flex-direction:column;gap:6px}
+.vf-sug{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1.5px solid var(--vf-trait);border-radius:12px;cursor:pointer;min-height:44px}
+.vf-sug:has(input:checked){border-color:var(--vf-neon);background:rgba(255,45,61,.07)}
+.vf-sug input{margin-top:4px;width:18px;height:18px;accent-color:#D41F2B}.vf-sug small{display:block;color:var(--vf-doux);font-size:12px}
+.vf-sug .vf-pourquoi{color:#C9CDD3}.vf-prise{opacity:.5;cursor:not-allowed}
+.vf-autre{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0;color:var(--vf-doux);font-size:13px}
+.vf-autre input{min-height:44px;flex:1;min-width:160px;border-radius:10px;border:1px solid var(--vf-trait);background:var(--vf-fond);color:var(--vf-texte);padding:0 12px;font:inherit}
+.vf-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:14px}
+.vf-btn{min-height:56px;border-radius:12px;border:1.5px solid var(--vf-trait);background:#1C2027;color:var(--vf-texte);font:800 16px var(--f-titre,"Barlow Condensed",system-ui);letter-spacing:.03em;cursor:pointer;padding:0 12px}
+.vf-btn kbd{display:inline-block;min-width:18px;margin-right:6px;padding:0 4px;border-radius:4px;background:rgba(255,255,255,.12);font:700 12px system-ui}
+.vf-btn:disabled{opacity:.4;cursor:not-allowed}.vf-btn:focus-visible{outline:2px solid var(--vf-neon);outline-offset:2px}
+.vf-oui{background:var(--vf-rouge);border-color:var(--vf-rouge);color:#fff}
+.vf-non{border-color:rgba(232,163,59,.7);color:var(--vf-ambre);background:rgba(232,163,59,.08)}
+.vf-petit{min-height:44px;font-size:14px}
+.vf-lien{background:none;border:0;color:#F4F2EF;text-decoration:underline dotted;cursor:pointer;font:inherit;padding:4px;min-height:32px}
+.vf-hist{margin:0;padding-left:20px;font-size:13px}.vf-hist li{margin:5px 0}
+.vf-file{border:1px solid var(--vf-trait);border-radius:16px;background:#101317;padding:10px;position:sticky;top:12px;max-height:calc(100vh - 40px);overflow:auto}
+.vf-onglets{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-bottom:8px}
+.vf-onglets button{min-height:44px;border-radius:10px;border:1px solid var(--vf-trait);background:var(--vf-carte);color:var(--vf-doux);font:700 13px system-ui;cursor:pointer}
+.vf-onglets button[aria-selected=true]{color:var(--vf-texte);border-color:var(--vf-neon);background:rgba(255,45,61,.1)}
+.vf-chercher{width:100%;box-sizing:border-box;min-height:44px;border-radius:10px;border:1px solid var(--vf-trait);background:var(--vf-fond);color:var(--vf-texte);padding:0 12px;margin-bottom:8px;font:inherit}
+.vf-groupe{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px;border-radius:12px;border:1px solid rgba(232,163,59,.5);margin-bottom:8px}
+.vf-liste{list-style:none;margin:0;padding:0}
+.vf-item{display:grid;grid-template-columns:34px minmax(0,1fr);align-items:stretch;border-top:1px solid var(--vf-trait)}
+.vf-coche{display:grid;place-items:center;cursor:pointer}.vf-coche input{width:20px;height:20px;accent-color:#D41F2B}
+.vf-ligne{text-align:left;background:none;border:0;color:var(--vf-texte);padding:9px 6px;min-height:56px;cursor:pointer;font:inherit;border-radius:8px}
+.vf-ligne:disabled{cursor:default;opacity:.8}
+.vf-actif .vf-ligne{background:rgba(255,45,61,.08);outline:1px solid rgba(255,45,61,.5)}
+.vf-ligne small{display:block;color:var(--vf-doux);font-size:12px;margin-top:2px}
+.vf-tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:5px}
+.vf-b{font:700 10px var(--f-titre,"Barlow Condensed",system-ui);letter-spacing:.08em;text-transform:uppercase;padding:2px 6px;border-radius:4px;background:rgba(158,163,171,.14);color:#C9CDD3;font-style:normal;white-space:nowrap}
+.vf-b.vf-c-en_compte{background:rgba(47,184,108,.16);color:var(--vf-vert)}.vf-b.vf-c-sans_compte{background:rgba(232,163,59,.16);color:var(--vf-ambre)}.vf-b.vf-c-a_verifier{border:1px dashed #6E737B;background:none}
+.vf-b.vf-sug{background:rgba(62,134,240,.16);color:#8FB6F5}.vf-b.vf-alerte{background:rgba(240,149,43,.18);color:var(--vf-ambre)}.vf-b.vf-passe{background:none;border:1px solid #3A404A}
+.vf-vide{color:var(--vf-doux);padding:12px}
+.vf-voile{position:fixed;inset:0;background:rgba(0,0,0,.6);display:grid;place-items:center;z-index:90;padding:16px}
+.vf-modale{width:min(560px,100%);max-height:90vh;overflow:auto;background:var(--vf-carte);border:1px solid var(--vf-trait);border-radius:16px;padding:18px 20px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.vf-modale p{margin:8px 0}.vf-modale .vf-actions{grid-template-columns:1fr 1fr}
+.vf-mini{margin:6px 0;padding-left:18px;max-height:180px;overflow:auto;font-size:13px}
+.vf-choix{display:flex;gap:10px;align-items:flex-start;margin:12px 0;font-size:14px;cursor:pointer}.vf-choix input{width:20px;height:20px;margin-top:1px;accent-color:#D41F2B}
+@media (max-width:860px){.vf-corps{grid-template-columns:1fr}.vf-file{position:static;max-height:none}.vf-compteurs{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .vf-actions{grid-template-columns:1fr}.vf-carte{padding:14px}.vf h1{font-size:26px}.vf-fiche-tete{flex-direction:column}}

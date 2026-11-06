@@ -279,11 +279,14 @@ test('22. SANS COMPTE seulement avec une vérification enregistrée (auteur + da
   assert.equal(tous.filter(e => e.compte.statut === 'sans_compte').length, 0, 'sans vérification, personne n’est « sans compte »');
 });
 
-test('23. rapprochement EBP incertain ou client déclaré absent d’EBP → À VÉRIFIER, même avec une vérification', () => {
+test('23. ressemblance de nom : n’annule pas une absence vérifiée (alerte à examiner) ; sans vérification → À VÉRIFIER ; client déclaré absent d’EBP → À VÉRIFIER', () => {
   const r = R(), g = nomme(r, 'CARROSSERIE FICTIVE G');
   assert.equal(g.length, 2, 'homonymes non fusionnés');
-  assert.deepEqual(g.map(e => e.compte.statut).sort(), ['a_verifier', 'en_compte']);
-  assert.match(g.find(e => e.compte.statut === 'a_verifier').compte.motif, /Rapprochement EBP incertain/);
+  assert.deepEqual(g.map(e => e.compte.statut).sort(), ['en_compte', 'sans_compte'], 'la vérification humaine est conservée');
+  assert.match(g.find(e => e.compte.statut === 'sans_compte').compte.alerte, /même nom dans la même commune.*à examiner/);
+  const sansVerif = M.construire(Object.assign({}, F, { verificationsCompte: [] }));
+  const g2 = [...sansVerif.communes.values()].flatMap(c => c.etablissements).filter(e => e.nom.valeur === 'CARROSSERIE FICTIVE G');
+  assert.match(g2.find(e => e.compte.statut === 'a_verifier').compte.motif, /Rapprochement EBP incertain/);
   const [c] = nomme(r, 'CARROSSERIE FICTIVE DÉCLARÉE CLIENTE');
   assert.equal(c.compte.statut, 'a_verifier'); assert.match(c.compte.motif, /non retrouvé dans EBP/);
 });

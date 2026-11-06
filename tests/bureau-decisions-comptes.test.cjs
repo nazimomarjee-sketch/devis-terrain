@@ -59,14 +59,20 @@ test('3. liaison validée → EN COMPTE (auteur, date, source) ; absence vérifi
   assert.equal(a.bilan.appliquees, 2);
 });
 
-test('4. contradiction : absence déclarée mais fiche EBP au même nom et même code postal → à revérifier, historique gardé', () => {
+test('4. ressemblance de nom : n’annule jamais une décision ; alerte visible à examiner ; la personne peut écarter la fiche', () => {
   const j = journal({ type: 'absence', cible: cible(G4) });
   const { a, de } = modele(j);
-  assert.equal(a.etats[0].etat, 'contredite');
-  assert.equal(de(4).compte.statut, 'a_verifier'); assert.match(de(4).compte.motif, /Absence déclarée le 2026-11-07.*C20.*à revérifier/);
+  assert.equal(a.etats[0].etat, 'appliquee', 'la décision humaine reste appliquée');
+  assert.match(a.etats[0].alerte, /même nom et même code postal.*C20.*à examiner/); assert.deepEqual(a.etats[0].codesProches, ['C20']);
+  assert.equal(a.bilan.alertes, 1);
+  assert.equal(de(4).compte.statut, 'sans_compte'); assert.match(de(4).compte.motif, /⚠ .*C20/);
   assert.equal(j.decisions.length, 1, 'la décision reste dans le journal');
-  // Sans cette fiche EBP (export qui ne la contient pas) : l'absence s'applique, puisque c'est une déclaration humaine.
-  assert.equal(modele(j, terrain(), clientsEbp().slice(0, 1)).de(4).compte.statut, 'sans_compte');
+  // « Ce n'est pas ce garage » : nouvelle décision qui écarte la fiche, l'ancienne est remplacée (historique gardé).
+  const j2 = DC.decider(j, { type: 'absence', cible: cible(G4), ecarte: ['C20'], auteur: NAZ }, { maintenant: T }).journal;
+  const r2 = modele(j2);
+  assert.deepEqual(r2.a.etats.map(e => e.etat), ['remplacee', 'appliquee']); assert.equal(r2.a.etats[1].alerte, undefined);
+  assert.equal(r2.de(4).compte.statut, 'sans_compte'); assert.doesNotMatch(r2.de(4).compte.motif, /⚠/);
+  assert.match(r2.de(4).compte.motif, /auteur déclaré, non authentifié/);
 });
 
 test('5. la décision la plus récente remplace la précédente ; annuler ne réactive rien ; historique complet', () => {

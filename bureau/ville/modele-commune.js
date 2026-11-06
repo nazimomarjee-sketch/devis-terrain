@@ -224,7 +224,7 @@
     const m = new Map();
     for (const v of l || []) {
       if (!v || v.resultat !== 'aucun_compte' || !txt(v.par) || !iso(v.date)) continue; // une vérification sans auteur ni date ne compte pas
-      const r = { par: txt(v.par, 60), date: iso(v.date), source: txt(v.source, 60) || 'Vérification EBP' };
+      const r = { par: txt(v.par, 60), date: iso(v.date), source: txt(v.source, 60) || 'Vérification EBP', alerte: v.alerte ? txt(v.alerte, 400) : null, ecarte: Array.isArray(v.ecarte) ? v.ecarte.map(c => txt(c, 40)) : [] };
       if (v.ref) m.set('ref:' + v.ref, r);
       if (siretValide(v.siret)) m.set('siret:' + siretDe(v.siret), r);
     }
@@ -237,10 +237,16 @@
     const r = x.sources.map(s => revoir.get('ref:' + s.ref)).find(Boolean) || (x.siret && revoir.get('siret:' + x.siret.valeur));
     if (r) return { statut: 'a_verifier', motif: r.motif, source: null, date: null, decision: r.decision };
     const enAttente = props.find(p => p.uids.includes(x.uid));
-    if (enAttente) return { statut: 'a_verifier', motif: 'Rapprochement EBP incertain (' + enAttente.motif + ')', source: null, date: null };
+    // Deux déclarations humaines contraires (client au téléphone / aucun compte dans EBP) : à vérifier.
     if (x.categorie === 'client') return { statut: 'a_verifier', motif: 'Déclaré client (' + x.sources.map(s => s.source).join(', ') + ') mais non retrouvé dans EBP', source: null, date: null };
+    // Une absence vérifiée par une personne n'est JAMAIS annulée par une ressemblance de nom : elle reste, avec une alerte à examiner.
     const v = x.sources.map(s => verifs.get('ref:' + s.ref)).find(Boolean) || (x.siret && verifs.get('siret:' + x.siret.valeur));
-    if (v) return { statut: 'sans_compte', motif: 'Absence de compte vérifiée par ' + v.par, source: v.source, date: v.date };
+    if (v) {
+      const autres = enAttente ? enAttente.uids.filter(u => u !== x.uid && !(v.ecarte || []).some(c => u === 'ebp:' + c)) : [];
+      const alerte = v.alerte || (autres.length ? 'Fiche proche : même nom dans la même commune, sans identifiant commun (' + autres.join(', ') + ') : à examiner' : null);
+      return { statut: 'sans_compte', motif: 'Absence de compte vérifiée, déclarée par ' + v.par + ' (auteur déclaré, non authentifié)' + (alerte ? ' · ⚠ ' + alerte : ''), source: v.source, date: v.date, alerte };
+    }
+    if (enAttente) return { statut: 'a_verifier', motif: 'Rapprochement EBP incertain (' + enAttente.motif + ')', source: null, date: null };
     return { statut: 'a_verifier', motif: 'Absence de compte ODICOLOR non vérifiée', source: null, date: null };
   }
 

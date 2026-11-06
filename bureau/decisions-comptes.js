@@ -6,7 +6,9 @@
    Règles du propriétaire (07/11/2026) :
    - aucun rapprochement incertain ne devient une liaison sans décision humaine (ce module ne crée JAMAIS de liaison seul) ;
    - l'absence d'un garage dans un export EBP ne prouve rien : seule une ABSENCE déclarée rend un garage « sans compte » ;
-   - une contradiction déclenche une vérification (garage remis « à vérifier », motif affiché) et l'historique reste complet ;
+   - une contradiction déclenche une vérification et l'historique reste complet. Une simple RESSEMBLANCE de nom (fiche EBP au même
+     nom, même code postal) n'annule jamais une décision humaine : la décision reste appliquée, avec une ALERTE à examiner ;
+     la personne peut écarter cette fiche (« ce n'est pas ce garage ») ou corriger sa décision ;
    - aucune décision n'est perdue : décision sur un garage disparu = « orpheline », gardée et listée.
    Le journal est enregistré dans le coffre chiffré du PC (état du Bureau, version 2). Lecture seule sur ses entrées. */
 (function (racine) {
@@ -51,6 +53,7 @@
       d.cible = c.tel != null ? { tel: c.tel, nom: txt(c.nom, 120), cp: txt(c.cp, 10), siret: siretDe(c.siret) } : { siret: siretDe(c.siret), nom: txt(c.nom, 120) || null };
       d.exportClientsDu = iso(e.exportClientsDu) || null;
       if (e.type === 'liaison') d.codeEbp = txt(e.codeEbp, 40);
+      if (e.type === 'absence' && Array.isArray(e.ecarte) && e.ecarte.length) d.ecarte = [...new Set(e.ecarte.map(c => txt(c, 40)).filter(Boolean))].slice(0, 20); // fiches EBP écartées par la personne
     }
     const actives = new Set(j.decisions.map(x => x.id));
     const refus = controle(d, actives);
@@ -125,16 +128,19 @@
     for (const d of valides.filter(x => x.type === 'absence')) {
       const g = d.cible.tel != null ? tel.get(d.cible.tel) : null;
       const k = nn(g ? g.nom : d.cible.nom) + '|' + (g ? cpDe(g) : '');
-      const proches = (ebpParNom.get(k) || []).filter(c => !codesLies.has(String(c.code).trim()));
-      if (proches.length) { revoir(d, 'Absence déclarée le ' + d.date + ' par ' + d.auteur + ', mais l’export clients EBP' + (exportClientsDu ? ' du ' + exportClientsDu : '') + ' contient « ' + proches.map(c => c.nom + ' » (code ' + c.code + ')').join(', « ') + ' : à revérifier', 'contredite'); continue; }
-      verifs.push(Object.assign(d.cible.tel != null ? { ref: 'tel:' + d.cible.tel } : { siret: d.cible.siret }, { resultat: 'aucun_compte', par: d.auteur, date: d.date, source: d.source, decision: d.id }));
-      etat(d, 'appliquee');
+      const ecartes = new Set(d.ecarte || []);
+      const proches = (ebpParNom.get(k) || []).filter(c => !codesLies.has(String(c.code).trim()) && !ecartes.has(String(c.code).trim()));
+      const alerte = proches.length ? 'Fiche EBP au même nom et même code postal : « ' + proches.map(c => c.nom + ' » (code ' + c.code + ')').join(', « ') +
+        (exportClientsDu ? ', export du ' + exportClientsDu : '') + '. Absence maintenue (décision du ' + d.date + ') : à examiner' : null;
+      verifs.push(Object.assign(d.cible.tel != null ? { ref: 'tel:' + d.cible.tel } : { siret: d.cible.siret }, { resultat: 'aucun_compte', par: d.auteur, date: d.date, source: d.source, decision: d.id, alerte, ecarte: [...ecartes] }));
+      etat(d, 'appliquee'); if (alerte) { etats.get(d.id).alerte = alerte; etats.get(d.id).codesProches = proches.map(c => String(c.code).trim()); }
     }
     const liste = decisions.map(d => etats.get(d.id));
+    const alertes = liste.filter(x => x.alerte).length;
     const compte = e => liste.filter(x => x.etat === e).length;
     return { liaisonsValidees: liaisons, verificationsCompte: verifs, aRevoir, etats: liste,
       bilan: { total: decisions.length, appliquees: compte('appliquee'), remplacees: compte('remplacee'), annulees: compte('annulee'), aReverifier: compte('a_reverifier'),
-        contredites: compte('contredite'), conflits: compte('conflit'), orphelines: compte('orpheline'), enAttente: compte('en_attente') } };
+        alertes, conflits: compte('conflit'), orphelines: compte('orpheline'), enAttente: compte('en_attente') } };
   }
 
   const api = { VERSION, SOURCES, creerJournal, decider, lire, appliquer };

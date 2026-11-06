@@ -333,6 +333,7 @@ select.recherche{appearance:auto}
 <div id="couche-fiche" hidden></div>
 <link rel="stylesheet" href="ville/ville-commune.css">
 <link rel="stylesheet" href="cockpit-ca.css">
+<link rel="stylesheet" href="verifier-comptes.css">
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="communes-idf.js"></script>
@@ -347,6 +348,7 @@ select.recherche{appearance:auto}
 <script src="annuaire.js"></script>
 <script src="ca-facture.js"></script>
 <script src="decisions-comptes.js"></script>
+<script src="verifier-comptes.js"></script>
 <script src="ville/modele-commune.js"></script>
 <script src="ville/dessin-iso.js"></script>
 <script src="ville/vue-commune.js"></script>
@@ -415,7 +417,7 @@ function rendreKpis(){
     kpi('fiole','Essais Carsystem', null, h('span',{class:'badge b-vide'},'Lot 3')));
 }
 function rendreFiltres(){
-  if (['simulation','bureau','commune','communes'].includes(route().ecran)) { $('#filtres').replaceChildren(); return; }
+  if (['simulation','bureau','commune','communes','verifier-comptes'].includes(route().ecran)) { $('#filtres').replaceChildren(); return; }
   const seg = etat.garages.some(g => g.segment);
   const def = seg ? [['tous','Tous',null], ...L0.SEGMENTS.map(k => ['seg:' + k, STATUTS[k].libelle, STATUTS[k].couleur]), ['alertes','Alertes (règlement, dormant, inactif)','var(--danger)']]
     : [['tous','Tous',null],['actif','Clients','var(--vert)'],['prospect','Prospects','var(--bleu)'],['dormant','Dormants / perdus','var(--orange)'],['risque','Risque règlement','var(--danger)']];
@@ -867,7 +869,7 @@ function ficheActeur(a){
 // ================= Fil d'actions =================
 function rendreFil(){
   const zone = $('#fil-actions');
-  if (['simulation','bureau','commune','communes'].includes(route().ecran)) { zone.hidden = true; return; } zone.hidden = false;
+  if (['simulation','bureau','commune','communes','verifier-comptes'].includes(route().ecran)) { zone.hidden = true; return; } zone.hidden = false;
   const types = { visite:['visite','var(--vert)','Visite client'], devis:['devis','var(--neon)','Devis'], essai:['fiole','var(--orange)','Essai Carsystem'], relance:['relance','var(--danger)','Relance règlement'], prospect:['cible','var(--bleu)','Prospection'], action:['calendrier','var(--doux)','Prochaine action'] };
   let evts;
   if (etat.mode === 'demo') {
@@ -1174,7 +1176,7 @@ function vueBureau(){
     h('div',{class:'deps'}, EXPORTS.map(champ)));
   let plan = null, erreur = '';
   try { plan = planBureau(); } catch (e) { erreur = e.message; }
-  if (!plan) return h('div',{class:'ecran'}, h('div',{class:'panneau'}, blocCA(caAccueil()), imports, panneauReveil(null), erreur ? h('div',{class:'message erreur'}, erreur) :
+  if (!plan) return h('div',{class:'ecran'}, h('div',{class:'panneau'}, blocCA(caAccueil()), blocComptes(), imports, panneauReveil(null), erreur ? h('div',{class:'message erreur'}, erreur) :
     h('section',{class:'bloc'}, h('h2',{},'Ta journée'), h('p',{class:'sous'},'Charge au moins l’export des pièces EBP pour voir tes 3 actions et ton CA réel.'))));
   const k = plan.kpi, top = plan.actions.filter(a => a.prio === 1), suite = plan.actions.filter(a => a.prio > 1);
   const action = (a, i) => h('div',{class:'action'}, h('div',{class:'n'}, (i + 1) + ' · ' + a.tag + ' · ' + a.responsable),
@@ -1189,7 +1191,7 @@ function vueBureau(){
       plan.changement ? h('section',{class:'bloc'}, h('div',{class:'titre-bloc'},'Un seul changement cette semaine'), h('p',{}, plan.changement.texte), h('small',{class:'info'}, plan.changement.mesure)) : null,
       panneauReveil(plan)),
     h('div',{class:'panneau'},
-      blocCA(caAccueil()),
+      blocCA(caAccueil()), blocComptes(),
       h('section',{class:'bloc'}, h('div',{class:'titre-bloc'},'Où j’en suis'), h('div',{class:'chiffres'},
         chiffre('CA commandé cette semaine', e2(k.semaine.cmdHt), ebpB, k.semaine.cmdN + ' commande(s)'),
         chiffre('CA commandé ce mois', e2(k.mois.cmdHt), ebpB, k.mois.cmdN + ' commande(s)'),
@@ -1352,6 +1354,44 @@ function resultatsMaVille(q){
   return out;
 }
 
+// ================= Lot B : écran « Vérifier les comptes » (bureau/verifier-comptes.js) =================
+// Mêmes fonctions pour l'écran et pour OdicolorBureau.decisions : une seule façon de décider, toujours enregistrée dans le coffre.
+etat.auteurDeclare = ''; etat.vf = null; // auteur DÉCLARÉ pour la session (texte libre, non authentifié), jamais écrit hors des décisions
+function deciderCompte(e){
+  if (etat.mode !== 'reel' || !etat.telephone) throw new Error('Charge d’abord la sauvegarde de ton téléphone : aucune décision sur la démo.');
+  if (etat.decisionsAlerte) throw new Error(etat.decisionsAlerte);
+  const r = DecisionsComptes.decider(etat.decisions, Object.assign({ exportClientsDu: etat.ebp.clients ? etat.ebp.arrete : null }, e));
+  etat.decisions = r.journal; signalerChangement(); return r.decision;
+}
+const donneesComptes = () => ({ terrain: etat.telephone ? etat.telephone.clients : [], clientsEbp: etat.ebp.clients ? etat.ebp.clients.clients : [],
+  piecesEbp: etat.ebp.pieces ? etat.ebp.pieces.pieces : [], arrete: etat.ebp.arrete, exportClientsDu: etat.ebp.clients ? etat.ebp.arrete : null, dateTelephone: etat.telephone ? etat.telephone.date : null });
+const appliquerDecisions = () => { const d = donneesComptes(); return DecisionsComptes.appliquer(etat.decisions, { terrain:d.terrain, clientsEbp:d.clientsEbp, piecesEbp:d.piecesEbp, exportClientsDu:d.exportClientsDu }); };
+// Modèle « Mes garages » : téléphone + EBP + décisions humaines (le même modèle que Ma Ville ; branché à la vue Commune au lot C).
+function modeleReel(a = appliquerDecisions()){
+  const d = donneesComptes();
+  return ModeleCommune.construire({ arrete:d.arrete, dates:{ EBP:d.arrete, Terrain:d.dateTelephone ? String(d.dateTelephone).slice(0,10) : null }, terrain:d.terrain, clientsEbp:d.clientsEbp, piecesEbp:d.piecesEbp,
+    liaisonsValidees:a.liaisonsValidees, verificationsCompte:a.verificationsCompte, aRevoir:a.aRevoir });
+}
+function vueVerifierComptes(){
+  if (etat.mode !== 'reel' || !etat.telephone) return h('section',{class:'bloc'}, h('h2',{},'Vérifier les comptes ODICOLOR'),
+    h('p',{class:'info'}, 'Cet écran travaille sur tes garages : charge d’abord la sauvegarde de ton téléphone (bouton Démo / Mes garages) et l’export clients EBP. Aucune décision n’est possible sur la démo.'));
+  const hote = h('div',{});
+  const coffre = document.documentElement.dataset.coffre;
+  VerifierComptes.monter(hote, { donnees: donneesComptes, appliquer: appliquerDecisions, modele: modeleReel, decider: deciderCompte,
+    auteur: () => etat.auteurDeclare, definirAuteur: t => { etat.auteurDeclare = String(t || '').slice(0, 60); },
+    enregistrement: () => coffre ? { ok:true, texte:'✓ Chaque décision est enregistrée dans le coffre chiffré de ce PC (auteur déclaré, date, source).' }
+      : { ok:false, texte:'⚠ Bureau ouvert sans l’application locale : les décisions restent en mémoire et seront perdues à la fermeture. Ouvre le Bureau par l’application ODICOLOR.' },
+    rafraichir: S => { etat.vf = S; rendre(); } }, etat.vf);
+  return hote;
+}
+function blocComptes(){
+  if (etat.mode !== 'reel' || !etat.telephone) return null;
+  let k; try { const t = [...modeleReel().communes.values()].flatMap(c => c.etablissements); k = s => t.filter(e => e.compte.statut === s).length; } catch (e) { return null; }
+  return h('section',{class:'bloc', id:'bloc-comptes'}, h('div',{class:'titre-bloc'},'Comptes ODICOLOR'),
+    h('p',{class:'info'}, k('en_compte') + ' en compte · ' + k('sans_compte') + ' sans compte · ' + k('a_verifier') + ' à vérifier'),
+    h('a',{class:'btn', href:'#verifier-comptes'}, 'Vérifier les comptes'));
+}
+
 // ================= Navigation =================
 function route(){
   const hs = location.hash, m = /^#carte-(\d\d)(?:-([a-z]+))?$/.exec(hs);
@@ -1359,6 +1399,7 @@ function route(){
   if (hs === '#simulation') return {ecran:'simulation'};
   if (hs === '#bureau') return {ecran:'bureau'};
   if (hs === '#a-classer') return {ecran:'a-classer'};
+  if (hs === '#verifier-comptes') return {ecran:'verifier-comptes'};
   const mv = /^#commune-(\d{5})$/.exec(hs); if (mv) return {ecran:'commune', insee:mv[1]};
   const md = /^#communes(?:-(\d\d))?$/.exec(hs); if (md && (!md[1] || L0.depInfo(md[1]))) return {ecran:'communes', dep:md[1] || null};
   return {ecran:'ville'};
@@ -1370,8 +1411,8 @@ function rendre(){
   if (r.porte) etat.choix = r.porte.id;
   if (r.ecran !== 'carte' && carte) { carte.remove(); carte = null; }
   rendreEntete(); rendreKpis(); rendreFiltres();
-  $('#kpis').hidden = ['simulation','bureau','commune','communes'].includes(r.ecran);
-  $('#vue').replaceChildren(['commune','communes'].includes(r.ecran) ? (reelSansMV() || (r.ecran === 'commune' ? vueCommuneMV(r.insee) : vueCommunesMV(r.dep)))
+  $('#kpis').hidden = ['simulation','bureau','commune','communes','verifier-comptes'].includes(r.ecran);
+  $('#vue').replaceChildren(r.ecran === 'verifier-comptes' ? vueVerifierComptes() : ['commune','communes'].includes(r.ecran) ? (reelSansMV() || (r.ecran === 'commune' ? vueCommuneMV(r.insee) : vueCommunesMV(r.dep)))
     : r.ecran==='carte' ? vueCarte(r.D, r.porte) : r.ecran==='simulation' ? vueSimulation() : r.ecran==='bureau' ? vueBureau() : r.ecran==='a-classer' ? vueAClasser() : vueVille());
   rendreFil();
   const sc = document.getElementById('scene'); if (sc && sc.scrollWidth > sc.clientWidth) { const t = TERRITOIRES.find(x=>x.id===etat.choix), [px] = iso(...pos(t)); sc.scrollLeft = (px + 495) / 990 * sc.scrollWidth - sc.clientWidth/2; }
@@ -1416,14 +1457,8 @@ window.OdicolorBureau = Object.freeze({
   // Décisions (sans écran au lot A ; l'écran « Vérifier les comptes » du lot B utilisera ces mêmes fonctions).
   decisions: Object.freeze({
     journal: () => JSON.parse(JSON.stringify(etat.decisions)),
-    decider(e){
-      if (etat.mode !== 'reel' || !etat.telephone) throw new Error('Charge d’abord la sauvegarde de ton téléphone : aucune décision sur la démo.');
-      if (etat.decisionsAlerte) throw new Error(etat.decisionsAlerte);
-      const r = DecisionsComptes.decider(etat.decisions, Object.assign({ exportClientsDu: etat.ebp.clients ? etat.ebp.arrete : null }, e));
-      etat.decisions = r.journal; signalerChangement(); return r.decision;
-    },
-    appliquer: () => DecisionsComptes.appliquer(etat.decisions, { terrain: etat.telephone ? etat.telephone.clients : [], clientsEbp: etat.ebp.clients ? etat.ebp.clients.clients : [],
-      piecesEbp: etat.ebp.pieces ? etat.ebp.pieces.pieces : [], exportClientsDu: etat.ebp.clients ? etat.ebp.arrete : null })
+    decider: e => deciderCompte(e),
+    appliquer: () => appliquerDecisions()
   }),
   restaurer(d, enregistreLe){
     if (!d || (d.version !== 1 && d.version !== 2)) return false;
