@@ -192,3 +192,45 @@ C'est un **filtre indépendant** : les 4 couleurs commerciales ne changent pas.
 - **Le bouton « Planifier une visite »** est désactivé sur un établissement fictif.
 - **Pas d'onglet dans l'en-tête.** On accède à la vue par la recherche, puis par le fil d'Ariane. C'est un choix fait pour ne pas modifier le design.
 - **Application Samsung** : non modifiée. Elle sera traitée à l'étape 4.
+
+## 13. Cadrage : CA facturé HT du mois en cours (décision du propriétaire, 07/11/2026)
+
+**Où le voir**
+- **Accueil du Bureau :** CA global, progression vers l'objectif mensuel, part attribuée à une commune, part non attribuée et CA personnel.
+- **Ma Ville :** l'Île-de-France, chaque département, chaque commune et chaque garage (aperçu et fiche).
+
+**Règles appliquées** (module `bureau/ca-facture.js`, tests `tests/bureau-ca-facture.test.cjs` et `tests/bureau-ca-navigateur.cjs`)
+- **Ce qui compte :** seules les factures émises, à leur date, hors taxes. Les avoirs sont déduits à **leur** date.
+- **Ce qui ne compte jamais :** commandes, devis, bons de livraison et encaissements.
+- **Doublons :** un numéro de pièce n'est compté qu'une fois, et le doublon est signalé.
+- **Rattachement :** uniquement par le **code client EBP**. Le chemin est : client EBP → établissement → commune (référentiel officiel) → département. Jamais par le nom.
+- **Non attribué :** une facture sans code, avec un code inconnu ou pour un client sans commune reconnue n'est attribuée à aucune commune. Elle est **affichée à part**, avec son motif. Le total global vaut Île-de-France + non attribué, et c'est vérifié à chaque calcul.
+- **Pas de double comptage :** la somme des garages donne la commune, la somme des communes donne le département, la somme des départements donne l'Île-de-France.
+- **Fraîcheur :** la date du dernier export EBP est toujours affichée, avec la mention « pas en temps réel ». Les données incomplètes sont signalées : lignes écartées à l'import, doublons, avoir illisible.
+- **Pas de faux zéro :** sans export, ou avec un export d'un mois passé, on affiche « Non renseigné ». Un garage sans compte EBP affiche aussi « Non renseigné ». Un client en compte sans facture ce mois affiche un 0 réel.
+- **CA personnel :** seulement si le fichier clients EBP contient une colonne représentant et si ton code est saisi. Sinon, « Non renseigné ».
+- **Sélecteur de compte :** il ne change pas le CA. Le CA couvre toutes les catégories.
+
+**Choix à ta place, réversibles**
+- **L'objectif mensuel n'est pas écrit dans le code** (le dépôt est public). Tu le saisis dans le Bureau, et il est gardé sur ce PC.
+- **Le code représentant** est aussi saisi dans le Bureau.
+
+**Limites**
+- **Ma Ville ne montre encore que des données fictives.** L'accueil, lui, calcule sur tes exports EBP dès qu'ils sont chargés.
+- **Le format réel de l'export EBP n'est pas confirmé.** En particulier, on ne sait pas si l'export liste une ligne par article ou une ligne par facture : une facture sur plusieurs lignes est signalée « à vérifier ».
+
+## 14. Cadrage : agence ODICOLOR interactive (maquette seulement, aucun développement)
+
+**Parcours :** Ma Ville → clic sur le bâtiment ODICOLOR → intérieur de l'agence → choix d'un agent → fiche de l'agent → « Donner une mission ».
+
+**Zones de l'agence :** bureaux et pôles de travail, comptoir, magasin et stocks, rayonnages et palettes, zone de préparation et d'expédition (quai, chariot).
+
+**Agents IA :** Business Developer, Achats, Logistique, Analyste, Technicien Méthodes, Ingénieur, Ingénieur logiciel. Chacun a un poste placé selon sa fonction.
+
+**Règles**
+- **Agents IA et collaborateurs bien distincts :** chaque agent IA porte un badge « IA ». Les postes des vrais collaborateurs ODICOLOR sont marqués « collaborateur », sans nom inventé.
+- **Aucune mission inventée :** une mission en cours n'apparaît que si elle existe réellement. Aucune action humaine n'est simulée.
+- **Aucun démarrage spontané :** un agent ne démarre aucune mission sans ta demande explicite. Toute action externe ou modification de données demande ton autorisation.
+- **Stocks et palettes :** données vérifiées quand elles seront disponibles. Sinon, « Non renseigné ».
+
+**La référence Ma Ville reste figée.** La maquette se trouve hors du dépôt.

@@ -75,7 +75,7 @@ test('pièces : lecture du fichier d’essai, correspondance des colonnes affich
 test('pièces : ligne écartée avec motif ; avoir gardé à part (pièce normale, jamais « écartée »)', () => {
   const r = E.lirePieces(table('ebp-pieces.csv'));
   assert.deepEqual(r.ignorees, [{ ligne: 19, motif: 'Date illisible pour CC-2006' }]);
-  assert.deepEqual(r.avoirs, [{ ligne: 18, no: 'AV-5001', date: '2026-11-04', client: 'GARAGE FICTIF ALPHA', htCents: -10000, origine: 'FA-4001' }]);
+  assert.deepEqual(r.avoirs, [{ ligne: 18, no: 'AV-5001', date: '2026-11-04', client: 'GARAGE FICTIF ALPHA', htCents: -10000, origine: 'FA-4001', code: 'C001' }]);
   assert.equal(r.liens, true, 'colonne « pièce d’origine » présente');
   assert.equal(E.lirePieces([['N° pièce', 'Date', 'Nom du client', 'Montant HT'], ['FA-1', '01/11/2026', 'A', '1,00']]).liens, false);
 });

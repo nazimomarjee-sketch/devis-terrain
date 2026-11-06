@@ -332,6 +332,7 @@ select.recherche{appearance:auto}
 </div>
 <div id="couche-fiche" hidden></div>
 <link rel="stylesheet" href="ville/ville-commune.css">
+<link rel="stylesheet" href="cockpit-ca.css">
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="communes-idf.js"></script>
@@ -344,6 +345,7 @@ select.recherche{appearance:auto}
 <script src="reveil.js"></script>
 <script src="lecture-sauvegarde.js"></script>
 <script src="annuaire.js"></script>
+<script src="ca-facture.js"></script>
 <script src="ville/modele-commune.js"></script>
 <script src="ville/dessin-iso.js"></script>
 <script src="ville/vue-commune.js"></script>
@@ -1171,7 +1173,7 @@ function vueBureau(){
     h('div',{class:'deps'}, EXPORTS.map(champ)));
   let plan = null, erreur = '';
   try { plan = planBureau(); } catch (e) { erreur = e.message; }
-  if (!plan) return h('div',{class:'ecran'}, h('div',{class:'panneau'}, imports, panneauReveil(null), erreur ? h('div',{class:'message erreur'}, erreur) :
+  if (!plan) return h('div',{class:'ecran'}, h('div',{class:'panneau'}, blocCA(caAccueil()), imports, panneauReveil(null), erreur ? h('div',{class:'message erreur'}, erreur) :
     h('section',{class:'bloc'}, h('h2',{},'Ta journée'), h('p',{class:'sous'},'Charge au moins l’export des pièces EBP pour voir tes 3 actions et ton CA réel.'))));
   const k = plan.kpi, top = plan.actions.filter(a => a.prio === 1), suite = plan.actions.filter(a => a.prio > 1);
   const action = (a, i) => h('div',{class:'action'}, h('div',{class:'n'}, (i + 1) + ' · ' + a.tag + ' · ' + a.responsable),
@@ -1186,6 +1188,7 @@ function vueBureau(){
       plan.changement ? h('section',{class:'bloc'}, h('div',{class:'titre-bloc'},'Un seul changement cette semaine'), h('p',{}, plan.changement.texte), h('small',{class:'info'}, plan.changement.mesure)) : null,
       panneauReveil(plan)),
     h('div',{class:'panneau'},
+      blocCA(caAccueil()),
       h('section',{class:'bloc'}, h('div',{class:'titre-bloc'},'Où j’en suis'), h('div',{class:'chiffres'},
         chiffre('CA commandé cette semaine', e2(k.semaine.cmdHt), ebpB, k.semaine.cmdN + ' commande(s)'),
         chiffre('CA commandé ce mois', e2(k.mois.cmdHt), ebpB, k.mois.cmdN + ' commande(s)'),
@@ -1204,8 +1207,50 @@ function vueBureau(){
 // ================= Ma Ville · vue Commune (étape 3) : DONNÉES FICTIVES uniquement =================
 // Modèle : bureau/ville/modele-commune.js · dessin : bureau/ville/vue-commune.js · styles séparés : bureau/ville/ville-commune.css.
 // Lecture seule : rien n'est écrit (coffre, téléphone, EBP). Les données réelles ne sont PAS branchées à cette étape.
-let mvModele = null;
-const modeleMV = () => mvModele || (mvModele = ModeleCommune.construire(window.FICTIF_IDF.avecDemoBureau(L0.garagesDemo(2026))));
+let mvModele = null, mvDonnees = null;
+const modeleMV = () => mvModele || (mvModele = ModeleCommune.construire(mvDonnees = window.FICTIF_IDF.avecDemoBureau(L0.garagesDemo(2026))));
+// ---- CA facturé HT du mois (bureau/ca-facture.js) : un seul calcul par source, partagé par tous les niveaux (pas de double comptage) ----
+const lireLocal = k => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } };
+const ecrireLocal = (k, v) => { try { v ? localStorage.setItem(k, v) : localStorage.removeItem(k); } catch (e) {} };
+etat.objectifCents = Number(lireLocal('odicolor-objectif-mensuel-ht')) || null; // saisi par toi, jamais écrit dans le code (dépôt public)
+etat.monCommercial = lireLocal('odicolor-mon-code-representant');
+function caMV(){ // Ma Ville (données fictives) : mêmes pièces que le modèle, « aujourd'hui » = date de l'export fictif
+  const m = modeleMV(), d = mvDonnees;
+  return Object.assign(CaFacture.calculer({ pieces:d.piecesEbp, avoirs:d.avoirsEbp, clientsEbp:d.clientsEbp, modele:m, arrete:d.arrete, aujourdhui:d.arrete, monCommercial:etat.monCommercial }), { fictif:true });
+}
+function caAccueil(){ // Accueil : exports EBP réels s'ils sont chargés ; sinon la démo fictive ; sinon « Non renseigné »
+  const E = etat.ebp;
+  if (E.pieces) {
+    const clients = E.clients ? E.clients.clients : [];
+    const modele = ModeleCommune.construire({ clientsEbp:clients, piecesEbp:E.pieces.pieces, arrete:E.arrete }); // rattachement par code client et référentiel officiel des communes
+    return CaFacture.calculer({ pieces:E.pieces.pieces, avoirs:E.pieces.avoirs, ignorees:E.pieces.ignorees, clientsEbp:clients, modele, arrete:E.arrete, aujourdhui:jourIso(), monCommercial:etat.monCommercial });
+  }
+  return etat.mode === 'demo' ? caMV() : CaFacture.calculer({ aujourdhui:jourIso() });
+}
+const titreCA = r => 'CA facturé HT · ' + r.libelleMois;
+function blocCA(r){
+  const eu = CaFacture.euros, obj = etat.objectifCents, v = r.totalCents;
+  const pct = obj && v != null ? Math.max(0, Math.round(v / obj * 100)) : null;
+  const saisie = (lib, cle, val, conv, placeholder) => h('label',{class:'ca-saisie'}, lib,
+    h('input',{type:'text', inputmode: cle === 'objectif' ? 'numeric' : null, value:val, placeholder, 'data-ca':cle, onchange:ev => conv(ev.target.value.trim())}));
+  return h('section',{class:'ca-bloc', id:'bloc-ca'},
+    h('div',{class:'ca-titre'}, titreCA(r), h('span',{class:'badge ' + (r.fictif ? 'b-demo' : r.statut === 'renseigne' ? 'b-confirme' : 'b-vide')}, r.fictif ? 'Données fictives' : r.statut === 'renseigne' ? 'EBP' : 'Non renseigné')),
+    h('div',{class:'ca-valeur' + (v == null ? ' vide' : ''), 'data-ca':'global'}, eu(v)),
+    h('p',{class:'ca-detail'}, r.statut === 'renseigne' ? `${pluriel(r.nbFactures,'facture')} émise(s) ${eu(r.facturesCents)} · ${pluriel(r.nbAvoirs,'avoir')} déduit(s) ${eu(r.avoirsCents)} · du ${frDate(r.debut)} au ${frDate(r.fin)}` : r.motif),
+    obj ? [h('div',{class:'ca-jauge', role:'progressbar', 'aria-valuemin':0, 'aria-valuemax':100, 'aria-valuenow':pct == null ? null : Math.min(pct,100)}, h('i',{style:`width:${pct == null ? 0 : Math.min(pct,100)}%`})),
+      h('div',{class:'ca-ligne'}, h('span',{}, 'Objectif mensuel ' + eu(obj)), h('b',{'data-ca':'progression'}, pct == null ? 'Progression : non renseignée' : pct + ' % · reste ' + eu(Math.max(0, obj - v))))] : null,
+    r.statut === 'renseigne' ? [
+      h('div',{class:'ca-ligne'}, h('span',{}, 'Attribué à une commune d’Île-de-France'), h('b',{'data-ca':'idf'}, eu(r.idfCents))),
+      h('div',{class:'ca-ligne'}, h('span',{}, 'Non attribué géographiquement (compté à part)'), h('b',{'data-ca':'non-attribue'}, eu(r.nonAttribue.cents))),
+      r.nonAttribue.lignes.length ? h('details',{class:'info'}, h('summary',{}, 'Détail du non attribué'), h('ul',{}, r.nonAttribue.lignes.map(l => h('li',{}, l.no + ' · ' + (l.client || 'client ?') + ' · ' + eu(l.cents) + ' : ' + l.motif)))) : null,
+      h('div',{class:'ca-ligne'}, h('span',{}, 'Mon CA personnel' + (r.personnel.commercial ? ' (' + r.personnel.commercial + ')' : '')), h('b',{'data-ca':'personnel'}, eu(r.personnel.totalCents))),
+      r.personnel.motif ? h('p',{class:'ca-alerte'}, r.personnel.motif) : null] : null,
+    ...(r.incomplets || []).map(t => h('p',{class:'ca-alerte'}, '⚠ ' + t)),
+    h('p',{class:'ca-detail', style:'margin-top:8px'}, CaFacture.fraicheur(r)),
+    h('div',{}, saisie('Objectif mensuel HT (€)', 'objectif', obj ? String(obj / 100) : '', t => { const n = Math.round(Number(t.replace(/\s/g,'').replace(',','.')) * 100);
+        etat.objectifCents = n > 0 ? n : null; ecrireLocal('odicolor-objectif-mensuel-ht', etat.objectifCents ? String(etat.objectifCents) : ''); rendre(); }, 'à saisir'),
+      saisie('Mon code représentant EBP', 'commercial', etat.monCommercial, t => { etat.monCommercial = t.slice(0, 40); ecrireLocal('odicolor-mon-code-representant', etat.monCommercial); rendre(); }, 'non renseigné')));
+}
 etat.mvCompte = 'tous'; etat.mvChoix = null;
 const CAT_MV = { client:'Client', prospect:'Prospect', a_qualifier:'À qualifier', hors_cible:'Hors cible' };
 const ACHAT_MV = { actif:'Achats réguliers', reachat:'Réachat à vérifier', potentiellement_dormant:'Potentiellement dormant', inactif:'Inactif', a_verifier:'Achats à vérifier' };
@@ -1230,7 +1275,9 @@ function ficheDe(e){
 function champsMaVille(e, champ){
   const c = e.compte, src = (s, d) => s + (d ? ' du ' + frDate(d) : '');
   const bc = c.statut === 'en_compte' ? ['b-confirme', src(c.source, c.date)] : c.statut === 'sans_compte' ? ['b-estime', src(c.source, c.date)] : ['b-alerte','À vérifier'];
+  const ca = caMV(), vca = CaFacture.valeur(ca, 'etablissement', e);
   return [
+    champ(titreCA(ca), vca.cents == null ? '' : CaFacture.euros(vca.cents), vca.cents == null ? ['','', vca.motif || 'Non renseigné'] : ['b-demo', CaFacture.fraicheur(ca)]),
     champ('Compte ODICOLOR', VueCommune.COMPTE[c.statut] + ' · ' + c.motif, bc),
     champ('Catégorie (Ma Ville)', CAT_MV[e.categorie] + (e.activite ? ' · ' + e.activite.valeur + (e.activite.probable ? ' (probable)' : '') : ' · métier inconnu'),
       e.activite ? ['b-estime', src(e.activite.source, e.activite.date)] : ['','','À qualifier']),
@@ -1251,10 +1298,11 @@ function vueCommunesMV(dep){
   const r = modeleMV(), a = ModeleCommune.agreger(r), D = dep ? L0.depInfo(dep) : null, f = etat.mvCompte;
   const k = D ? a.parDep.find(x => x.dep === dep) || { total:0, en_compte:0, sans_compte:0, a_verifier:0 } : a.idf;
   const n = x => f === 'tous' ? x.total : x[f];
+  const ca = caMV(), eu = CaFacture.euros, caDe = (niv, cle) => eu(CaFacture.valeur(ca, niv, cle).cents);
   const hote = h('div',{class:'vc vc-dep'});
   const ligne = (href, titre, sous, x) => `<a class="vc-dep-ligne" href="${href}"><span><b>${titre}</b><small>${sous}</small></span>
     <span class="vc-dep-n"><b>${n(x)}</b><small>${f === 'tous' ? 'établissements' : VueCommune.COMPTE[f].toLowerCase()}</small></span>
-    <span class="vc-dep-detail"><i class="vc-b vc-bc-en_compte">${x.en_compte} en compte</i><i class="vc-b vc-bc-sans_compte">${x.sans_compte} sans compte</i><i class="vc-b vc-bc-a_verifier">${x.a_verifier} à vérifier</i></span></a>`;
+    <span class="vc-dep-detail"><span class="vc-dep-ca" data-ca="${x.insee ? 'commune-' + x.insee : 'dep-' + x.dep}">${titreCA(ca)} : ${x.insee ? caDe('commune', x.insee) : caDe('dep', x.dep)}</span><i class="vc-b vc-bc-en_compte">${x.en_compte} en compte</i><i class="vc-b vc-bc-sans_compte">${x.sans_compte} sans compte</i><i class="vc-b vc-bc-a_verifier">${x.a_verifier} à vérifier</i></span></a>`;
   const lignes = D
     ? a.parCommune.filter(c => c.dep === dep && n(c) > 0).sort((x, y) => n(y) - n(x) || x.commune.localeCompare(y.commune)).map(c => ligne('#commune-' + c.insee, c.commune, c.insee + ' · ' + c.total + ' établissement(s)', c))
     : a.parDep.filter(d => n(d) > 0).map(d => ligne('#communes-' + d.dep, L0.depInfo(d.dep).nom + ' (' + d.dep + ')', d.communes + ' commune(s)', d));
@@ -1262,6 +1310,8 @@ function vueCommunesMV(dep){
     <nav class="vc-fil" aria-label="Où je suis">${D ? '<a href="#communes">Île-de-France</a> › <span>' + D.nom + ' (' + D.dep + ')</span>' : '<span>Île-de-France</span>'}</nav>
     <div class="vc-dep-tete"><h2>${D ? D.nom + ' <small>· ' + D.dep + '</small>' : 'Île-de-France'}</h2><span class="vc-fictif-txt">DONNÉES FICTIVES</span></div>
     ${VueCommune.selecteur(k, f)}
+    <div class="vc-ca"><span>${titreCA(ca)} · ${D ? 'garages rattachés au ' + D.dep : 'garages attribués à une commune d’Île-de-France'}</span><b data-ca="${D ? 'dep-' + D.dep : 'idf'}">${D ? caDe('dep', D.dep) : caDe('idf')}</b><small>${CaFacture.fraicheur(ca)} · sélecteur sans effet sur le CA (toutes catégories)</small></div>
+    ${!D && ca.statut === 'renseigne' ? `<p class="vc-dep-na">Non attribué géographiquement (à part, hors totaux des départements) : <b data-ca="non-attribue">${eu(ca.nonAttribue.cents)}</b> · total global <b data-ca="global">${eu(ca.totalCents)}</b></p>` : ''}
     <p class="vc-dep-note">Chaque établissement est compté une seule fois. « À vérifier » n’est jamais classé « sans compte » automatiquement.${D ? '' : ' Départements prioritaires 95, 94, 91, 77, 93 : sans ordre entre eux.'}</p>
     <div class="vc-dep-liste">${lignes.join('') || '<p class="vc-dep-note">Aucun établissement dans cette sélection.</p>'}</div>
     ${!D && a.aClasser.total ? `<details class="vc-dep-note"><summary>${a.aClasser.total} établissement(s) sans commune (à classer), comptés à part</summary><ul>${r.aClasser.map(e => '<li>' + e.nom.valeur.replace(/</g, '&lt;') + ' · ' + VueCommune.COMPTE[e.compte.statut] + '</li>').join('')}</ul></details>` : ''}
@@ -1272,8 +1322,10 @@ function vueCommunesMV(dep){
 function vueCommuneMV(insee){
   const r = modeleMV(), c = ModeleCommune.commune(r, insee);
   if (!c) return h('section',{class:'bloc'}, h('h2',{},'Commune sans établissement'), h('p',{class:'info'}, 'Aucun établissement (fictif) dans cette commune.'), h('a',{class:'btn', href:'#communes'}, 'Île-de-France'));
-  const D = L0.depInfo(c.dep), hote = h('div',{class:'vc-hote'});
-  const vue = VueCommune.monter(hote, c, { fictif:true, compte:etat.mvCompte, choisir:etat.mvChoix, surCompte:changerCompteMV,
+  const D = L0.depInfo(c.dep), hote = h('div',{class:'vc-hote'}), ca = caMV();
+  const vue = VueCommune.monter(hote, c, { fictif:true,
+    ca:{ libelle:titreCA(ca), commune:CaFacture.euros(CaFacture.valeur(ca, 'commune', c.insee).cents), fraicheur:CaFacture.fraicheur(ca),
+      etablissement:e => { const v = CaFacture.valeur(ca, 'etablissement', e); return v.cents == null ? 'Non renseigné' + (v.motif ? ' (' + v.motif.toLowerCase() + ')' : '') : CaFacture.euros(v.cents); } }, compte:etat.mvCompte, choisir:etat.mvChoix, surCompte:changerCompteMV,
     fil:[{ libelle:'Île-de-France', href:'#communes' }, { libelle:(D ? D.nom : c.dep) + ' (' + c.dep + ')', href:'#communes-' + c.dep }, { libelle:c.commune }],
     ouvrirFiche:(uid, e) => ouvrirFiche(ficheDe(e)) });
   window.vueCommuneBureau = vue; // pour les essais automatiques

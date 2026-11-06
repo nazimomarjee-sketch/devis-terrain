@@ -133,6 +133,7 @@
           <p>${k.total} établissement${k.total > 1 ? 's' : ''} · tous listés${sc.reste ? ' · ' + sc.dessines + ' dessinés' : ''}</p>
           <div class="vc-comptes"><span><b>${k.clients}</b> clients${k.dontDormants ? ' · dont ' + k.dontDormants + ' dormant' + (k.dontDormants > 1 ? 's' : '') + '/inactif' + (k.dontDormants > 1 ? 's' : '') : ''}</span>
           <span><b>${k.prospects}</b> prospects</span><span><b>${k.aQualifier}</b> ? à qualifier</span><span><b>${k.horsCible}</b> ⊘ hors cible</span></div>
+          ${opts.ca ? `<div class="vc-ca"><span>${esc(opts.ca.libelle)}</span><b>${esc(opts.ca.commune)}</b><small>${esc(opts.ca.fraicheur)}</small></div>` : ''}
           ${filtre !== 'tous' ? `<p class="vc-filtre-etat">Sélection <b>${COMPTE[filtre].toUpperCase()}</b> : ${l.length} sur ${k.total} affiché${l.length > 1 ? 's' : ''}${l.length ? '' : ' · aucun établissement dans cette sélection'}</p>` : ''}
           ${l.length > 12 ? `<input type="search" class="vc-chercher" placeholder="Chercher dans la liste (nom, n°, SIRET)" aria-label="Chercher dans la liste">` : ''}</div>
         <ol class="vc-liste">${l.map(e => { const q = qualif(e);
@@ -156,6 +157,7 @@
       ap.innerHTML = `<h4>${e.numero} · ${esc(e.nom.valeur)}</h4><p>${esc(sousTitre(e))}</p>
         <p class="vc-ap-src">${sources(e)} <span class="vc-b ${q[0]}">${q[1]}</span>${p ? '' : ' <span class="vc-b vc-b-inc">dans la liste (îlot)</span>'}</p>
         <p class="vc-ap-compte">${badgeCompte(e)} ${esc(e.compte ? e.compte.motif : '')}${e.compte && e.compte.source ? ` <span class="vc-b vc-src">${esc(e.compte.source)}${e.compte.date ? ' · ' + fr(e.compte.date) : ''}</span>` : ''}</p>
+        ${opts.ca ? `<p class="vc-ap-ca">${esc(opts.ca.libelle)} : <b>${esc(opts.ca.etablissement(e))}</b></p>` : ''}
         ${e.achat && e.achat.motif && e.achat.niveau !== 'actif' ? `<p class="vc-ap-motif">${esc(e.achat.motif)} <span class="vc-b vc-src">${esc(e.achat.source)}${e.achat.date ? ' · ' + fr(e.achat.date) : ''}</span></p>` : ''}
         <div class="vc-ap-btns"><button type="button" class="vc-ouvrir">Ouvrir la fiche ›</button><button type="button" class="vc-fermer">Fermer</button></div>`;
       ap.hidden = false;

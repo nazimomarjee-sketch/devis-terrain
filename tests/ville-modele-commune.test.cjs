@@ -297,7 +297,7 @@ test('24. compteurs sans doublon : chaque établissement dans une seule case, co
     assert.equal(somme(a.parCommune, k), a.idf[k], 'communes → IDF : ' + k);
   }
   assert.equal(a.idf.total + a.aClasser.total, r.bilan.etablissements, 'à classer comptés à part, aucun oubli');
-  assert.equal(a.aClasser.en_compte, 1, 'client EBP sans adresse : en compte, à classer');
+  assert.equal(a.aClasser.en_compte, 2, 'clients EBP sans adresse (connus seulement par leurs pièces) : en compte, à classer');
   const uids = [...r.communes.values()].flatMap(c => c.etablissements.map(e => e.uid)).concat(r.aClasser.map(e => e.uid));
   assert.equal(new Set(uids).size, uids.length, 'aucun établissement compté deux fois');
   assert.ok(r.bilan.conservation);

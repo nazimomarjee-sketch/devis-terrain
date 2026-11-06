@@ -35,7 +35,9 @@
       ['ville', 'Ville', /ville|commune/, false],
       ['cp', 'Code postal', /code postal|^cp$/, false],
       ['statut', 'Statut du compte', /statut|bloque|sommeil|^etat|^actif$/, false], // jamais « Compte comptable »
-      ['famille', 'Famille / activité (carrosserie, mécanique)', /famille|categorie|activite|type de client|secteur/, false]
+      ['famille', 'Famille / activité (carrosserie, mécanique)', /famille|categorie|activite|type de client|secteur/, false],
+      // Portefeuille : sert seulement à distinguer le CA personnel du CA de l'agence. Jamais « Nom commercial » (enseigne).
+      ['commercial', 'Représentant / commercial', /^(code )?(representant|commercial|vendeur)$|representant|^portefeuille|^vendeur|^commercial (attitre|affecte)/, false]
     ]
   };
 
@@ -140,8 +142,8 @@
       const client = texte(g('client'), 120) || texte(g('code'), 40);
       if (!no) return ignorees.push({ ligne: n, motif: 'N° de pièce absent' });
       if (!type) return ignorees.push({ ligne: n, motif: 'Type de pièce non reconnu (' + texte(g('type'), 30) + ' / ' + no + ')' });
-      // Avoir : pièce normale, gardée à part (non déduite du CA tant que la règle n'est pas validée), jamais « écartée ».
-      if (type === 'avoir') return avoirs.push({ ligne: n, no, date, client, htCents: ht, origine: texte(g('origine'), 40) });
+      // Avoir : pièce normale, gardée à part, jamais « écartée ». Déduit du CA facturé à SA date (règle validée le 07/11/2026, bureau/ca-facture.js).
+      if (type === 'avoir') return avoirs.push({ ligne: n, no, date, client, htCents: ht, origine: texte(g('origine'), 40), code: texte(g('code'), 40) });
       if (!date) return ignorees.push({ ligne: n, motif: 'Date illisible pour ' + no });
       if (ht == null) return ignorees.push({ ligne: n, motif: 'Montant HT illisible pour ' + no });
       if (!client) return ignorees.push({ ligne: n, motif: 'Client absent pour ' + no });
@@ -188,7 +190,7 @@
       const statut = /^(bloque|sommeil|en sommeil)/.test(titre) && /^(oui|vrai|1|x)$/.test(norm(brut)) ? (/bloque/.test(titre) ? 'Bloqué' : 'En sommeil')
         : /^(bloque|sommeil|en sommeil)/.test(titre) && /^(non|faux|0)?$/.test(norm(brut)) ? 'Actif'
         : titre === 'actif' && /^(non|faux|0)$/.test(norm(brut)) ? 'Inactif' : titre === 'actif' && /^(oui|vrai|1|x)$/.test(norm(brut)) ? 'Actif' : brut;
-      clients.push({ code, nom, ville: texte(g('ville'), 80), cp: texte(g('cp'), 10), statut, famille: texte(g('famille'), 60), bloque: /bloqu|suspendu|interdit|contentieux/.test(norm(statut)) });
+      clients.push({ code, nom, ville: texte(g('ville'), 80), cp: texte(g('cp'), 10), statut, famille: texte(g('famille'), 60), commercial: texte(g('commercial'), 40), bloque: /bloqu|suspendu|interdit|contentieux/.test(norm(statut)) });
     });
     return { clients, ignorees, correspondance: T.correspondance, lues: T.corps.length };
   }
