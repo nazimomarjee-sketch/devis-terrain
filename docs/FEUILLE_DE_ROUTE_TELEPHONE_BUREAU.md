@@ -37,6 +37,11 @@ avant tout essai sur Samsung. Rien n'est fusionné, publié ou mis en production
 
 ## Cockpit ODICOLOR 2.0 (décidé le 06/11/2026)
 
+> **Règle du propriétaire (06/11/2026) — Ville LEGO.** La Ville est un élément central : bâtiments, personnages,
+> animations, interactions et design sont conservés intégralement. Le cockpit **alimente** la Ville avec les données
+> commerciales ; il ne la remplace jamais par un tableau de bord. Toute modification importante de la Ville
+> (`dessinerVille`, `figurine`, `persoVille`, `volume`, `vueVille`, fiches, styles de la scène) exige l'accord préalable du propriétaire.
+
 4 espaces : Terrain (téléphone) · Bureau (pipeline EBP) · Ma Ville (`bureau/`, carte et marché) · Mon Business (CA, marge, objectifs).
 Une donnée = une source : terrain → téléphone ; transactions, prix, marge → exports EBP ; marché → annuaire/SIRENE ; objectifs → validés avec Faizal.
 
