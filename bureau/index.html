@@ -1091,7 +1091,7 @@ async function importerEbp(type, f){
 }
 function planBureau(){
   const E = etat.ebp; if (!E.pieces) return null;
-  const ignorees = ['pieces','reglements','clients'].reduce((n,k) => n + (E[k] ? E[k].ignorees.length : 0), 0);
+  const ignorees = E.pieces.ignorees.length; // seules les pièces écartées rendent les preuves commerciales incomplètes
   return Pipeline.construirePlan({ piecesEbp:E.pieces.pieces, reglements:E.reglements ? E.reglements.reglements : [], clientsEbp:E.clients ? E.clients.clients : [],
     devisTelephone: etat.telephone ? etat.telephone.devis : [], arrete:E.arrete, aujourdhui: jourIso(), ignorees });
 }
@@ -1107,7 +1107,9 @@ function vueBureau(){
       E.erreur[type] ? h('div',{class:'message erreur'}, 'Refusé : ' + E.erreur[type]) : null,
       r ? h('details',{class:'info'}, h('summary',{}, `${r.fichier} : ${r.lues} ligne(s) lue(s), ${r.ignorees.length} écartée(s)`),
         h('p',{}, 'Colonnes retenues : ' + r.correspondance.map(c => c.libelle + ' ← « ' + c.colonne + ' »').join(' · ')),
-        r.ignorees.length ? h('ul',{}, r.ignorees.slice(0, 50).map(x => h('li',{}, 'Ligne ' + x.ligne + ' : ' + x.motif))) : null) : null); };
+        r.ignorees.length ? h('ul',{}, r.ignorees.slice(0, 50).map(x => h('li',{}, 'Ligne ' + x.ligne + ' : ' + x.motif))) : null,
+        type === 'pieces' && !r.liens ? h('div',{class:'message erreur'}, 'Colonne « pièce d’origine » absente : impossible de relier devis, commandes, livraisons et factures. Les retards ne sont pas fiables.') : null,
+        r.avoirs && r.avoirs.length ? h('p',{}, r.avoirs.length + ' avoir(s) lu(s), non déduit(s) du CA (règle à valider) : ' + r.avoirs.map(x => x.no).join(', ')) : null) : null); };
   const imports = h('section',{class:'bloc'}, h('div',{class:'titre-bloc'},'Exports EBP'),
     h('p',{class:'info'}, 'Charge tes exports EBP (CSV ou Excel). Lecture seule : rien n’est modifié ni envoyé. ',
       etat.telephone ? h('b',{}, (etat.telephone.devis || []).length + ' devis du téléphone pris en compte.') : 'Charge aussi ta sauvegarde téléphone (bouton Démo / Mes garages) pour relier tes devis.'),
@@ -1139,7 +1141,7 @@ function vueBureau(){
       h('section',{class:'bloc'}, h('div',{class:'titre-bloc'},'Plan du matin pour le téléphone'),
         h('p',{class:'info'}, plan.actions.length + ' action(s), ' + plan.clients.length + ' fiche(s) client, chiffres EBP. Sur le téléphone : Réglages → Imports → Plan PC.'),
         plan.rapprochements.length ? h('p',{class:'info'}, plan.rapprochements.length + ' pièce(s) du téléphone reconnue(s) dans EBP (non comptées deux fois) : ' + plan.rapprochements.map(r => r.telephone + ' = ' + r.ebp).join(', ') + '.') : null,
-        plan.sources.commercial.restrictions.map(t => h('div',{class:'message erreur'}, t)),
+        plan.sources.preuvesCommerciales.restrictions.map(t => h('div',{class:'message erreur'}, t)),
         h('button',{class:'btn principal plein', onclick:() => telechargerPlan(plan)}, 'Télécharger le plan du matin')),
       imports));
 }

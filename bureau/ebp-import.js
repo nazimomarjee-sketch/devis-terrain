@@ -132,14 +132,15 @@
 
   // Pièces commerciales (devis, commandes, BL, factures). lignes = tableau de lignes (1re = en-têtes).
   function lirePieces(lignes) {
-    const T = verifierTable('pieces', lignes), pieces = [], ignorees = [], vus = new Map();
+    const T = verifierTable('pieces', lignes), pieces = [], ignorees = [], avoirs = [], vus = new Map();
     T.corps.forEach((r, i) => {
       const n = i + 2, g = k => cellule(r, T.carte, k);
       const no = texte(g('no'), 40), date = lireDate(g('date')), type = lireType(g('type'), no), ht = lireMontant(g('ht'));
       const client = texte(g('client'), 120) || texte(g('code'), 40);
       if (!no) return ignorees.push({ ligne: n, motif: 'N° de pièce absent' });
       if (!type) return ignorees.push({ ligne: n, motif: 'Type de pièce non reconnu (' + texte(g('type'), 30) + ' / ' + no + ')' });
-      if (type === 'avoir') return ignorees.push({ ligne: n, motif: 'Avoir ' + no + ' : non déduit du CA (traitement à valider)' });
+      // Avoir : pièce normale, gardée à part (non déduite du CA tant que la règle n'est pas validée), jamais « écartée ».
+      if (type === 'avoir') return avoirs.push({ ligne: n, no, date, client, htCents: ht, origine: texte(g('origine'), 40) });
       if (!date) return ignorees.push({ ligne: n, motif: 'Date illisible pour ' + no });
       if (ht == null) return ignorees.push({ ligne: n, motif: 'Montant HT illisible pour ' + no });
       if (!client) return ignorees.push({ ligne: n, motif: 'Client absent pour ' + no });
@@ -152,7 +153,8 @@
       const p = { type, no, date, code: texte(g('code'), 40), client, htCents: ht, origine: texte(g('origine'), 40), ref: texte(g('ref'), 160), source: 'ebp', lignesSource: 1 };
       vus.set(cle, p); pieces.push(p);
     });
-    return { pieces, ignorees, correspondance: T.correspondance, lues: T.corps.length };
+    // liens = l'export indique la pièce d'origine (indispensable pour suivre devis → commande → BL → facture).
+    return { pieces, ignorees, avoirs, liens: T.carte.origine != null, correspondance: T.correspondance, lues: T.corps.length };
   }
 
   // Échéancier des règlements. Sans colonne « reste » : réglé si date de règlement, sinon montant entier dû.

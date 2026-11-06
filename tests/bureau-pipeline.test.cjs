@@ -88,7 +88,7 @@ test('sans échéancier EBP : aucune facture déclarée impayée, mention « non
   const plan = P.construirePlan(s);
   assert.ok(!plan.actions.some(a => a.tag === 'Règlement'));
   assert.equal(plan.kpi.echu, undefined);
-  assert.deepEqual(plan.indicateurs[5], { l: 'Échu non réglé', v: 'non vérifiable', n: 'échéancier EBP non chargé' });
+  assert.deepEqual(plan.indicateurs.find(i => i.l === 'Échu non réglé'), { l: 'Échu non réglé', v: 'non vérifiable', n: 'échéancier EBP non chargé' });
 });
 
 test('échéancier chargé mais facture absente : « à vérifier », jamais impayée', () => {
@@ -127,12 +127,45 @@ test('plan : refus clairs (date d’export absente ou dans le futur)', () => {
   assert.throws(() => P.construirePlan({ ...s, arrete: '2026-11-07', aujourdhui: '2026-11-06' }), /futur/);
 });
 
-test('plan : preuves incomplètes signalées si des lignes EBP ont été écartées', () => {
+test('plan : format « sources » lu par le téléphone ; preuves incomplètes si historique court ou lignes écartées', () => {
   const plan = P.construirePlan(scenario());
   assert.deepEqual(plan.chiffre, { source: 'import', arrete: AUJ });
-  assert.equal(plan.sources.commercial.fiable, false);
-  assert.match(plan.sources.commercial.restrictions[0], /2 ligne\(s\) EBP ignorée\(s\)/);
-  assert.equal(P.construirePlan({ ...scenario(), ignorees: 0 }).sources.commercial.fiable, true);
+  assert.equal(plan.sources.ebpDate, AUJ);
+  assert.deepEqual(plan.sources.importStats, { pieces: { ignorees: 1 } });
+  const pc = plan.sources.preuvesCommerciales;
+  assert.equal(pc.fiable, false);
+  assert.match(pc.restrictions[0], /Historique des commandes EBP depuis le 2026-10-15 seulement : 12 mois nécessaires/);
+  assert.match(pc.restrictions[1], /1 ligne\(s\) de pièces EBP écartée\(s\)/);
+});
+
+function historique() {
+  const p = E.lirePieces(table('ebp-pieces-historique.csv'));
+  return { piecesEbp: p.pieces, ignorees: p.ignorees.length, clientsEbp: E.lireClientsEbp(table('ebp-clients-historique.csv')).clients, arrete: AUJ, maintenant: MAINTENANT };
+}
+
+test('signaux : reconquête et baisse détectées sur 14 mois d’historique, compte bloqué exclu', () => {
+  const plan = P.construirePlan(historique());
+  assert.deepEqual(plan.sources.preuvesCommerciales, { fiable: true, restrictions: [], signaux: 2 });
+  const sig = Object.fromEntries(plan.clients.filter(c => c.signaux && c.signaux.length).map(c => [c.nom, c.signaux]));
+  assert.deepEqual(Object.keys(sig).sort(), ['GARAGE FICTIF OMEGA', 'GARAGE FICTIF SIGMA']);
+  const o = sig['GARAGE FICTIF OMEGA'][0];
+  assert.deepEqual([o.type, o.dateDernier, o.ca12, o.seuil], ['reconquete', '2026-07-15', 7200, 'Plus de 60 jours sans commande']);
+  assert.match(o.titre, /Aucune commande depuis 114 j/);
+  assert.match(o.preuve, /CA commandé sur 12 mois : 7 200,00 € HT, 9 commande\(s\)/);
+  const g = sig['GARAGE FICTIF SIGMA'][0];
+  assert.equal(g.type, 'baisse');
+  assert.match(g.titre, /400,00 € sur 90 j contre 3 000,00 € avant/);
+  assert.match(g.seuil, /50 %/);
+});
+
+test('reconquête : devient une action « Visite » avec preuve ; pièces sans suite anciennes = à vérifier, pas d’action', () => {
+  const plan = P.construirePlan(historique());
+  assert.deepEqual(plan.actions.map(a => [a.prio, a.tag, a.client]), [[1, 'Commande', 'GARAGE FICTIF KAPPA'], [1, 'Visite', 'GARAGE FICTIF OMEGA']]);
+  const r = plan.actions[1];
+  assert.equal(r.id, 'chaine:reconquete:C101');
+  assert.match(r.preuve, /CA commandé sur 12 mois/);
+  assert.deepEqual(plan.indicateurs.find(i => i.l === 'Pièces sans suite à vérifier'), { l: 'Pièces sans suite à vérifier', v: '26', n: 'plus de 20 j ouvrés : lien manquant dans l’export ?' });
+  assert.deepEqual(P.verifierPlan(plan), []);
 });
 
 test('plan : conforme aux limites du téléphone, même avec des noms très longs', () => {
@@ -178,13 +211,4 @@ test('téléphone (code réel) : statut « fait » d’une action conservé au p
   const demain = P.construirePlan({ ...scenario(), maintenant: '2026-11-07T07:00:00.000Z' });
   const recu = await importer(fichier(demain));
   assert.equal(recu.actions.find(a => a.id === id).statut, 'fait');
-});
-
-test('téléphone (code réel) : écarts connus — champs « chiffre » et « sources » effacés à l’import', async () => {
-  // Défaut du TÉLÉPHONE (app.js, nettoyerPlan) : ces champs conditionnent « opportunités » et la ligne EBP de l'accueil.
-  // Ce test documente l'écart ; il devra être inversé quand le téléphone sera corrigé (décision du propriétaire).
-  const { importer } = importTelephone();
-  const recu = await importer(fichier(P.construirePlan(scenario())));
-  assert.equal(recu.chiffre, undefined);
-  assert.equal(recu.sources, undefined);
 });

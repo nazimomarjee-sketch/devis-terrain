@@ -62,8 +62,10 @@ test('Bureau : 3 actions, CA EBP, rapprochements et plan conforme', async () => 
     assert.match(texte.replace(/\s/g, ' '), /2 800 €/);
     assert.match(texte.replace(/\s/g, ' '), /3 600 €/);
     assert.match(texte, /TEL-D11 = DV-1001, TEL-C13 = CC-2001/);
-    assert.match(texte, /2 ligne\(s\) EBP ignorée\(s\)/);
-    assert.match(texte, /Ligne 18 : Avoir AV-5001/);
+    assert.match(texte, /1 ligne\(s\) de pièces EBP écartée\(s\)/);
+    assert.match(texte, /Ligne 19 : Date illisible pour CC-2006/);
+    assert.match(texte, /1 avoir\(s\) lu\(s\), non déduit\(s\) du CA \(règle à valider\) : AV-5001/);
+    assert.match(texte, /Historique des commandes EBP depuis le 2026-10-15 seulement/);
     const dl = page.waitForEvent('download');
     await page.click('text=Télécharger le plan du matin');
     const fichier = await dl;
@@ -119,6 +121,49 @@ test('Bureau au format téléphone : pas de défilement horizontal', async () =>
     assert.ok(large <= ecran + 1, large + 'px pour ' + ecran + 'px');
     const coupes = await page.$$eval('.onglet', l => l.filter(o => { const r = o.getBoundingClientRect(); return r.left < 0 || r.right > document.documentElement.clientWidth + 1 || o.scrollWidth > o.clientWidth + 1; }).map(o => o.textContent));
     assert.deepEqual(coupes, [], 'chaque onglet est entièrement visible');
+    assert.deepEqual(erreurs, []);
+  } finally { await ctx.close(); }
+});
+
+test('Historique EBP 14 mois → Bureau → téléphone : page Opportunités (reconquête, baisse) et accueil EBP', async () => {
+  // 14:00 : la version du téléphone en service (main) refuse encore l'export du jour avant midi ;
+  // la correction est sur la PR #2 (tests/plan-pc-matin-browser.cjs, de 08:30 à 23:30).
+  const b = await contexte();
+  let plan;
+  try {
+    await b.page.clock.setFixedTime(new Date('2026-11-06T14:00:00'));
+    await b.page.goto(origine + '/bureau/index.html#bureau');
+    for (const [type, f] of [['pieces', 'ebp-pieces-historique.csv'], ['clients', 'ebp-clients-historique.csv']]) {
+      await b.page.setInputFiles('#ebp-' + type, path.join(F, f));
+      await b.page.waitForSelector('#ebp-' + type + ' >> xpath=ancestor::label[starts-with(normalize-space(.), "✓")]');
+    }
+    assert.deepEqual((await b.page.locator('.action b').allTextContents()).slice(0, 2), ['Débloquer avec Mohamed la commande de GARAGE FICTIF KAPPA', 'Reconquérir : GARAGE FICTIF OMEGA']);
+    const dl = b.page.waitForEvent('download'); await b.page.click('text=Télécharger le plan du matin');
+    plan = JSON.parse(fs.readFileSync(await (await dl).path(), 'utf8'));
+    assert.equal(plan.sources.preuvesCommerciales.fiable, true);
+    fs.writeFileSync(path.join(dossier, 'plan-historique.json'), JSON.stringify(plan));
+    assert.deepEqual(b.erreurs, []);
+  } finally { await b.ctx.close(); }
+  const { ctx, page, erreurs } = await contexte({ viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true });
+  try {
+    await page.clock.setFixedTime(new Date('2026-11-06T14:00:00'));
+    await page.goto(origine + '/#/reglages');
+    await page.evaluate(() => putMany('clients', [{ id: 1, nom: 'GARAGE FICTIF OMEGA', statutCrm: 'client' }, { id: 2, nom: 'GARAGE FICTIF SIGMA', statutCrm: 'client' }, { id: 3, nom: 'GARAGE FICTIF KAPPA', statutCrm: 'client' }]));
+    await page.click('text=Plan commercial du PC');
+    await page.getByLabel('Plan PC à importer').setInputFiles(path.join(dossier, 'plan-historique.json'));
+    await page.getByRole('button', { name: 'Importer le plan PC' }).click();
+    await page.waitForSelector('text=Plan du PC importé');
+    assert.deepEqual(await page.evaluate(async () => window.__commercialV22.fiabilite(await lirePC()).ok), true);
+    await page.goto(origine + '/#/opportunites');
+    await page.waitForSelector('text=Client à reconquérir');
+    const t = await page.textContent('body');
+    assert.match(t, /GARAGE FICTIF OMEGA\s*Client à reconquérir\s*Aucune commande depuis 114 j/);
+    assert.match(t, /GARAGE FICTIF SIGMA\s*Achats en baisse/);
+    assert.match(t, /Règle de détection \(hypothèse\) : Plus de 60 jours sans commande/);
+    assert.doesNotMatch(t, /LAMBDA/, 'compte bloqué : aucun signal');
+    await page.goto(origine + '/#/');
+    await page.waitForSelector('text=montants EBP à consulter sur Mon travail');
+    await page.waitForSelector('.v29-home-note small:has-text("Pour GARAGE FICTIF")');
     assert.deepEqual(erreurs, []);
   } finally { await ctx.close(); }
 });

@@ -72,12 +72,12 @@ test('pièces : lecture du fichier d’essai, correspondance des colonnes affich
   assert.deepEqual(r.pieces.find(p => p.no === 'BL-3001'), { type: 'bl', no: 'BL-3001', date: '2026-10-16', code: 'C001', client: 'GARAGE FICTIF ALPHA', htCents: 180000, origine: 'CC-2002', ref: '', source: 'ebp', lignesSource: 1 });
 });
 
-test('pièces : chaque ligne écartée a un motif clair (avoir, date impossible)', () => {
+test('pièces : ligne écartée avec motif ; avoir gardé à part (pièce normale, jamais « écartée »)', () => {
   const r = E.lirePieces(table('ebp-pieces.csv'));
-  assert.deepEqual(r.ignorees, [
-    { ligne: 18, motif: 'Avoir AV-5001 : non déduit du CA (traitement à valider)' },
-    { ligne: 19, motif: 'Date illisible pour CC-2006' }
-  ]);
+  assert.deepEqual(r.ignorees, [{ ligne: 19, motif: 'Date illisible pour CC-2006' }]);
+  assert.deepEqual(r.avoirs, [{ ligne: 18, no: 'AV-5001', date: '2026-11-04', client: 'GARAGE FICTIF ALPHA', htCents: -10000, origine: 'FA-4001' }]);
+  assert.equal(r.liens, true, 'colonne « pièce d’origine » présente');
+  assert.equal(E.lirePieces([['N° pièce', 'Date', 'Nom du client', 'Montant HT'], ['FA-1', '01/11/2026', 'A', '1,00']]).liens, false);
 });
 
 test('pièces : refus clair si une colonne obligatoire manque, avec les colonnes lues', () => {

@@ -11,7 +11,8 @@
 (function (racine) {
   'use strict';
 
-  const SEUILS = Object.freeze({ devisRelanceJours: 3, devisFroidJours: 14, prepJoursOuvres: 1, factJoursOuvres: 2, echeanceToleranceJours: 1 });
+  const SEUILS = Object.freeze({ devisRelanceJours: 3, devisFroidJours: 14, prepJoursOuvres: 1, factJoursOuvres: 2, echeanceToleranceJours: 1,
+    reconqueteJours: 60, suiviMaxJoursOuvres: 20, baisseJours: 90, baisseTaux: 0.5, baisseMinCents: 50000, historiqueJours: 365 });
   const ETAPES = Object.freeze({ devis: 'Devis envoyé', prep: 'Commande en préparation', livraison: 'Livraison', facturation: 'Livré, à facturer',
     encaissement: 'Facture à encaisser', facture: 'Facturé (règlement non vérifiable)', solde: 'Soldée' });
 
@@ -122,10 +123,14 @@
         const n = joursOuvres(a.bl.date, aujourdhui); a.depuis = a.bl.date; a.age = n;
         if (n <= 1) { a.etape = 'livraison'; a.niveau = 'ok'; a.retard = false; }
         else { a.etape = 'facturation'; a.retard = n > S.factJoursOuvres; a.niveau = a.retard ? 'bad' : 'warn'; }
+        // Au-delà de suiviMaxJoursOuvres, l'absence de suite vient presque sûrement d'un lien manquant dans l'export :
+        // « à vérifier », jamais une action pour Mohamed (hypothèse réglable).
+        if (n > S.suiviMaxJoursOuvres) { a.retard = false; a.niveau = 'warn'; a.lienAVerifier = true; }
       } else if (a.commande) {
         const n = joursOuvres(a.commande.date, aujourdhui); a.depuis = a.commande.date; a.age = n; a.etape = 'prep';
         a.attenteEbp = a.commande.source === 'telephone';
         a.retard = n > S.prepJoursOuvres; a.niveau = a.retard ? 'bad' : 'warn';
+        if (n > S.suiviMaxJoursOuvres) { a.retard = false; a.niveau = 'warn'; a.lienAVerifier = true; }
       } else {
         const n = ecart(a.devis.date, aujourdhui); a.depuis = a.devis.date; a.age = n; a.etape = 'devis';
         a.froid = n > S.devisFroidJours;
@@ -152,7 +157,7 @@
   }
 
   // ---------- actions du jour : valeur en jeu, preuve, source, contrôle ----------
-  function actions(affaires, { arrete, aujourdhui, seuils = SEUILS }) {
+  function actions(affaires, { arrete, aujourdhui, seuils = SEUILS, supplementaires = [] }) {
     const S = Object.assign({}, SEUILS, seuils), src = a => (a.source === 'telephone' ? 'Téléphone (déclaratif)' : 'Export EBP du ' + arrete);
     const out = [];
     const ajouter = (a, genre, tag, responsable, t, d, preuve, poids, montant) => out.push({
@@ -181,6 +186,7 @@
         ajouter(a, 'facturation', 'Facture', 'Mohamed', 'Faire facturer : ' + court(a.client, 80), 'Livré depuis ' + a.age + ' j ouvrés sans facture · ' + eur(a.htCents) + ' HT',
           'Bon de livraison ' + a.bl.no + ' du ' + a.bl.date + ', aucune facture liée. Seuil ' + S.factJoursOuvres + ' j ouvrés (hypothèse).', 2, a.htCents);
     }
+    out.push(...supplementaires);
     out.sort((x, y) => y.valeur - x.valeur || x.id.localeCompare(y.id));
     out.forEach((x, i) => { x.prio = i < 3 ? 1 : i < 10 ? 2 : 3; });
     return out;
@@ -218,6 +224,51 @@
     return L[0] || null;
   }
 
+
+  // ---------- signaux commerciaux par client, lus par le téléphone (commercial-v22.js : « Opportunités ») ----------
+  // reconquete : du CA commandé sur 12 mois mais plus aucune commande depuis reconqueteJours ;
+  // baisse : CA commandé des baisseJours derniers jours inférieur de baisseTaux à la période précédente (minimum baisseMinCents).
+  // Seuils = HYPOTHÈSES, recopiées dans chaque signal. Jamais de signal pour un compte bloqué dans EBP.
+  function signauxClients(piecesEbp, clientsEbp, arrete, seuils = SEUILS) {
+    const S = Object.assign({}, SEUILS, seuils), bloques = new Set((clientsEbp || []).filter(c => c.bloque).map(c => c.code));
+    const parClient = new Map();
+    for (const p of piecesEbp) {
+      if (p.type !== 'commande' || p.date > arrete) continue;
+      const k = p.code || norm(p.client); if (!parClient.has(k)) parClient.set(k, { nom: p.client, code: p.code, cmd: [] });
+      parClient.get(k).cmd.push(p);
+    }
+    const source = 'Export EBP du ' + arrete + ' (commandes)', out = new Map();
+    for (const [k, c] of parClient) {
+      if (c.code && bloques.has(c.code)) continue;
+      const cmd = c.cmd.sort((a, b) => b.date.localeCompare(a.date)), entre = (de, a) => cmd.filter(p => p.date > de && p.date <= a);
+      const ca12 = entre(plus(arrete, -S.historiqueJours), arrete).reduce((n, p) => n + p.htCents, 0), dernier = cmd[0].date, depuis = ecart(dernier, arrete);
+      const signaux = [];
+      if (ca12 > 0 && depuis > S.reconqueteJours) {
+        signaux.push({ type: 'reconquete', titre: court('Aucune commande depuis ' + depuis + ' j (dernière le ' + dernier + ')', 120),
+          preuve: court('CA commandé sur 12 mois : ' + eur(ca12) + ' HT, ' + entre(plus(arrete, -S.historiqueJours), arrete).length + ' commande(s). Dernières : ' + cmd.slice(0, 5).map(p => p.no + ' du ' + p.date + ' (' + eur(p.htCents) + ')').join(', ') + '.', 650),
+          source, dateDernier: dernier, ca12: enEuros(ca12), pieces: cmd.slice(0, 15).map(p => p.no), seuil: 'Plus de ' + S.reconqueteJours + ' jours sans commande', actionId: 'chaine:reconquete:' + k });
+      } else {
+        const recent = entre(plus(arrete, -S.baisseJours), arrete), avant = entre(plus(arrete, -2 * S.baisseJours), plus(arrete, -S.baisseJours));
+        const r = recent.reduce((n, p) => n + p.htCents, 0), a = avant.reduce((n, p) => n + p.htCents, 0);
+        if (a >= S.baisseMinCents && r < a * (1 - S.baisseTaux))
+          signaux.push({ type: 'baisse', titre: court('Commandes en baisse : ' + eur(r) + ' sur ' + S.baisseJours + ' j contre ' + eur(a) + ' avant', 120),
+            preuve: court(recent.length + ' commande(s) récentes contre ' + avant.length + ' sur la période précédente. Pièces : ' + [...recent, ...avant].slice(0, 8).map(p => p.no).join(', ') + '.', 650),
+            source, dateDernier: dernier, ca12: enEuros(ca12), pieces: [...recent, ...avant].slice(0, 15).map(p => p.no), seuil: 'Baisse de plus de ' + Math.round(S.baisseTaux * 100) + ' % sur ' + S.baisseJours + ' jours (minimum ' + eur(S.baisseMinCents) + ' avant)', actionId: '' });
+      }
+      if (signaux.length) out.set(k, { nom: c.nom, code: c.code, signaux });
+    }
+    return out;
+  }
+
+  // Fiabilité déclarée au téléphone : historique de commandes EBP ≥ 12 mois ET aucune ligne de pièce écartée.
+  function preuvesCommerciales(piecesEbp, ignorees, arrete, nbSignaux, seuils = SEUILS) {
+    const S = Object.assign({}, SEUILS, seuils), cmd = piecesEbp.filter(p => p.type === 'commande').map(p => p.date).sort(), restrictions = [];
+    if (!cmd.length) restrictions.push('Aucune commande dans l’export EBP : signaux commerciaux impossibles.');
+    else if (cmd[0] > plus(arrete, -S.historiqueJours)) restrictions.push('Historique des commandes EBP depuis le ' + cmd[0] + ' seulement : ' + Math.round(S.historiqueJours / 30) + ' mois nécessaires pour les signaux.');
+    if (ignorees) restrictions.push(ignorees + ' ligne(s) de pièces EBP écartée(s) à l’import : preuves incomplètes.');
+    return { fiable: restrictions.length === 0, restrictions, signaux: nbSignaux };
+  }
+
   // ---------- plan du matin pour le téléphone (format « plan-pc » version 2) ----------
   function construirePlan({ piecesEbp, reglements = [], clientsEbp = [], devisTelephone = [], arrete, aujourdhui, maintenant, seuils = SEUILS, ignorees = 0 }) {
     if (!/^\d{4}-\d\d-\d\d$/.test(arrete || '')) throw new Error('Date de l’export EBP obligatoire (AAAA-MM-JJ).');
@@ -225,7 +276,12 @@
     if (ecart(arrete, aujourdhui) < 0) throw new Error('La date de l’export EBP est dans le futur.');
     const { pieces, rapprochements } = fusionner(piecesTelephone(devisTelephone), piecesEbp);
     const affaires = construireAffaires(pieces, reglements, clientsEbp, aujourdhui, seuils);
-    const acts = actions(affaires, { arrete, aujourdhui, seuils }).slice(0, 200);
+    const sig = signauxClients(piecesEbp, clientsEbp, arrete, seuils);
+    const reconquetes = [...sig.values()].flatMap(c => c.signaux.filter(s => s.type === 'reconquete').map(s => ({
+      id: court(s.actionId, 150), genre: 'reconquete', tag: 'Visite', responsable: 'Toi', client: court(c.nom, 80), t: court('Reconquérir : ' + c.nom, 200),
+      d: court('Plus de commande depuis ' + ecart(s.dateDernier, arrete) + ' j · ' + eur(Math.round(s.ca12 * 100)) + ' HT sur 12 mois', 200), preuve: court(s.preuve, 500),
+      source: 'Export EBP du ' + arrete, qualite: 'Historique de commandes EBP', valeur: Math.round(s.ca12 * 100) / 12, montantCents: Math.round(s.ca12 * 100), jour: aujourdhui, statut: 'a_faire' })));
+    const acts = actions(affaires, { arrete, aujourdhui, seuils, supplementaires: reconquetes }).slice(0, 200);
     const parClient = new Map();
     for (const a of affaires.filter(x => x.ouverte)) {
       const k = a.code || norm(a.client); if (!parClient.has(k)) parClient.set(k, { nom: court(a.client, 80), code: court(a.code, 20), niveau: 'ok', lignes: [] });
@@ -233,6 +289,13 @@
       if (e.lignes.length < 8) e.lignes.push(court(l, 160));
       if (a.niveau === 'bad') e.niveau = 'bad'; else if (a.niveau === 'warn' && e.niveau === 'ok') e.niveau = 'warn';
     }
+    for (const [k2, c] of sig) {
+      if (!parClient.has(k2)) parClient.set(k2, { nom: court(c.nom, 80), code: court(c.code, 20), niveau: 'warn', lignes: [] });
+      const e = parClient.get(k2); e.signaux = c.signaux;
+      for (const s of c.signaux) if (e.lignes.length < 8) e.lignes.push(court((s.type === 'reconquete' ? 'À reconquérir · ' : 'Achats en baisse · ') + s.titre, 160));
+      if (e.niveau === 'ok') e.niveau = 'warn';
+    }
+    const nbSignaux = [...sig.values()].reduce((n, c) => n + c.signaux.length, 0);
     const k = kpi(piecesEbp, affaires, reglements, aujourdhui), lv = levier(affaires, seuils);
     const ouvertes = affaires.filter(a => a.ouverte);
     const ind = [
@@ -241,12 +304,14 @@
       { l: 'Devis sans réponse', v: String(ouvertes.filter(a => a.etape === 'devis' && a.retard && !a.froid).length), n: 'au-delà de ' + Object.assign({}, SEUILS, seuils).devisRelanceJours + ' j' },
       { l: 'Commandes en retard de préparation', v: String(ouvertes.filter(a => a.etape === 'prep' && a.retard).length) },
       { l: 'Livré non facturé', v: String(ouvertes.filter(a => a.etape === 'facturation' && a.retard).length) },
+      { l: 'Pièces sans suite à vérifier', v: String(ouvertes.filter(a => a.lienAVerifier).length), n: 'plus de ' + Object.assign({}, SEUILS, seuils).suiviMaxJoursOuvres + ' j ouvrés : lien manquant dans l’export ?' },
       k.echu ? { l: 'Échu non réglé', v: eur(Math.round(k.echu.reste * 100)), n: k.echu.n + ' facture(s)' } : { l: 'Échu non réglé', v: 'non vérifiable', n: 'échéancier EBP non chargé' }
     ];
     return {
       appli: 'plan-pc', version: 2, date: maintenant || new Date().toISOString(), arrete,
       chiffre: { source: 'import', arrete },
-      sources: { commercial: { fiable: ignorees === 0 && piecesEbp.length > 0, restrictions: ignorees ? [ignorees + ' ligne(s) EBP ignorée(s) à l’import : preuves incomplètes.'] : [] }, importIgnorees: ignorees },
+      // Format lu par le téléphone (commercial-v22.js, nettoyerPlan) : ebpDate, importStats.pieces.ignorees, preuvesCommerciales.
+      sources: { ebpDate: arrete, importStats: { pieces: { ignorees } }, preuvesCommerciales: preuvesCommerciales(piecesEbp, ignorees, arrete, nbSignaux, seuils) },
       kpi: k, changement: lv ? { texte: lv.texte, mesure: lv.mesure } : null, indicateurs: ind.map(x => ({ l: x.l, v: x.v, n: x.n || '' })),
       actions: acts.map(({ valeur, montantCents, genre, ...a }) => a),
       clients: [...parClient.values()].slice(0, 600),
@@ -273,12 +338,20 @@
     }
     for (const c of ['semaine', 'passee', 'avant', 'mois', 'moisPrec']) { const v = p && p.kpi && p.kpi[c]; if (!v || !/^\d{4}-\d\d-\d\d$/.test(v.debut)) err.push('kpi ' + c); }
     if (!Array.isArray(p && p.clients) || p.clients.length > 600) err.push('clients');
-    else p.clients.forEach((c, i) => { if (c.lignes.length > 8 || c.lignes.some(l => l.length > 160) || String(c.nom).length > 80) err.push('client ' + i); });
+    else p.clients.forEach((c, i) => {
+      if (c.lignes.length > 8 || c.lignes.some(l => l.length > 160) || String(c.nom).length > 80) err.push('client ' + i);
+      const sg = c.signaux || [];
+      if (sg.length > 4 || sg.some(z => !['reconquete', 'baisse'].includes(z.type) || z.titre.length > 120 || z.preuve.length > 650 || z.source.length > 130 ||
+        z.seuil.length > 130 || z.actionId.length > 160 || z.pieces.length > 15 || z.pieces.some(x => x.length > 45))) err.push('signaux du client ' + i);
+    });
+    const pc = p && p.sources && p.sources.preuvesCommerciales;
+    if (!pc || typeof pc.fiable !== 'boolean' || !Array.isArray(pc.restrictions) || pc.restrictions.length > 8 || pc.restrictions.some(r => r.length > 170)) err.push('sources.preuvesCommerciales');
+    if (!(p && p.chiffre && p.chiffre.source === 'import')) err.push('chiffre.source');
     if (!Array.isArray(p && p.indicateurs) || p.indicateurs.length > 12) err.push('indicateurs');
     return err;
   }
 
-  const api = { SEUILS, ETAPES, joursFeries, ouvre, joursOuvres, lundi, periodes, piecesTelephone, totalDevisCents, fusionner, construireAffaires, actions, kpi, levier, construirePlan, verifierPlan };
+  const api = { signauxClients, preuvesCommerciales, SEUILS, ETAPES, joursFeries, ouvre, joursOuvres, lundi, periodes, piecesTelephone, totalDevisCents, fusionner, construireAffaires, actions, kpi, levier, construirePlan, verifierPlan };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else racine.Pipeline = api;
 })(typeof self !== 'undefined' ? self : this);

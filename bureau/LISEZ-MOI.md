@@ -47,6 +47,10 @@ Onglet **Bureau**. Charge les exports EBP (CSV ou Excel) : pièces (obligatoire)
   avec preuve et source, levier de la semaine, CA EBP par période. Le téléphone ne compte jamais en double une affaire déjà dans EBP.
 - Garde-fous : aucun impayé sans échéancier EBP ; pas de TTC « × 1,2 » ; aucun objectif ni marge inventés ;
   compte bloqué = jamais d'action de vente.
+- **Signaux clients** (lus par la page « Opportunités » du téléphone) : client à reconquérir (CA sur 12 mois, plus de commande
+  depuis 60 j) et achats en baisse (−50 % sur 90 j, minimum 500 € avant). Seuils = hypothèses recopiées dans chaque signal.
+  Déclarés fiables seulement si l'export couvre 12 mois de commandes sans pièce écartée. Compte bloqué : aucun signal.
+- **Pièces sans suite depuis plus de 20 jours ouvrés** : « à vérifier » (lien manquant dans l'export ?), jamais une action.
 - **Plan du matin** : fichier `plan-odicolor-AAAA-MM-JJ.json` à importer sur le téléphone (Réglages → Imports → Plan PC).
   Format « plan-pc » v2 vérifié avec le **vrai code d'import du téléphone**.
 

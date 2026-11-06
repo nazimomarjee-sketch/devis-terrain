@@ -47,11 +47,15 @@ Une donnée = une source : terrain → téléphone ; transactions, prix, marge �
 
 | Étape | État |
 |---|---|
-| 1. Pipeline EBP dans le dépôt + plan du matin v2 vers le téléphone | **Fait sur données fictives (06/11)** — bout en bout testé jusqu'aux écrans du téléphone |
+| 1. Pipeline EBP dans le dépôt + plan du matin v2 vers le téléphone | **Fait sur données fictives (06-07/11)** — bout en bout testé jusqu'aux écrans du téléphone, opportunités comprises |
 | 2. Référentiel garages unique (téléphone ↔ code EBP ↔ SIRET, rapprochement validé à la main) | À faire |
 | 3. Cockpit du matin (où j'en suis, 3 actions, garages à visiter, blocages, ce qui rapporte) | À faire |
 | 4. Ma Ville → tournées vers le téléphone | À faire |
 | 5. Mon Business (marge, encaissements, rentabilité) | Bloqué : prix d'achat EBP et objectifs validés |
 
-Écart connu côté téléphone : `nettoyerPlan` (app.js) efface `chiffre` et `sources` ; les écrans qui en dépendent
-(opportunités, ligne EBP de l'accueil, présélection de garage) ne peuvent pas s'activer. Correction = modification de l'appli téléphone (accord requis).
+**Correctif du diagnostic (07/11/2026).** Le diagnostic du 06/11 était faux : le téléphone conserve bien `chiffre` et `sources`
+(commercial-v22.js remplace `nettoyerPlan` d'app.js ; le test d'alors n'avait extrait qu'app.js). Causes réelles, corrigées :
+1. Bureau : format `sources` différent de celui lu par le téléphone, et aucun signal client → corrigé (`sources.preuvesCommerciales`,
+   `importStats`, `clients[].signaux` reconquête/baisse ; fiabilité seulement si 12 mois d'historique et aucune pièce écartée).
+2. Téléphone (commercial-v22.js, PR #2) : avant midi, l'export du jour comptait « -1 jours » → opportunités suspendues le matin. Corrigé (1 ligne).
+Les 3 fonctions (opportunités, ligne EBP de l'accueil, garage présélectionné) sont vérifiées de bout en bout dans le vrai téléphone.
