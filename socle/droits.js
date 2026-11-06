@@ -13,6 +13,8 @@
 
   const oui = { ok: true, motif: '' }, non = motif => ({ ok: false, motif });
   const CHAMPS_DIRECTION = ['statut', 'motifDirection', 'decideePar', 'decideeLe'];
+  // Pendant une offre, seul l'état « remis » des cadeaux peut changer (libellés et coûts validés figés).
+  const memesCadeaux = (a = [], b = []) => a.length === b.length && a.every((c, i) => c.libelle === b[i].libelle && c.coutReelCents === b[i].coutReelCents);
 
   // op = { type: 'lire' | 'creer' | 'modifier' | 'importer' | 'supprimer', entite, avant (objet actuel ou null), champs (nouvelles valeurs) }
   function peut(utilisateur, op) {
@@ -53,6 +55,26 @@
         if (av.proposeePar !== utilisateur.uid) return non('Seul l’auteur modifie sa proposition.');
         if (!['proposee', 'a_completer'].includes(av.statut)) return non('Décision déjà tranchée : non modifiable.');
         return oui;
+      }
+      case 'offreConquete': {
+        // Le développement prépare et suit ; la direction valide ou refuse. Une offre ne démarre qu'une fois validée.
+        if (op.type === 'creer') {
+          if (r !== 'developpement') return non('Les Offres de conquête sont préparées par le pilotage commercial.');
+          if (ch.proposeePar !== utilisateur.uid) return non('Une Offre de conquête est proposée en son propre nom.');
+          return ['brouillon', 'proposee'].includes(ch.statut) && !ch.valideePar ? oui : non('Une Offre de conquête part en brouillon ou proposée ; seule la direction la valide.');
+        }
+        const vers = ch.statut, de = av.statut;
+        if (r === 'direction') {
+          if (cles.some(k => !['statut', 'valideePar', 'valideeLe', 'motifDirection'].includes(k))) return non('La direction valide ; le contenu de l’offre reste celui de son auteur.');
+          if (!['validee', 'refusee', 'proposee', undefined].includes(vers)) return non('La direction valide, refuse ou renvoie en proposition.');
+          if (vers === 'validee' && ch.valideePar !== utilisateur.uid) return non('Une offre validée indique qui l’a validée.');
+          return de === 'proposee' ? oui : non('Seule une offre proposée peut être validée ou refusée.');
+        }
+        if (cles.some(k => ['valideePar', 'valideeLe', 'motifDirection'].includes(k)) || ['validee', 'refusee'].includes(vers)) return non('Valider ou refuser une Offre de conquête relève de la direction.');
+        if (['brouillon', 'proposee'].includes(de)) return vers == null || ['brouillon', 'proposee', 'annulee'].includes(vers) ? oui : non('Une offre non validée ne peut pas démarrer.');
+        if (de === 'validee') return cles.every(k => ['statut', 'debut', 'fin'].includes(k)) && ['en_cours', 'annulee', undefined].includes(vers) ? oui : non('Offre validée : seuls le démarrage et les dates sont modifiables ; les conditions validées sont figées.');
+        if (de === 'en_cours') return cles.every(k => ['statut', 'cadeaux', 'termineeLe', 'bilan', 'fin'].includes(k)) && ['terminee', undefined].includes(vers) && (!('cadeaux' in ch) || memesCadeaux(av.cadeaux, ch.cadeaux)) ? oui : non('Offre en cours : seuls la remise des cadeaux, la fin et le bilan sont modifiables.');
+        return non('Offre terminée, refusée ou annulée : historique figé.');
       }
       case 'objectif':
         if (r === 'direction') {

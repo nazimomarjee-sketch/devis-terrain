@@ -73,3 +73,18 @@ test('aucune modification des fiches reçues, classement géographique conservé
     assert.equal(r.garages[i].etape, s.garages[i].etape);
   }
 });
+
+test('Offres de conquête : anneau seulement pour une offre en cours, historique conservé, couleur inchangée', () => {
+  const OC = require('../socle/offres-conquete.js');
+  const lignes = [{ produit: 'Vernis', quantite: 2, prixTarifCents: 12000, prixOffreCents: 10500, coutAchatCents: 7000 }];
+  const cadeaux = [{ libelle: 'Pistolet de peinture', coutReelCents: 18000, remis: true }];
+  const t = OC.tableau([
+    { uid: 'oc-1', garageUid: 'GARAGE FICTIF ALPHA', titre: 'Offre de conquête ALPHA', statut: 'en_cours', lignes, cadeaux, proposeePar: 'u-developpement', debut: '2026-10-01' },
+    { uid: 'oc-2', garageUid: 'GARAGE FICTIF BETA', titre: 'Offre de conquête BETA', statut: 'terminee', lignes, cadeaux, proposeePar: 'u-developpement', debut: '2026-06-01' }], [], AUJ);
+  const s = scenario(), g = V.offresParGarage(s.garages, t, x => x.nom), x = n => g.find(y => y.nom === 'GARAGE FICTIF ' + n);
+  assert.equal(x('ALPHA').offresConquete.enCours.length, 1);
+  assert.equal(x('ALPHA').offresConquete.enCours[0].cadeaux[0].libelle, 'Pistolet de peinture');
+  assert.deepEqual([x('BETA').offresConquete.enCours.length, x('BETA').offresConquete.historique[0].statut], [0, 'terminee'], 'anneau éteint, historique gardé');
+  assert.equal(x('NU').offresConquete, undefined);
+  for (const n of ['ALPHA', 'BETA']) assert.equal(x(n).statut, s.garages.find(y => y.nom === 'GARAGE FICTIF ' + n).statut, 'couleur du personnage inchangée');
+});

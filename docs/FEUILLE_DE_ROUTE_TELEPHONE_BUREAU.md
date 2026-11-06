@@ -66,3 +66,7 @@ Les 3 fonctions (opportunités, ligne EBP de l'accueil, garage présélectionné
 - Ville LEGO : P1–P5 **validées et appliquées** (commandes et facturé jamais confondus, chiffres datés et justifiés par EBP,
   graphisme verrouillé par `tests/bureau-ville-invariance.test.cjs`).
 - Ma Ville en 4 couleurs : logique faite, **maquette en attente d'accord** (`docs/maquettes/VILLE_4_COULEURS.md`).
+- **Offres de conquête** : logique intégrée au modèle commercial (`docs/OFFRES_DE_CONQUETE.md`) ; anneau doré dans la Ville
+  en **maquette** seulement.
+- **Espace client et parcours de commande** : ajoutés à la feuille de route (`docs/PARCOURS_COMMANDE_CLIENT.md`),
+  **aucun développement avant validation du parcours**.

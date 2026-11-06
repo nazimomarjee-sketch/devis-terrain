@@ -27,11 +27,16 @@
   });
 
   // Décisions qui relèvent de la direction (validation obligatoire par le rôle « direction »).
-  const DECISIONS_DIRECTION = Object.freeze(['prix', 'remise', 'ouverture-compte', 'objectif', 'recrutement', 'activation-pole', 'conditions-reglement', 'investissement']);
+  const DECISIONS_DIRECTION = Object.freeze(['prix', 'remise', 'ouverture-compte', 'objectif', 'recrutement', 'activation-pole', 'conditions-reglement', 'investissement', 'offre-conquete']);
+
+  // Offres de conquête : règles de validation par la direction. Tant que la direction n'a pas fixé de seuils,
+  // TOUTE offre de conquête doit être validée (choix prudent). Les seuils ci-dessous signalent les offres sensibles.
+  // HYPOTHÈSES à faire fixer par la direction.
+  const REGLES_OFFRES_CONQUETE = Object.freeze({ validationToujours: true, alerteTauxMargeMin: 0.15, alerteRemiseMax: 0.30, alerteCadeauMaxCents: 30000, dureeMaxJours: 90 });
 
   const roleActif = r => !!(ROLES[r] && ROLES[r].actif && POLES[ROLES[r].pole] && POLES[ROLES[r].pole].actif);
 
-  const api = { POLES, ROLES, DECISIONS_DIRECTION, roleActif };
+  const api = { POLES, ROLES, DECISIONS_DIRECTION, REGLES_OFFRES_CONQUETE, roleActif };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else racine.SocleOrganisation = api;
 })(typeof self !== 'undefined' ? self : this);

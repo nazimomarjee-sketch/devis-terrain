@@ -2,6 +2,7 @@
    Lecture seule, sans interface pour l'instant. Aucun chiffre inventé : un objectif non validé est signalé comme tel. */
 (function (racine) {
   'use strict';
+  const OC = (typeof module === 'object' && module.exports) ? require('./offres-conquete.js') : racine.SocleOffresConquete;
   const ouverte = a => a.statut === 'a_faire' || a.statut === 'reporte';
   const somme = l => l.reduce((n, x) => n + x, 0);
   const plus = (iso, n) => new Date(Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10) + n)).toISOString().slice(0, 10);
@@ -15,6 +16,9 @@
       objectif: obj ? { caCents: obj.caCents, statut: obj.statut } : null,
       avancement: obj && obj.statut === 'valide' && obj.caCents > 0 ? Math.round(caCents / obj.caCents * 100) : null };
   }
+
+  // Offres de conquête : à valider (avec alertes), en cours, bilan réussies / déficitaires.
+  const offres = (etat, aujourdhui) => OC.tableau(etat.offreConquete || [], etat.pieceEbp || [], aujourdhui);
 
   // Cockpit : piloter (mes 3 priorités) et coordonner (demandes de la direction, décisions à préparer, conflits).
   function cockpit(etat, utilisateur, aujourdhui, conflits = []) {
@@ -30,7 +34,8 @@
       decisionsACompleter: dec.filter(d => d.statut === 'a_completer'),
       decisionsTranchees: dec.filter(d => d.statut === 'validee' || d.statut === 'refusee'),
       conflits,
-      resultats: resultatsMois(etat, aujourdhui)
+      resultats: resultatsMois(etat, aujourdhui),
+      offresConquete: offres(etat, aujourdhui)
     };
   }
 
@@ -42,6 +47,7 @@
       aValider: (etat.decision || []).filter(d => d.statut === 'proposee').sort((a, b) => (a.proposeeLe || '').localeCompare(b.proposeeLe || '')),
       objectifsAValider: (etat.objectif || []).filter(o => o.statut === 'propose'),
       resultats: resultatsMois(etat, aujourdhui),
+      offresConquete: offres(etat, aujourdhui),
       activite: {
         visitesSemaine: (etat.visite || []).filter(v => v.date >= debutSemaine && v.date <= aujourdhui).length,
         actionsOuvertes: (etat.action || []).filter(ouverte).length,

@@ -70,7 +70,22 @@
     return [...ebp, ...tel].slice(0, max);
   }
 
-  const api = { alimenterVille, filActions, PICTO };
+  // Offres de conquête par garage (MAQUETTE) : « enCours » allume l'anneau doré ; « historique » reste consultable
+  // dans la fiche après la fin de l'offre. cleGarage(g) relie un garage de la Ville à l'identifiant de l'offre.
+  // Les couleurs des personnages (4 segments) ne sont jamais modifiées par une offre.
+  function offresParGarage(garages, tableauOffres, cleGarage) {
+    const parCle = new Map();
+    for (const o of tableauOffres.offres) { if (!parCle.has(o.garageUid)) parCle.set(o.garageUid, []); parCle.get(o.garageUid).push(o); }
+    return garages.map(g => {
+      const l = parCle.get(cleGarage(g)) || [];
+      if (!l.length) return g;
+      const resume = o => ({ uid: o.uid, titre: o.titre, statut: o.statut, cadeaux: o.cadeaux, margeCents: o.chiffrage.margeCents, tauxMarge: o.chiffrage.tauxMarge,
+        coutAcquisitionCents: o.chiffrage.coutAcquisitionCents, reachats: o.suivi.reachats, margeNetteCents: o.suivi.margeNetteCents, verdict: o.suivi.libelleVerdict });
+      return Object.assign({}, g, { offresConquete: { enCours: l.filter(o => o.statut === 'en_cours').map(resume), historique: l.filter(o => o.statut !== 'en_cours').map(resume) } });
+    });
+  }
+
+  const api = { alimenterVille, filActions, offresParGarage, PICTO };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else racine.VillePipeline = api;
 })(typeof self !== 'undefined' ? self : this);

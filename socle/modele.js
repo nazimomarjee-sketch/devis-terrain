@@ -16,6 +16,12 @@
   const centimesOpt = v => v == null || Number.isSafeInteger(v);
   const uid = v => typeof v === 'string' && /^[a-z0-9-]{8,64}$/.test(v);
   const uidOpt = v => v == null || v === '' || uid(v);
+  const cent = v => v === null || Number.isSafeInteger(v);
+  const lignesOffre = v => Array.isArray(v) && v.length > 0 && v.length <= 50 && v.every(l => l && typeof l === 'object' &&
+    texte(80)(l.produit) && Number.isSafeInteger(l.quantite) && l.quantite > 0 && Number.isSafeInteger(l.prixTarifCents) && l.prixTarifCents >= 0 &&
+    Number.isSafeInteger(l.prixOffreCents) && l.prixOffreCents >= 0 && cent(l.coutAchatCents) &&
+    (l.paliers == null || (Array.isArray(l.paliers) && l.paliers.every(p => p && Number.isSafeInteger(p.aPartirDe) && p.aPartirDe > 0 && Number.isSafeInteger(p.prixCents) && p.prixCents >= 0))));
+  const cadeauxOffre = v => Array.isArray(v) && v.length <= 10 && v.every(c => c && typeof c === 'object' && texte(80)(c.libelle) && cent(c.coutReelCents) && typeof c.remis === 'boolean');
 
   // pole : pôle propriétaire de l'entité (droits) ; immuable : jamais modifiable après création.
   const ENTITES = Object.freeze({
@@ -33,9 +39,16 @@
       obligatoires: ['type', 'titre', 'proposeePar', 'statut'] },
     objectif: { pole: 'pilotage', champs: { periode: v => typeof v === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(v), caCents: centimes, statut: parmi(['propose', 'valide']), valideePar: uidOpt },
       obligatoires: ['periode', 'caCents', 'statut'] },
-    // Copie en lecture seule d'une pièce EBP importée (EBP reste la source de vérité ; aucune écriture vers EBP).
+    // Offre de conquête : conditions commerciales accordées à un prospect pour le convertir en client régulier.
+    // lignes : [{ produit, quantite, prixTarifCents, prixOffreCents, coutAchatCents (null = inconnu, jamais deviné), paliers: [{ aPartirDe, prixCents }] }]
+    // cadeaux : [{ libelle, coutReelCents (null = inconnu), remis: bool }]
+    offreConquete: { pole: 'commercial', champs: { garageUid: uid, titre: texte(200), statut: parmi(['brouillon', 'proposee', 'validee', 'refusee', 'en_cours', 'terminee', 'annulee']),
+      lignes: lignesOffre, cadeaux: cadeauxOffre, engagement: texteLibre(300), engagementCents: centimesOpt, debut: dateOpt, fin: dateOpt,
+      proposeePar: uid, valideePar: uidOpt, valideeLe: dateOpt, motifDirection: texteLibre(1000), termineeLe: dateOpt, bilan: texteLibre(1000) },
+      obligatoires: ['garageUid', 'titre', 'statut', 'lignes', 'cadeaux', 'proposeePar'] },
+  // Copie en lecture seule d'une pièce EBP importée (EBP reste la source de vérité ; aucune écriture vers EBP).
     pieceEbp: { pole: 'commercial', champs: { type: parmi(['devis', 'commande', 'bl', 'facture', 'avoir']), no: texte(40), date, client: texte(120), htCents: centimes,
-      codeEbp: texteLibre(40), garageUid: uidOpt, origine: texteLibre(40), arrete: date }, obligatoires: ['type', 'no', 'date', 'client', 'htCents', 'arrete'] }
+      codeEbp: texteLibre(40), garageUid: uidOpt, origine: texteLibre(40), arrete: date, margeCents: centimesOpt }, obligatoires: ['type', 'no', 'date', 'client', 'htCents', 'arrete'] }
   });
 
   // Retourne la liste des erreurs (vide = valide). Les champs inconnus sont refusés : rien n'entre sans être prévu.
