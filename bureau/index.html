@@ -1107,7 +1107,7 @@ async function importerEbp(type, f){
     const fn = EXPORTS.find(x => x[0] === type)[2];
     etat.ebp[type] = Object.assign(EbpImport[fn](await lireTableau(f)), {fichier: f.name});
   } catch (e) { etat.ebp.erreur[type] = e.message + (etat.ebp[type] ? ' Le fichier chargé avant (' + etat.ebp[type].fichier + ') reste utilisé.' : ''); } // un fichier refusé ne fait jamais perdre le précédent
-  connecterVille(); rendre();
+  connecterVille(); rendre(); signalerChangement();
 }
 // Ville connectée (P1–P5) : seulement si la sauvegarde du téléphone ET l'export des pièces EBP sont chargés.
 function connecterVille(){
@@ -1160,7 +1160,7 @@ function vueBureau(){
   const imports = h('section',{class:'bloc'}, h('div',{class:'titre-bloc'},'Exports EBP'),
     h('p',{class:'info'}, 'Charge tes exports EBP (CSV ou Excel). Lecture seule : rien n’est modifié ni envoyé. ',
       etat.telephone ? h('b',{}, (etat.telephone.devis || []).length + ' devis du téléphone pris en compte.') : 'Charge aussi ta sauvegarde téléphone (bouton Démo / Mes garages) pour relier tes devis.'),
-    h('label',{class:'info', for:'ebp-arrete'}, 'Date de l’export EBP '), h('input',{type:'date', id:'ebp-arrete', class:'recherche', value:E.arrete, max:jourIso(), onchange:ev => { E.arrete = ev.target.value; connecterVille(); rendre(); }}),
+    h('label',{class:'info', for:'ebp-arrete'}, 'Date de l’export EBP '), h('input',{type:'date', id:'ebp-arrete', class:'recherche', value:E.arrete, max:jourIso(), onchange:ev => { E.arrete = ev.target.value; connecterVille(); rendre(); signalerChangement(); }}),
     h('div',{class:'deps'}, EXPORTS.map(champ)));
   let plan = null, erreur = '';
   try { plan = planBureau(); } catch (e) { erreur = e.message; }
@@ -1226,21 +1226,48 @@ async function importer(f){
     const r = await window.LectureSauvegarde.lire(f);
     etat.telephone = r.telephone; // devis du téléphone : utilisés par l'écran Bureau (pipeline)
     etat.garagesTelephone = r.garages; // fiches d'origine, jamais modifiées
+    etat.sauvegardeTelephone = { telephone: r.telephone, garages: r.garages, rapport: r.rapport }; // pour le coffre (le retour à la démo ne l'efface pas)
     Object.assign(etat, {mode:'reel', garages:r.garages, rapport:r.rapport, tournee:[], filtre:'tous',
       message:{texte: window.LectureSauvegarde.message(r.rapport)}});
   } catch (e) {
     etat.message = {erreur:true, texte:'Fichier refusé : ' + (e && e.message ? e.message : 'lecture impossible.') +
       (etat.mode === 'reel' ? ' Les garages déjà chargés restent affichés.' : ' La démo reste affichée.')};
   } finally { etat.lecture = false; }
-  connecterVille(); rendre();
+  connecterVille(); rendre(); signalerChangement();
 }
 function retourDemo(){ const g = L0.garagesDemo(2026); Object.assign(etat,{mode:'demo', garages:g, rapport:L0.rapportClassement(g), tournee:[], message:null, ebpVille:null, garagesTelephone:null}); rendre(); }
 
 $('#mode').addEventListener('click', () => { etat.donneesOuvertes = !etat.donneesOuvertes; rendreEntete(); });
 window.addEventListener('hashchange', () => { const c = $('#couche-fiche'); c.hidden = true; c.replaceChildren(); rendre(); });
+// ================= Coffre ODICOLOR (application locale) =================
+// Pont vers bureau/coffre-client.js : état réel à enregistrer, état retrouvé à l'ouverture.
+// Sans l'application locale (fichier ouvert directement, tests), rien ne change. La démo n'est jamais enregistrée.
+function signalerChangement(){ window.dispatchEvent(new Event('odicolor-change')); }
+window.OdicolorBureau = Object.freeze({
+  exporter(){
+    const s = etat.sauvegardeTelephone || null, E = etat.ebp;
+    return { version:1, telephone: s && s.telephone, garagesTelephone: s && s.garages, rapport: s && s.rapport,
+      ebp: { pieces:E.pieces, reglements:E.reglements, clients:E.clients, arrete:E.arrete } };
+  },
+  restaurer(d, enregistreLe){
+    if (!d || d.version !== 1) return false;
+    if (d.telephone && Array.isArray(d.garagesTelephone)) {
+      etat.sauvegardeTelephone = { telephone:d.telephone, garages:d.garagesTelephone, rapport:d.rapport };
+      Object.assign(etat, {telephone:d.telephone, garagesTelephone:d.garagesTelephone, mode:'reel', garages:d.garagesTelephone,
+        rapport:d.rapport || L0.rapportClassement(d.garagesTelephone), tournee:[], filtre:'tous'});
+    }
+    const E = d.ebp || {};
+    for (const k of ['pieces','reglements','clients']) etat.ebp[k] = E[k] || null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(E.arrete || '')) etat.ebp.arrete = E.arrete;
+    etat.message = {texte:'Données retrouvées dans le coffre ODICOLOR' + (enregistreLe ? ' (dernier enregistrement : ' + new Date(enregistreLe).toLocaleString('fr-FR') + ')' : '') + '.'};
+    connecterVille(); rendre(); return true;
+  }
+});
+
 monterRecherche();
 rendre();
 })();
 </script>
+<script src="coffre-client.js"></script>
 
 </body></html>

@@ -81,8 +81,52 @@ Bureau, téléphone et Ville : **aucun fichier modifié** ; tous les tests exist
 
 ## 4. Étapes suivantes proposées (une validation à chaque fois)
 
-2. **Relier le Bureau au coffre** : écran de mot de passe, le cockpit retrouvé à chaque ouverture (Bureau et Ville inchangés).
+2. ~~Relier le Bureau au coffre~~ : **fait le 08/11/2026** (voir section 5).
 3. **Imports cumulatifs** : clés anti-doublon, journal, points de restauration, terrain jamais écrasé par EBP.
 4. **Sauvegardes chiffrées et restauration vérifiée** (clé USB) — condition pour toute donnée réelle.
 5. **Lanceur Windows** et essai sur le PC réel (données fictives).
 6. **Étude de l'accès distant sécurisé.**
+
+## 5. Étape 2 réalisée : le Bureau relié au coffre (`local/serveur.js`, `bureau/coffre-client.js`)
+
+**Parcours :** lancer le programme local → ouvrir l'adresse affichée → mot de passe → le cockpit, les garages, la Ville LEGO
+et les voyants réapparaissent tels qu'enregistrés. Chaque import (sauvegarde du téléphone, pièces, règlements, clients,
+date d'export) est enregistré aussitôt dans le coffre. La démo n'est jamais enregistrée.
+
+**Bureau et Ville :** aucune modification du dessin ni des styles (garde-fou d'invariance vert). Trois ajouts de logique
+seulement dans `bureau/index.html` : un signal après chaque import, un pont « exporter / restaurer », le chargement de
+`coffre-client.js`. Ouvert sans l'application locale (double-clic), le Bureau fonctionne exactement comme avant.
+**Application Samsung : aucun fichier modifié.**
+
+**Sécurité de la liaison**
+- Écoute uniquement sur 127.0.0.1 : inaccessible depuis un autre appareil.
+- En-tête Host contrôlé (une page Internet ne peut pas se faire passer pour l'application).
+- API : en-tête dédié obligatoire, Origin obligatoire et identique pour toute écriture (aucun site tiers, ni autre programme
+  local dans le navigateur, ne peut écrire).
+- Session : jeton aléatoire dans un cookie inaccessible au JavaScript (HttpOnly, SameSite=Strict), invalidé au verrouillage.
+- Mot de passe : uniquement dans le corps d'une requête POST ; jamais dans l'adresse, le journal ou les fichiers (testé).
+- Essais limités : attente croissante après 5 échecs. Politique de sécurité du contenu stricte (aucun envoi de données hors du PC par la page).
+- Seuls le Bureau et l'écran d'ouverture sont servis : ni le coffre, ni le code, ni les tests, ni le dépôt (testé, y compris `../`).
+
+**Tests (données fictives) — tous verts**
+- `tests/local-serveur.test.cjs` : 9/9 (127.0.0.1 seulement, Host étranger, fichiers interdits, Origin/en-tête, cookie,
+  session, verrouillage, freinage des essais, aucun mot de passe dans journal, fichiers ou réponses).
+- `tests/local-bureau-navigateur.cjs` : 3/3, dont le scénario complet : création du coffre → imports → **arrêt brutal du
+  programme (comme une coupure de courant)** → relance → mauvais mot de passe refusé → bon mot de passe → voyants identiques,
+  mêmes personnages dans la Ville (nom, couleur, alerte), animations intactes, aucune erreur ni blocage dans la page ;
+  verrouillage après inactivité → retour à l'écran de mot de passe ; Bureau sans application locale inchangé.
+- Sabotages vérifiés : contrôle Origin retiré, écoute sur tout le réseau, contrôle Host retiré, journal trop bavard,
+  imports EBP non enregistrés → chaque fois au moins un test échoue.
+- Toute la suite existante reste verte (Bureau, Ville, cockpit avec la vraie appli téléphone, coffre).
+- Captures : `docs/maquettes/local/`.
+
+**Risques restants après l'étape 2**
+
+| Risque | Gravité | Parade proposée |
+|---|---|---|
+| Toujours **aucune sauvegarde hors du PC** | Élevée | Étape 4 avant toute donnée réelle |
+| La carte (Leaflet) et les polices viennent d'Internet : dépendance à un site tiers dans une page qui affiche les données ; carte indisponible hors ligne | Moyenne | Embarquer une copie locale vérifiée de Leaflet et des polices (étape 5) |
+| Verrouillage après 10 min **sans enregistrement**, même si tu consultes la Ville | Gêne | Compter aussi les clics comme activité (petit ajout, à valider) |
+| Windows non testé (Node à installer, antivirus, pare-feu) | Moyenne | Essai sur le PC réel avec données fictives (étape 5) |
+| Un logiciel malveillant installé sur le PC pourrait espionner la session ouverte | Faible | Hors de portée d'une application ; Windows à jour + session verrouillée |
+| Le compteur d'essais repart à zéro si le programme est relancé | Faible | Chaque essai coûte ≈ 0,4 s de calcul ; mot de passe long |

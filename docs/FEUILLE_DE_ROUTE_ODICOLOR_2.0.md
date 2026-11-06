@@ -102,3 +102,5 @@ Impact : effet attendu sur CA, marge ou réachat · Coût / difficulté : 1 faib
   avant validation de l'option.
 - Stockage : page par double-clic **non retenue** ; **application locale** (Node.js, sans serveur externe) — étape 1
   « coffre chiffré » faite et testée sur données fictives (`APPLICATION_LOCALE.md`). Aucune donnée réelle avant les sauvegardes (étape 4).
+- Application locale, étape 2 **faite** sur données fictives : mot de passe → cockpit, garages et Ville retrouvés, même après coupure.
+  Prochaine priorité fixée par le propriétaire : **sauvegardes chiffrées et restauration vérifiée** avant tout usage professionnel.

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="fr"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ODICOLOR 2.0 — Coffre</title>
+<link rel="stylesheet" href="/ouvrir.css">
+</head><body>
+<main class="carte" aria-live="polite">
+  <div class="marque"><img src="/odicolor-logo-officiel.png" alt="" width="44" height="44"><div><b>ODICOLOR <em>2.0</em></b><span>Coffre sécurisé · ce PC uniquement</span></div></div>
+
+  <form id="f-ouvrir" hidden>
+    <h1>Ouvrir mon cockpit</h1>
+    <label for="mdp">Mot de passe ODICOLOR</label>
+    <input id="mdp" type="password" autocomplete="current-password" required>
+    <button id="valider" class="principal" type="submit">Ouvrir</button>
+    <button id="oubli" class="lien" type="button">Mot de passe oublié ? Utiliser la clé de secours</button>
+  </form>
+
+  <form id="f-creer" hidden>
+    <h1>Créer le coffre ODICOLOR</h1>
+    <p class="doux">Première ouverture sur ce PC. Tes données seront chiffrées avec ce mot de passe : 12 caractères minimum. Une phrase est idéale.</p>
+    <label for="nouveau-mdp">Mot de passe</label><input id="nouveau-mdp" type="password" autocomplete="new-password" required>
+    <label for="nouveau-mdp2">Confirmer le mot de passe</label><input id="nouveau-mdp2" type="password" autocomplete="new-password" required>
+    <button id="creer" class="principal" type="submit">Créer le coffre</button>
+  </form>
+
+  <section id="s-secours-cle" hidden>
+    <h1>Ta clé de secours</h1>
+    <p class="doux">Note-la sur papier maintenant et range-la sous enveloppe, chez une autre personne. Elle ne sera <b>plus jamais affichée</b>.
+      Sans mot de passe ni clé de secours, les données sont illisibles.</p>
+    <output id="cle-secours" class="cle"></output>
+    <label class="case"><input id="note" type="checkbox"> J’ai noté la clé de secours sur papier</label>
+    <button id="continuer" class="principal" type="button" disabled>Ouvrir mon cockpit</button>
+  </section>
+
+  <form id="f-secours" hidden>
+    <h1>Clé de secours</h1>
+    <label for="cle">Clé de secours (32 caractères)</label><input id="cle" autocomplete="off" spellcheck="false" required>
+    <label for="nouveau">Nouveau mot de passe</label><input id="nouveau" type="password" autocomplete="new-password" required>
+    <label for="nouveau2">Confirmer</label><input id="nouveau2" type="password" autocomplete="new-password" required>
+    <button id="valider-secours" class="principal" type="submit">Ouvrir et changer le mot de passe</button>
+    <button id="retour" class="lien" type="button">Retour</button>
+  </form>
+
+  <p id="message" role="status"></p>
+</main>
+<script src="/ouvrir.js"></script>
+</body></html>
