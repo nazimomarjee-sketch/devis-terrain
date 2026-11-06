@@ -96,19 +96,17 @@ test('4. homonymes d’une même source : ni fusionnés, ni proposés au rapproc
   assert.equal(r.propositions.some(x => x.nom === 'GARAGE FICTIF HOMONYME'), false);
 });
 
-test('5. catégories distinctes : client, dormant (reste client), prospect, à qualifier, hors cible', () => {
+test('5. catégories distinctes : client (inactif ou à vérifier, reste client), prospect, à qualifier, hors cible', () => {
   const r = M.construire(jeu());
   const actif = un(r, 'CARROSSERIE FICTIVE ACTIVE');
-  assert.deepEqual([actif.categorie, actif.dormant, actif.segment, actif.qualification], ['client', null, 'client-carrosserie', 'confirme']);
+  assert.deepEqual([actif.categorie, actif.dormant, actif.achat.niveau, actif.segment, actif.qualification], ['client', null, 'actif', 'client-carrosserie', 'confirme']);
   const ancien = un(r, 'GARAGE FICTIF ANCIEN');
-  assert.equal(ancien.categorie, 'client');
-  assert.equal(ancien.segment, 'client-mecanique');
-  assert.equal(ancien.dormant.depuisMois, 16);
-  assert.match(ancien.dormant.motif, /2025-06-10/);
+  assert.deepEqual([ancien.categorie, ancien.segment, ancien.achat.niveau, ancien.dormant.niveau, ancien.dormant.depuisMois], ['client', 'client-mecanique', 'inactif', 'inactif', 16]);
   const sansAchat = un(r, 'GARAGE SANS ACHAT');
-  assert.equal(sansAchat.categorie, 'client'); assert.equal(sansAchat.dormant.depuisJours, null, 'durée inconnue : jamais devinée');
+  assert.deepEqual([sansAchat.categorie, sansAchat.achat.niveau, sansAchat.dormant], ['client', 'a_verifier', null], 'aucune commande : « à vérifier », jamais « dormant » affirmé');
   const dormAir = un(r, 'GARAGE FICTIF DORMANT AIRTABLE');
-  assert.deepEqual([dormAir.categorie, dormAir.confirmeEbp, dormAir.qualification, dormAir.dormant.source], ['client', false, 'a_verifier', 'Airtable']);
+  assert.deepEqual([dormAir.categorie, dormAir.confirmeEbp, dormAir.qualification, dormAir.achat.niveau, dormAir.achat.source, dormAir.dormant], ['client', false, 'a_verifier', 'a_verifier', 'Airtable', null]);
+  assert.deepEqual(dormAir.statutsHistoriques, [{ valeur: 'dormant', source: 'Airtable', date: '2026-09-15', ref: 'air:rec1' }], 'statut Airtable conservé avec sa source');
   assert.equal(un(r, 'CONTRÔLE FICTIF EXCLU').categorie, 'hors_cible');
   const sir = un(r, 'ATELIER FICTIF SIRENE');
   assert.deepEqual([sir.categorie, sir.qualification], ['a_qualifier', 'probable'], 'SIRENE seul : jamais une carrosserie confirmée');
@@ -136,7 +134,8 @@ test('7. comptes : total = clients + prospects + à qualifier + hors cible ; les
     assert.ok(k.dontDormants <= k.clients);
   }
   const g = M.commune(r, '95280').comptes; // Goussainville
-  assert.deepEqual([g.clients, g.dontDormants, g.dontClientsNonConfirmesEbp, g.horsCible, g.aQualifier], [3, 2, 1, 1, 1]);
+  assert.deepEqual([g.clients, g.dontDormants, g.dontClientsNonConfirmesEbp, g.horsCible, g.aQualifier], [3, 1, 1, 1, 1]);
+  assert.deepEqual(g.signauxAchat, { reachat: 0, potentiellementDormant: 0, inactif: 1, aVerifier: 1, ralentissent: 0 });
 });
 
 test('8. source et date conservées ; rien d’inventé (pas de CA, suivi vide)', () => {
@@ -201,4 +200,56 @@ test('14. volume : 1 500 établissements fictifs dont 200 dans une même commune
   assert.equal(r.bilan.etablissements, 1500); assert.equal(r.bilan.conservation, true);
   assert.equal(M.commune(r, '95127').etablissements.length, 200); // Cergy
   assert.ok(ms < 1000, ms.toFixed(0) + ' ms');
+});
+
+// ---------- Signal d'achat (règle du 06/11/2026 : 60 j réachat · 90 j potentiellement dormant · 12 mois inactif) ----------
+const jour = n => new Date(Date.UTC(2026, 10, 6) - n * 86400000).toISOString().slice(0, 10); // n jours avant l'arrêté
+const client = (code, ilYA) => ({ clientsEbp: [{ code, nom: 'CLIENT FICTIF ' + code, ville: 'Gonesse', cp: '95500', statut: 'Actif', famille: 'Carrosserie' }],
+  piecesEbp: ilYA.map((n, i) => ({ type: 'commande', no: code + '-' + i, date: jour(n), code, client: 'CLIENT FICTIF ' + code, htCents: 10000 })) });
+function signal(cas, { historique = 400, parametres } = {}) {
+  const cl = [], pc = [];
+  for (const [code, ilYA] of cas) { const x = client(code, ilYA); cl.push(...x.clientsEbp); pc.push(...x.piecesEbp); }
+  if (historique) pc.push({ type: 'facture', no: 'ANCIEN', date: jour(historique), code: 'Z999', client: 'CLIENT FICTIF ANCIEN', htCents: 100 }); // couverture de l'export
+  const r = M.construire({ arrete: ARRETE, clientsEbp: cl, piecesEbp: pc, parametres });
+  return Object.fromEntries(cas.map(([code]) => [code, un(r, 'CLIENT FICTIF ' + code).achat]));
+}
+
+test('15. seuils de départ (rythme inconnu, historique complet) : 60 j réachat · 90 j potentiellement dormant · 12 mois inactif', () => {
+  const s = signal([['A', [59]], ['B', [60]], ['C', [89]], ['D', [90]], ['E', [364]], ['F', [365]]]);
+  assert.deepEqual(Object.values(s).map(x => x.niveau), ['actif', 'reachat', 'reachat', 'potentiellement_dormant', 'potentiellement_dormant', 'inactif']);
+  assert.equal(s.B.base, 'seuils'); assert.equal(s.F.base, 'seuil');
+});
+
+test('16. rythme habituel connu (≥ 3 commandes) : le signal suit le rythme du client', () => {
+  const s = signal([['RAPIDE', [28, 42, 56]], ['LENT_OK', [100, 220, 340]], ['LENT_RETARD', [200, 320, 440]], ['LENT_PERDU', [250, 370, 490]]], { historique: 500 });
+  assert.deepEqual([s.RAPIDE.rythmeJours, s.RAPIDE.niveau], [14, 'reachat'], 'commande toutes les 2 semaines : alerte dès 21 j, sans attendre 60 j');
+  assert.deepEqual([s.LENT_OK.rythmeJours, s.LENT_OK.niveau], [120, 'actif'], 'commande tous les 4 mois : 100 j sans commande reste normal');
+  assert.equal(s.LENT_RETARD.niveau, 'reachat');
+  assert.equal(s.LENT_PERDU.niveau, 'potentiellement_dormant');
+  assert.match(s.LENT_OK.motif, /tous les 120 j/);
+});
+
+test('17. historique incomplet : « à vérifier » plutôt que « dormant » affirmé', () => {
+  const s = signal([['X', [95]], ['Y', [65]]], { historique: 0 }); // export couvrant ~95 jours seulement
+  assert.equal(s.X.niveau, 'a_verifier');
+  assert.match(s.X.motif, /historique incomplet/);
+  assert.equal(s.Y.niveau, 'reachat', 'le réachat reste signalé : c’est déjà une alerte « à vérifier »');
+});
+
+test('18. statut Airtable conservé, jamais écrasé : Airtable « dormant » + commande EBP récente → les deux gardés, conflit signalé', () => {
+  const r = M.construire({ arrete: ARRETE, ...client('K1', [10]), airtable: [{ id: 'recK', nom: 'CLIENT FICTIF K1', ville: 'Gonesse', cp: '95500', statut: 'dormant', codeEbp: 'K1', majLe: '2026-08-01' }] });
+  const e = un(r, 'CLIENT FICTIF K1');
+  assert.equal(e.achat.niveau, 'actif');
+  assert.deepEqual(e.statutsHistoriques.map(s => [s.valeur, s.source, s.date]), [['dormant', 'Airtable', '2026-08-01']]);
+  assert.match(e.avertissements.join(' '), /Airtable : dormant ; EBP : commande récente/);
+});
+
+test('19. ralentissement repéré pour l’Agent Business Developer (dernier écart bien plus long que d’habitude)', () => {
+  const s = signal([['R', [10, 100, 130, 160, 190]], ['N', [10, 40, 70, 100, 130]]], { historique: 500 });
+  assert.equal(s.R.ralentit, true); assert.equal(s.N.ralentit, false);
+});
+
+test('20. seuils réglables (valeurs de départ, pas des vérités absolues)', () => {
+  const s = signal([['P', [50]]], { parametres: { seuils: { reachat: 45 } } });
+  assert.equal(s.P.niveau, 'reachat');
 });

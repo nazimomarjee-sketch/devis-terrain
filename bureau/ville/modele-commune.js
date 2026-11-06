@@ -9,6 +9,10 @@
      elles partagent un identifiant certain (SIRET, code client EBP) ou si une liaison a été VALIDÉE PAR UNE PERSONNE.
      Un même nom dans la même commune donne une PROPOSITION « à confirmer » : les deux fiches restent séparées.
    - Catégories distinctes : client (un dormant reste client), prospect, à qualifier, hors cible.
+   - Signal d'achat (règle du propriétaire, 06/11/2026) : 60 j sans commande = réachat à vérifier ; 90 j = potentiellement
+     dormant ; 12 mois = inactif. Valeurs de départ réglables. Si l'historique EBP donne le rythme habituel du client
+     (au moins 3 commandes), le signal suit ce rythme. Historique incomplet → « à vérifier », jamais « dormant » affirmé.
+     Les statuts historiques d'Airtable sont conservés avec leur source, jamais écrasés.
    - Rien n'est inventé : une information absente vaut null (« Inconnu » à l'affichage), jamais zéro deviné.
    - Chaque information garde sa source et sa date quand elles existent.
    - Pointage, obstacles et vue Direction : champs prévus (suivi), null tant que la fonction n'existe pas.
@@ -20,7 +24,10 @@
   const MV = node ? require('../ma-ville.js') : racine.MaVille;
 
   const VERSION = 1;
-  const DEFAUTS = Object.freeze({ dormantJours: 365 }); // aligné sur « client EBP inactif » de Ma Ville ; à confirmer par le propriétaire
+  // Seuils de départ (décision du propriétaire du 06/11/2026), réglables : ce ne sont pas des vérités absolues.
+  const DEFAUTS = Object.freeze({ seuils: Object.freeze({ reachat: 60, potentiellementDormant: 90, inactif: 365 }),
+    minCommandesRythme: 3, facteurReachat: 1.5, facteurDormant: 2, historiqueCompletJours: 365 });
+  const GRAVITE = { alerte: 0, potentiellement_dormant: 1, reachat: 2, inactif: 3, a_verifier: 4, actif: 5 };
   const SOURCES = Object.freeze(['EBP', 'Airtable', 'Terrain', 'SIRENE']);
   const RANG_CATEGORIE = { client: 0, prospect: 1, a_qualifier: 2, hors_cible: 3 };
   const AIRTABLE = { prospect: 'prospect', dormant: 'dormant', a_exclure: 'hors_cible', hors_cible: 'hors_cible', a_verifier: 'a_verifier' };
@@ -83,6 +90,38 @@
     return { groupes: [...groupes.values()], conflits };
   }
 
+  // ---------- 3 bis. Signal d'achat d'un client EBP ----------
+  function signalAchat(pieces, ctx) {
+    const P = ctx.parametres, S = P.seuils, ok = p => p.date <= ctx.arrete;
+    let base = pieces.filter(p => p.type === 'commande' && ok(p)), typeBase = 'commande';
+    if (!base.length) { base = pieces.filter(p => p.type === 'facture' && ok(p)); typeBase = 'facture'; }
+    const hist = ctx.debutHistorique ? ' (export EBP couvrant depuis le ' + ctx.debutHistorique + ')' : '';
+    if (!base.length) return { niveau: 'a_verifier', joursDepuis: null, derniere: null, rythmeJours: null, base: null, ralentit: null,
+      motif: 'Aucune commande dans l’export EBP' + hist + ' : impossible de dire depuis quand', source: 'EBP', date: ctx.dates.EBP };
+    const dates = [...new Set(base.map(p => p.date))].sort(), derniere = base.filter(p => p.date === dates[dates.length - 1])[0];
+    const j = joursEntre(derniere.date, ctx.arrete), ecarts = dates.slice(1).map((d, i) => joursEntre(dates[i], d));
+    const med = l => { const s = [...l].sort((a, b) => a - b), m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : Math.round((s[m - 1] + s[m]) / 2); };
+    const rythme = dates.length >= P.minCommandesRythme ? med(ecarts) : null;
+    const ralentit = rythme && ecarts.length >= 3 ? ecarts[ecarts.length - 1] > P.facteurReachat * med(ecarts.slice(0, -1)) : null;
+    const complet = ctx.debutHistorique && joursEntre(ctx.debutHistorique, ctx.arrete) >= P.historiqueCompletJours;
+    let niveau, baseSignal, motif;
+    if (j >= S.inactif) { niveau = 'inactif'; baseSignal = 'seuil'; motif = 'Aucune ' + typeBase + ' depuis ' + j + ' jours (seuil ' + S.inactif + ' j)'; }
+    else if (rythme) {
+      baseSignal = 'rythme';
+      niveau = j > P.facteurDormant * rythme ? 'potentiellement_dormant' : j > P.facteurReachat * rythme ? 'reachat' : 'actif';
+      motif = 'Commande habituelle tous les ' + rythme + ' j environ ; dernière il y a ' + j + ' j';
+    } else {
+      baseSignal = 'seuils';
+      niveau = j >= S.potentiellementDormant ? 'potentiellement_dormant' : j >= S.reachat ? 'reachat' : 'actif';
+      motif = 'Dernière ' + typeBase + ' il y a ' + j + ' j (rythme inconnu : moins de ' + P.minCommandesRythme + ' commandes)';
+      // Historique incomplet : on ne déclare pas un client dormant sans recul suffisant.
+      if (niveau === 'potentiellement_dormant' && !complet) { niveau = 'a_verifier'; motif += ' ; historique incomplet' + hist; }
+    }
+    if (typeBase === 'facture') motif += ' — calculé sur les factures (aucune commande dans l’export)';
+    return { niveau, joursDepuis: j, derniere: { type: derniere.type, no: derniere.no, date: derniere.date }, rythmeJours: rythme, base: baseSignal, ralentit,
+      motif, source: 'EBP', date: ctx.dates.EBP };
+  }
+
   // ---------- 3. Un groupe → un établissement ----------
   function etablissement(g, ctx) {
     const de = s => g.filter(f => f.source === s), premier = s => de(s)[0];
@@ -113,18 +152,22 @@
 
     // Catégorie : EBP fait foi pour « client ». Le hors cible Airtable n'efface jamais un client EBP (avertissement).
     const statutsAir = [...new Set(air.map(f => f.statutAirtable).filter(Boolean))];
-    let categorie, qualification, dormant = null, confirmeEbp = false;
+    // Statuts historiques Airtable : conservés tels quels avec leur source et leur date (jamais écrasés).
+    const statutsHistoriques = air.filter(f => f.statutAirtableBrut).map(f => ({ valeur: f.statutAirtableBrut, source: 'Airtable', date: f.date || null, ref: f.ref }));
+    let categorie, qualification, achat = null, confirmeEbp = false;
     if (ebp.length || pieces.length) {
       categorie = 'client'; confirmeEbp = true; qualification = 'confirme';
-      const ref0 = dernierAchat ? dernierAchat.date : null;
-      if (!ref0) { dormant = { depuisJours: null, motif: 'Aucune commande ni facture dans l’export EBP', source: 'EBP', date: ctx.dates.EBP }; }
-      else { const j = joursEntre(ref0, ctx.arrete); if (j >= ctx.dormantJours) dormant = { depuisJours: j, depuisMois: Math.floor(j / 30.44), motif: 'Dernier achat EBP le ' + ref0, source: 'EBP', date: ctx.dates.EBP }; }
-      if (ebp.some(f => /inactif|sommeil|ferme/i.test(f.statutEbp))) dormant = dormant || { depuisJours: null, motif: 'Compte EBP marqué inactif / en sommeil', source: 'EBP', date: ctx.dates.EBP };
+      achat = signalAchat(pieces, ctx);
+      if (ebp.some(f => /inactif|sommeil|ferme/i.test(f.statutEbp)))
+        achat = Object.assign({}, achat, { niveau: 'inactif', motif: 'Compte EBP marqué inactif / en sommeil' + (achat.joursDepuis != null ? ' ; ' + achat.motif : '') });
       if (statutsAir.includes('hors_cible')) avert.push('Airtable le classe hors cible alors qu’il est client EBP : client conservé, à vérifier');
+      if (statutsAir.includes('dormant') && achat.niveau === 'actif')
+        avert.push('Airtable : dormant ; EBP : commande récente (' + achat.derniere.date + ') — les deux sont conservés, à vérifier');
     } else if (statutsAir.includes('hors_cible')) { categorie = 'hors_cible'; qualification = 'hors_cible'; }
     else if (statutsAir.includes('dormant')) {
       categorie = 'client'; qualification = 'a_verifier';
-      dormant = { depuisJours: null, motif: 'Client dormant déclaré dans Airtable, non retrouvé dans EBP', source: 'Airtable', date: premier('Airtable').date };
+      achat = { niveau: 'a_verifier', joursDepuis: null, derniere: null, rythmeJours: null, base: null, ralentit: null,
+        motif: 'Client dormant déclaré dans Airtable, non retrouvé dans EBP', source: 'Airtable', date: premier('Airtable').date };
     }
     else if (tel.some(f => f.statutTerrain === 'client')) { categorie = 'client'; qualification = 'a_verifier'; avert.push('Déclaré client au téléphone, non retrouvé dans EBP'); }
     else if (statutsAir.includes('prospect') || tel.length) { categorie = 'prospect'; qualification = 'confirme'; }
@@ -132,6 +175,8 @@
     else { categorie = 'a_qualifier'; qualification = 'probable'; } // SIRENE seul : activité probable, jamais une carrosserie confirmée
     if (statutsAir.includes('a_verifier') && qualification === 'confirme' && categorie !== 'client') qualification = 'a_verifier';
 
+    const dormant = achat && (achat.niveau === 'potentiellement_dormant' || achat.niveau === 'inactif')
+      ? { niveau: achat.niveau, depuisJours: achat.joursDepuis, depuisMois: Math.floor(achat.joursDepuis / 30.44), motif: achat.motif, source: achat.source, date: achat.date } : null;
     const segment = categorie === 'client' || categorie === 'prospect'
       ? (activite && (activite.valeur === 'carrosserie' || activite.valeur === 'mecanique') ? categorie + '-' + activite.valeur : null) : null;
     const alertes = [];
@@ -142,7 +187,7 @@
       uid, nom: val(ref.nom, ref.source, ref.date), siret: siret ? val(siret, (g.find(f => f.siret) || {}).source, (g.find(f => f.siretDate) || {}).siretDate || null) : null,
       codesEbp, insee: cl.insee || null, commune: cl.commune || null, dep: cl.dep || null,
       rattachement: { niveau: cl.niveau, motif: cl.motif },
-      categorie, qualification, segment, activite, dormant, confirmeEbp, alertes,
+      categorie, qualification, segment, activite, achat, dormant, statutsHistoriques, confirmeEbp, alertes,
       dernierAchat: dernierAchat ? { type: dernierAchat.type, no: dernierAchat.no, date: dernierAchat.date, source: 'EBP', exportDu: ctx.dates.EBP } : null,
       interlocuteur: interlocuteur ? val(true, interlocuteur.source, interlocuteur.date) : null,
       etapeTerrain: (tel.find(f => f.etape) || {}).etape || null,
@@ -170,24 +215,29 @@
   // ---------- 5. Comptes d'une commune (règles de la référence) ----------
   function comptes(l) {
     const n = f => l.filter(f).length;
+    const sig = v => n(e => e.categorie === 'client' && e.achat && e.achat.niveau === v);
     const c = { total: l.length, clients: n(e => e.categorie === 'client'), dontDormants: n(e => e.categorie === 'client' && e.dormant),
+      signauxAchat: { reachat: sig('reachat'), potentiellementDormant: sig('potentiellement_dormant'), inactif: sig('inactif'), aVerifier: sig('a_verifier'), ralentissent: n(e => e.achat && e.achat.ralentit) },
       dontClientsNonConfirmesEbp: n(e => e.categorie === 'client' && !e.confirmeEbp), prospects: n(e => e.categorie === 'prospect'),
       aQualifier: n(e => e.categorie === 'a_qualifier'), horsCible: n(e => e.categorie === 'hors_cible'),
       alertes: n(e => e.alertes.length > 0), avecInterlocuteur: n(e => !!e.interlocuteur) };
     c.parSegment = {}; for (const s of Object.keys(MV.SEGMENTS).filter(k => /^(client|prospect)-(carrosserie|mecanique)$/.test(k))) c.parSegment[s] = n(e => e.segment === s);
     return c;
   }
-  const rang = e => [RANG_CATEGORIE[e.categorie], e.alertes.length ? 0 : 1, e.dormant ? 0 : 1, e.nom.valeur, e.uid]; // uid : départage stable des homonymes
+  // Ordre de liste : catégorie, puis urgence commerciale (alerte, potentiellement dormant, réachat…), nom, uid (départage stable).
+  const rang = e => [RANG_CATEGORIE[e.categorie], e.alertes.length ? GRAVITE.alerte : GRAVITE[(e.achat || {}).niveau] ?? 6, e.nom.valeur, e.uid];
   const comparer = (a, b) => { const x = rang(a), y = rang(b); for (let i = 0; i < x.length; i++) { if (x[i] < y[i]) return -1; if (x[i] > y[i]) return 1; } return 0; };
 
   // ---------- Point d'entrée ----------
-  // e = { terrain, clientsEbp, piecesEbp, airtable, annuaire, liaisonsValidees, arrete, dates:{EBP,Terrain,Airtable,SIRENE}, dormantJours }
+  // e = { terrain, clientsEbp, piecesEbp, airtable, annuaire, liaisonsValidees, arrete, dates:{EBP,Terrain,Airtable,SIRENE}, parametres }
   function construire(e = {}) {
     if (!iso(e.arrete)) throw new Error('Date d’arrêté (export EBP) obligatoire au format AAAA-MM-JJ.');
     const dates = Object.assign({ EBP: e.arrete, Terrain: null, Airtable: null, SIRENE: null }, e.dates || {});
     const piecesParCode = (() => { const m = new Map(); (e.piecesEbp || []).forEach(p => { if (!m.has(p.code)) m.set(p.code, []); m.get(p.code).push(p); });
       return codes => codes.flatMap(c => m.get(c) || []); })();
-    const ctx = { arrete: e.arrete.slice(0, 10), dates, dormantJours: e.dormantJours || DEFAUTS.dormantJours, piecesParCode };
+    const parametres = Object.assign({}, DEFAUTS, e.parametres || {}, { seuils: Object.assign({}, DEFAUTS.seuils, (e.parametres || {}).seuils || {}) });
+    const datesPieces = (e.piecesEbp || []).map(p => p.date).filter(Boolean).sort();
+    const ctx = { arrete: e.arrete.slice(0, 10), dates, parametres, debutHistorique: datesPieces[0] || null, piecesParCode };
     const { out: fr, ecartees } = fragments(e, dates);
     const { groupes, conflits } = regrouper(fr, e.liaisonsValidees);
     const etabs = groupes.map(g => etablissement(g, ctx));
@@ -200,7 +250,7 @@
     for (const c of communes.values()) { c.etablissements.sort(comparer); c.etablissements.forEach((x, i) => { x.numero = i + 1; }); c.comptes = comptes(c.etablissements); }
     const entrees = {}; for (const s of SOURCES) entrees[s] = fr.filter(f => f.source === s).length + ecartees.filter(f => f.source === s).length;
     const fragmentsPlaces = etabs.reduce((n, x) => n + x.sources.length, 0);
-    return { version: VERSION, arrete: ctx.arrete, dates, communes, aClasser, ecartees, propositions: propositions(etabs), conflits,
+    return { version: VERSION, arrete: ctx.arrete, dates, parametres, debutHistorique: ctx.debutHistorique, communes, aClasser, ecartees, propositions: propositions(etabs), conflits,
       bilan: { entrees, fragments: fr.length, ecartees: ecartees.length, fragmentsPlaces, etablissements: etabs.length,
         conservation: fragmentsPlaces + ecartees.length === Object.values(entrees).reduce((a, b) => a + b, 0) } };
   }
