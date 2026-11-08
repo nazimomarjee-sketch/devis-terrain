@@ -11,7 +11,7 @@ Légende : ✅ fait et testé · 🟡 partiel · ⬜ à faire
 - ⬜ T7 Prochaine action recommandée + préparation/compte rendu de visite simplifiés. *Critère : parcours visite en ≤4 touches, hors ligne.*
 - ⬜ T8 Rappels/rendez-vous + recherche rapide (<300 ms à 2000 fiches).
 ## P2 cockpit
-- ⬜ T9 Cockpit : CA vs objectif, pipeline, relances, devis à suivre, clients à risque, plan de semaine. *(dépend B1)*
+- 🟡 T9 Cockpit MOBILE (téléphone, sans PC, hors ligne) : CA facturé vs rythme des jours ouvrés, comptes bloqués, devis acceptés à commander, règlements en retard, rappels, devis à relancer, prospects prioritaires, clients à ne pas laisser dormir — chaque ligne avec sa raison. *Tests : cockpit-telephone (5), cockpit-browser (1).* Reste : mise en page grand écran du Bureau, secteur/analyse, import EBP.
 - ⬜ T10 Import EBP avec contrôle des doublons (existant à auditer avant de refaire).
 - ⬜ T11 Commandes / facturé / encaissé en trois colonnes cohérentes.
 ## P3 carte & Ville

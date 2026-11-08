@@ -11,3 +11,6 @@
 | D8 | Coffre inaccessible ⇒ décisions refusées (pas un simple avertissement) | Demande du propriétaire |
 | D9 | Tests : jamais de chaîne courte cherchée dans du chiffré base64 (faux positifs) — `tests/support/en-clair.cjs` | Test intermittent lot A diagnostiqué |
 | D10 | Ralph Loop : présent dans le catalogue officiel, NON activé ; activation = action du propriétaire (voir BLOCKERS B6). Sans lui : boucle manuelle via ces fichiers | Ne pas prétendre ce qui n'est pas installé |
+| D11 | Mobile-first : le cockpit vit dans la PWA du téléphone (données IndexedDB, hors ligne) ; le Bureau et le coffre local restent des options, jamais requis | Orientation du propriétaire, pas de PC |
+| D12 | Sauvegardes : AES-256-GCM + PBKDF2-SHA256 600 000 itérations, phrase non conservée, relecture avant téléchargement, anciens formats importables | Demande du propriétaire (issue #6) |
+| D13 | CA = factures HT − avoirs saisis ; jamais déduit des commandes ; « non renseigné » sinon ; annulation motivée, jamais de suppression | Demande du propriétaire |

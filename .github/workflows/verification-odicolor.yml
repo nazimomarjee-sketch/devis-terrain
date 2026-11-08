@@ -60,6 +60,7 @@ jobs:
           node tests/stabilisation-lot1-browser.cjs
           node tests/plan-pc-matin-browser.cjs
           node tests/ca-facture-browser.cjs
+          node tests/cockpit-browser.cjs
       - name: Préparer les paquets Samsung (aucun déploiement)
         run: >-
           node scripts/preparer-preview-samsung.cjs

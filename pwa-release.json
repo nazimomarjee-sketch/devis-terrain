@@ -1,5 +1,5 @@
 {
-  "id": "ccab6f4addfdef977c9a07120b1f9553904c6f995e28442d1adf9be2f08dbc25",
+  "id": "540cb142280306ba0c36efbe17ad29b46d5e07916231195d86a352a311fe92a7",
   "assets": [
     {
       "path": "accueil-v23.css",
@@ -7,7 +7,7 @@
     },
     {
       "path": "accueil-v23.js",
-      "sha256": "cbe4b472efb0101c91ad243aa83bb988f50a49236058ca9174d9da01bf92d54d"
+      "sha256": "b553c38b7cd0744db8d3fa105b791d5822b1ad8c5a45827a7c453dcf8075c6cd"
     },
     {
       "path": "agent-commercial-v35.css",
@@ -19,7 +19,7 @@
     },
     {
       "path": "app.js",
-      "sha256": "9cf30082b995c112a32e69f0981f0e0ff45bf1b5f926afd4e22db3a3c8909137"
+      "sha256": "2432a265d34a772ba444cd1ef1e5d7f359668a704181b475a7f1af4663c271f1"
     },
     {
       "path": "apparence-v26.css",
@@ -48,6 +48,10 @@
     {
       "path": "catalogues-pdf-v32.js",
       "sha256": "2cf69840493d4eb11046ace9ee1eedb8dbd1b3266f17a5acc6bea17c64fc74e3"
+    },
+    {
+      "path": "cockpit-v48.js",
+      "sha256": "f1dc0304f32a69eb3f7f1e4f6e52fe3bdba6581f8c857b69ee3be83f0e1477a7"
     },
     {
       "path": "commercial-v22.js",
@@ -99,7 +103,7 @@
     },
     {
       "path": "index.html",
-      "sha256": "17d20ee4942da946c556204650caa191877190a30d61035ab087812a464dd5c9"
+      "sha256": "f25bb1b90186214c502e232839b8a895b20bac82eccc62a1625bcc08e24bb2a7"
     },
     {
       "path": "logo-96.png",
@@ -143,7 +147,7 @@
     },
     {
       "path": "pwa-client.js",
-      "sha256": "24c43cb4a9357173c0a6521e667013f6fa3764ac3b903938c9d580936825da2b"
+      "sha256": "fdb973890ed397d1cca7bf2246b77fed6752c98028d8ad625b697b7df329dea7"
     },
     {
       "path": "rappels-produits-v24.js",

@@ -32,7 +32,7 @@
       h('p',{class:'mut'},!renseigne?'Saisis tes factures et avoirs HT : le CA n’est jamais estimé à partir des commandes.':objectif?(pct+' % · reste '+montant(Math.max(0,objectif-caSem))+' à facturer'):'Définir un objectif pour suivre le CA de la semaine.'),
       renseigne&&om?h('p',{class:'mut'},'Mois : '+montant(mois.totalCents)+' sur '+montant(om.cents)+' ('+Math.max(0,Math.min(100,Math.round(mois.totalCents/om.cents*100)))+' %)'):null,
       h('small',{class:'v23-source'},'Source : factures et avoirs HT saisis par toi · indicateurs séparés ce mois : commandes envoyées '+montant(cmdMois)+' HT · encaissé '+montant(encMois)+' · '+ligneEbp),
-      h('div',{class:'actions'},lien('#/ca',renseigne?'CA facturé : voir / saisir':'Saisir mon CA facturé','sec'),!objectif?lien('#/reglages','Régler mon objectif'):null));
+      h('div',{class:'actions'},lien('#/cockpit','Cockpit','sec'),lien('#/ca',renseigne?'CA facturé : voir / saisir':'Saisir mon CA facturé','sec'),!objectif?lien('#/reglages','Régler mon objectif'):null));
   }
 
   function candidats(dv,cl,pc,tours) {

@@ -378,6 +378,7 @@ async function route() {
     else if (p[0] === 'evolution') await pageEvolution();
     else if (p[0] === 'travail') await pageTravail(p[1]);
     else if (p[0] === 'ca') await pageCA();
+    else if (p[0] === 'cockpit') await pageCockpit();
     else nonTrouve();
   } catch (e) { console.error(e); toast('Erreur : ' + e.message, true); }
 }
@@ -1182,7 +1183,7 @@ async function pageComparateur() {
 }
 function pagePlus() {
   const L = (href, t, d) => h('a', { class: 'ligne', href, style: 'color:inherit;text-decoration:none' }, h('span', { class: 'g' }, h('strong', {}, t), h('br'), h('small', {}, d)), h('span', {}, '›'));
-  montrer('Plus', L('#/ca', 'CA facturé HT', 'Tes factures et avoirs HT : le chiffre d’affaires, sans doublon'), L('#/travail', 'Mon travail', 'Tes 6 chiffres : visites, devis, commandes, factures, impayés'), L('#/point', 'Point du lundi', 'Le récap de la semaine écoulée : bilan, UN changement, engagements'), L('#/feuille', 'Feuille de route', 'Le plan de la semaine qui commence, jour par jour'), L('#/pc', 'Lien avec le PC', 'Envoyer ta sauvegarde au PC, recevoir le plan de la semaine'), L('#/evolution', 'Évolution', 'Tous les indicateurs, semaine par semaine, avec leur courbe'), L('#/signalements', 'Signalements', 'Problèmes remontés avec photo et leur suivi'), L('#/signaler', 'Signaler un problème', 'Photo + note envoyées à ton responsable'),
+  montrer('Plus', L('#/cockpit', 'Cockpit', 'Tes priorités du jour : CA, relances, devis, prospects, clients à voir'), L('#/ca', 'CA facturé HT', 'Tes factures et avoirs HT : le chiffre d’affaires, sans doublon'), L('#/travail', 'Mon travail', 'Tes 6 chiffres : visites, devis, commandes, factures, impayés'), L('#/point', 'Point du lundi', 'Le récap de la semaine écoulée : bilan, UN changement, engagements'), L('#/feuille', 'Feuille de route', 'Le plan de la semaine qui commence, jour par jour'), L('#/pc', 'Lien avec le PC', 'Envoyer ta sauvegarde au PC, recevoir le plan de la semaine'), L('#/evolution', 'Évolution', 'Tous les indicateurs, semaine par semaine, avec leur courbe'), L('#/signalements', 'Signalements', 'Problèmes remontés avec photo et leur suivi'), L('#/signaler', 'Signaler un problème', 'Photo + note envoyées à ton responsable'),
     L('#/comparateur', 'Comparateur de coût', 'Coût réel au m² : produit actuel contre produit proposé'), L('#/reglages', 'Réglages', 'Objectifs, responsable, TVA, sauvegarde'));
 }
 
@@ -1976,6 +1977,29 @@ async function pageCA() {
     h('h2', {}, 'Ajouter une pièce'), type, num, dt, mt, cli, msg,
     h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onclick: () => enregistrer(false) }, 'Enregistrer')),
     h('h2', {}, 'Historique'), lignes.length ? lignes : h('p', { class: 'vide' }, 'Aucune pièce.'));
+}
+
+// ---------- Cockpit : priorités commerciales du jour, sur le téléphone, sans PC ----------
+async function pageCockpit() {
+  const [dv, cl, caStore] = [await getAll('devis'), await getAll('clients'), await get('meta', 'caFacture')];
+  const now = new Date(), auj = jourLocal(now), mk = auj.slice(0, 7), om = objectifDuMois(now);
+  const m = ODICOLOR_CA.calculerMois(caStore, mk), debut = new Date(now.getFullYear(), now.getMonth(), 1), fin = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23);
+  const veille = new Date(now); veille.setDate(veille.getDate() - 1); veille.setHours(23, 59, 0, 0);
+  const K = ODICOLOR_COCKPIT.calculer({ auj, clients: cl, devis: dv, relanceJours: S.relanceJours || 3, totalDevis: d => totaux(d).ht,
+    ca: { renseigne: ODICOLOR_CA.aDesPieces(caStore), moisCents: m.totalCents, nFactures: m.nFactures, nAvoirs: m.nAvoirs }, objectifMoisCents: om ? om.cents : 0,
+    jours: { ouvresTotal: joursOuvres(debut, fin), ouvresFaits: veille >= debut ? joursOuvres(debut, veille) : 0 } });
+  const r = K.rythme, carteCA = h('div', { class: 'carte obj hero' }, h('small', { class: 'etiq' }, 'CA facturé HT · ' + mk),
+    h('div', { class: 'gros-chiffre' }, K.ca.renseigne ? eur(K.ca.moisCents) : 'Non renseigné', om ? h('span', {}, ' sur ' + eur(om.cents)) : null),
+    r.calculable ? [h('div', { class: 'piste', role: 'img', 'aria-label': r.pct + ' % de l’objectif du mois' }, h('div', { class: 'rempli', style: 'width:' + Math.max(0, Math.min(100, r.pct)) + '%' })),
+      h('p', { class: r.ecartCents >= 0 ? '' : 'mut' }, (r.ecartCents >= 0 ? 'En avance de ' : 'En retard de ') + eur(Math.abs(r.ecartCents)) + ' sur le rythme des jours ouvrés' + (r.resteParJourOuvre ? ' · ' + eur(r.resteParJourOuvre) + ' à facturer par jour ouvré restant' : ''))]
+      : h('p', { class: 'mut' }, 'Rythme non calculable : ' + r.motif + '. ', h('a', { href: K.ca.renseigne ? '#/reglages' : '#/ca' }, K.ca.renseigne ? 'Régler l’objectif' : 'Saisir le CA facturé')));
+  const ligne = (sec, x) => h('a', { class: 'ligne', href: sec.lien(x), style: 'color:inherit;text-decoration:none' }, h('span', { class: 'g' }, h('strong', {}, x.nom || '—'), h('br'), h('small', {}, x.raison + (x.montant ? ' · ' + eur(x.montant) : '') + (x.ville ? ' · ' + x.ville : ''))), h('span', {}, '›'));
+  const cartes = K.sections.filter(sec => sec.total).map(sec => h('div', { class: 'carte' }, h('div', { class: 'elan-tete' }, h('strong', {}, sec.titre), h('small', { class: 'mut' }, sec.total + (sec.montant ? ' · ' + eur(sec.montant) : ''))),
+    sec.lignes.map(x => ligne(sec, x)), sec.total > sec.lignes.length ? h('p', { class: 'mut' }, '+ ' + (sec.total - sec.lignes.length) + ' autre(s)') : null));
+  montrer('Cockpit', carteCA,
+    h('div', { class: 'actions' }, h('a', { class: 'btn', href: '#/tournee' }, 'Préparer ma tournée'), h('a', { class: 'btn sec', href: '#/ca' }, 'CA facturé'), h('a', { class: 'btn sec', href: '#/feuille' }, 'Plan de la semaine')),
+    cartes.length ? cartes : h('p', { class: 'vide' }, 'Rien d’urgent d’après tes données : ' + cl.length + ' garage(s), ' + dv.length + ' devis. Ajoute des rappels et des priorités sur les fiches pour alimenter le cockpit.'),
+    h('p', { class: 'mut' }, 'Chaque ligne vient de ce que tu as saisi (visites, rappels, devis, factures). Rien n’est deviné.'));
 }
 
 async function pageReglages() {
