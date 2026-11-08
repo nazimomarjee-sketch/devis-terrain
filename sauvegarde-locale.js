@@ -166,6 +166,7 @@ const ODICOLOR_BACKUP = (() => {
     if (meta.has('settings')) settings(meta.get('settings'));
     for (const k of ['signalements','appels','pcActions','pdfFournisseursIndex','pcArchives'])
       if (meta.has(k) && (!Array.isArray(meta.get(k)) || meta.get(k).some(x=>!object(x)))) fail('Rubrique '+k+' incorrecte.');
+    if (meta.has('caFacture')) { const m=meta.get('caFacture'); if(!object(m)||m.version!==1||!Array.isArray(m.entrees))fail('CA facturé : magasin invalide.'); const ids=new Set(),cles=new Set(); for(const e of m.entrees){ if(!object(e)||!text(e.id)||ids.has(e.id)||!['facture','avoir'].includes(e.type)||!text(String(e.numero==null?'':e.numero))||!date(e.date)||e.date.length!==10||!integer(e.montantHt,1,1e10))fail('CA facturé : pièce invalide.'); ids.add(e.id); if(e.annule!=null&&(!object(e.annule)||!text(String(e.annule.motif==null?'':e.annule.motif)))) fail('CA facturé : annulation sans motif.'); if(!e.annule){const k=e.type+'|'+String(e.numero).normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]/g,''); if(cles.has(k))fail('CA facturé : doublon de numéro '+e.numero+'.'); cles.add(k);} } }
     for (const k of ['point','comparateur','tournees'])
       if (meta.has(k) && !object(meta.get(k))) fail('Rubrique '+k+' incorrecte.');
     for (const s of meta.get('signalements') || [])

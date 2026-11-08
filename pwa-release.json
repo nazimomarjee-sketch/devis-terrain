@@ -1,5 +1,5 @@
 {
-  "id": "9ff94a824526afdb82c853cf7c9b1455688018071095b8a5fb9a8d493b7ad653",
+  "id": "ccab6f4addfdef977c9a07120b1f9553904c6f995e28442d1adf9be2f08dbc25",
   "assets": [
     {
       "path": "accueil-v23.css",
@@ -7,7 +7,7 @@
     },
     {
       "path": "accueil-v23.js",
-      "sha256": "f99b4234c817b9d7472cc597ef054018fd5c07ae5ab9e466b06ae18e594a8a21"
+      "sha256": "cbe4b472efb0101c91ad243aa83bb988f50a49236058ca9174d9da01bf92d54d"
     },
     {
       "path": "agent-commercial-v35.css",
@@ -19,7 +19,7 @@
     },
     {
       "path": "app.js",
-      "sha256": "477909dc263fd854e1ff4e9f917722384b1307cf41655def6bd8833d1d6a64d9"
+      "sha256": "9cf30082b995c112a32e69f0981f0e0ff45bf1b5f926afd4e22db3a3c8909137"
     },
     {
       "path": "apparence-v26.css",
@@ -36,6 +36,10 @@
     {
       "path": "barlow-condensed-latin-800-normal.woff2",
       "sha256": "2515494e8cc2ca07c86ea78766cfa104b796aa6ed5d66821c01d51dbb0b52bce"
+    },
+    {
+      "path": "ca-facture-v48.js",
+      "sha256": "d5c18f45eb3bc5ee623772f4b564a1d5157101002f266b30771275dcfc3e453e"
     },
     {
       "path": "catalogues-pdf-v32.css",
@@ -95,7 +99,7 @@
     },
     {
       "path": "index.html",
-      "sha256": "745c1952c65d0254ef0e4b5fe62d11812c77d2713934709ab34ae48e116f7c66"
+      "sha256": "17d20ee4942da946c556204650caa191877190a30d61035ab087812a464dd5c9"
     },
     {
       "path": "logo-96.png",
@@ -139,7 +143,7 @@
     },
     {
       "path": "pwa-client.js",
-      "sha256": "1d8bc3c4c90b42d99b18e33cfa49f86965877464349817dcdac59f41071088a8"
+      "sha256": "24c43cb4a9357173c0a6521e667013f6fa3764ac3b903938c9d580936825da2b"
     },
     {
       "path": "rappels-produits-v24.js",
@@ -147,7 +151,7 @@
     },
     {
       "path": "recuperation-v47.html",
-      "sha256": "9bb47d81c889407bdd2e9d68582ad1e1b44a58aee6cf186ee7c0022c452f3118"
+      "sha256": "11e4bfe611508145253ee30a827d4430b87d75270e352fcb1352f92b5ffecbb6"
     },
     {
       "path": "recuperation-v47.js",
@@ -155,7 +159,7 @@
     },
     {
       "path": "sauvegarde-locale.js",
-      "sha256": "dd201e0d39d9678fb1975435681d08dbf75097153610211723feb1db9874d7e3"
+      "sha256": "2ebb6c5a24d9defe9326c6642163b1d999c6f35cf9702c903ae9cbc1fc06196d"
     },
     {
       "path": "style-v22.css",

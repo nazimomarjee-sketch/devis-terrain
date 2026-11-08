@@ -377,6 +377,7 @@ async function route() {
     else if (p[0] === 'comparateur') await pageComparateur();
     else if (p[0] === 'evolution') await pageEvolution();
     else if (p[0] === 'travail') await pageTravail(p[1]);
+    else if (p[0] === 'ca') await pageCA();
     else nonTrouve();
   } catch (e) { console.error(e); toast('Erreur : ' + e.message, true); }
 }
@@ -585,17 +586,22 @@ function tableauDeBord(dv, cl, sigs, ext = {}) {
   const envoyes = dv.filter(d => d.lignes.length && d.statut !== 'brouillon');
   const duMois = envoyes.filter(d => cleMois(envoiDe(d)) === mk);
   const acceptesMois = dv.filter(d => d.statut === 'accepte' && d.reponseLe && cleMois(d.reponseLe) === mk);
-  const ca = dv.filter(d => d.commandeLe && cleMois(d.commandeLe) === mk).reduce((a, d) => a + totaux(d).ht, 0);
+  // CA = FACTURES HT (avoirs déduits) saisies dans l'appli ; commandes et encaissements sont des indicateurs SÉPARÉS (jamais additionnés au CA).
+  const cmdMois = dv.filter(d => d.commandeLe && cleMois(d.commandeLe) === mk).reduce((a, d) => a + totaux(d).ht, 0);
+  const caRenseigne = ODICOLOR_CA.aDesPieces(ext.caFacture), caMois = ODICOLOR_CA.calculerMois(ext.caFacture, mk), ca = caRenseigne ? caMois.totalCents : 0;
+  const encMois = cl.reduce((a, c) => a + (Array.isArray(c.factures) ? c.factures : []).filter(f => f && f.regleLe && String(f.regleLe).slice(0, 7) === mk).reduce((b, f) => b + (f.montant || 0), 0), 0);
   const attente = dv.filter(d => d.statut === 'envoye' && d.lignes.length), attHt = attente.reduce((a, d) => a + totaux(d).ht, 0);
   const visitesMois = cl.reduce((a, c) => a + (Array.isArray(c.visites) ? c.visites : []).filter(v => v && v.res === 'vu' && typeof v.date === 'string' && v.date.slice(0, 7) === mk).length, 0);
   const obj = objectifDuMois(now), jr = joursOuvres(now, new Date(now.getFullYear(), now.getMonth() + 1, 0, 23));
+  { const w = ODICOLOR_CA.calculer(ext.caFacture, SW.l, jourLocal(now)); SW.ca = caRenseigne ? w.totalCents : 0; }
   const bloc = (titre, ca, cible) => h('div', { class: 'colobj' }, h('div', { class: 'mut' }, titre), h('div', { class: 'gros-chiffre' }, eur(ca)),
     h('div', { class: 'piste', role: 'img', 'aria-label': Math.round(ca / cible * 100) + ' % de l’objectif ' + titre }, h('div', { class: 'rempli', style: 'width:' + Math.min(100, Math.round(ca / cible * 100)) + '%' })),
     h('div', { class: 'mut' }, 'sur ' + eur(cible) + ' · ' + Math.round(ca / cible * 100) + ' %'));
   const JNOM = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
   const carteObj = (obj || SW.cible) ? (() => {
     const reste = obj ? Math.max(0, obj.cents - ca) : 0, pcM = obj ? Math.min(100, Math.round(ca / obj.cents * 100)) : 0, pcS = SW.cible ? Math.min(100, Math.round(SW.ca / SW.cible * 100)) : 0;
-    return h('div', { class: 'carte obj hero' }, h('div', { class: 'elan-tete' }, h('strong', {}, obj ? 'Objectif du mois (' + obj.rang + '/' + S.objectifs.length + ')' : 'Objectif de la semaine'), h('small', {}, 'Commandes envoyées HT')),
+    return h('div', { class: 'carte obj hero' }, h('div', { class: 'elan-tete' }, h('strong', {}, obj ? 'Objectif du mois (' + obj.rang + '/' + S.objectifs.length + ')' : 'Objectif de la semaine'), h('small', {}, 'CA facturé HT')),
+      caRenseigne ? null : h('p', { class: 'mut' }, h('strong', {}, 'CA facturé non renseigné. '), 'Saisis tes factures et avoirs HT pour suivre ton objectif. ', h('a', { href: '#/ca' }, 'Saisir mon CA facturé')),
       obj ? [h('div', { class: 'gros-chiffre' }, eur(ca), h('span', {}, ' sur ' + eur(obj.cents))),
         h('div', { class: 'piste', role: 'img', 'aria-label': pcM + ' % de l’objectif du mois' }, h('div', { class: 'rempli', style: 'width:' + pcM + '%' })),
         h('div', { class: 'lh' }, h('span', {}, pcM + ' %'), h('span', {}, reste ? 'reste ' + eur(reste) : 'objectif du mois atteint')),
@@ -604,7 +610,8 @@ function tableauDeBord(dv, cl, sigs, ext = {}) {
         h('div', { class: 'lh' }, h('strong', {}, 'Cette semaine : ' + eur(SW.ca) + ' sur ' + eur(SW.cible)), h('span', {}, pcS + ' %')),
         h('p', { class: 'mut' }, JNOM[now.getDay()] + ' · jour ' + SW.j + '/' + SW.ouv + (SW.fait ? ' · attendu ce soir pour tenir le rythme : ' + eur(SW.attendu) + ' ' : ' · la semaine commence : rien à rattraper '), SW.fait ? h('strong', { class: 'pastille ' + (SW.ca >= SW.attendu ? 'ok' : 'ko') }, (SW.ca >= SW.attendu ? '+' : '−') + eur(Math.abs(SW.ca - SW.attendu))) : null, SW.ca >= SW.cible ? ' · objectif de la semaine atteint' : ''),
         SW.derive ? h('p', { class: 'mut' }, 'Cible de la semaine déduite du mois (jours ouvrés), à valider : tu peux la fixer dans Réglages.') : null) : null,
-      h('p', { class: 'mut' }, 'En attente de réponse : ' + eur(attHt) + ' (' + attente.length + ' devis). Objectif : commandes envoyées HT sur ce téléphone, pas factures ni encaissements.'));
+      h('p', { class: 'mut' }, 'Autres indicateurs (ils ne comptent pas dans le CA) : commandes envoyées ce mois ' + eur(cmdMois) + ' HT · encaissé ce mois ' + eur(encMois) + ' · en attente de réponse ' + eur(attHt) + ' (' + attente.length + ' devis).'),
+      h('p', { class: 'mut' }, caRenseigne ? 'CA facturé du mois : ' + caMois.nFactures + ' facture(s)' + (caMois.nAvoirs ? ', ' + caMois.nAvoirs + ' avoir(s) déduit(s)' : '') + ', saisi(es) par toi. ' : '', h('a', { href: '#/ca' }, 'Voir / saisir le CA facturé')));
   })() : h('div', { class: 'carte' }, h('strong', {}, 'Pas d’objectif réglé. '), 'Entre ton objectif mensuel dans ', h('a', { href: '#/reglages' }, 'Réglages'), '.');
   const nbBloques = cl.filter(c => c.compte && c.compte.statut === 'bloque').length, nbAccSansCmd = dv.filter(d => d.statut === 'accepte' && !d.commandeLe).length, nbRel = dv.filter(d => relanceDue(d, now.getTime()) != null).length, nbRep = cl.filter(c => (Number(c.reports) || 0) >= 3).length;
   const tAl = (n, l, href, ko) => h('a', { class: 'alt' + (n && ko ? ' ko' : ''), href }, h('strong', {}, n), h('span', {}, l));
@@ -647,7 +654,7 @@ function tableauDeBord(dv, cl, sigs, ext = {}) {
 
 async function pageAccueil() {
   const [dv, cl, sigs] = [await getAll('devis'), await getAll('clients'), await lireSig()];
-  const ext = { point: await get('meta', 'point'), appels: await lireAppels(), tournees: await lireTournees(), sigs, pc: await lirePC() };
+  const ext = { point: await get('meta', 'point'), appels: await lireAppels(), tournees: await lireTournees(), sigs, pc: await lirePC(), caFacture: await get('meta', 'caFacture') };
   dv.sort((a, b) => b.id - a.id);
   const prenom = (S.vendeur || '').trim().split(' ')[0], JN = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
   montrer('Bonjour, ' + (S.accueilNom || 'Mr Omarjee'),
@@ -1043,7 +1050,7 @@ async function pageTravail(k) {
   const vertsAVoir = cl.filter(c => c.compte && c.compte.statut === 'ouvert').filter(c => { const vs = (Array.isArray(c.visites) ? c.visites : []).filter(v => v && v.res === 'vu').map(v => jourLocal(v.date)).sort(); return !vs.length || ecartJours(vs[vs.length - 1], now.getTime()) > 30; });
   const relances = dv.filter(d => relanceDue(d, now.getTime()) != null), sansCmd = dv.filter(d => d.statut === 'accepte' && !d.commandeLe);
   const nAct = tag => pc ? pc.actions.filter(a => a.tag === tag && a.statut !== 'fait' && (tag !== 'Commande' || a.responsable !== 'Toi')).length : 0;
-  const manque = cible - M.cmdHt;
+  const caStore = await get('meta', 'caFacture'), caPer = { renseigne: ODICOLOR_CA.aDesPieces(caStore), r: ODICOLOR_CA.calculer(caStore, per.debut, per.fin) };
   const fil = [nb(M.clients, 'client visité', 'clients visités'), nb(M.devis, 'devis', 'devis'), nb(M.cmd, 'commande', 'commandes')].concat(E ? [nb(E.cur.facN, 'facture (EBP)', 'factures (EBP)')] : []).join('  →  ');
   // Conversion par cohorte : suivre les MÊMES devis, et non deux flux de semaines différentes.
   const cohorte = dv.filter(d=>d.lignes&&d.lignes.length&&d.statut!=='brouillon'&&
@@ -1057,7 +1064,9 @@ async function pageTravail(k) {
       vertsAVoir.length ? h('a', { class: 'btn sec', href: '#/tournee' }, vertsAVoir.length + ' client' + (vertsAVoir.length > 1 ? 's' : '') + ' vert' + (vertsAVoir.length > 1 ? 's' : '') + ' pas vu' + (vertsAVoir.length > 1 ? 's' : '') + ' depuis 30 j : préparer la tournée') : null),
     ligne('2 · Devis envoyés', source('MOI'), nb(M.devis, 'devis', 'devis'), eur(M.devisHt) + ' HT', deltaTxt(M.devis, P.devis, null, per.plib),
       relances.length ? h('a', { class: 'btn sec', href: '#/devis/' + relances[0].id }, 'Relancer ' + nb(relances.length, 'devis', 'devis') + ' sans réponse') : null),
-    ligne('3 · Commandes envoyées', source('MOI'), nb(M.cmd, 'commande', 'commandes'), eur(M.cmdHt) + ' HT' + (cible ? ' · objectif ' + eur(cible) + (manque > 0 ? ' · il manque ' + eur(manque) : ' · atteint') : ''), deltaTxt(M.cmdHt, P.cmdHt, eur, per.plib),
+    ligne('2b · CA facturé HT (saisi)', source('MOI'), caPer.renseigne ? eur(caPer.r.totalCents) : 'Non renseigné', caPer.renseigne ? caPer.r.nFactures + ' facture(s)' + (caPer.r.nAvoirs ? ' − ' + caPer.r.nAvoirs + ' avoir(s)' : '') + (cible ? ' · objectif ' + eur(cible) + (cible - caPer.r.totalCents > 0 ? ' · il manque ' + eur(cible - caPer.r.totalCents) : ' · atteint') : '') : 'Aucune facture saisie : le CA n’est pas deviné à partir des commandes.', null,
+      h('a', { class: 'btn sec', href: '#/ca' }, 'Saisir / voir le CA facturé')),
+    ligne('3 · Commandes envoyées (≠ CA)', source('MOI'), nb(M.cmd, 'commande', 'commandes'), eur(M.cmdHt) + ' HT · indicateur d’activité, distinct du CA facturé', deltaTxt(M.cmdHt, P.cmdHt, eur, per.plib),
       sansCmd.length ? h('a', { class: 'btn sec', href: '#/devis/' + sansCmd[0].id }, nb(sansCmd.length, 'devis accepté', 'devis acceptés') + ' sans commande : envoyer') : null),
     E ? ligne('4 · Commandes retrouvées dans EBP', source('EBP du ' + dateExp), nb(E.cur.cmdN, 'commande', 'commandes'), eur(Math.round(E.cur.cmdHt * 100)) + ' HT' + (M.cmdHt > Math.round(E.cur.cmdHt * 100) ? ' · ' + eur(M.cmdHt - Math.round(E.cur.cmdHt * 100)) + ' déclarés mais pas encore dans EBP' : ''), E.prev ? deltaTxt(E.cur.cmdN, E.prev.cmdN, null, per.plib) : null,
       nAct('Commande') ? h('a', { class: 'btn sec', href: '#/pc' }, nb(nAct('Commande'), 'commande à vérifier', 'commandes à vérifier') + ' avec ' + (S.respNom || 'ton responsable')) : null) : pasExport('4 · Commandes retrouvées dans EBP'),
@@ -1173,7 +1182,7 @@ async function pageComparateur() {
 }
 function pagePlus() {
   const L = (href, t, d) => h('a', { class: 'ligne', href, style: 'color:inherit;text-decoration:none' }, h('span', { class: 'g' }, h('strong', {}, t), h('br'), h('small', {}, d)), h('span', {}, '›'));
-  montrer('Plus', L('#/travail', 'Mon travail', 'Tes 6 chiffres : visites, devis, commandes, factures, impayés'), L('#/point', 'Point du lundi', 'Le récap de la semaine écoulée : bilan, UN changement, engagements'), L('#/feuille', 'Feuille de route', 'Le plan de la semaine qui commence, jour par jour'), L('#/pc', 'Lien avec le PC', 'Envoyer ta sauvegarde au PC, recevoir le plan de la semaine'), L('#/evolution', 'Évolution', 'Tous les indicateurs, semaine par semaine, avec leur courbe'), L('#/signalements', 'Signalements', 'Problèmes remontés avec photo et leur suivi'), L('#/signaler', 'Signaler un problème', 'Photo + note envoyées à ton responsable'),
+  montrer('Plus', L('#/ca', 'CA facturé HT', 'Tes factures et avoirs HT : le chiffre d’affaires, sans doublon'), L('#/travail', 'Mon travail', 'Tes 6 chiffres : visites, devis, commandes, factures, impayés'), L('#/point', 'Point du lundi', 'Le récap de la semaine écoulée : bilan, UN changement, engagements'), L('#/feuille', 'Feuille de route', 'Le plan de la semaine qui commence, jour par jour'), L('#/pc', 'Lien avec le PC', 'Envoyer ta sauvegarde au PC, recevoir le plan de la semaine'), L('#/evolution', 'Évolution', 'Tous les indicateurs, semaine par semaine, avec leur courbe'), L('#/signalements', 'Signalements', 'Problèmes remontés avec photo et leur suivi'), L('#/signaler', 'Signaler un problème', 'Photo + note envoyées à ton responsable'),
     L('#/comparateur', 'Comparateur de coût', 'Coût réel au m² : produit actuel contre produit proposé'), L('#/reglages', 'Réglages', 'Objectifs, responsable, TVA, sauvegarde'));
 }
 
@@ -1931,6 +1940,44 @@ async function pageDevis(id) {
 }
 
 // ---------- réglages ----------
+// ---------- CA facturé HT : saisie contrôlée (factures et avoirs), historique conservé ----------
+async function pageCA() {
+  const [magasin, cl] = [await get('meta', 'caFacture'), (await getAll('clients')).sort((a, b) => String(a.nom).localeCompare(String(b.nom), 'fr'))];
+  const auj = jourLocal(new Date()), mois = auj.slice(0, 7), m = ODICOLOR_CA.calculerMois(magasin, mois), obj = objectifDuMois(new Date());
+  const type = h('select', { 'aria-label': 'Type de pièce' }, h('option', { value: 'facture' }, 'Facture'), h('option', { value: 'avoir' }, 'Avoir (déduit du CA)'));
+  const num = h('input', { maxlength: 40, placeholder: 'N° de la pièce (obligatoire)', autocapitalize: 'characters', 'aria-label': 'Numéro de la pièce' });
+  const dt = h('input', { type: 'date', value: auj, max: auj, 'aria-label': 'Date de la pièce' });
+  const mt = h('input', { inputmode: 'decimal', placeholder: 'Montant HT en € (pas TTC)', 'aria-label': 'Montant hors taxes' });
+  const cli = h('select', { 'aria-label': 'Garage (facultatif)' }, h('option', { value: '' }, 'Garage : non précisé'), cl.map(c => h('option', { value: c.id }, c.nom)));
+  const msg = h('p', { class: 'mut', role: 'status' });
+  const enregistrer = async confirme => {
+    let cents; try { cents = parseCents(mt.value); } catch (e) { cents = null; }
+    const c = cli.value ? cl.find(x => x.id === Number(cli.value)) : null;
+    try {
+      const nouveau = ODICOLOR_CA.ajouter(await get('meta', 'caFacture'), { type: type.value, numero: num.value, date: dt.value, montantHt: cents, clientId: c ? c.id : null, clientNom: c ? c.nom : '' }, { id: nouvelUid(), maintenant: new Date().toISOString(), auj, confirme });
+      await put('meta', nouveau, 'caFacture'); toast('Pièce enregistrée.'); pageCA();
+    } catch (e) {
+      if (e.confirmation) { msg.textContent = ''; if (confirm(e.controle.avertissements.join('\n') + '\n\nEnregistrer quand même ?')) await enregistrer(true); }
+      else { msg.textContent = e.message; msg.style.color = 'var(--ko)'; }
+    }
+  };
+  const lignes = (magasin && magasin.entrees ? magasin.entrees : []).slice().sort((a, b) => b.date.localeCompare(a.date) || String(b.saisiLe).localeCompare(String(a.saisiLe))).slice(0, 60).map(e =>
+    h('div', { class: 'carte', style: e.annule ? 'opacity:.55' : '' },
+      h('div', { class: 'elan-tete' }, h('strong', {}, (e.type === 'avoir' ? 'Avoir ' : 'Facture ') + e.numero + (e.annule ? ' · annulé(e)' : '')), h('span', {}, (e.type === 'avoir' ? '− ' : '') + eur(e.montantHt) + ' HT')),
+      h('p', { class: 'mut' }, dateFr(e.date + 'T12:00:00') + (e.clientNom ? ' · ' + e.clientNom : '') + ' · saisi' + (e.type === 'avoir' ? 'e' : 'e') + ' ' + new Date(e.saisiLe).toLocaleDateString('fr-FR') + (e.annule ? ' · motif : ' + e.annule.motif : '')),
+      e.annule ? null : h('button', { class: 'btn sec', type: 'button', onclick: async () => {
+        const motif = prompt('Motif de l’annulation (la pièce reste dans l’historique) :'); if (!motif || !motif.trim()) return;
+        try { await put('meta', ODICOLOR_CA.annuler(await get('meta', 'caFacture'), e.id, motif, { maintenant: new Date().toISOString() }), 'caFacture'); toast('Pièce annulée.'); pageCA(); } catch (er) { toast(er.message, true); }
+      } }, 'Annuler cette pièce')));
+  montrer('CA facturé HT',
+    h('div', { class: 'carte obj hero' }, h('small', { class: 'etiq' }, 'CA facturé HT · ' + mois), h('div', { class: 'gros-chiffre' }, ODICOLOR_CA.aDesPieces(magasin) ? eur(m.totalCents) : 'Non renseigné'),
+      h('p', { class: 'mut' }, ODICOLOR_CA.aDesPieces(magasin) ? m.nFactures + ' facture(s) − ' + m.nAvoirs + ' avoir(s)' + (obj ? ' · objectif ' + eur(obj.cents) : '') : 'Aucune pièce saisie ce mois : le CA n’est pas estimé à partir des commandes.')),
+    h('p', { class: 'mut' }, 'Le CA = factures HT émises moins avoirs, à leur date. Les commandes et les encaissements sont suivis à part. Un futur import EBP utilisera les mêmes règles (le numéro évite les doublons).'),
+    h('h2', {}, 'Ajouter une pièce'), type, num, dt, mt, cli, msg,
+    h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onclick: () => enregistrer(false) }, 'Enregistrer')),
+    h('h2', {}, 'Historique'), lignes.length ? lignes : h('p', { class: 'vide' }, 'Aucune pièce.'));
+}
+
 async function pageReglages() {
   const tva = h('input', { value: pct(S.tva100), inputmode: 'decimal', 'aria-label': 'TVA %' }),
     rem = h('input', { value: pct(S.remiseMax100), inputmode: 'decimal', 'aria-label': 'Remise maximale %' }),

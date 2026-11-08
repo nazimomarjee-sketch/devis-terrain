@@ -7,7 +7,7 @@ Légende : ✅ fait et testé · 🟡 partiel · ⬜ à faire
 - ⬜ T4 Test restauration sur gros volume profil `terrain` (2000 clients/10000 devis) dans la CI. *Critère : temps + zéro perte.*
 - ⬜ T5 Protocole de test Samsung (photos, PDF, hors ligne, restauration) écrit pas à pas, une page. *Critère : le propriétaire l'exécute en 20 min.*
 ## P1 production terrain
-- ⬜ T6 Objectif téléphone = CA HT facturé (bloc `caFacture` daté importé du Bureau), commandes séparées, mention « pas en temps réel ». *Critère : écran téléphone affiche les 3 montants distincts, test.*
+- ✅ T6 CA facturé HT sur téléphone : saisie contrôlée de factures/avoirs (numéro obligatoire, doublons refusés, futur refusé, annulation motivée sans suppression), objectif de l'accueil = CA facturé ; commandes et encaissements affichés à part ; « Non renseigné » plutôt qu'un faux zéro ; inclus dans la sauvegarde chiffrée. *Tests : ca-facture-telephone (8), ca-facture-browser (3).* Reste : import EBP (même module, source « ebp »), lien facture→créance à encaisser.
 - ⬜ T7 Prochaine action recommandée + préparation/compte rendu de visite simplifiés. *Critère : parcours visite en ≤4 touches, hors ligne.*
 - ⬜ T8 Rappels/rendez-vous + recherche rapide (<300 ms à 2000 fiches).
 ## P2 cockpit
