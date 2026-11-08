@@ -61,3 +61,16 @@ test('hors ligne : la visite s’enregistre et survit au rechargement',async()=>
   await page.locator('#titre',{hasText:'Visite enregistrée'}).waitFor();await page.reload();
   const c=await page.evaluate(()=>get('clients',1));assert.equal(c.visites.length,1);assert.equal(c.infosTerrain[0].type,'prix');assert.deepEqual(errs,[]);await context.close();
 });
+test('tournée proposée depuis le cockpit : garages proches et prioritaires, cochés, validés → tournée du jour ; sans position : jamais proposé',async()=>{
+  const {context,page,errs}=await ouvrir();
+  await page.evaluate(()=>rq(st('clients','readwrite').clear()));                           // base de test vide : seuls les garages de ce scénario comptent
+  await page.evaluate(()=>{const c0=ODICOLOR_COMMUNES_CENTRES.find(r=>r[0]==='91174'),rows=ODICOLOR_COMMUNES_CENTRES.filter(r=>r[4]&&Math.hypot((r[2]-c0[2])*111,(r[3]-c0[3])*73)<9).slice(0,6),hier=new Date(Date.now()-3*864e5).toISOString().slice(0,10);
+    return putMany('clients',[...rows.map((r,i)=>({id:i+10,nom:'GARAGE FICTIF PROCHE '+i,ville:r[1],cp:r[4].split(' ')[0],rappel:hier,statutCrm:'client'})),{id:99,nom:'GARAGE FICTIF SANS POSITION',rappel:hier}])});
+  await page.goto(origin+'/#/cockpit');await page.getByRole('link',{name:'Proposer ma tournée du jour'}).click();
+  await page.getByText(/6 garage\(s\) proches les uns des autres/).waitFor();assert.equal(await page.getByText('GARAGE FICTIF SANS POSITION').count(),0,'non proposé');
+  assert.match(await page.locator('body').innerText(),/1 garage\(s\) prioritaire\(s\) sans position/);
+  await page.getByLabel('Inclure GARAGE FICTIF PROCHE 0').uncheck();
+  await page.getByRole('button',{name:'Valider cette tournée'}).click();await page.waitForURL(/#\/tournee$/);
+  const T=await page.evaluate(()=>lireTournees().then(T=>T[aujourdhui()]));assert.equal(T.ids.length,5);assert.ok(!T.ids.includes(10));assert.deepEqual(T.res,{});
+  assert.deepEqual(errs,[]);await context.close();
+});

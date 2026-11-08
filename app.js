@@ -381,6 +381,7 @@ async function route() {
     else if (p[0] === 'ca') await pageCA();
     else if (p[0] === 'cockpit') await pageCockpit();
     else if (p[0] === 'carte') await pageCarte();
+    else if (p[0] === 'proposition') await pageProposition();
     else if (p[0] === 'ville') await pageVille(p[1]);
     else if (p[0] === 'visite' && /^\d+$/.test(p[1] || '')) await pageVisite(Number(p[1]));
     else nonTrouve();
@@ -2023,7 +2024,7 @@ async function pageCockpit() {
   const cartes = K.sections.filter(sec => sec.total).map(sec => h('div', { class: 'carte' }, h('div', { class: 'elan-tete' }, h('strong', {}, sec.titre), h('small', { class: 'mut' }, sec.total + (sec.montant ? ' · ' + eur(sec.montant) : ''))),
     sec.lignes.map(x => ligne(sec, x)), sec.total > sec.lignes.length ? h('p', { class: 'mut' }, '+ ' + (sec.total - sec.lignes.length) + ' autre(s)') : null));
   montrer('Cockpit', carteCA,
-    h('div', { class: 'actions' }, h('a', { class: 'btn', href: '#/tournee' }, 'Préparer ma tournée'), h('a', { class: 'btn sec', href: '#/carte' }, 'Carte'), h('a', { class: 'btn sec', href: '#/ca' }, 'CA facturé'), h('a', { class: 'btn sec', href: '#/feuille' }, 'Plan de la semaine')),
+    h('div', { class: 'actions' }, h('a', { class: 'btn', href: '#/proposition' }, 'Proposer ma tournée du jour'), h('a', { class: 'btn sec', href: '#/tournee' }, 'Ma tournée'), h('a', { class: 'btn sec', href: '#/carte' }, 'Carte'), h('a', { class: 'btn sec', href: '#/ca' }, 'CA facturé'), h('a', { class: 'btn sec', href: '#/feuille' }, 'Plan de la semaine')),
     cartes.length ? cartes : h('p', { class: 'vide' }, 'Rien d’urgent d’après tes données : ' + cl.length + ' garage(s), ' + dv.length + ' devis. Ajoute des rappels et des priorités sur les fiches pour alimenter le cockpit.'),
     h('p', { class: 'mut' }, 'Chaque ligne vient de ce que tu as saisi (visites, rappels, devis, factures). Rien n’est deviné.'));
 }
@@ -2198,6 +2199,31 @@ async function pageVille(insee) {
     ouvrirFiche: (uid, e) => { const ref = e.sources.find(x => /^tel:/.test(x.ref)); if (ref) location.hash = '#/client/' + ref.ref.slice(4); else toast('Cette fiche ne vient pas de ce téléphone.', true); } });
 }
 const L0nom = dep => { const D = BureauLogique.depInfo(dep); return D ? D.nom : 'Département ' + dep; };
+
+// ---------- Proposition de tournée du jour : garages proches et prioritaires, à cocher puis valider ----------
+async function pageProposition() {
+  const [dv, cl, caStore] = [await getAll('devis'), await getAll('clients'), await get('meta', 'caFacture')];
+  ODICOLOR_CARTE.charger(ODICOLOR_COMMUNES_CENTRES);
+  const now = new Date(), auj = jourLocal(now), mk = auj.slice(0, 7), parCode = ODICOLOR_CA.parCode(caStore, mk + '-01', ODICOLOR_CA.finDeMois(mk)), facturation = {};
+  for (const c of cl) if (c.codeEbp && parCode.has(c.codeEbp)) { const x = parCode.get(c.codeEbp); facturation[c.id] = { derniere: x.derniereFacture, moisCents: x.periodeCents }; }
+  const sections = ODICOLOR_COCKPIT.calculer({ auj, facturation, clients: cl, devis: dv, relanceJours: S.relanceJours || 3, totalDevis: d => totaux(d).ht, ca: { renseigne: false }, sansLimite: true }).sections;
+  const parId = new Map(cl.map(c => [c.id, c])), position = id => { const c = parId.get(id), p = c ? ODICOLOR_CARTE.placer(c) : null; return p && p.precision ? { lat: p.lat, lng: p.lng } : null; };
+  const T0 = await lireTournees(), existant = T0[auj], r = ODICOLOR_TOURNEE.proposer(sections, position, { max: 8, rayonKm: 25 });
+  const coches = new Map(r.ids.map(id => [id, h('input', { type: 'checkbox', checked: true, 'aria-label': 'Inclure ' + (parId.get(id) || {}).nom, style: 'width:24px;height:24px' })]));
+  const valider = async () => {
+    const ids = r.ids.filter(id => coches.get(id).checked); if (!ids.length) { toast('Coche au moins un garage.', true); return; }
+    const T = await lireTournees(); const ex = T[auj];
+    if (ex && ex.ids && Object.keys(ex.res || {}).length && !confirm('Une tournée est déjà commencée aujourd’hui (' + Object.keys(ex.res).length + ' garage(s) traité(s)). La remplacer ?')) return;
+    T[auj] = { ids, res: {} }; await ecrireTournees(T); toast('Tournée du jour : ' + ids.length + ' garage(s).'); location.hash = '#/tournee';
+  };
+  montrer('Tournée proposée',
+    r.ids.length ? [h('div', { class: 'carte obj' }, h('strong', {}, r.ids.length + ' garage(s) proches les uns des autres'), h('p', { class: 'mut' }, 'Distance à vol d’oiseau ≈ ' + r.kmApprox + ' km entre les garages (position = centre de la commune quand le GPS manque). Ordre de passage : du plus proche au plus proche.' + (r.sansPosition ? ' ' + r.sansPosition + ' garage(s) prioritaire(s) sans position ne sont pas proposés.' : ''))),
+      r.details.map((d, i) => { const c = parId.get(d.id); return h('label', { class: 'carte', style: 'display:flex;gap:12px;align-items:flex-start;min-height:56px' }, coches.get(d.id), h('span', { style: 'flex:1' }, h('strong', {}, (i + 1) + '. ' + c.nom), h('br'), h('small', { class: 'mut' }, (c.ville || '') + ' · ' + d.raisons.join(' · ')))); }),
+      h('div', { class: 'actions' }, h('button', { class: 'btn gros', type: 'button', onclick: valider }, 'Valider cette tournée'), h('a', { class: 'btn sec', href: '#/cockpit' }, 'Annuler')),
+      existant && existant.ids ? h('p', { class: 'mut' }, 'Une tournée existe déjà aujourd’hui (' + existant.ids.length + ' garage(s)). La valider la remplace.') : null]
+      : [h('p', { class: 'vide' }, r.motif || 'Rien à proposer.'), h('p', { class: 'mut' }, 'Renseigne la ville et le code postal sur les fiches, ajoute des rappels et des priorités A/B : la proposition s’en nourrit.'), h('a', { class: 'btn sec', href: '#/tournee' }, 'Choisir à la main')],
+    h('div', { style: 'height:96px' }));
+}
 
 async function pageReglages() {
   const tva = h('input', { value: pct(S.tva100), inputmode: 'decimal', 'aria-label': 'TVA %' }),

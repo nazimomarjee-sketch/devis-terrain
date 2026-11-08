@@ -10,7 +10,7 @@ const ODICOLOR_COCKPIT = (() => {
   /* d = { auj:'YYYY-MM-DD', clients, devis, ca:{renseigne, moisCents, nFactures, nAvoirs}, objectifMoisCents, jours:{ouvresTotal, ouvresFaits}, relanceJours, totalDevis(d)->cents HT }
      Retour : sections ordonnées, chacune avec sa liste (limitée) et son total réel. */
   function calculer(d) {
-    const auj = d.auj, relJ = d.relanceJours || 3, ht = d.totalDevis || (() => 0), lim = (a, n) => ({ total: a.length, lignes: a.slice(0, n) });
+    const auj = d.auj, relJ = d.relanceJours || 3, ht = d.totalDevis || (() => 0), lim = (a, n) => ({ total: a.length, lignes: a.slice(0, d.sansLimite ? Infinity : n) });
     const cl = Array.isArray(d.clients) ? d.clients : [], dv = Array.isArray(d.devis) ? d.devis : [];
     const rappels = cl.filter(c => iso(c.rappel) && iso(c.rappel) <= auj).map(c => ({ id: c.id, nom: c.nom, quand: iso(c.rappel), retard: ecart(iso(c.rappel), auj), raison: 'Rappel prévu le ' + iso(c.rappel) })).sort((a, b) => b.retard - a.retard);
     const devisASuivre = dv.filter(x => x.statut === 'envoye' && Array.isArray(x.lignes) && x.lignes.length).map(x => {
