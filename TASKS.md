@@ -22,4 +22,6 @@ Légende : ✅ fait et testé · 🟡 partiel · ⬜ à faire
 ## Cohérence (tâche 5)
 - ✅ `tests/coherence-telephone-bureau.test.cjs` : même export EBP fictif → même CA du mois (téléphone = Bureau) ; même sauvegarde (claire/chiffrée) → mêmes garages et même modèle Ma Ville ; indicateurs du cockpit sans doublon.
 - ✅ Rattachement EXPLICITE code client EBP → garage (jamais par le nom), CA par garage du mois, alerte « client à relancer » (dernière facture > 60 j) et « plus gros CA » dans le cockpit. *Tests : ca-ebp (+1), cockpit (+1), ca-facture-browser (+1).*
-- ⬜ À faire : CA par commune sur le téléphone ; import EBP du fichier clients (codes) pour rattacher en masse ; seuil de réachat réglable.
+- ✅ Import EBP des clients + rapprochement fiable des codes : propositions fortes (même nom + même CP/ville, unique), à vérifier, sans garage ; aucune liaison sans validation ; traçabilité (qui, quand, fichier, méthode) ; création de fiche sur demande ; compte bloqué EBP → cockpit. *Tests : ebp-clients-telephone (9), ebp-clients-browser (2).*
+- ✅ Analyse par secteur (département/commune) : CA du mois, actifs/dormants/sans suivi, prospects A/B, visites 30 j, couverture du marché recensé, priorités motivées, CA non attribué contrôlé. *Tests : secteur-telephone (7), ville-telephone-browser (+1).*
+- ⬜ À faire : seuil de réachat réglable.

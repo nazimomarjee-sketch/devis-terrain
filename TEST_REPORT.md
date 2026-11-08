@@ -13,5 +13,7 @@ Environnement : Node, Chromium/Playwright émulé (profil Galaxy S9+). **Simulat
 | Cycle 4 : rattachement code EBP, réachat, tournée proposée (4 unit. + 1 nav.), grand écran | OK (émulation) |
 | Fin cycle 4 : 37 fichiers Node, 13 navigateur Bureau/local, 11 navigateur téléphone, build `--check` | tout OK (émulation Chromium) |
 | Mesure ponctuelle (Chromium de bureau, pas un Samsung) : 2 000 garages, ouverture des pages clients/cockpit/proposition/ville/carte < 250 ms hors attente | à confirmer sur le téléphone réel |
+| CI GitHub, commit ffd8614 (branche ccr-b491dc52-ckgq60) | SUCCÈS : syntaxe, build PWA, 37 fichiers Node, jeu de volume, 10 suites navigateur téléphone, 13 suites Bureau/local |
+| Anomalie trouvée et corrigée (cycle 5) : `pwa-browser` test 5 intermittent (~50 %) depuis l'ajout des scripts de Ma Ville. Cause : le test passait hors ligne alors qu'un worker en attente n'avait pas encore pris le contrôle (l'application échoue alors de façon sûre : « Chargement incomplet »). Correction : `nextVersion` n'accepte la nouvelle version que si plus aucune mise à jour n'attend ; 8/8 exécutions stables. Aucun test désactivé. | corrigé |
 | Vrai Samsung | **NON TESTÉ** |
 | Données réelles | **NON TESTÉ** (interdit, B2) |

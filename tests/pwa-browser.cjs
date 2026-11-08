@@ -37,10 +37,11 @@ async function installed(context,old=false){
 async function waiting(page){await page.evaluate(async()=>{const r=await navigator.serviceWorker.getRegistration();await r.update()});await page.waitForFunction(async()=>!!(await navigator.serviceWorker.getRegistration()).waiting);}
 async function nextVersion(context,page){
   await page.close();
-  for(let i=0;i<6;i++){
-    await delay(250);const p=await context.newPage();await p.goto(origin+'/#/reglages');
-    await p.getByRole('button',{name:'Télécharger une sauvegarde chiffrée',exact:true}).waitFor();
-    if(await p.evaluate(()=>window.ODICOLOR_PWA.release)===manifestB.id)return p;
+  for(let i=0;i<12;i++){
+    await delay(400);const p=await context.newPage();await p.goto(origin+'/#/reglages');
+    await p.getByRole('button',{name:/^Télécharger une sauvegarde/}).first().waitFor();   // ancien ou nouvel écran selon l'activation : on attend l'un OU l'autre
+    // La nouvelle version est « prête » seulement si la page est celle de B ET qu'aucune mise à jour n'attend encore : sinon l'ancien worker contrôle encore la page (le passage hors ligne échouerait de façon sûre, mais le test deviendrait aléatoire).
+    if(await p.evaluate(async()=>window.ODICOLOR_PWA&&window.ODICOLOR_PWA.release&&!(await navigator.serviceWorker.getRegistration()).waiting&&window.ODICOLOR_PWA.release)===manifestB.id)return p;
     await p.close();
   }
   throw Error('La nouvelle version ne s’est pas activée après fermeture des fenêtres.');

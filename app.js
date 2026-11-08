@@ -378,9 +378,11 @@ async function route() {
     else if (p[0] === 'evolution') await pageEvolution();
     else if (p[0] === 'travail') await pageTravail(p[1]);
     else if (p[0] === 'ca' && p[1] === 'import') await pageCAImport();
+    else if (p[0] === 'clients-ebp') await pageClientsEbp();
     else if (p[0] === 'ca') await pageCA();
     else if (p[0] === 'cockpit') await pageCockpit();
     else if (p[0] === 'carte') await pageCarte();
+    else if (p[0] === 'secteurs') await pageSecteurs(p[1]);
     else if (p[0] === 'proposition') await pageProposition();
     else if (p[0] === 'ville') await pageVille(p[1]);
     else if (p[0] === 'visite' && /^\d+$/.test(p[1] || '')) await pageVisite(Number(p[1]));
@@ -1188,7 +1190,7 @@ async function pageComparateur() {
 }
 function pagePlus() {
   const L = (href, t, d) => h('a', { class: 'ligne', href, style: 'color:inherit;text-decoration:none' }, h('span', { class: 'g' }, h('strong', {}, t), h('br'), h('small', {}, d)), h('span', {}, '›'));
-  montrer('Plus', L('#/ville', 'Ma Ville', 'Tes garages commune par commune, en vue LEGO tactile'), L('#/carte', 'Carte commerciale', 'Tous tes garages sur la carte, regroupés, hors ligne'), L('#/cockpit', 'Cockpit', 'Tes priorités du jour : CA, relances, devis, prospects, clients à voir'), L('#/ca', 'CA facturé HT', 'Tes factures et avoirs HT : le chiffre d’affaires, sans doublon'), L('#/travail', 'Mon travail', 'Tes 6 chiffres : visites, devis, commandes, factures, impayés'), L('#/point', 'Point du lundi', 'Le récap de la semaine écoulée : bilan, UN changement, engagements'), L('#/feuille', 'Feuille de route', 'Le plan de la semaine qui commence, jour par jour'), L('#/pc', 'Lien avec le PC', 'Envoyer ta sauvegarde au PC, recevoir le plan de la semaine'), L('#/evolution', 'Évolution', 'Tous les indicateurs, semaine par semaine, avec leur courbe'), L('#/signalements', 'Signalements', 'Problèmes remontés avec photo et leur suivi'), L('#/signaler', 'Signaler un problème', 'Photo + note envoyées à ton responsable'),
+  montrer('Plus', L('#/secteurs', 'Secteurs', 'CA, clients actifs/dormants, prospects et priorités par département et commune'), L('#/clients-ebp', 'Clients EBP', 'Relier les codes clients EBP à tes garages (tu valides chaque lien)'), L('#/ville', 'Ma Ville', 'Tes garages commune par commune, en vue LEGO tactile'), L('#/carte', 'Carte commerciale', 'Tous tes garages sur la carte, regroupés, hors ligne'), L('#/cockpit', 'Cockpit', 'Tes priorités du jour : CA, relances, devis, prospects, clients à voir'), L('#/ca', 'CA facturé HT', 'Tes factures et avoirs HT : le chiffre d’affaires, sans doublon'), L('#/travail', 'Mon travail', 'Tes 6 chiffres : visites, devis, commandes, factures, impayés'), L('#/point', 'Point du lundi', 'Le récap de la semaine écoulée : bilan, UN changement, engagements'), L('#/feuille', 'Feuille de route', 'Le plan de la semaine qui commence, jour par jour'), L('#/pc', 'Lien avec le PC', 'Envoyer ta sauvegarde au PC, recevoir le plan de la semaine'), L('#/evolution', 'Évolution', 'Tous les indicateurs, semaine par semaine, avec leur courbe'), L('#/signalements', 'Signalements', 'Problèmes remontés avec photo et leur suivi'), L('#/signaler', 'Signaler un problème', 'Photo + note envoyées à ton responsable'),
     L('#/comparateur', 'Comparateur de coût', 'Coût réel au m² : produit actuel contre produit proposé'), L('#/reglages', 'Réglages', 'Objectifs, responsable, TVA, sauvegarde'));
 }
 
@@ -1988,7 +1990,7 @@ async function pageCA() {
     h('div', { class: 'carte obj hero' }, h('small', { class: 'etiq' }, 'CA facturé HT · ' + mois), h('div', { class: 'gros-chiffre' }, ODICOLOR_CA.aDesPieces(magasin) ? eur(m.totalCents) : 'Non renseigné'),
       h('p', { class: 'mut' }, ODICOLOR_CA.aDesPieces(magasin) ? m.nFactures + ' facture(s) − ' + m.nAvoirs + ' avoir(s)' + (obj ? ' · objectif ' + eur(obj.cents) : '') : 'Aucune pièce saisie ce mois : le CA n’est pas estimé à partir des commandes.')),
     h('p', { class: 'mut' }, 'Le CA = factures HT émises moins avoirs, à leur date. Les commandes et les encaissements sont suivis à part. Un futur import EBP utilisera les mêmes règles (le numéro évite les doublons).'),
-    h('div', { class: 'actions' }, h('a', { class: 'btn sec', href: '#/ca/import' }, 'Importer un export EBP (factures et avoirs HT)')),
+    h('div', { class: 'actions' }, h('a', { class: 'btn sec', href: '#/ca/import' }, 'Importer un export EBP (factures et avoirs HT)'), h('a', { class: 'btn sec', href: '#/clients-ebp' }, 'Importer les clients EBP (codes)')),
     h('h2', {}, 'Ajouter une pièce'), type, num, dt, mt, cli, msg,
     h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onclick: () => enregistrer(false) }, 'Enregistrer')),
     (magasin && magasin.imports && magasin.imports.length ? [h('h2', {}, 'Imports EBP'), magasin.imports.slice().reverse().map(ev => h('div', { class: 'carte', style: ev.annule ? 'opacity:.55' : '' },
@@ -2024,7 +2026,7 @@ async function pageCockpit() {
   const cartes = K.sections.filter(sec => sec.total).map(sec => h('div', { class: 'carte' }, h('div', { class: 'elan-tete' }, h('strong', {}, sec.titre), h('small', { class: 'mut' }, sec.total + (sec.montant ? ' · ' + eur(sec.montant) : ''))),
     sec.lignes.map(x => ligne(sec, x)), sec.total > sec.lignes.length ? h('p', { class: 'mut' }, '+ ' + (sec.total - sec.lignes.length) + ' autre(s)') : null));
   montrer('Cockpit', carteCA,
-    h('div', { class: 'actions' }, h('a', { class: 'btn', href: '#/proposition' }, 'Proposer ma tournée du jour'), h('a', { class: 'btn sec', href: '#/tournee' }, 'Ma tournée'), h('a', { class: 'btn sec', href: '#/carte' }, 'Carte'), h('a', { class: 'btn sec', href: '#/ca' }, 'CA facturé'), h('a', { class: 'btn sec', href: '#/feuille' }, 'Plan de la semaine')),
+    h('div', { class: 'actions' }, h('a', { class: 'btn', href: '#/proposition' }, 'Proposer ma tournée du jour'), h('a', { class: 'btn sec', href: '#/tournee' }, 'Ma tournée'), h('a', { class: 'btn sec', href: '#/carte' }, 'Carte'), h('a', { class: 'btn sec', href: '#/secteurs' }, 'Secteurs'), h('a', { class: 'btn sec', href: '#/ca' }, 'CA facturé'), h('a', { class: 'btn sec', href: '#/feuille' }, 'Plan de la semaine')),
     cartes.length ? h('div', { class: 'cg-grille' }, cartes) : h('p', { class: 'vide' }, 'Rien d’urgent d’après tes données : ' + cl.length + ' garage(s), ' + dv.length + ' devis. Ajoute des rappels et des priorités sur les fiches pour alimenter le cockpit.'),
     h('p', { class: 'mut' }, 'Chaque ligne vient de ce que tu as saisi (visites, rappels, devis, factures). Rien n’est deviné.'));
 }
@@ -2223,6 +2225,76 @@ async function pageProposition() {
       existant && existant.ids ? h('p', { class: 'mut' }, 'Une tournée existe déjà aujourd’hui (' + existant.ids.length + ' garage(s)). La valider la remplace.') : null]
       : [h('p', { class: 'vide' }, r.motif || 'Rien à proposer.'), h('p', { class: 'mut' }, 'Renseigne la ville et le code postal sur les fiches, ajoute des rappels et des priorités A/B : la proposition s’en nourrit.'), h('a', { class: 'btn sec', href: '#/tournee' }, 'Choisir à la main')],
     h('div', { style: 'height:96px' }));
+}
+
+// ---------- Import EBP des clients : rapprochement des codes, validation explicite par l'utilisateur ----------
+async function pageClientsEbp() {
+  const E = ODICOLOR_EBP_CLIENTS, file = h('input', { type: 'file', accept: '.xlsx,.xlsm,.csv,.txt', 'aria-label': 'Export EBP des clients' }), zone = h('div');
+  montrer('Clients EBP ↔ garages', h('p', { class: 'mut' }, 'Choisis l’export EBP des clients (code, nom, ville, code postal…). Le téléphone PROPOSE des liens ; aucun n’est enregistré sans ton accord. Un lien relie le code EBP au garage : il donne ensuite le CA par garage et l’alerte de réachat.'), file, zone);
+  file.addEventListener('change', async () => {
+    const f = file.files[0]; if (!f) return;
+    try {
+      const feuilles = await lireFichier(f), fe = feuilles.find(x => E.associer(x.rows).ok) || feuilles[0], lu = E.lire(fe.rows);
+      if (!lu.ok) { zone.replaceChildren(h('div', { class: 'carte erreur', role: 'alert' }, 'Import impossible : ' + lu.erreur)); return; }
+      const dessiner = async () => {
+        const garages = await getAll('clients'), r = E.rapprocher(lu.clients, garages), parCode = new Map(lu.clients.map(c => [c.code, c])), parId = new Map(garages.map(g => [g.id, g])), auj = jourLocal(new Date());
+        const ctx = { auj, fichier: f.name, auteur: S.vendeur || 'Moi' };
+        const lier = async (decisions) => {
+          const ap = E.appliquer(garages, decisions, parCode, ctx);
+          if (ap.modifies.length) { await putMany('clients', ap.modifies); await put('meta', { version: 1, fichier: f.name, importeLe: new Date().toISOString(), clients: lu.clients.map(({ ligne, ...c }) => c) }, 'ebpClients'); }
+          toast(ap.modifies.length + ' lien(s) enregistré(s)' + (ap.refus.length ? ', ' + ap.refus.length + ' refusé(s) : ' + ap.refus[0].motif : '') + '.', ap.modifies.length === 0); await dessiner();
+        };
+        const coches = new Map(r.fortes.map(x => [x.code, h('input', { type: 'checkbox', 'aria-label': 'Lier ' + x.code, style: 'width:24px;height:24px' })]));
+        const nomG = id => { const g = parId.get(id); return g ? g.nom + (g.ville ? ' · ' + g.ville : '') + (g.cp ? ' ' + g.cp : '') : '—'; };
+        const bloquesNb = lu.clients.filter(c => c.bloque).length;
+        zone.replaceChildren(
+          h('div', { class: 'carte' }, h('strong', {}, f.name), h('p', { class: 'mut' }, 'Colonnes retenues : ' + lu.correspondance.map(c => c.libelle + ' ← « ' + c.colonne + ' »').join(' · ')),
+            h('p', {}, lu.clients.length + ' client(s) EBP · ' + r.liees.length + ' déjà lié(s) · ' + r.fortes.length + ' proposition(s) forte(s) · ' + r.aVerifier.length + ' à vérifier · ' + r.sansGarage.length + ' sans garage' + (bloquesNb ? ' · ' + bloquesNb + ' compte(s) bloqué(s) dans EBP' : '')),
+            lu.ignorees.length || lu.conflitsCode.length ? h('p', { class: 'mut' }, lu.ignorees.length + ' ligne(s) ignorée(s)' + (lu.conflitsCode.length ? ' · ' + lu.conflitsCode.length + ' code(s) répété(s) avec un autre nom : ' + lu.conflitsCode.slice(0, 5).map(c => c.code).join(', ') : '') + '.') : null),
+          r.fortes.length ? h('details', { class: 'carte', open: true }, h('summary', {}, 'Propositions fortes · ' + r.fortes.length),
+            h('p', { class: 'mut' }, 'Même nom et même code postal (ou ville), unique des deux côtés. Relis, coche, valide.'),
+            r.fortes.slice(0, 200).map(x => h('label', { class: 'ligne', style: 'display:flex;gap:10px;align-items:center;min-height:52px' }, coches.get(x.code), h('span', { style: 'flex:1' }, h('strong', {}, x.code + ' → ' + nomG(x.id)), h('br'), h('small', { class: 'mut' }, (parCode.get(x.code) || {}).nom + ' · ' + x.raison)))),
+            h('div', { class: 'actions' }, h('button', { class: 'btn sec', type: 'button', onclick: () => coches.forEach(c => { c.checked = true; }) }, 'Tout cocher'),
+              h('button', { class: 'btn', type: 'button', onclick: async () => { const d = r.fortes.filter(x => coches.get(x.code).checked).map(x => ({ code: x.code, id: x.id, methode: 'nom+lieu' })); if (!d.length) { toast('Coche au moins un lien.', true); return; } if (confirm('Lier ' + d.length + ' code(s) EBP à leur garage ?')) await lier(d); } }, 'Lier les liens cochés'))) : null,
+          r.aVerifier.length ? h('details', { class: 'carte' }, h('summary', {}, 'À vérifier · ' + r.aVerifier.length),
+            r.aVerifier.slice(0, 100).map(x => { const c = parCode.get(x.code), sel = h('select', { 'aria-label': 'Garage pour ' + x.code }, h('option', { value: '' }, 'Choisir le garage…'), x.candidats.map(k => h('option', { value: k.id }, nomG(k.id) + ' — ' + k.raison)));
+              return h('div', { class: 'carte' }, h('strong', {}, x.code + ' · ' + c.nom), h('p', { class: 'mut' }, [c.ville, c.cp].filter(Boolean).join(' ') + ' · ' + x.raison), sel, h('button', { class: 'btn sec', type: 'button', onclick: async () => { if (!sel.value) { toast('Choisis un garage.', true); return; } await lier([{ code: x.code, id: Number(sel.value), methode: 'verifie' }]); } }, 'Lier')); })) : null,
+          r.sansGarage.length ? h('details', { class: 'carte' }, h('summary', {}, 'Sans garage correspondant · ' + r.sansGarage.length),
+            h('p', { class: 'mut' }, 'Aucun garage du téléphone ne correspond. Tu peux créer la fiche (client) : jamais fait automatiquement.'),
+            r.sansGarage.slice(0, 100).map(code => { const c = parCode.get(code); return h('div', { class: 'ligne', style: 'display:flex;gap:8px;align-items:center;min-height:52px' }, h('span', { style: 'flex:1' }, h('strong', {}, code + ' · ' + c.nom), h('br'), h('small', { class: 'mut' }, [c.ville, c.cp].filter(Boolean).join(' '))),
+              h('button', { class: 'btn sec', type: 'button', onclick: async () => { await putMany('clients', [E.nouveauGarage(c, ctx)]); await put('meta', { version: 1, fichier: f.name, importeLe: new Date().toISOString(), clients: lu.clients.map(({ ligne, ...x }) => x) }, 'ebpClients'); toast('Fiche créée : ' + c.nom + '.'); await dessiner(); } }, 'Créer la fiche')); }),
+            r.sansGarage.length > 1 ? h('button', { class: 'btn', type: 'button', onclick: async () => { if (!confirm('Créer ' + r.sansGarage.length + ' fiche(s) client ?')) return; await putMany('clients', r.sansGarage.map(code => E.nouveauGarage(parCode.get(code), ctx))); await put('meta', { version: 1, fichier: f.name, importeLe: new Date().toISOString(), clients: lu.clients.map(({ ligne, ...x }) => x) }, 'ebpClients'); toast(r.sansGarage.length + ' fiche(s) créée(s).'); await dessiner(); } }, 'Créer les ' + r.sansGarage.length + ' fiches') : null) : null,
+          r.liees.length ? h('p', { class: 'mut' }, r.liees.length + ' code(s) déjà lié(s) à un garage.') : null, h('div', { style: 'height:96px' }));
+      };
+      await dessiner();
+    } catch (e) { zone.replaceChildren(h('div', { class: 'carte erreur', role: 'alert' }, 'Import impossible : ' + e.message)); }
+  });
+}
+
+// ---------- Analyse commerciale par secteur (département puis commune) ----------
+async function pageSecteurs(dep) {
+  ODICOLOR_CARTE.charger(ODICOLOR_COMMUNES_CENTRES);
+  const [cl, caStore, marche] = [await getAll('clients'), await get('meta', 'caFacture'), await get('meta', 'marche')], now = new Date(), auj = jourLocal(now), mk = auj.slice(0, 7);
+  const parCode = ODICOLOR_CA.parCode(caStore, mk + '-01', ODICOLOR_CA.finDeMois(mk)), facturation = {};
+  for (const c of cl) if (c.codeEbp && parCode.has(c.codeEbp)) { const x = parCode.get(c.codeEbp); facturation[c.id] = { derniere: x.derniereFacture, moisCents: x.periodeCents }; }
+  const communes = new Map(ODICOLOR_COMMUNES_CENTRES.map(r => [r[0], { nom: r[1] }]));
+  const r = ODICOLOR_SECTEUR.calculer({ auj, clients: cl, facturation, communes, marche: marche ? marche.communes : [], caTotalMoisCents: ODICOLOR_CA.aDesPieces(caStore) ? ODICOLOR_CA.calculerMois(caStore, mk).totalCents : null,
+    placer: c => { const p = ODICOLOR_CARTE.placer(c); return p.insee ? { insee: p.insee, commune: p.commune } : null; } });
+  const carteSecteur = (x, lien) => h(lien ? 'a' : 'div', Object.assign({ class: 'carte', style: 'display:block;color:inherit;text-decoration:none' }, lien ? { href: lien } : {}),
+    h('div', { class: 'elan-tete' }, h('strong', {}, x.nom), h('small', { class: 'mut' }, x.garages + ' garage(s)')),
+    h('p', {}, 'CA du mois ', h('strong', {}, ODICOLOR_CA.aDesPieces(caStore) ? eur(x.caMoisCents) : 'non renseigné'), ' · ', x.actifs + ' actif(s) · ' + x.dormants + ' dormant(s)' + (x.sansSuivi ? ' · ' + x.sansSuivi + ' sans suivi de facturation' : '')),
+    h('p', { class: 'mut' }, x.prospects + ' prospect(s) (' + x.prospectsPrio + ' A/B) · ' + x.visites30 + ' vu(s) en 30 j' + (x.marche ? ' · marché recensé ' + x.marche + ' (couverture ' + x.couverturePct + ' %)' : '')),
+    x.raisons.length ? h('p', { class: 'mut' }, 'À faire : ' + x.raisons.join(' · ')) : null);
+  const entete = h('div', { class: 'carte obj' }, h('strong', {}, r.totaux.garages + ' garage(s) · ' + r.totaux.clients + ' client(s) · ' + r.totaux.actifs + ' actif(s) · ' + r.totaux.dormants + ' dormant(s) · ' + r.totaux.prospects + ' prospect(s)'),
+    h('p', { class: 'mut' }, 'Actif = client lié à un code EBP facturé depuis moins de ' + r.seuilJours + ' j. Dormant = lié mais plus de ' + r.seuilJours + ' j. Un client non lié n’est ni actif ni dormant : on ne le devine pas (' + 'Plus › Clients EBP pour relier les codes).'),
+    r.controle ? h('p', { class: 'mut' }, 'CA du mois : ' + eur(r.controle.totalCents) + ' au total · ' + eur(r.controle.secteursCents) + ' attribué à un secteur · ' + eur(r.controle.nonAttribueCents) + ' non attribué (code non lié ou garage sans commune).') : h('p', { class: 'mut' }, 'CA facturé non saisi : colonnes CA à « non renseigné ».'));
+  if (!dep) {
+    montrer('Secteurs', entete, h('h2', {}, 'Départements'), r.departements.length ? r.departements.map(d => carteSecteur({ ...d, nom: d.nom }, '#/secteurs/' + d.dep)) : h('p', { class: 'vide' }, 'Aucun garage placé dans un secteur.'),
+      r.sans.garages ? carteSecteur(r.sans) : null, h('div', { style: 'height:96px' }));
+    return;
+  }
+  const lignes = r.communes.filter(c => c.dep === dep);
+  montrer('Secteur ' + dep, h('a', { class: 'btn sec', href: '#/secteurs' }, '‹ Tous les départements'), entete, lignes.length ? lignes.map(c => carteSecteur(c, '#/ville/' + c.id)) : h('p', { class: 'vide' }, 'Aucun garage dans ce département.'), h('div', { style: 'height:96px' }));
 }
 
 async function pageReglages() {

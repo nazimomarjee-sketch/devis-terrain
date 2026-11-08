@@ -18,7 +18,7 @@ const ODICOLOR_COCKPIT = (() => {
     }).filter(x => x.du).sort((a, b) => b.montant - a.montant);
     const acceptesSansCommande = dv.filter(x => x.statut === 'accepte' && !x.commandeLe && Array.isArray(x.lignes) && x.lignes.length).map(x => ({ id: x.id, nom: x.clientNom, montant: ht(x), raison: 'Devis accepté, commande non envoyée' })).sort((a, b) => b.montant - a.montant);
     const impayes = cl.flatMap(c => ouverts(c).filter(f => f.echeance && iso(f.echeance) < auj).map(f => ({ id: c.id, nom: c.nom, montant: f.montant || 0, jours: ecart(iso(f.echeance), auj), raison: 'Facture ' + (f.num || 'sans numéro') + ' échue depuis ' + ecart(iso(f.echeance), auj) + ' j' }))).sort((a, b) => b.jours - a.jours);
-    const bloques = cl.filter(c => c.compte && c.compte.statut === 'bloque').map(c => ({ id: c.id, nom: c.nom, raison: 'Compte bloqué : ne pas livrer sans vérification' }));
+    const bloques = cl.filter(c => (c.compte && c.compte.statut === 'bloque') || (c.ebp && c.ebp.bloque)).map(c => ({ id: c.id, nom: c.nom, raison: c.ebp && c.ebp.bloque ? 'Compte bloqué dans EBP (import du ' + (c.ebp.importeLe || '?') + ') : ne pas livrer sans vérification' : 'Compte bloqué : ne pas livrer sans vérification' }));
     const prospects = cl.filter(c => c.statutCrm !== 'client' && (c.priorite === 'A' || c.priorite === 'B') && c.conv !== 'refus' && c.conv !== 'converti').map(c => {
       const v = derniereVisite(c), jours = v ? ecart(v, auj) : null;
       return { id: c.id, nom: c.nom, ville: c.ville || c.villeProspection || '', priorite: c.priorite, jours, raison: 'Priorité ' + c.priorite + (v ? ' · vu il y a ' + jours + ' j' : ' · jamais visité') };

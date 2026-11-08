@@ -45,9 +45,21 @@ test('Ma Ville : lisible sur un écran de téléphone (pas de défilement horizo
 });
 test('toutes les nouvelles pages (base vide puis garnie) : jamais de « null », « undefined » ou « NaN » affiché',async()=>{
   const {context,page,errs}=await ouvrir();
-  const pages=['#/plus','#/cockpit','#/ca','#/ca/import','#/carte','#/ville','#/visite/1','#/ville/91174'];
+  const pages=['#/plus','#/secteurs','#/secteurs/91','#/clients-ebp','#/cockpit','#/ca','#/ca/import','#/carte','#/ville','#/visite/1','#/ville/91174'];
   const verifier=async()=>{for(const h of pages){await page.goto(origin+'/'+h);await page.waitForTimeout(250);const t=await page.evaluate(()=>document.body.innerText);const m=t.match(/\b(null|undefined|NaN)\b/g);assert.equal(m,null,h+' affiche '+(m||[]).join(','));}};
   await verifier();
   await page.evaluate(()=>putMany('clients',[{id:1,nom:'GARAGE FICTIF A',ville:'Corbeil-Essonnes',cp:'91100',statutCrm:'client',rappel:'2026-01-01',factures:[{num:'F1',montant:100,echeance:'2026-01-02'}]},{id:2,nom:'GARAGE FICTIF B',priorite:'A'}]));
   await verifier();assert.deepEqual(errs,[]);await context.close();
+});
+test('secteurs : CA par département et commune cohérent avec le total, actifs/dormants sur preuve de facturation, lien vers Ma Ville',async()=>{
+  const {context,page,errs}=await ouvrir();
+  const j=new Date(),iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'),recent=iso(new Date(j.getTime()-3*864e5)),ancien=iso(new Date(j.getTime()-100*864e5));
+  await page.evaluate(({recent,ancien})=>putMany('clients',[{id:1,nom:'GARAGE FICTIF ACTIF',ville:'Corbeil-Essonnes',cp:'91100',statutCrm:'client',codeEbp:'C1'},{id:2,nom:'GARAGE FICTIF DORMANT',ville:'Corbeil-Essonnes',cp:'91100',statutCrm:'client',codeEbp:'C2'},{id:3,nom:'GARAGE FICTIF SANS CODE',ville:'Massy',cp:'91300',statutCrm:'client'},{id:4,nom:'GARAGE FICTIF PROSPECT',ville:'Massy',cp:'91300',priorite:'A'}]).then(()=>put('meta',{version:1,entrees:[{id:'a',type:'facture',numero:'F1',date:recent,montantHt:100000,codeEbp:'C1',clientNom:'X',source:'ebp'},{id:'b',type:'facture',numero:'F2',date:ancien,montantHt:50000,codeEbp:'C2',clientNom:'Y',source:'ebp'},{id:'c',type:'facture',numero:'F3',date:recent,montantHt:7000,codeEbp:'C9',clientNom:'Z',source:'ebp'}]},'caFacture')),{recent,ancien});
+  await page.goto(origin+'/#/secteurs');await page.getByText(/4 garage\(s\) · 3 client\(s\) · 1 actif\(s\) · 1 dormant\(s\) · 1 prospect\(s\)/).waitFor();
+  await page.getByText(/non attribué/).first().waitFor();
+  await page.getByText('Département 91').first().click();await page.waitForURL(/#\/secteurs\/91$/);
+  await page.getByText(/1 client\(s\) dormant\(s\) à relancer|1 dormant\(s\)/).first().waitFor();
+  assert.match(await page.locator('body').innerText(),/1 sans suivi de facturation/);
+  await page.getByText('Corbeil-Essonnes').first().click();await page.waitForURL(/#\/ville\/91174$/);
+  assert.deepEqual(errs,[]);await context.close();
 });

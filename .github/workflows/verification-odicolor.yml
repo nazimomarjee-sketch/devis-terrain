@@ -64,6 +64,7 @@ jobs:
           node tests/visite-browser.cjs
           node tests/carte-browser.cjs
           node tests/ville-telephone-browser.cjs
+          node tests/ebp-clients-browser.cjs
       - name: Tester le Bureau et l'application locale (navigateur, données fictives)
         run: |
           for f in tests/*navigateur.cjs; do echo "== $f"; node "$f" || exit 1; done

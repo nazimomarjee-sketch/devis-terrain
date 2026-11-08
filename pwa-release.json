@@ -1,5 +1,5 @@
 {
-  "id": "a4ce4e92ce5077994a686d817242f06f3db4f318eef4cdc4144d4547311ac12f",
+  "id": "da50767b4b040e983eab23d0477ef676db0898687cd384416001b58164ca50f1",
   "assets": [
     {
       "path": "accueil-v23.css",
@@ -19,7 +19,7 @@
     },
     {
       "path": "app.js",
-      "sha256": "48a8a59c4b4bab04bc9c3a75e3b1b90abb5462f17185e1dd1393bbe0bd1e614c"
+      "sha256": "1c7eafe90d327364091a5399e5bfb6ffa49f4d2b5592a4ce4a20e76972fa9162"
     },
     {
       "path": "apparence-v26.css",
@@ -87,7 +87,7 @@
     },
     {
       "path": "cockpit-v48.js",
-      "sha256": "436bd1926f9bd5c04a8e152186a35bf26bc86a8e8ae426e67c09b05ee64a0aa1"
+      "sha256": "dbe25c95950cee1a42100ac09b2a515801639a08a8f225589a1bc45f2dcb6895"
     },
     {
       "path": "commercial-v22.js",
@@ -112,6 +112,10 @@
     {
       "path": "dossier-n1-v31.js",
       "sha256": "00992d35694af09bf0f2d3b8167f8e4e93c985f1f8ff5c786e3fdda2cfecab36"
+    },
+    {
+      "path": "ebp-clients-v48.js",
+      "sha256": "ab426ca79b3534a0788c0ecf9a49089524ce2f49029e7ee363551b7954fd4e67"
     },
     {
       "path": "fiche-client-v36.css",
@@ -147,7 +151,7 @@
     },
     {
       "path": "index.html",
-      "sha256": "88303cb6a101e0f46119be51e234e140ea1fcf8f411d0dae9c913ff4a0ffdd63"
+      "sha256": "6f251d6062b5dc71ba1151e3a2da0c63bfd592a2d23ebeb75abdac069b25bf8e"
     },
     {
       "path": "logo-96.png",
@@ -191,7 +195,7 @@
     },
     {
       "path": "pwa-client.js",
-      "sha256": "b95c060df55d7565cc359c8eb9e17760819de3c80bba5e1f94f738736a9d6092"
+      "sha256": "5e214322be8c2018041964bca9ba7ce2086847aa67a5bb7519e087ef31209292"
     },
     {
       "path": "rappels-produits-v24.js",
@@ -199,7 +203,7 @@
     },
     {
       "path": "recuperation-v47.html",
-      "sha256": "06665552c7968b9e492eb23e4f6e90006679d219375a3ef9ede6099b23a3c579"
+      "sha256": "5662f3d6254d7985ffc62c3a4cf08e71613cd74bcaf5bccc30f84a62a1561c0c"
     },
     {
       "path": "recuperation-v47.js",
@@ -207,7 +211,11 @@
     },
     {
       "path": "sauvegarde-locale.js",
-      "sha256": "b4ccebacccc34b67a93b8057557e29d5d865e0bea72bf625fe99d15e35769530"
+      "sha256": "5e0dcdcaee8458d4bf0c56f15b17938e6aeef5215a7513eeaf1ca0ae63f0d3ee"
+    },
+    {
+      "path": "secteur-v48.js",
+      "sha256": "c071662cc44a430d22f17e48cac52427a3983ca88401479593650190ed0bf6aa"
     },
     {
       "path": "style-v22.css",
