@@ -17,6 +17,8 @@ async function ouvrir(){
   const context=await browser.newContext({...devices['Galaxy S9+']}),page=await context.newPage(),errs=[];page.on('pageerror',e=>errs.push(e.message));
   await page.route(u=>!u.href.startsWith(origin),r=>r.abort());
   await page.goto(origin+'/#/reglages');await page.getByRole('button',{name:'Télécharger une sauvegarde chiffrée',exact:true}).waitFor();
+  // La bannière « mise à jour prête » (fonction existante, couverte par pwa-browser) peut couvrir les boutons du bas : masquée ici pour des clics déterministes.
+  await page.addStyleTag({content:'#v25-maj{display:none!important}'});
   return {context,page,errs};
 }
 const saisir=async(page,{type='facture',num,date=AUJ,montant,confirm=false})=>{

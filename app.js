@@ -355,7 +355,7 @@ function apparition() {
 addEventListener('scroll', () => { const on = scrollY > 110; document.body.classList.toggle('defile', on); }, { passive: true });
 function nonTrouve() { montrer('Introuvable', h('p', { class: 'vide' }, 'Cette page n’existe pas. '), h('a', { class: 'btn', href: '#/' }, 'Retour')); }
 async function route() {
-  const p = (location.hash || '#/').slice(2).split('/');
+  const p = (location.hash || '#/').slice(2).split('?')[0].split('/');
   { const q = p[0] || 'accueil', tab = q === 'accueil' ? 'accueil' : q === 'tournee' ? 'tournee' : (q === 'clients' || q === 'client') ? 'clients' : (q === 'devis' || q === 'nouveau') ? 'devis' : (q === 'catalogue' || q === 'article' || q === 'catalogues-pdf') ? 'catalogue' : 'plus'; document.querySelectorAll('.onglets a').forEach(x => x.classList.toggle('on', x.dataset.p === tab)); }
   try {
     if (p[0] === '' || p[0] === undefined) await pageAccueil();
@@ -380,6 +380,7 @@ async function route() {
     else if (p[0] === 'ca' && p[1] === 'import') await pageCAImport();
     else if (p[0] === 'ca') await pageCA();
     else if (p[0] === 'cockpit') await pageCockpit();
+    else if (p[0] === 'visite' && /^\d+$/.test(p[1] || '')) await pageVisite(Number(p[1]));
     else nonTrouve();
   } catch (e) { console.error(e); toast('Erreur : ' + e.message, true); }
 }
@@ -1415,7 +1416,7 @@ async function pageTournee() {
         c.etape ? h('small', { class: 'mut' }, 'Étape prévue : ' + c.etape) : null,
         etat ? null : h('div', { class: 'trio' }, h('button', { class: 'btn vert', onclick: () => agir('vu') }, 'Vu'), h('button', { class: 'btn ambre', onclick: () => agir('absent') }, 'Absent'), h('button', { class: 'btn gris', onclick: () => agir('reporte') }, 'Reporter')),
         etat ? null : h('label', { class: 'rang' }, h('span', { class: 'mut' }, 'Reporter au'), dateR),
-        h('div', { class: 'actions' }, h('a', { class: 'btn sec', href: '#/client/' + c.id }, 'Fiche'), etat ? h('button', { class: 'btn sec', onclick: async () => { delete r[id]; await sauver(); pageTournee(); } }, 'Annuler') : null));
+        h('div', { class: 'actions' }, etat ? null : h('a', { class: 'btn', href: '#/visite/' + c.id + '?t=1' }, 'Visite en 4 touches'), h('a', { class: 'btn sec', href: '#/client/' + c.id }, 'Fiche'), etat ? h('button', { class: 'btn sec', onclick: async () => { delete r[id]; await sauver(); pageTournee(); } }, 'Annuler') : null));
     });
     const restants = plan.ids.filter(i => !r[i]).map(i => parId.get(i)).filter(Boolean), u = urlItineraire(restants);
     const pc = Math.round((st.prevus - st.restants) / st.prevus * 100);
@@ -2001,7 +2002,10 @@ async function pageCockpit() {
     r.calculable ? [h('div', { class: 'piste', role: 'img', 'aria-label': r.pct + ' % de l’objectif du mois' }, h('div', { class: 'rempli', style: 'width:' + Math.max(0, Math.min(100, r.pct)) + '%' })),
       h('p', { class: r.ecartCents >= 0 ? '' : 'mut' }, (r.ecartCents >= 0 ? 'En avance de ' : 'En retard de ') + eur(Math.abs(r.ecartCents)) + ' sur le rythme des jours ouvrés' + (r.resteParJourOuvre ? ' · ' + eur(r.resteParJourOuvre) + ' à facturer par jour ouvré restant' : ''))]
       : h('p', { class: 'mut' }, 'Rythme non calculable : ' + r.motif + '. ', h('a', { href: K.ca.renseigne ? '#/reglages' : '#/ca' }, K.ca.renseigne ? 'Régler l’objectif' : 'Saisir le CA facturé')));
-  const ligne = (sec, x) => h('a', { class: 'ligne', href: sec.lien(x), style: 'color:inherit;text-decoration:none' }, h('span', { class: 'g' }, h('strong', {}, x.nom || '—'), h('br'), h('small', {}, x.raison + (x.montant ? ' · ' + eur(x.montant) : '') + (x.ville ? ' · ' + x.ville : ''))), h('span', {}, '›'));
+  const visitable = new Set(['rappels', 'prospects', 'risque']);
+  const ligne = (sec, x) => h('div', { class: 'ligne', style: 'display:flex;align-items:center;gap:8px' },
+    h('a', { href: visitable.has(sec.id) ? '#/visite/' + x.id : sec.lien(x), style: 'color:inherit;text-decoration:none;flex:1;min-height:48px', 'aria-label': (visitable.has(sec.id) ? 'Visiter ' : 'Ouvrir ') + (x.nom || '') }, h('span', { class: 'g' }, h('strong', {}, x.nom || '—'), h('br'), h('small', {}, x.raison + (x.montant ? ' · ' + eur(x.montant) : '') + (x.ville ? ' · ' + x.ville : '')))),
+    visitable.has(sec.id) ? h('a', { class: 'btn sec', href: '#/client/' + x.id, style: 'min-height:44px' }, 'Fiche') : h('span', {}, '›'));
   const cartes = K.sections.filter(sec => sec.total).map(sec => h('div', { class: 'carte' }, h('div', { class: 'elan-tete' }, h('strong', {}, sec.titre), h('small', { class: 'mut' }, sec.total + (sec.montant ? ' · ' + eur(sec.montant) : ''))),
     sec.lignes.map(x => ligne(sec, x)), sec.total > sec.lignes.length ? h('p', { class: 'mut' }, '+ ' + (sec.total - sec.lignes.length) + ' autre(s)') : null));
   montrer('Cockpit', carteCA,
@@ -2040,6 +2044,38 @@ async function pageCAImport() {
         } }, ap.nouvelles.length ? 'Importer ces ' + ap.nouvelles.length + ' pièces' : 'Rien à importer'), h('a', { class: 'btn sec', href: '#/ca' }, 'Annuler')));
     } catch (e) { zone.replaceChildren(h('div', { class: 'carte erreur', role: 'alert' }, 'Import impossible : ' + e.message)); }
   });
+}
+
+// ---------- Visite terrain en 4 touches maximum ----------
+async function pageVisite(id) {
+  const c = await get('clients', id); if (!c) return nonTrouve();
+  const V = ODICOLOR_VISITE, choix = {}, avant = JSON.stringify(c), deTournee = /[?&]t=1/.test(location.hash);
+  const noteIn = h('input', { maxlength: 500, placeholder: 'Note (facultatif)', 'aria-label': 'Note de visite', autocomplete: 'off' });
+  const gros = (label, sous, fn, cls) => h('button', { class: 'btn gros ' + (cls || ''), type: 'button', style: 'min-height:68px;text-align:left;display:block;width:100%;margin:8px 0', onclick: fn }, h('strong', {}, label), sous ? h('br') : null, sous ? h('small', {}, sous) : null);
+  const entete = (n, total, titre) => [h('div', { class: 'mut' }, 'Étape ' + n + ' sur ' + total + ' · ' + c.nom), h('h2', { style: 'margin:6px 0' }, titre)];
+  const total = () => V.etapes(choix.resultat).length;
+  const enregistrer = async () => {
+    try {
+      choix.note = noteIn.value;
+      const r = V.appliquer(c, choix, { auj: aujourdhui(), nouvelId: nouvelUid, prochainOuvre: j => estOuvre(new Date(j + 'T12:00:00')) ? j : prochainOuvre(new Date(j + 'T12:00:00')) });
+      await putMany('clients', [r.client]);
+      if (deTournee) { const T = await lireTournees(), j = aujourdhui(), plan = T[j]; if (plan && Array.isArray(plan.ids) && plan.ids.includes(id)) { (plan.res || (plan.res = {}))[id] = choix.resultat === 'vu' ? 'vu' : choix.resultat === 'absent' ? 'absent' : 'reporte'; await ecrireTournees(T); } }
+      fin(r.resume);
+    } catch (e) { toast(e.message, true); }
+  };
+  const fin = async resume => {
+    let suivant = null;
+    if (deTournee) { const T = await lireTournees(), plan = T[aujourdhui()]; if (plan && plan.ids) suivant = plan.ids.find(i => i !== id && !(plan.res || {})[i]); }
+    montrer('Visite enregistrée', h('div', { class: 'carte obj' }, h('strong', {}, c.nom), h('p', {}, resume)),
+      suivant ? h('a', { class: 'btn gros', href: '#/visite/' + suivant + '?t=1' }, 'Garage suivant de la tournée') : null,
+      h('div', { class: 'actions' }, h('a', { class: 'btn sec', href: deTournee ? '#/tournee' : '#/cockpit' }, deTournee ? 'Retour à la tournée' : 'Retour au cockpit'), h('a', { class: 'btn sec', href: '#/client/' + id }, 'Fiche'),
+        h('button', { class: 'btn sec', type: 'button', onclick: async () => { await putMany('clients', [JSON.parse(avant)]); toast('Visite annulée : fiche remise comme avant.'); const cible = '#/visite/' + id + (deTournee ? '?t=1' : ''); if (location.hash === cible) pageVisite(id); else location.hash = cible; } }, 'Annuler cette visite')), h('div', { style: 'height:96px' }));
+  };
+  const etapeSuite = () => montrer('Visite · ' + c.nom, ...entete(total(), total(), choix.resultat === 'vu' ? 'Et ensuite ?' : 'Quand repasser ?'), V.choixSuite(choix.resultat).map(s => gros(s[1], '', () => { choix.suite = s[0]; enregistrer(); }, 'sec')), noteIn);
+  const etapeRetour = () => montrer('Visite · ' + c.nom, ...entete(2, total(), 'Qu’est-ce qui est ressorti ?'), V.RETOURS.map(r => gros(r[1], '', () => { choix.retour = r[0]; etapeSuite(); }, 'sec')), noteIn);
+  montrer('Visite · ' + c.nom, h('a', { class: 'btn sec', href: deTournee ? '#/tournee' : '#/client/' + id, style: 'margin-bottom:6px' }, '‹ Retour'), ...entete(1, 3, 'Résultat de la visite'),
+    V.RESULTATS.map(r => gros(r[1], r[2], () => { choix.resultat = r[0]; r[0] === 'vu' ? etapeRetour() : etapeSuite(); }, r[0] === 'vu' ? 'vert' : 'sec')),
+    h('p', { class: 'mut' }, 'Chaque réponse est un seul toucher. Le dernier enregistre la visite ; tu peux l’annuler juste après.'));
 }
 
 async function pageReglages() {

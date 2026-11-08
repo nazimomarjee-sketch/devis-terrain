@@ -8,7 +8,7 @@ Légende : ✅ fait et testé · 🟡 partiel · ⬜ à faire
 - ✅ T5 Recette Samsung unique de 12 étapes : `docs/RECETTE_SAMSUNG_FINALE.md` (à exécuter par le propriétaire ; B9). *Critère : le propriétaire l'exécute en 20 min.*
 ## P1 production terrain
 - ✅ T6 CA facturé HT sur téléphone : saisie contrôlée de factures/avoirs (numéro obligatoire, doublons refusés, futur refusé, annulation motivée sans suppression), objectif de l'accueil = CA facturé ; commandes et encaissements affichés à part ; « Non renseigné » plutôt qu'un faux zéro ; inclus dans la sauvegarde chiffrée. *Tests : ca-facture-telephone (8), ca-facture-browser (3).* Reste : import EBP (même module, source « ebp »), lien facture→créance à encaisser.
-- ⬜ T7 Prochaine action recommandée + préparation/compte rendu de visite simplifiés. *Critère : parcours visite en ≤4 touches, hors ligne.*
+- ✅ T7 Visite terrain en 4 touches maximum (3 si absent) : ouvrir (cockpit/tournée) → résultat → ce qui est ressorti → suite = enregistrement ; note facultative ; annulation immédiate ; enchaînement « garage suivant » en tournée ; hors ligne. *Tests : visite-telephone (7), visite-browser (4, touches comptées).*
 - ⬜ T8 Rappels/rendez-vous + recherche rapide (<300 ms à 2000 fiches).
 ## P2 cockpit
 - 🟡 T9 Cockpit MOBILE (téléphone, sans PC, hors ligne) : CA facturé vs rythme des jours ouvrés, comptes bloqués, devis acceptés à commander, règlements en retard, rappels, devis à relancer, prospects prioritaires, clients à ne pas laisser dormir — chaque ligne avec sa raison. *Tests : cockpit-telephone (5), cockpit-browser (1).* Reste : mise en page grand écran du Bureau, secteur/analyse, import EBP.
