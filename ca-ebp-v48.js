@@ -13,6 +13,7 @@ const ODICOLOR_CA_EBP = (() => {
     ['type', 'Type de pièce', /^(type|nature)|type de (piece|document)|^document$/, false],
     ['no', 'N° de pièce', /^(n°|no|num(ero)?)( de)? ?(piece|document|facture)?$|^(n°|no|numero) (piece|document|facture)|^piece$/, true],
     ['date', 'Date', /^date( de)?( la)? ?(piece|document|facture)?$/, true],
+    ['code', 'Code client', /code.*client|^code tiers$|^tiers$|^code$/, false],
     ['client', 'Client', /(nom|raison sociale|libelle).*client|^client$|^raison sociale$|^nom$/, false],
     ['ht', 'Montant HT', /(montant|total|net).*h\.?t|^h\.?t\.?$/, true]
   ];
@@ -74,15 +75,15 @@ const ODICOLOR_CA_EBP = (() => {
       if (!date) { ignorees.push({ ligne, motif: 'Date illisible pour ' + no }); continue; }
       if (ht == null) { ignorees.push({ ligne, motif: 'Montant HT illisible pour ' + no }); continue; }
       if (ctx.auj && date > ctx.auj) { ignorees.push({ ligne, motif: 'Date future pour ' + no }); continue; }
-      const cle = type + '|' + CA.numeroNorm(no), client = texte(g('client'));
+      const cle = type + '|' + CA.numeroNorm(no), client = texte(g('client')) , code = texte(g('code'), 40);
       if (pieces.has(cle)) { const p = pieces.get(cle); if (p.date !== date) { ignorees.push({ ligne, motif: 'N° ' + no + ' répété avec une date différente' }); continue; } p.signe += ht; p.lignes++; continue; }
-      pieces.set(cle, { type, numero: no, date, client, signe: ht, ligne, lignes: 1 });
+      pieces.set(cle, { type, numero: no, date, client, code, signe: ht, ligne, lignes: 1 });
     }
     for (const [cle, p] of pieces) {
       // Avoir : montant positif quel que soit le signe de l'export. Facture : un total ≤ 0 n'est pas une facture.
       const montantHt = p.type === 'avoir' ? Math.abs(p.signe) : p.signe;
       if (!(montantHt > 0)) { ignorees.push({ ligne: p.ligne, motif: (p.type === 'avoir' ? 'Avoir' : 'Facture') + ' ' + p.numero + ' : montant HT nul ou négatif' }); continue; }
-      const ex = parCle.get(cle), entree = { type: p.type, numero: p.numero, date: p.date, montantHt, clientNom: p.client, ligne: p.ligne };
+      const ex = parCle.get(cle), entree = { type: p.type, numero: p.numero, date: p.date, montantHt, clientNom: p.client, codeEbp: p.code, ligne: p.ligne };
       if (!ex) nouvelles.push(entree);
       else if (ex.date === p.date && ex.montantHt === montantHt) identiques.push(entree);
       else conflits.push({ ...entree, existant: { date: ex.date, montantHt: ex.montantHt, source: ex.source } });
@@ -96,7 +97,7 @@ const ODICOLOR_CA_EBP = (() => {
     if (!ap || !ap.ok) throw new Error('Aperçu invalide : rien à importer.');
     let m = magasin || CA.vide();
     for (const e of ap.nouvelles) {
-      m = CA.ajouter(m, { type: e.type, numero: e.numero, date: e.date, montantHt: e.montantHt, clientNom: e.clientNom, source: 'ebp' }, { id: ctx.nouvelId(), maintenant: ctx.maintenant, auj: ctx.auj, confirme: true });
+      m = CA.ajouter(m, { type: e.type, numero: e.numero, date: e.date, montantHt: e.montantHt, clientNom: e.clientNom, codeEbp: e.codeEbp, source: 'ebp' }, { id: ctx.nouvelId(), maintenant: ctx.maintenant, auj: ctx.auj, confirme: true });
       const dern = m.entrees[m.entrees.length - 1]; dern.import = { id: ctx.idImport, fichier: texte(ctx.fichier, 120), ligne: e.ligne };
     }
     const evt = { id: ctx.idImport, fichier: texte(ctx.fichier, 120), le: ctx.maintenant, ajoutees: ap.nouvelles.length, identiques: ap.identiques.length, conflits: ap.conflits.length, ignorees: ap.ignorees.length, horsCa: ap.horsCa, totalCents: ap.totaux.nouvellesCents };

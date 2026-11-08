@@ -41,7 +41,7 @@ const ODICOLOR_CA = (() => {
     if (!c.ok) throw Object.assign(new Error(c.erreurs.join(' ')), { controle: c });
     if (c.avertissements.length && !ctx.confirme) throw Object.assign(new Error('Confirmation nécessaire : ' + c.avertissements.join(' ')), { controle: c, confirmation: true });
     const entree = { id: ctx.id, type: e.type, numero: String(e.numero).trim().slice(0, 40), date: e.date, montantHt: e.montantHt,
-      clientId: e.clientId == null ? null : e.clientId, clientNom: String(e.clientNom || '').trim().slice(0, 120), source: SOURCES.includes(e.source) ? e.source : 'saisie', saisiLe: ctx.maintenant };
+      clientId: e.clientId == null ? null : e.clientId, clientNom: String(e.clientNom || '').trim().slice(0, 120), codeEbp: String(e.codeEbp || '').trim().slice(0, 40), source: SOURCES.includes(e.source) ? e.source : 'saisie', saisiLe: ctx.maintenant };
     return { ...m, version: 1, entrees: [...m.entrees, entree] };
   }
   function annuler(magasin, id, motif, ctx) {
@@ -63,6 +63,18 @@ const ODICOLOR_CA = (() => {
     r.totalCents = r.facturesCents - r.avoirsCents;
     return r;
   }
+  // CA par code client EBP sur une période + date de la dernière facture (jamais d'un avoir) : sert au rattachement EXPLICITE code → garage.
+  function parCode(magasin, debut, fin) {
+    const m = normaliserMagasin(magasin), r = new Map();
+    for (const e of m.entrees) {
+      if (e.annule || !e.codeEbp) continue;
+      let x = r.get(e.codeEbp); if (!x) { x = { code: e.codeEbp, nom: e.clientNom || '', periodeCents: 0, derniereFacture: null, nPieces: 0 }; r.set(e.codeEbp, x); }
+      if (e.clientNom && !x.nom) x.nom = e.clientNom; x.nPieces++;
+      if (e.type === 'facture' && (!x.derniereFacture || e.date > x.derniereFacture)) x.derniereFacture = e.date;
+      if (e.date >= debut && e.date <= fin) x.periodeCents += e.type === 'facture' ? e.montantHt : -e.montantHt;
+    }
+    return r;
+  }
   const finDeMois = mois => { const [y, m] = mois.split('-').map(Number); return mois + '-' + String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, '0'); };
   const calculerMois = (magasin, mois) => calculer(magasin, mois + '-01', finDeMois(mois));
   const aDesPieces = magasin => normaliserMagasin(magasin).entrees.some(e => !e.annule);
@@ -79,6 +91,6 @@ const ODICOLOR_CA = (() => {
     if (m.imports != null) { if (!Array.isArray(m.imports)) throw new Error('CA facturé : historique des imports invalide.'); const iid = new Set(); for (const x of m.imports) { if (!x || typeof x.id !== 'string' || !x.id || iid.has(x.id)) throw new Error('CA facturé : import invalide ou répété.'); iid.add(x.id); } }
     return { pieces: m.entrees.length };
   }
-  return { controler, ajouter, annuler, calculer, calculerMois, aDesPieces, valider, numeroNorm, vide, finDeMois };
+  return { controler, ajouter, annuler, parCode, calculer, calculerMois, aDesPieces, valider, numeroNorm, vide, finDeMois };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = ODICOLOR_CA;

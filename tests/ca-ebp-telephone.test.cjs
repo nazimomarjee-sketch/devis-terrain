@@ -64,3 +64,9 @@ test('volume : 5 000 lignes (pièces) analysées rapidement',()=>{
   const l=[EN];for(let i=0;i<5000;i++)l.push(['Facture','FA-'+i,'05/11/2026','G'+i,String(100+i)]);
   const t=Date.now(),ap=E.apercu(l,{auj:AUJ,existantes:[]});assert.equal(ap.nouvelles.length,5000);assert.ok(Date.now()-t<2000);
 });
+test('code client EBP : conservé sur chaque pièce importée ; CA par code et dernière facture (avoirs exclus de la date) ; aucun rattachement par le nom',()=>{
+  const EN2=['Type','N° de pièce','Date','Code client','Nom du client','Total HT'];
+  const ap=E.apercu([EN2,['Facture','FA-1','01/10/2026','C001','GARAGE A','100'],['Facture','FA-2','05/11/2026','C001','GARAGE A','250'],['Avoir','AV-1','09/11/2026','C001','GARAGE A','-50'],['Facture','FA-3','06/11/2026','','GARAGE A','10']],{auj:AUJ,existantes:[]});
+  const m=E.appliquer(CA.vide(),ap,ctx()),r=CA.parCode(m,'2026-11-01','2026-11-30');
+  assert.equal(r.size,1,'la pièce sans code n’est rattachée à aucun code malgré le même nom');const x=r.get('C001');assert.deepEqual([x.periodeCents,x.derniereFacture,x.nPieces],[20000,'2026-11-05',3]);
+});

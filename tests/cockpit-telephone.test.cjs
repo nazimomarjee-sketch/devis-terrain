@@ -35,3 +35,7 @@ test('clients à risque : pas vus depuis plus de 45 j, ou jamais visités ; le p
   const d=base();d.clients=Array.from({length:9},(_,i)=>({id:i+1,nom:'C'+i,statutCrm:'client',visites:i===0?[{date:'2026-11-01',res:'vu'}]:[{date:'2026-09-'+String(10+i).padStart(2,'0'),res:'vu'}]}));
   const s=sec(K.calculer(d),'risque');assert.equal(s.total,8);assert.equal(s.lignes.length,5);assert.equal(s.lignes[0].id,2);
 });
+test('réachat : client rattaché dont la dernière facture a plus de 60 j ; top CA du mois ; client non rattaché jamais concerné',()=>{
+  const d=base();d.clients=[{id:1,nom:'A'},{id:2,nom:'B'},{id:3,nom:'C'}];d.facturation={1:{derniere:'2026-08-01',moisCents:0},2:{derniere:'2026-11-05',moisCents:90000}};
+  const r=K.calculer(d);assert.deepEqual(sec(r,'reachat').lignes.map(x=>[x.id,x.jours]),[[1,101]]);assert.deepEqual(sec(r,'top').lignes.map(x=>x.id),[2]);assert.equal(sec(r,'top').montant,90000);
+});

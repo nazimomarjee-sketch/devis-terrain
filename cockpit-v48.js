@@ -27,6 +27,10 @@ const ODICOLOR_COCKPIT = (() => {
       const v = derniereVisite(c), jours = v ? ecart(v, auj) : null;
       return { id: c.id, nom: c.nom, jours, raison: v ? 'Client pas vu depuis ' + jours + ' j' : 'Client jamais visité depuis l’appli' };
     }).filter(x => x.jours == null || x.jours > 45).sort((a, b) => (b.jours == null ? 1e9 : b.jours) - (a.jours == null ? 1e9 : a.jours));
+    // Réachat : clients dont le code EBP est rattaché à leur fiche ET dont la dernière facture date de plus de N jours (d.facturation = { [idClient]: { derniere, moisCents } }).
+    const seuil = d.seuilReachatJours || 60, fact = d.facturation || {};
+    const reachat = cl.filter(c => fact[c.id] && fact[c.id].derniere).map(c => ({ id: c.id, nom: c.nom, jours: ecart(fact[c.id].derniere, auj), derniere: fact[c.id].derniere })).filter(x => x.jours > seuil).map(x => ({ ...x, raison: 'Dernière facture il y a ' + x.jours + ' j (' + x.derniere + ')' })).sort((a, b) => b.jours - a.jours);
+    const topMois = cl.filter(c => fact[c.id] && fact[c.id].moisCents > 0).map(c => ({ id: c.id, nom: c.nom, montant: fact[c.id].moisCents, raison: 'Facturé ce mois' })).sort((a, b) => b.montant - a.montant);
     // Rythme du CA : prorata des jours ouvrés (seulement si CA saisi et objectif réglé), sinon « non calculable » — jamais un chiffre inventé.
     let rythme = { calculable: false, motif: !d.ca || !d.ca.renseigne ? 'CA facturé non saisi' : !d.objectifMoisCents ? 'objectif du mois non réglé' : 'jours ouvrés indisponibles' };
     if (d.ca && d.ca.renseigne && d.objectifMoisCents > 0 && d.jours && d.jours.ouvresTotal > 0) {
@@ -42,6 +46,8 @@ const ODICOLOR_COCKPIT = (() => {
         { id: 'rappels', titre: 'Rappels du jour et en retard', urgence: 2, ...lim(rappels, 5), lien: x => '#/client/' + x.id },
         { id: 'devis', titre: 'Devis à relancer', urgence: 2, ...lim(devisASuivre, 5), montant: devisASuivre.reduce((a, x) => a + x.montant, 0), lien: x => '#/devis/' + x.id },
         { id: 'prospects', titre: 'Prospects prioritaires à visiter', urgence: 3, ...lim(prospects, 8), lien: x => '#/client/' + x.id },
+        { id: 'reachat', titre: 'Clients à relancer : plus de facture récente', urgence: 2, ...lim(reachat, 6), lien: x => '#/client/' + x.id },
+        { id: 'top', titre: 'Mes plus gros CA facturés ce mois', urgence: 4, ...lim(topMois, 5), montant: topMois.reduce((a, x) => a + x.montant, 0), lien: x => '#/client/' + x.id },
         { id: 'risque', titre: 'Clients à ne pas laisser dormir', urgence: 3, ...lim(risque, 5), lien: x => '#/client/' + x.id }
       ] };
   }

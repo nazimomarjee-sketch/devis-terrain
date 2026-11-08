@@ -100,3 +100,25 @@ test('import EBP : fichier sans colonne HT refusé avec un message clair, rien �
   await page.getByText(/Colonne\(s\) obligatoire\(s\) introuvable\(s\)/).waitFor();assert.equal(await page.evaluate(()=>get('meta','caFacture')),undefined);
   assert.deepEqual(errs,[]);await context.close();
 });
+
+test('rattachement explicite code EBP → garage, puis alerte « client à relancer » dans le cockpit ; aucun rapprochement par le nom',async()=>{
+  const {context,page,errs}=await ouvrir();
+  const dAncien=iso(new Date(auj.getTime()-90*864e5)).split('-').reverse().join('/'),dRecent=iso(new Date(auj.getTime()-3*864e5)).split('-').reverse().join('/');
+  await page.evaluate(()=>putMany('clients',[{id:1,nom:'GARAGE FICTIF ENDORMI',statutCrm:'client'},{id:2,nom:'GARAGE FICTIF ACTIF',statutCrm:'client'}]));
+  const csv=Buffer.from(['Type;N° de pièce;Date;Code client;Nom du client;Total HT','Facture;FA-1;'+dAncien+';C001;GARAGE FICTIF ENDORMI;1 000,00','Facture;FA-2;'+dRecent+';C002;GARAGE FICTIF ACTIF;500,00'].join('\r\n'),'latin1');
+  await page.goto(origin+'/#/ca/import');await page.getByLabel('Export EBP des pièces').setInputFiles({name:'ebp.csv',mimeType:'text/csv',buffer:csv});
+  await page.getByRole('button',{name:'Importer ces 2 pièces'}).click();await page.waitForURL(/#\/ca$/);
+  await page.getByText(/2 à rattacher/).waitFor();
+  // le cockpit ne propose rien tant que les codes ne sont pas rattachés (aucun lien par le nom)
+  await page.goto(origin+'/#/cockpit');await page.getByText('Rythme non calculable').waitFor();assert.equal(await page.getByText('Clients à relancer : plus de facture récente').count(),0);
+  await page.goto(origin+'/#/ca');
+  await page.getByLabel('Garage pour le code C001').selectOption({label:'GARAGE FICTIF ENDORMI'});await page.getByRole('button',{name:'Rattacher'}).first().click();
+  await page.getByText(/1 à rattacher/).waitFor();
+  await page.getByLabel('Garage pour le code C002').selectOption({label:'GARAGE FICTIF ACTIF'});await page.getByRole('button',{name:'Rattacher'}).first().click();
+  await page.getByText(/0 à rattacher/).waitFor();
+  assert.equal((await page.evaluate(()=>get('clients',1))).codeEbp,'C001');
+  await page.goto(origin+'/#/cockpit');await page.getByText('Clients à relancer : plus de facture récente').waitFor();
+  await page.getByText(/Dernière facture il y a 90 j/).waitFor();assert.equal(await page.getByText(/Dernière facture il y a 3 j/).count(),0);
+  await page.getByText('Mes plus gros CA facturés ce mois').waitFor();
+  assert.deepEqual(errs,[]);await context.close();
+});

@@ -1974,6 +1974,15 @@ async function pageCA() {
         const motif = prompt('Motif de l’annulation (la pièce reste dans l’historique) :'); if (!motif || !motif.trim()) return;
         try { await put('meta', ODICOLOR_CA.annuler(await get('meta', 'caFacture'), e.id, motif, { maintenant: new Date().toISOString() }), 'caFacture'); toast('Pièce annulée.'); pageCA(); } catch (er) { toast(er.message, true); }
       } }, 'Annuler cette pièce')));
+  // Rattachement EXPLICITE code client EBP → garage du téléphone (jamais par le nom) : permet CA par garage et alerte de réachat.
+  const codes = [...ODICOLOR_CA.parCode(magasin, '0000-01-01', '9999-12-31').values()], liesA = new Map(cl.filter(c => c.codeEbp).map(c => [c.codeEbp, c]));
+  const nonLies = codes.filter(x => !liesA.has(x.code)).sort((a, b) => b.periodeCents - a.periodeCents);
+  const liaisons = codes.length ? h('details', { class: 'carte', open: nonLies.length > 0 }, h('summary', {}, 'Codes clients EBP : ' + (codes.length - nonLies.length) + ' rattaché(s), ' + nonLies.length + ' à rattacher'),
+    h('p', { class: 'mut' }, 'Choisis toi-même le garage : aucun rapprochement automatique par le nom.'),
+    nonLies.slice(0, 40).map(x => { const sel = h('select', { 'aria-label': 'Garage pour le code ' + x.code }, h('option', { value: '' }, 'Garage…'), cl.map(c => h('option', { value: c.id }, c.nom)));
+      return h('div', { class: 'carte' }, h('strong', {}, x.code + (x.nom ? ' · ' + x.nom : '')), h('p', { class: 'mut' }, x.nPieces + ' pièce(s)' + (x.derniereFacture ? ' · dernière facture ' + x.derniereFacture : '')), sel,
+        h('button', { class: 'btn sec', type: 'button', onclick: async () => { const c = cl.find(y => y.id === Number(sel.value)); if (!c) { toast('Choisis un garage.', true); return; } if (c.codeEbp && c.codeEbp !== x.code && !confirm(c.nom + ' est déjà rattaché au code ' + c.codeEbp + '. Le remplacer ?')) return; c.codeEbp = x.code; await putMany('clients', [c]); toast(x.code + ' rattaché à ' + c.nom + '.'); pageCA(); } }, 'Rattacher')); }),
+    [...liesA.values()].length ? h('details', {}, h('summary', {}, 'Déjà rattachés'), [...liesA.entries()].map(([code, c]) => h('p', { class: 'mut' }, code + ' → ' + c.nom))) : null) : null;
   montrer('CA facturé HT',
     h('div', { class: 'carte obj hero' }, h('small', { class: 'etiq' }, 'CA facturé HT · ' + mois), h('div', { class: 'gros-chiffre' }, ODICOLOR_CA.aDesPieces(magasin) ? eur(m.totalCents) : 'Non renseigné'),
       h('p', { class: 'mut' }, ODICOLOR_CA.aDesPieces(magasin) ? m.nFactures + ' facture(s) − ' + m.nAvoirs + ' avoir(s)' + (obj ? ' · objectif ' + eur(obj.cents) : '') : 'Aucune pièce saisie ce mois : le CA n’est pas estimé à partir des commandes.')),
@@ -1987,6 +1996,7 @@ async function pageCA() {
         const motif = prompt('Motif de l’annulation de cet import (les pièces restent dans l’historique) :'); if (!motif || !motif.trim()) return;
         try { await put('meta', ODICOLOR_CA_EBP.annulerImport(await get('meta', 'caFacture'), ev.id, motif, { maintenant: new Date().toISOString() }), 'caFacture'); toast('Import annulé.'); pageCA(); } catch (er) { toast(er.message, true); }
       } }, 'Annuler cet import')))] : null),
+    liaisons,
     h('h2', {}, 'Historique'), lignes.length ? lignes : h('p', { class: 'vide' }, 'Aucune pièce.'));
 }
 
@@ -1996,7 +2006,9 @@ async function pageCockpit() {
   const now = new Date(), auj = jourLocal(now), mk = auj.slice(0, 7), om = objectifDuMois(now);
   const m = ODICOLOR_CA.calculerMois(caStore, mk), debut = new Date(now.getFullYear(), now.getMonth(), 1), fin = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23);
   const veille = new Date(now); veille.setDate(veille.getDate() - 1); veille.setHours(23, 59, 0, 0);
-  const K = ODICOLOR_COCKPIT.calculer({ auj, clients: cl, devis: dv, relanceJours: S.relanceJours || 3, totalDevis: d => totaux(d).ht,
+  const parCode = ODICOLOR_CA.parCode(caStore, mk + '-01', ODICOLOR_CA.finDeMois(mk)), facturation = {};
+  for (const c of cl) if (c.codeEbp && parCode.has(c.codeEbp)) { const x = parCode.get(c.codeEbp); facturation[c.id] = { derniere: x.derniereFacture, moisCents: x.periodeCents }; }
+  const K = ODICOLOR_COCKPIT.calculer({ auj, facturation, clients: cl, devis: dv, relanceJours: S.relanceJours || 3, totalDevis: d => totaux(d).ht,
     ca: { renseigne: ODICOLOR_CA.aDesPieces(caStore), moisCents: m.totalCents, nFactures: m.nFactures, nAvoirs: m.nAvoirs }, objectifMoisCents: om ? om.cents : 0,
     jours: { ouvresTotal: joursOuvres(debut, fin), ouvresFaits: veille >= debut ? joursOuvres(debut, veille) : 0 } });
   const r = K.rythme, carteCA = h('div', { class: 'carte obj hero' }, h('small', { class: 'etiq' }, 'CA facturé HT · ' + mk),
@@ -2004,7 +2016,7 @@ async function pageCockpit() {
     r.calculable ? [h('div', { class: 'piste', role: 'img', 'aria-label': r.pct + ' % de l’objectif du mois' }, h('div', { class: 'rempli', style: 'width:' + Math.max(0, Math.min(100, r.pct)) + '%' })),
       h('p', { class: r.ecartCents >= 0 ? '' : 'mut' }, (r.ecartCents >= 0 ? 'En avance de ' : 'En retard de ') + eur(Math.abs(r.ecartCents)) + ' sur le rythme des jours ouvrés' + (r.resteParJourOuvre ? ' · ' + eur(r.resteParJourOuvre) + ' à facturer par jour ouvré restant' : ''))]
       : h('p', { class: 'mut' }, 'Rythme non calculable : ' + r.motif + '. ', h('a', { href: K.ca.renseigne ? '#/reglages' : '#/ca' }, K.ca.renseigne ? 'Régler l’objectif' : 'Saisir le CA facturé')));
-  const visitable = new Set(['rappels', 'prospects', 'risque']);
+  const visitable = new Set(['rappels', 'prospects', 'risque', 'reachat']);
   const ligne = (sec, x) => h('div', { class: 'ligne', style: 'display:flex;align-items:center;gap:8px' },
     h('a', { href: visitable.has(sec.id) ? '#/visite/' + x.id : sec.lien(x), style: 'color:inherit;text-decoration:none;flex:1;min-height:48px', 'aria-label': (visitable.has(sec.id) ? 'Visiter ' : 'Ouvrir ') + (x.nom || '') }, h('span', { class: 'g' }, h('strong', {}, x.nom || '—'), h('br'), h('small', {}, x.raison + (x.montant ? ' · ' + eur(x.montant) : '') + (x.ville ? ' · ' + x.ville : '')))),
     visitable.has(sec.id) ? h('a', { class: 'btn sec', href: '#/client/' + x.id, style: 'min-height:44px' }, 'Fiche') : h('span', {}, '›'));

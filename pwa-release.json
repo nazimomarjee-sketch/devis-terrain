@@ -1,5 +1,5 @@
 {
-  "id": "1c3b38c381710aebcccab1f6ac4eef0d1ba4b536dc0ad4a3f6ac41386959a9cd",
+  "id": "c90bc6771329c8fb7a341893b757edf5dd354745a8b0ba889a78402d7f2ccd22",
   "assets": [
     {
       "path": "accueil-v23.css",
@@ -19,7 +19,7 @@
     },
     {
       "path": "app.js",
-      "sha256": "e232941f92173a60df1ab60c5aefce4a8c104102da8be6b55ab9d64172a9b637"
+      "sha256": "0917ad51bbc16836f25294a78079c0b63825d570133df5c5da6dbbd55d2b76b6"
     },
     {
       "path": "apparence-v26.css",
@@ -67,11 +67,11 @@
     },
     {
       "path": "ca-ebp-v48.js",
-      "sha256": "d0a8f8922edd8221cdf18ce4ce334ca0fb37534fdee51b999f8e6d5a54e734bb"
+      "sha256": "4d76866d385a023f3dd0cec0504bd2152a74f5904b3b5502f9ed5819056384bf"
     },
     {
       "path": "ca-facture-v48.js",
-      "sha256": "a6b700fbab68e791d486f33ab6af7e32c9422c5902ff8dbc57c544cacb0c03e6"
+      "sha256": "426ffd6800166a6bd229478bd48912cb5f77f67b267fbb8a98bab80988482109"
     },
     {
       "path": "carte-v48.js",
@@ -87,7 +87,7 @@
     },
     {
       "path": "cockpit-v48.js",
-      "sha256": "f1dc0304f32a69eb3f7f1e4f6e52fe3bdba6581f8c857b69ee3be83f0e1477a7"
+      "sha256": "4c6b30e9208970eb2deebdeee05d4faf354039425302a27acfb442ebcf4dae1d"
     },
     {
       "path": "commercial-v22.js",
@@ -143,7 +143,7 @@
     },
     {
       "path": "index.html",
-      "sha256": "e61bdb91ac04586e029bcf18ca9c11b71223ab00765668c2be69fb740e84040f"
+      "sha256": "6aa7a2a8e31263279953bcc313181bfff1c10e0970a080d80ec4893b1cfc0d1c"
     },
     {
       "path": "logo-96.png",
@@ -187,7 +187,7 @@
     },
     {
       "path": "pwa-client.js",
-      "sha256": "106798eefc5107c8dc0d820e8672a64cb5a98c622da09eafb9567086ad406b41"
+      "sha256": "f8e426fa38031a42e20152b6423e940dee9e8ccfbe990d3a15aeacf2ce3510a5"
     },
     {
       "path": "rappels-produits-v24.js",
