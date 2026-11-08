@@ -25,3 +25,5 @@ Légende : ✅ fait et testé · 🟡 partiel · ⬜ à faire
 - ✅ Import EBP des clients + rapprochement fiable des codes : propositions fortes (même nom + même CP/ville, unique), à vérifier, sans garage ; aucune liaison sans validation ; traçabilité (qui, quand, fichier, méthode) ; création de fiche sur demande ; compte bloqué EBP → cockpit. *Tests : ebp-clients-telephone (9), ebp-clients-browser (2).*
 - ✅ Analyse par secteur (département/commune) : CA du mois, actifs/dormants/sans suivi, prospects A/B, visites 30 j, couverture du marché recensé, priorités motivées, CA non attribué contrôlé. *Tests : secteur-telephone (7), ville-telephone-browser (+1).*
 - ⬜ À faire : seuil de réachat réglable.
+
+- ✅ T8b Rendez-vous avec heure et intégration aux tournées (rdv-telephone 7, agenda-browser 3).

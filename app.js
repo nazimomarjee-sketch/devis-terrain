@@ -382,6 +382,7 @@ async function route() {
     else if (p[0] === 'ca') await pageCA();
     else if (p[0] === 'cockpit') await pageCockpit();
     else if (p[0] === 'carte') await pageCarte();
+    else if (p[0] === 'agenda') await pageAgenda(p[1] === 'nouveau' ? Number(p[2]) || null : null);
     else if (p[0] === 'secteurs') await pageSecteurs(p[1]);
     else if (p[0] === 'proposition') await pageProposition();
     else if (p[0] === 'ville') await pageVille(p[1]);
@@ -1190,7 +1191,7 @@ async function pageComparateur() {
 }
 function pagePlus() {
   const L = (href, t, d) => h('a', { class: 'ligne', href, style: 'color:inherit;text-decoration:none' }, h('span', { class: 'g' }, h('strong', {}, t), h('br'), h('small', {}, d)), h('span', {}, '›'));
-  montrer('Plus', L('#/secteurs', 'Secteurs', 'CA, clients actifs/dormants, prospects et priorités par département et commune'), L('#/clients-ebp', 'Clients EBP', 'Relier les codes clients EBP à tes garages (tu valides chaque lien)'), L('#/ville', 'Ma Ville', 'Tes garages commune par commune, en vue LEGO tactile'), L('#/carte', 'Carte commerciale', 'Tous tes garages sur la carte, regroupés, hors ligne'), L('#/cockpit', 'Cockpit', 'Tes priorités du jour : CA, relances, devis, prospects, clients à voir'), L('#/ca', 'CA facturé HT', 'Tes factures et avoirs HT : le chiffre d’affaires, sans doublon'), L('#/travail', 'Mon travail', 'Tes 6 chiffres : visites, devis, commandes, factures, impayés'), L('#/point', 'Point du lundi', 'Le récap de la semaine écoulée : bilan, UN changement, engagements'), L('#/feuille', 'Feuille de route', 'Le plan de la semaine qui commence, jour par jour'), L('#/pc', 'Lien avec le PC', 'Envoyer ta sauvegarde au PC, recevoir le plan de la semaine'), L('#/evolution', 'Évolution', 'Tous les indicateurs, semaine par semaine, avec leur courbe'), L('#/signalements', 'Signalements', 'Problèmes remontés avec photo et leur suivi'), L('#/signaler', 'Signaler un problème', 'Photo + note envoyées à ton responsable'),
+  montrer('Plus', L('#/agenda', 'Rendez-vous', 'Ton agenda avec heures ; intégré à la tournée du jour'), L('#/secteurs', 'Secteurs', 'CA, clients actifs/dormants, prospects et priorités par département et commune'), L('#/clients-ebp', 'Clients EBP', 'Relier les codes clients EBP à tes garages (tu valides chaque lien)'), L('#/ville', 'Ma Ville', 'Tes garages commune par commune, en vue LEGO tactile'), L('#/carte', 'Carte commerciale', 'Tous tes garages sur la carte, regroupés, hors ligne'), L('#/cockpit', 'Cockpit', 'Tes priorités du jour : CA, relances, devis, prospects, clients à voir'), L('#/ca', 'CA facturé HT', 'Tes factures et avoirs HT : le chiffre d’affaires, sans doublon'), L('#/travail', 'Mon travail', 'Tes 6 chiffres : visites, devis, commandes, factures, impayés'), L('#/point', 'Point du lundi', 'Le récap de la semaine écoulée : bilan, UN changement, engagements'), L('#/feuille', 'Feuille de route', 'Le plan de la semaine qui commence, jour par jour'), L('#/pc', 'Lien avec le PC', 'Envoyer ta sauvegarde au PC, recevoir le plan de la semaine'), L('#/evolution', 'Évolution', 'Tous les indicateurs, semaine par semaine, avec leur courbe'), L('#/signalements', 'Signalements', 'Problèmes remontés avec photo et leur suivi'), L('#/signaler', 'Signaler un problème', 'Photo + note envoyées à ton responsable'),
     L('#/comparateur', 'Comparateur de coût', 'Coût réel au m² : produit actuel contre produit proposé'), L('#/reglages', 'Réglages', 'Objectifs, responsable, TVA, sauvegarde'));
 }
 
@@ -1417,7 +1418,7 @@ async function pageTournee() {
       const dateR = h('input', { type: 'date', value: prochainOuvre(), 'aria-label': 'Reporter ' + c.nom + ' au', style: 'flex:1 1 140px' });
       const agir = async (res) => { await marquerVisite(c, res, res === 'reporte' ? dateR.value : ''); r[id] = res; await sauver(); toast(res === 'vu' ? 'Visite notée : ' + c.nom : res === 'absent' ? 'Absent : rappel dans 2 jours.' : 'Reporté au ' + dateFr(c.reporteAu) + '.'); pageTournee(); };
       return h('div', { class: 'carte' },
-        h('div', { class: 'elan-tete' }, h('strong', {}, c.nom), etat ? h('span', { class: 'tag ' + tags[etat][1] }, tags[etat][0]) : null),
+        h('div', { class: 'elan-tete' }, h('strong', {}, (plan.rdv && plan.rdv[id] ? '⏰ ' + plan.rdv[id] + ' · ' : '') + c.nom), etat ? h('span', { class: 'tag ' + tags[etat][1] }, tags[etat][0]) : null),
         c.etape ? h('small', { class: 'mut' }, 'Étape prévue : ' + c.etape) : null,
         etat ? null : h('div', { class: 'trio' }, h('button', { class: 'btn vert', onclick: () => agir('vu') }, 'Vu'), h('button', { class: 'btn ambre', onclick: () => agir('absent') }, 'Absent'), h('button', { class: 'btn gris', onclick: () => agir('reporte') }, 'Reporter')),
         etat ? null : h('label', { class: 'rang' }, h('span', { class: 'mut' }, 'Reporter au'), dateR),
@@ -2014,6 +2015,8 @@ async function pageCockpit() {
   const K = ODICOLOR_COCKPIT.calculer({ auj, facturation, clients: cl, devis: dv, relanceJours: S.relanceJours || 3, totalDevis: d => totaux(d).ht,
     ca: { renseigne: ODICOLOR_CA.aDesPieces(caStore), moisCents: m.totalCents, nFactures: m.nFactures, nAvoirs: m.nAvoirs }, objectifMoisCents: om ? om.cents : 0,
     jours: { ouvresTotal: joursOuvres(debut, fin), ouvresFaits: veille >= debut ? joursOuvres(debut, veille) : 0 } });
+  const agenda = await get('meta', 'agenda'), rdvJour = ODICOLOR_RDV.duJour(agenda, auj);
+  const carteRdv = rdvJour.length ? h('div', { class: 'carte' }, h('div', { class: 'elan-tete' }, h('strong', {}, 'Rendez-vous aujourd’hui'), h('small', { class: 'mut' }, String(rdvJour.length))), rdvJour.map(x => h('a', { class: 'ligne', href: '#/visite/' + x.clientId, style: 'color:inherit;text-decoration:none;display:block;min-height:48px', 'aria-label': 'Rendez-vous ' + x.heure + ' ' + x.clientNom }, h('strong', {}, x.heure + ' · ' + x.clientNom), h('br'), h('small', { class: 'mut' }, x.duree + ' min' + (x.objet ? ' · ' + x.objet : ''))))) : null;
   const r = K.rythme, carteCA = h('div', { class: 'carte obj hero' }, h('small', { class: 'etiq' }, 'CA facturé HT · ' + mk),
     h('div', { class: 'gros-chiffre' }, K.ca.renseigne ? eur(K.ca.moisCents) : 'Non renseigné', om ? h('span', {}, ' sur ' + eur(om.cents)) : null),
     r.calculable ? [h('div', { class: 'piste', role: 'img', 'aria-label': r.pct + ' % de l’objectif du mois' }, h('div', { class: 'rempli', style: 'width:' + Math.max(0, Math.min(100, r.pct)) + '%' })),
@@ -2025,7 +2028,7 @@ async function pageCockpit() {
     visitable.has(sec.id) ? h('a', { class: 'btn sec', href: '#/client/' + x.id, style: 'min-height:44px' }, 'Fiche') : h('span', {}, '›'));
   const cartes = K.sections.filter(sec => sec.total).map(sec => h('div', { class: 'carte' }, h('div', { class: 'elan-tete' }, h('strong', {}, sec.titre), h('small', { class: 'mut' }, sec.total + (sec.montant ? ' · ' + eur(sec.montant) : ''))),
     sec.lignes.map(x => ligne(sec, x)), sec.total > sec.lignes.length ? h('p', { class: 'mut' }, '+ ' + (sec.total - sec.lignes.length) + ' autre(s)') : null));
-  montrer('Cockpit', carteCA,
+  montrer('Cockpit', carteCA, carteRdv,
     h('div', { class: 'actions' }, h('a', { class: 'btn', href: '#/proposition' }, 'Proposer ma tournée du jour'), h('a', { class: 'btn sec', href: '#/tournee' }, 'Ma tournée'), h('a', { class: 'btn sec', href: '#/carte' }, 'Carte'), h('a', { class: 'btn sec', href: '#/secteurs' }, 'Secteurs'), h('a', { class: 'btn sec', href: '#/ca' }, 'CA facturé'), h('a', { class: 'btn sec', href: '#/feuille' }, 'Plan de la semaine')),
     cartes.length ? h('div', { class: 'cg-grille' }, cartes) : h('p', { class: 'vide' }, 'Rien d’urgent d’après tes données : ' + cl.length + ' garage(s), ' + dv.length + ' devis. Ajoute des rappels et des priorités sur les fiches pour alimenter le cockpit.'),
     h('p', { class: 'mut' }, 'Chaque ligne vient de ce que tu as saisi (visites, rappels, devis, factures). Rien n’est deviné.'));
@@ -2067,7 +2070,7 @@ async function pageCAImport() {
 // ---------- Visite terrain en 4 touches maximum ----------
 async function pageVisite(id) {
   const c = await get('clients', id); if (!c) return nonTrouve();
-  const V = ODICOLOR_VISITE, choix = {}, avant = JSON.stringify(c), deTournee = /[?&]t=1/.test(location.hash);
+  let agendaAvant = null; const V = ODICOLOR_VISITE, choix = {}, avant = JSON.stringify(c), deTournee = /[?&]t=1/.test(location.hash);
   const noteIn = h('input', { maxlength: 500, placeholder: 'Note (facultatif)', 'aria-label': 'Note de visite', autocomplete: 'off' });
   const gros = (label, sous, fn, cls) => h('button', { class: 'btn gros ' + (cls || ''), type: 'button', style: 'min-height:68px;text-align:left;display:block;width:100%;margin:8px 0', onclick: fn }, h('strong', {}, label), sous ? h('br') : null, sous ? h('small', {}, sous) : null);
   const entete = (n, total, titre) => [h('div', { class: 'mut' }, 'Étape ' + n + ' sur ' + total + ' · ' + c.nom), h('h2', { style: 'margin:6px 0' }, titre)];
@@ -2077,6 +2080,7 @@ async function pageVisite(id) {
       choix.note = noteIn.value;
       const r = V.appliquer(c, choix, { auj: aujourdhui(), nouvelId: nouvelUid, prochainOuvre: j => estOuvre(new Date(j + 'T12:00:00')) ? j : prochainOuvre(new Date(j + 'T12:00:00')) });
       await putMany('clients', [r.client]);
+      if (choix.resultat === 'vu') { const ag = await get('meta', 'agenda'), rj = ODICOLOR_RDV.duJour(ag, aujourdhui()).filter(x => x.clientId === id); if (rj.length) { agendaAvant = { val: ag }; let m2 = ag; for (const x of rj) m2 = ODICOLOR_RDV.terminer(m2, x.id, { maintenant: new Date().toISOString() }); await put('meta', m2, 'agenda'); } }
       if (deTournee) { const T = await lireTournees(), j = aujourdhui(), plan = T[j]; if (plan && Array.isArray(plan.ids) && plan.ids.includes(id)) { (plan.res || (plan.res = {}))[id] = choix.resultat === 'vu' ? 'vu' : choix.resultat === 'absent' ? 'absent' : 'reporte'; await ecrireTournees(T); } }
       fin(r.resume);
     } catch (e) { toast(e.message, true); }
@@ -2086,8 +2090,8 @@ async function pageVisite(id) {
     if (deTournee) { const T = await lireTournees(), plan = T[aujourdhui()]; if (plan && plan.ids) suivant = plan.ids.find(i => i !== id && !(plan.res || {})[i]); }
     montrer('Visite enregistrée', h('div', { class: 'carte obj' }, h('strong', {}, c.nom), h('p', {}, resume)),
       suivant ? h('a', { class: 'btn gros', href: '#/visite/' + suivant + '?t=1' }, 'Garage suivant de la tournée') : null,
-      h('div', { class: 'actions' }, h('a', { class: 'btn sec', href: deTournee ? '#/tournee' : '#/cockpit' }, deTournee ? 'Retour à la tournée' : 'Retour au cockpit'), h('a', { class: 'btn sec', href: '#/client/' + id }, 'Fiche'),
-        h('button', { class: 'btn sec', type: 'button', onclick: async () => { await putMany('clients', [JSON.parse(avant)]); toast('Visite annulée : fiche remise comme avant.'); const cible = '#/visite/' + id + (deTournee ? '?t=1' : ''); if (location.hash === cible) pageVisite(id); else location.hash = cible; } }, 'Annuler cette visite')), h('div', { style: 'height:96px' }));
+      h('div', { class: 'actions' }, h('a', { class: 'btn sec', href: deTournee ? '#/tournee' : '#/cockpit' }, deTournee ? 'Retour à la tournée' : 'Retour au cockpit'), h('a', { class: 'btn sec', href: '#/client/' + id }, 'Fiche'), h('a', { class: 'btn sec', href: '#/agenda/nouveau/' + id }, 'Fixer un rendez-vous'),
+        h('button', { class: 'btn sec', type: 'button', onclick: async () => { await putMany('clients', [JSON.parse(avant)]); if (agendaAvant) { if (agendaAvant.val === undefined) await rq(st('meta', 'readwrite').delete('agenda')); else await put('meta', agendaAvant.val, 'agenda'); } toast('Visite annulée : fiche remise comme avant.'); const cible = '#/visite/' + id + (deTournee ? '?t=1' : ''); if (location.hash === cible) pageVisite(id); else location.hash = cible; } }, 'Annuler cette visite')), h('div', { style: 'height:96px' }));
   };
   const etapeSuite = () => montrer('Visite · ' + c.nom, ...entete(total(), total(), choix.resultat === 'vu' ? 'Et ensuite ?' : 'Quand repasser ?'), V.choixSuite(choix.resultat).map(s => gros(s[1], '', () => { choix.suite = s[0]; enregistrer(); }, 'sec')), noteIn);
   const etapeRetour = () => montrer('Visite · ' + c.nom, ...entete(2, total(), 'Qu’est-ce qui est ressorti ?'), V.RETOURS.map(r => gros(r[1], '', () => { choix.retour = r[0]; etapeSuite(); }, 'sec')), noteIn);
@@ -2210,17 +2214,21 @@ async function pageProposition() {
   for (const c of cl) if (c.codeEbp && parCode.has(c.codeEbp)) { const x = parCode.get(c.codeEbp); facturation[c.id] = { derniere: x.derniereFacture, moisCents: x.periodeCents }; }
   const sections = ODICOLOR_COCKPIT.calculer({ auj, facturation, clients: cl, devis: dv, relanceJours: S.relanceJours || 3, totalDevis: d => totaux(d).ht, ca: { renseigne: false }, sansLimite: true }).sections;
   const parId = new Map(cl.map(c => [c.id, c])), position = id => { const c = parId.get(id), p = c ? ODICOLOR_CARTE.placer(c) : null; return p && p.precision ? { lat: p.lat, lng: p.lng } : null; };
-  const T0 = await lireTournees(), existant = T0[auj], r = ODICOLOR_TOURNEE.proposer(sections, position, { max: 8, rayonKm: 25 });
+  const T0 = await lireTournees(), existant = T0[auj], r0 = ODICOLOR_TOURNEE.proposer(sections, position, { max: 8, rayonKm: 25 });
+  const agenda = await get('meta', 'agenda'), rdvJour = ODICOLOR_RDV.duJour(agenda, auj), integ = ODICOLOR_RDV.integrer(rdvJour, r0.ids, position), heures = {};
+  for (const x of integ.sequence) if (x.rdv) heures[x.id] = x.rdv.heure;
+  const r = { ...r0, ids: integ.sequence.map(x => x.id), details: integ.sequence.map(x => r0.details.find(d => d.id === x.id) || { id: x.id, score: 0, raisons: ['Rendez-vous ' + x.rdv.heure + (x.rdv.duree ? ' (' + x.rdv.duree + ' min)' : '')] }), avert: integ.avertissements };
   const coches = new Map(r.ids.map(id => [id, h('input', { type: 'checkbox', checked: true, 'aria-label': 'Inclure ' + (parId.get(id) || {}).nom, style: 'width:24px;height:24px' })]));
   const valider = async () => {
     const ids = r.ids.filter(id => coches.get(id).checked); if (!ids.length) { toast('Coche au moins un garage.', true); return; }
     const T = await lireTournees(); const ex = T[auj];
     if (ex && ex.ids && Object.keys(ex.res || {}).length && !confirm('Une tournée est déjà commencée aujourd’hui (' + Object.keys(ex.res).length + ' garage(s) traité(s)). La remplacer ?')) return;
-    T[auj] = { ids, res: {} }; await ecrireTournees(T); toast('Tournée du jour : ' + ids.length + ' garage(s).'); location.hash = '#/tournee';
+    T[auj] = { ids, res: {}, rdv: Object.fromEntries(ids.filter(id => heures[id]).map(id => [id, heures[id]])) }; await ecrireTournees(T); toast('Tournée du jour : ' + ids.length + ' garage(s).'); location.hash = '#/tournee';
   };
   montrer('Tournée proposée',
     r.ids.length ? [h('div', { class: 'carte obj' }, h('strong', {}, r.ids.length + ' garage(s) proches les uns des autres'), h('p', { class: 'mut' }, 'Distance à vol d’oiseau ≈ ' + r.kmApprox + ' km entre les garages (position = centre de la commune quand le GPS manque). Ordre de passage : du plus proche au plus proche.' + (r.sansPosition ? ' ' + r.sansPosition + ' garage(s) prioritaire(s) sans position ne sont pas proposés.' : ''))),
-      r.details.map((d, i) => { const c = parId.get(d.id); return h('label', { class: 'carte', style: 'display:flex;gap:12px;align-items:flex-start;min-height:56px' }, coches.get(d.id), h('span', { style: 'flex:1' }, h('strong', {}, (i + 1) + '. ' + c.nom), h('br'), h('small', { class: 'mut' }, (c.ville || '') + ' · ' + d.raisons.join(' · ')))); }),
+      r.details.map((d, i) => { const c = parId.get(d.id); return h('label', { class: 'carte', style: 'display:flex;gap:12px;align-items:flex-start;min-height:56px' }, coches.get(d.id), h('span', { style: 'flex:1' }, h('strong', {}, (i + 1) + '. ' + c.nom), h('br'), h('small', { class: 'mut' }, (heures[d.id] ? '⏰ RDV ' + heures[d.id] + ' · ' : '') + (c.ville || '') + ' · ' + d.raisons.join(' · ')))); }),
+      (r.avert && r.avert.length) ? h('div', { class: 'carte alerte', role: 'alert' }, h('strong', {}, 'Attention : '), r.avert.join(' ')) : null,
       h('div', { class: 'actions' }, h('button', { class: 'btn gros', type: 'button', onclick: valider }, 'Valider cette tournée'), h('a', { class: 'btn sec', href: '#/cockpit' }, 'Annuler')),
       existant && existant.ids ? h('p', { class: 'mut' }, 'Une tournée existe déjà aujourd’hui (' + existant.ids.length + ' garage(s)). La valider la remplace.') : null]
       : [h('p', { class: 'vide' }, r.motif || 'Rien à proposer.'), h('p', { class: 'mut' }, 'Renseigne la ville et le code postal sur les fiches, ajoute des rappels et des priorités A/B : la proposition s’en nourrit.'), h('a', { class: 'btn sec', href: '#/tournee' }, 'Choisir à la main')],
@@ -2295,6 +2303,35 @@ async function pageSecteurs(dep) {
   }
   const lignes = r.communes.filter(c => c.dep === dep);
   montrer('Secteur ' + dep, h('a', { class: 'btn sec', href: '#/secteurs' }, '‹ Tous les départements'), entete, lignes.length ? lignes.map(c => carteSecteur(c, '#/ville/' + c.id)) : h('p', { class: 'vide' }, 'Aucun garage dans ce département.'), h('div', { style: 'height:96px' }));
+}
+
+// ---------- Rendez-vous avec heure ----------
+async function pageAgenda(clientPre) {
+  const cl = (await getAll('clients')).sort((a, b) => String(a.nom).localeCompare(String(b.nom), 'fr')), parId = new Map(cl.map(c => [c.id, c])), auj = jourLocal(new Date());
+  const A = await get('meta', 'agenda'), R = ODICOLOR_RDV;
+  const cli = h('select', { 'aria-label': 'Garage du rendez-vous' }, h('option', { value: '' }, 'Garage…'), cl.map(c => h('option', { value: c.id, selected: c.id === clientPre }, c.nom)));
+  const dt = h('input', { type: 'date', value: auj, min: auj, 'aria-label': 'Date du rendez-vous' }), hr = h('input', { type: 'time', value: '09:00', 'aria-label': 'Heure du rendez-vous' });
+  const du = h('select', { 'aria-label': 'Durée' }, R.DUREES.map(d => h('option', { value: d, selected: d === R.DUREE_DEFAUT }, d + ' min'))), ob = h('input', { maxlength: 200, placeholder: 'Objet (facultatif)', 'aria-label': 'Objet du rendez-vous' }), msg = h('p', { class: 'mut', role: 'status' });
+  const sauver = async (m, texte) => { await put('meta', m, 'agenda'); if (texte) toast(texte); pageAgenda(null); };
+  const creer = async confirme => {
+    const c = parId.get(Number(cli.value));
+    try { await sauver(R.ajouter(await get('meta', 'agenda'), { clientId: c ? c.id : 0, clientNom: c ? c.nom : '', date: dt.value, heure: hr.value, duree: Number(du.value), objet: ob.value }, { id: nouvelUid(), maintenant: new Date().toISOString(), auj, confirme }), 'Rendez-vous enregistré.'); }
+    catch (e) { if (e.confirmation) { if (confirm(e.controle.avertissements.join('\n') + '\n\nEnregistrer quand même ?')) await creer(true); } else { msg.textContent = e.message; msg.style.color = 'var(--ko)'; } }
+  };
+  const aVenir = R.aVenir(A, auj, 14);
+  const carteRdv = r => { const c = parId.get(r.clientId);
+    const nd = h('input', { type: 'date', value: r.date, min: auj, 'aria-label': 'Nouvelle date' }), nh = h('input', { type: 'time', value: r.heure, 'aria-label': 'Nouvelle heure' });
+    return h('div', { class: 'carte' }, h('div', { class: 'elan-tete' }, h('strong', {}, r.heure + ' · ' + (c ? c.nom : r.clientNom)), h('small', { class: 'mut' }, r.duree + ' min')),
+      r.objet ? h('p', { class: 'mut' }, r.objet) : null, c && c.ville ? h('p', { class: 'mut' }, c.ville) : null,
+      h('div', { class: 'actions' }, h('a', { class: 'btn', href: '#/visite/' + r.clientId }, 'Visiter'),
+        h('button', { class: 'btn sec', type: 'button', onclick: async () => { await sauver(R.terminer(await get('meta', 'agenda'), r.id, { maintenant: new Date().toISOString() }), 'Rendez-vous terminé.'); } }, 'Terminé'),
+        h('button', { class: 'btn sec', type: 'button', onclick: async () => { const mo = prompt('Motif de l’annulation :'); if (!mo || !mo.trim()) return; await sauver(R.annuler(await get('meta', 'agenda'), r.id, mo, { maintenant: new Date().toISOString() }), 'Rendez-vous annulé.'); } }, 'Annuler')),
+      h('details', {}, h('summary', {}, 'Déplacer'), nd, nh, h('button', { class: 'btn sec', type: 'button', onclick: async () => { try { await sauver(R.deplacer(await get('meta', 'agenda'), r.id, nd.value, nh.value, { maintenant: new Date().toISOString(), auj }), 'Rendez-vous déplacé.'); } catch (e) { toast(e.message, true); } } }, 'Enregistrer le déplacement'))); };
+  const jours = [...new Set(aVenir.map(r => r.date))];
+  montrer('Rendez-vous', h('div', { class: 'carte obj' }, h('strong', {}, aVenir.filter(r => r.date === auj).length + ' rendez-vous aujourd’hui · ' + aVenir.length + ' dans les 14 jours'), h('p', { class: 'mut' }, 'Les rendez-vous du jour deviennent des points fixes de la tournée proposée. Les temps de trajet affichés sont des estimations à vol d’oiseau.')),
+    h('div', { class: 'actions' }, h('a', { class: 'btn', href: '#/proposition' }, 'Proposer ma tournée du jour')),
+    jours.length ? jours.map(j => [h('h2', {}, j === auj ? 'Aujourd’hui' : dateFr(j + 'T12:00:00')), aVenir.filter(r => r.date === j).map(carteRdv)]) : h('p', { class: 'vide' }, 'Aucun rendez-vous à venir.'),
+    h('h2', {}, 'Nouveau rendez-vous'), cli, dt, hr, du, ob, msg, h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onclick: () => creer(false) }, 'Enregistrer')), h('div', { style: 'height:96px' }));
 }
 
 async function pageReglages() {
