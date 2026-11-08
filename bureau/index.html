@@ -1468,11 +1468,32 @@ function rendre(){
 // ================= Import (lecture seule) =================
 // Lit .odicolor (intégrité vérifiée) ou ancien .json. En cas de refus, les garages affichés
 // jusque-là restent affichés : un mauvais fichier ne fait jamais perdre ce qui était chargé.
+function demanderPhrase(titre){
+  return new Promise(ok => {
+    const v = document.createElement('div'); v.className = 'vf-voile'; v.setAttribute('role','dialog'); v.setAttribute('aria-modal','true');
+    v.innerHTML = '<form class="vf-modale"><h2>Phrase secrète</h2><p class="vf-msg"></p><input type="password" autocomplete="off" class="vf-chercher" aria-label="Phrase secrète" style="width:100%"><div class="vf-actions"><button type="button" class="vf-btn vf-non" data-x="n">Annuler</button><button type="submit" class="vf-btn vf-oui">Ouvrir</button></div></form>';
+    v.querySelector('.vf-msg').textContent = titre + ' Saisis la phrase choisie sur le téléphone. Elle n’est pas conservée.';
+    const f = v.querySelector('form'), i = v.querySelector('input');
+    const fin = val => { v.remove(); ok(val); };
+    f.addEventListener('submit', e => { e.preventDefault(); fin(i.value || null); });
+    v.querySelector('[data-x]').addEventListener('click', () => fin(null));
+    document.body.append(v); i.focus();
+  });
+}
 async function importer(f){
   if (!f || etat.lecture) return;
   etat.lecture = true; etat.message = {texte:'Vérification de « ' + f.name + ' »…'}; rendre();
   try {
-    const r = await window.LectureSauvegarde.lire(f);
+    let r;
+    try { r = await window.LectureSauvegarde.lire(f); }
+    catch (e0) {
+      if (!e0 || e0.code !== 'PHRASE_REQUISE') throw e0;
+      for (let essai = 0; ; essai++) { // sauvegarde chiffrée : phrase demandée, jamais conservée
+        const phrase = await demanderPhrase(essai ? 'Phrase incorrecte, réessaie.' : 'Cette sauvegarde est chiffrée.');
+        if (phrase == null) throw new Error('lecture annulée (phrase secrète non saisie).');
+        try { r = await window.LectureSauvegarde.lire(f, { phrase }); break; } catch (e1) { if (!e1 || e1.code !== 'PHRASE_INCORRECTE' || essai >= 4) throw e1; }
+      }
+    }
     etat.telephone = r.telephone; // devis du téléphone : utilisés par l'écran Bureau (pipeline)
     etat.garagesTelephone = r.garages; // fiches d'origine, jamais modifiées
     etat.sauvegardeTelephone = { telephone: r.telephone, garages: r.garages, rapport: r.rapport }; // pour le coffre (le retour à la démo ne l'efface pas)

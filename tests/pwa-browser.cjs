@@ -30,16 +30,16 @@ before(async()=>{
 });
 after(async()=>{await browser?.close();if(server?.listening)await new Promise(r=>server.close(r));if(temp)fs.rmSync(temp,{recursive:true,force:true});});
 async function installed(context,old=false){
-  const page=await context.newPage();await page.goto(origin+'/#/reglages');await page.getByRole('button',{name:old?'Télécharger une sauvegarde':'Télécharger une sauvegarde complète',exact:true}).waitFor();
+  const page=await context.newPage();await page.goto(origin+'/#/reglages');await page.getByRole('button',{name:old?'Télécharger une sauvegarde':'Télécharger une sauvegarde chiffrée',exact:true}).waitFor();
   await page.evaluate(()=>navigator.serviceWorker.ready);await page.reload();await page.waitForFunction(()=>navigator.serviceWorker.controller!==null);
-  await page.getByRole('button',{name:old?'Télécharger une sauvegarde':'Télécharger une sauvegarde complète',exact:true}).waitFor();return page;
+  await page.getByRole('button',{name:old?'Télécharger une sauvegarde':'Télécharger une sauvegarde chiffrée',exact:true}).waitFor();return page;
 }
 async function waiting(page){await page.evaluate(async()=>{const r=await navigator.serviceWorker.getRegistration();await r.update()});await page.waitForFunction(async()=>!!(await navigator.serviceWorker.getRegistration()).waiting);}
 async function nextVersion(context,page){
   await page.close();
   for(let i=0;i<6;i++){
     await delay(250);const p=await context.newPage();await p.goto(origin+'/#/reglages');
-    await p.getByRole('button',{name:'Télécharger une sauvegarde complète',exact:true}).waitFor();
+    await p.getByRole('button',{name:'Télécharger une sauvegarde chiffrée',exact:true}).waitFor();
     if(await p.evaluate(()=>window.ODICOLOR_PWA.release)===manifestB.id)return p;
     await p.close();
   }
@@ -58,7 +58,7 @@ for(const failure of ['bad-503','bad-sha'])test('installation '+failure+' refus�
   mode=failure;await failedInstall(page);
   assert.equal(await page.evaluate(()=>ODICOLOR_PWA.release),manifestA.id);
   const keys=await page.evaluate(()=>caches.keys());assert.ok(keys.some(k=>k.endsWith(manifestA.id)));assert.equal(keys.some(k=>k.endsWith(manifestB.id)),false);
-  await context.setOffline(true);await page.reload();await page.getByRole('button',{name:'Télécharger une sauvegarde complète',exact:true}).waitFor();assert.equal(await page.evaluate(async()=>(await get('clients',1)).nom),'GARAGE SYNTHETIQUE A');assert.equal(await page.evaluate(()=>ODICOLOR_PWA.release),manifestA.id);await context.close();
+  await context.setOffline(true);await page.reload();await page.getByRole('button',{name:'Télécharger une sauvegarde chiffrée',exact:true}).waitFor();assert.equal(await page.evaluate(async()=>(await get('clients',1)).nom),'GARAGE SYNTHETIQUE A');assert.equal(await page.evaluate(()=>ODICOLOR_PWA.release),manifestA.id);await context.close();
 });
 test('mise à jour en attente : saisie conservée, activation à la fermeture, aucun mélange',async()=>{
   mode='A';const context=await browser.newContext();let page=await installed(context);
@@ -69,7 +69,7 @@ test('mise à jour en attente : saisie conservée, activation à la fermeture, a
   const old=manifestA.assets.find(e=>e.path==='pwa-client.js');const text=await page.evaluate(async url=>(await fetch(url)).text(),'pwa-client.js?odicolor='+old.sha256);assert.ok(text.includes(manifestA.id));
   assert.equal(await page.evaluate(async()=>(await fetch('app.js')).status),503);
   assert.equal(await page.evaluate(async()=>(await fetch('app.js?odicolor='+'0'.repeat(64))).status),503);
-  await context.setOffline(true);await page.reload();await page.getByRole('button',{name:'Télécharger une sauvegarde complète',exact:true}).waitFor();assert.equal(await page.evaluate(()=>ODICOLOR_PWA.release),manifestB.id);await context.close();
+  await context.setOffline(true);await page.reload();await page.getByRole('button',{name:'Télécharger une sauvegarde chiffrée',exact:true}).waitFor();assert.equal(await page.evaluate(()=>ODICOLOR_PWA.release),manifestB.id);await context.close();
 });
 test('premier chargement incohérent : intégrité bloquante avant toute migration',async()=>{
   mode='initial-bad';const context=await browser.newContext(),page=await context.newPage();await page.goto(origin+'/#/reglages');await page.getByRole('alert').waitFor();
@@ -80,12 +80,12 @@ test('transition depuis le vrai terrain-v47 : ancien écran intact puis migratio
   await page.evaluate(()=>putMany('clients',[{id:1,nom:'GARAGE SYNTHETIQUE V47'}]));await page.locator('input[aria-label="Nom sur le devis"]').fill('BROUILLON V47');
   mode='B';await waiting(page);assert.equal(await page.evaluate(()=>DB.db.version),1);assert.equal(await page.locator('input[aria-label="Nom sur le devis"]').inputValue(),'BROUILLON V47');
   page=await nextVersion(context,page);assert.equal(await page.evaluate(()=>DB.db.version),2);assert.equal(await page.evaluate(async()=>(await get('clients',1)).nom),'GARAGE SYNTHETIQUE V47');assert.ok((await page.evaluate(()=>caches.keys())).includes('terrain-v47'));
-  await context.setOffline(true);await page.reload();await page.getByRole('button',{name:'Télécharger une sauvegarde complète',exact:true}).waitFor();assert.equal(await page.evaluate(()=>ODICOLOR_PWA.release),manifestB.id);await context.close();
+  await context.setOffline(true);await page.reload();await page.getByRole('button',{name:'Télécharger une sauvegarde chiffrée',exact:true}).waitFor();assert.equal(await page.evaluate(()=>ODICOLOR_PWA.release),manifestB.id);await context.close();
 });
 test('réparation en ligne d’une ressource évincée : uniquement ses octets attendus',async()=>{
   mode='A';const context=await browser.newContext(),page=await installed(context),entry=manifestA.assets.find(e=>e.path==='app.js'),url=origin+'/app.js?odicolor='+entry.sha256;
   await page.evaluate(async({id,url})=>{for(const k of await caches.keys())if(k.endsWith(id))await (await caches.open(k)).delete(url)},{id:manifestA.id,url});
   assert.equal(await page.evaluate(async url=>(await fetch(url)).status,url),200);
   await page.waitForFunction(async({id,url})=>{for(const k of await caches.keys())if(k.endsWith(id))return !!await(await caches.open(k)).match(url);return false},{id:manifestA.id,url});
-  await context.setOffline(true);await page.reload();await page.getByRole('button',{name:'Télécharger une sauvegarde complète',exact:true}).waitFor();assert.equal(await page.evaluate(()=>ODICOLOR_PWA.release),manifestA.id);await context.close();
+  await context.setOffline(true);await page.reload();await page.getByRole('button',{name:'Télécharger une sauvegarde chiffrée',exact:true}).waitFor();assert.equal(await page.evaluate(()=>ODICOLOR_PWA.release),manifestA.id);await context.close();
 });

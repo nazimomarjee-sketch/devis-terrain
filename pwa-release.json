@@ -1,5 +1,5 @@
 {
-  "id": "083c65c68be4758197823d50bb733d067b0acb42f3adec5141f2a6cf80fd7353",
+  "id": "9ff94a824526afdb82c853cf7c9b1455688018071095b8a5fb9a8d493b7ad653",
   "assets": [
     {
       "path": "accueil-v23.css",
@@ -19,7 +19,7 @@
     },
     {
       "path": "app.js",
-      "sha256": "1dd4c7262b33dcedb8506a3d0f91d6970e1fbcfa97fab2af129bb7b297a0efbf"
+      "sha256": "477909dc263fd854e1ff4e9f917722384b1307cf41655def6bd8833d1d6a64d9"
     },
     {
       "path": "apparence-v26.css",
@@ -95,7 +95,7 @@
     },
     {
       "path": "index.html",
-      "sha256": "e4e256a97b166a831d9fc80e11cff77f2695ab0aa95c8eb53a561f8186a68720"
+      "sha256": "745c1952c65d0254ef0e4b5fe62d11812c77d2713934709ab34ae48e116f7c66"
     },
     {
       "path": "logo-96.png",
@@ -139,7 +139,7 @@
     },
     {
       "path": "pwa-client.js",
-      "sha256": "f48c1922377a4f2038d26712750d5f4563722f4a5fddfc42141acd6ceb6f5b56"
+      "sha256": "1d8bc3c4c90b42d99b18e33cfa49f86965877464349817dcdac59f41071088a8"
     },
     {
       "path": "rappels-produits-v24.js",
@@ -147,7 +147,7 @@
     },
     {
       "path": "recuperation-v47.html",
-      "sha256": "017d4b29bbf0b484b08543379a7a7e4c02bd289837e7ec2dffff276f44acbffc"
+      "sha256": "9bb47d81c889407bdd2e9d68582ad1e1b44a58aee6cf186ee7c0022c452f3118"
     },
     {
       "path": "recuperation-v47.js",
@@ -155,7 +155,7 @@
     },
     {
       "path": "sauvegarde-locale.js",
-      "sha256": "d7857c85e27369f161944083ae282635ec399a43c05a32432b13ca1d2436a1fe"
+      "sha256": "dd201e0d39d9678fb1975435681d08dbf75097153610211723feb1db9874d7e3"
     },
     {
       "path": "style-v22.css",

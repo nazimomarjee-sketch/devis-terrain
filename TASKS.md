@@ -3,7 +3,7 @@ Légende : ✅ fait et testé · 🟡 partiel · ⬜ à faire
 ## P0 fiabilité
 - ✅ T1 Sauvegarde complète `.odicolor` + restauration sûre + PWA hors ligne (Lot 1 intégré). *Critère : tests backup/pwa/null-ui/stabilisation verts.*
 - ✅ T2 Lecture téléphone→Bureau sans perte à 1 500 garages. *Test `integration-telephone-bureau`.*
-- ⬜ T3 Chiffrer/protéger l'export `.odicolor` (issue #6). *Critère : export illisible sans phrase secrète, restauration testée, ancienne sauvegarde toujours lisible.* (arbitrage B4)
+- ✅ T3 Export `.odicolor` chiffré (AES-256-GCM, PBKDF2-SHA256 600 000, phrase jamais conservée, relecture avant téléchargement) ; anciennes sauvegardes importables ; Bureau lit les fichiers chiffrés. *Tests : backup-chiffre (10), intégration (4), navigateur téléphone.*
 - ⬜ T4 Test restauration sur gros volume profil `terrain` (2000 clients/10000 devis) dans la CI. *Critère : temps + zéro perte.*
 - ⬜ T5 Protocole de test Samsung (photos, PDF, hors ligne, restauration) écrit pas à pas, une page. *Critère : le propriétaire l'exécute en 20 min.*
 ## P1 production terrain

@@ -12,6 +12,7 @@
   if (!L0) throw new Error('bureau-logique.js doit être chargé avant lecture-sauvegarde.js');
 
   const MAGIC = 'ODICOLOR-BACKUP-2\n';
+  const MAGIC_ENC = 'ODICOLOR-BACKUP-2E\n'; // sauvegarde chiffrée par phrase secrète (AES-256-GCM, clé PBKDF2-SHA256) : même format que le téléphone
   // Mêmes limites que le téléphone : un fichier qu'il produit est toujours lisible ici.
   const MAX_FICHIER = 1024 * 1024 * 1024, MAX_ENTETE = 64 * 1024 * 1024, MAX_PIECE = 128 * 1024 * 1024, MAX_JSON = 25 * 1024 * 1024;
   const MAX_PROFONDEUR = 64;
@@ -53,6 +54,26 @@
       return out;
     }
     refus('Sauvegarde invalide : type de donnée inconnu.');
+  }
+
+  // Déchiffre une sauvegarde chiffrée par le téléphone. La phrase n'est ni conservée ni journalisée. Renvoie le fichier clair (Blob) ou refuse avec un code.
+  async function dechiffrer(fichier, phrase) {
+    if (typeof phrase !== 'string' || !phrase) { const e = new Error('Cette sauvegarde est chiffrée : saisis sa phrase secrète.'); e.refus = true; e.code = 'PHRASE_REQUISE'; throw e; }
+    const o = MAGIC_ENC.length;
+    if (fichier.size < o + 4 + 16) refus('Sauvegarde chiffrée tronquée : refais l’export sur le téléphone.');
+    const lg = new DataView(await fichier.slice(o, o + 4).arrayBuffer()).getUint32(0, true);
+    if (!lg || lg > 65536 || o + 4 + lg >= fichier.size) refus('En-tête de chiffrement invalide ou tronqué.');
+    const bytes = new Uint8Array(await fichier.slice(o + 4, o + 4 + lg).arrayBuffer());
+    let h; try { h = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)); } catch (_) { refus('En-tête de chiffrement illisible.'); }
+    if (!objet(h) || h.appli !== 'devis-terrain' || h.chiffre !== 1 || h.kdf !== 'PBKDF2-SHA256' || h.algo !== 'AES-256-GCM' || !entier(h.iterations, 100000, 5000000)) refus('Chiffrement de version inconnue : mets le Bureau à jour.');
+    const deb64 = t => { try { return Uint8Array.from(atob(t), c => c.charCodeAt(0)); } catch (_) { refus('Paramètres de chiffrement illisibles.'); } };
+    const sel = deb64(h.sel), iv = deb64(h.iv);
+    if (sel.length !== 16 || iv.length !== 12) refus('Paramètres de chiffrement invalides.');
+    const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(phrase.normalize('NFC')), 'PBKDF2', false, ['deriveKey']);
+    const cle = await crypto.subtle.deriveKey({ name: 'PBKDF2', hash: 'SHA-256', salt: sel, iterations: h.iterations }, base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+    const aad = new Uint8Array([...new TextEncoder().encode(MAGIC_ENC), ...bytes]);
+    try { return new Blob([await crypto.subtle.decrypt({ name: 'AES-GCM', iv, additionalData: aad }, cle, await fichier.slice(o + 4 + lg).arrayBuffer())]); }
+    catch (_) { const e = new Error('Phrase secrète incorrecte, ou fichier modifié ou corrompu. Rien n’a été chargé.'); e.refus = true; e.code = 'PHRASE_INCORRECTE'; throw e; }
   }
 
   async function lireOdicolor(fichier) {
@@ -112,11 +133,13 @@
   }
 
   // Point d'entrée. fichier = Blob ou File (navigateur ou Node 18+). Retourne { garages, rapport }.
-  async function lire(fichier) {
+  async function lire(fichier, options = {}) {
     if (!fichier || typeof fichier.slice !== 'function' || typeof fichier.size !== 'number') refus('Aucun fichier à lire.');
     if (!fichier.size) refus('Fichier vide : l’export n’a pas abouti. Refais-le sur le téléphone.');
     if (fichier.size > MAX_FICHIER) refus('Fichier trop volumineux (1 Go maximum).');
-    const prefixe = new TextDecoder().decode(await fichier.slice(0, MAGIC.length).arrayBuffer());
+    let prefixe = new TextDecoder().decode(await fichier.slice(0, MAGIC_ENC.length).arrayBuffer());
+    if (prefixe === MAGIC_ENC) { fichier = await dechiffrer(fichier, options.phrase); prefixe = new TextDecoder().decode(await fichier.slice(0, MAGIC.length).arrayBuffer()); }
+    else prefixe = prefixe.slice(0, MAGIC.length);
     let lu;
     if (prefixe === MAGIC) lu = await lireOdicolor(fichier);
     else if (prefixe.startsWith('ODICOLOR-BACKUP-')) refus('Sauvegarde .odicolor d’une version plus récente que ce Bureau : mets le Bureau à jour.');
@@ -145,7 +168,7 @@
       'Pas de contrôle d’intégrité possible sur ce format : préfère la sauvegarde complète .odicolor.';
   }
 
-  const api = { lire, message, MAGIC, MAX_FICHIER, MAX_JSON };
+  const api = { lire, dechiffrer, message, MAGIC, MAGIC_ENC, MAX_FICHIER, MAX_JSON };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else racine.LectureSauvegarde = api;
 })(typeof self !== 'undefined' ? self : this);

@@ -1953,7 +1953,9 @@ async function pageReglages() {
   const stock = h('p', { class: 'mut' }, 'Stockage : vérification…');
   if (navigator.storage && navigator.storage.persist) navigator.storage.persisted().then(p => { stock.textContent = p ? 'Stockage protégé : le navigateur ne l’effacera pas tout seul.' : 'Stockage non protégé : fais une sauvegarde régulièrement.'; });
   const fich = h('input', { type: 'file', accept: '.odicolor,.json', 'aria-label': 'Fichier de sauvegarde' });
-  const recuperations = await panneauRecuperations();
+  const champPhrase = (nom) => h('input', { type: 'password', autocomplete: 'new-password', 'aria-label': nom, autocapitalize: 'off', spellcheck: 'false' });
+  const phrase1 = champPhrase('Phrase secrète'), phrase2 = champPhrase('Confirmer la phrase secrète'), phraseRestau = champPhrase('Phrase secrète de la sauvegarde à restaurer');
+  const recuperations = await panneauRecuperations(() => phrase1.value);
   montrer('Réglages',
     h('div', { class: 'carte alerte' }, 'Valeurs par défaut non confirmées : TVA 8,5 % et remise maximale 60 % sont des hypothèses. Vérifie-les avant usage réel.'),
     h('label', {}, 'TVA (%)'), tva, h('label', {}, 'Remise maximale (%)'), rem, h('label', {}, 'Indicatif WhatsApp (33 = France, 262 = La Réunion)'), ind, h('label', {}, 'Nom sur le devis'), soc, h('label', {}, 'Ton nom (joint aux devis envoyés)'), ven,
@@ -1978,18 +1980,23 @@ async function pageReglages() {
     } }, 'Enregistrer')),
     h('h2', {}, 'Sauvegarde'),
     h('p', { class: 'mut' }, 'Tes devis et clients ne sont QUE sur ce téléphone. Si tu perds le téléphone ou effaces les données du navigateur, ils sont perdus. Sauvegarde régulièrement, puis envoie le fichier où tu veux.'),
+    h('p', { class: 'mut' }, 'Les sauvegardes sont chiffrées avec une phrase secrète (', String(ODICOLOR_BACKUP.PHRASE_MIN), ' caractères minimum). Elle n’est jamais enregistrée : si tu l’oublies, la sauvegarde est définitivement illisible. Note-la ailleurs que sur ce téléphone.'),
+    h('label', {}, 'Phrase secrète de la sauvegarde'), phrase1, h('label', {}, 'Confirme la phrase secrète'), phrase2,
     h('div', { class: 'actions' }, h('button', { class: 'btn', onclick: async event => {
-      const btn=event.currentTarget;btn.disabled=true;
-      try{const r=await exporterSauvegarde();toast('Copie préparée : '+r.garages+' garages, '+r.photos+' photos, '+r.pdf+' PDF. Vérifie les téléchargements.');}
+      const btn=event.currentTarget;
+      if(phrase1.value!==phrase2.value){toast('Les deux phrases ne sont pas identiques.',true);return}
+      btn.disabled=true;
+      try{const r=await exporterSauvegarde(phrase1.value);phrase1.value=phrase2.value='';toast('Copie chiffrée et relue : '+r.garages+' garages, '+r.photos+' photos, '+r.pdf+' PDF. Vérifie les téléchargements.');}
       catch(e){toast('Sauvegarde impossible : '+e.message,true)}finally{btn.disabled=false}
-    } }, 'Télécharger une sauvegarde complète')),
+    } }, 'Télécharger une sauvegarde chiffrée')),
     h('label', {}, 'Restaurer une sauvegarde (contrôle avant remplacement)'), fich,
+    h('label', {}, 'Phrase secrète (seulement si la sauvegarde est chiffrée)'), phraseRestau,
     h('p', {class:'mut'}, 'La sauvegarde complète inclut clients, notes, historiques, tarifs, photos, PDF et suivi PC. Conserve une copie hors du téléphone. Ferme les autres onglets ODICOLOR avant de restaurer. L’état remplacé sera conservé dans les copies de récupération ci-dessous.'),
     h('div', { class: 'actions' }, h('button', { class: 'btn sec', onclick: async event => {
       const btn=event.currentTarget;btn.disabled=true;
       try {
         const f = fich.files[0]; if (!f) { toast('Choisis un fichier de sauvegarde.', true); return; }
-        const o=await ODICOLOR_BACKUP.decode(f),resume=verifierSauvegardeLocale(o);
+        const o=await ODICOLOR_BACKUP.decode(f,{phrase:phraseRestau.value}),resume=verifierSauvegardeLocale(o);phraseRestau.value='';
         const avertissement=o.version===1
           ? ' Ancien JSON incomplet : aucun tarif, photo ou PDF n’est fourni. Le catalogue actif sera vide ; importe ensuite les tarifs EBP. Les tarifs, photos, PDF et suivis locaux remplacés resteront dans la copie de récupération, sans être mélangés au portefeuille restauré.'
           : ' Tarifs, photos, PDF et suivis actifs seront remplacés par ceux de la sauvegarde.';
@@ -2031,9 +2038,12 @@ function telechargerFichierSauvegarde(file, nom) {
   document.body.append(a);a.click();a.remove();
   setTimeout(()=>URL.revokeObjectURL(url),30000);
 }
-async function exporterSauvegarde() {
+async function exporterSauvegarde(phrase) {
+  // Chiffrement obligatoire : la phrase n'est jamais conservée. La copie est relue et déchiffrée AVANT d'être proposée au téléchargement.
   const data=await ODICOLOR_BACKUP.read(DB.db);
-  const {file,summary}=await ODICOLOR_BACKUP.encode(data);
+  const {file,summary}=await ODICOLOR_BACKUP.encodeChiffre(data,phrase);
+  const relu=await ODICOLOR_BACKUP.decode(file,{phrase});
+  if(relu.stores.clients.length!==summary.garages||relu.stores.devis.length!==summary.devis)throw new Error('Contrôle de relecture échoué : la copie n’est pas fournie.');
   telechargerFichierSauvegarde(file,'odicolor-sauvegarde-'+new Date().toISOString().replace(/[:.]/g,'-')+'.odicolor');
   return summary;
 }
@@ -2041,7 +2051,7 @@ async function exporterSauvegardePC() {
   const data=await ODICOLOR_BACKUP.read(DB.db,ODICOLOR_BACKUP.STORES);
   telecharger('odicolor-echange-pc-'+new Date().toISOString().slice(0,10)+'.json',JSON.stringify(ODICOLOR_BACKUP.pcExchange(data)),'application/json');
 }
-async function panneauRecuperations() {
+async function panneauRecuperations(lirePhrase) {
   const archives=await getAll(ODICOLOR_BACKUP.RECOVERY);
   const box=h('details',{class:'carte'},h('summary',{},'États conservés avant restauration · '+archives.length),
     h('p',{class:'mut'},'Ces copies locales permettent de retrouver l’état remplacé. Elles ne remplacent pas une sauvegarde conservée hors du téléphone. Aucune archive n’est effacée automatiquement.'));
@@ -2051,7 +2061,7 @@ async function panneauRecuperations() {
     for(const r of archives.slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(visible,visible+10)){
       const btn=h('button',{class:'btn sec',type:'button',onclick:async()=>{
         btn.disabled=true;
-        try{const {file,warning}=await ODICOLOR_BACKUP.encode(r.stores,{recovery:true});telechargerFichierSauvegarde(file,'odicolor-recuperation-'+r.id+'.odicolor');toast(warning?'Copie brute conservée : données à réparer avant restauration.':'Copie préparée : vérifie sa présence dans les téléchargements.',Boolean(warning));}
+        try{const ph=lirePhrase?lirePhrase():'';if(!ph)throw new Error('saisis d’abord la phrase secrète (copie chiffrée).');const {file,warning}=await ODICOLOR_BACKUP.encodeChiffre(r.stores,ph,{recovery:true});telechargerFichierSauvegarde(file,'odicolor-recuperation-'+r.id+'.odicolor');toast(warning?'Copie brute conservée : données à réparer avant restauration.':'Copie préparée : vérifie sa présence dans les téléchargements.',Boolean(warning));}
         catch(e){toast('Export impossible : '+e.message,true)}finally{btn.disabled=false}
       }},'Télécharger cette copie');
       list.append(h('div',{class:'carte'},h('strong',{},new Date(r.date).toLocaleString('fr-FR')),h('p',{class:'mut'},r.stores.clients.length+' garages · '+r.stores.devis.length+' devis'),btn));

@@ -55,22 +55,31 @@ test('legacy JSON ne réassocie pas les anciennes métadonnées et garde une ré
 test('application complète : modules chargés et sauvegarde complète dans Réglages',async()=>{
   const ui=await browser.newPage({viewport:{width:412,height:915}}),errors=[];ui.on('pageerror',e=>errors.push(e.message));
   await ui.goto('http://127.0.0.1:'+server.address().port+'/#/reglages');
-  await ui.getByRole('button',{name:'Télécharger une sauvegarde complète',exact:true}).waitFor();
-  const file=ui.waitForEvent('download');await ui.getByRole('button',{name:'Télécharger une sauvegarde complète',exact:true}).click();
+  await ui.getByRole('button',{name:'Télécharger une sauvegarde chiffrée',exact:true}).waitFor();
+  // Phrases différentes : refus, aucun téléchargement. Phrase trop courte : refus. Puis phrase valide : fichier chiffré, relu avec la phrase seulement.
+  await ui.getByLabel('Phrase secrète',{exact:true}).fill('une phrase secrète fictive 123');await ui.getByLabel('Confirmer la phrase secrète',{exact:true}).fill('autre chose');
+  await ui.getByRole('button',{name:'Télécharger une sauvegarde chiffrée',exact:true}).click();await ui.getByText('ne sont pas identiques').waitFor();
+  await ui.getByLabel('Confirmer la phrase secrète',{exact:true}).fill('une phrase secrète fictive 123');
+  const file=ui.waitForEvent('download');await ui.getByRole('button',{name:'Télécharger une sauvegarde chiffrée',exact:true}).click();
   const download=await file;assert.match(download.suggestedFilename(),/\.odicolor$/);
+  const chemin=path.join(temp,'ui-chiffre.odicolor');await download.saveAs(chemin);
+  const Bn=require('../sauvegarde-locale.js'),blob=new Blob([fs.readFileSync(chemin)]);
+  assert.equal(await Bn.estChiffre(blob),true);await assert.rejects(Bn.decode(blob),e=>e.code==='PHRASE_REQUISE');
+  assert.ok((await Bn.decode(blob,{phrase:'une phrase secrète fictive 123'})).stores.clients);
+  assert.equal(await ui.getByLabel('Phrase secrète',{exact:true}).inputValue(),'','la phrase est effacée du champ après usage');
   assert.deepEqual(errors,[]);await ui.close();
 });
 test('deux onglets : une ancienne fiche ne peut plus écrire après restauration',async()=>{
   const context=await browser.newContext(),first=await context.newPage(),second=await context.newPage();
   const url='http://127.0.0.1:'+server.address().port+'/#/reglages';
-  await first.goto(url);await first.getByRole('button',{name:'Télécharger une sauvegarde complète',exact:true}).waitFor();
-  await second.goto(url);await second.getByRole('button',{name:'Télécharger une sauvegarde complète',exact:true}).waitFor();
+  await first.goto(url);await first.getByRole('button',{name:'Télécharger une sauvegarde chiffrée',exact:true}).waitFor();
+  await second.goto(url);await second.getByRole('button',{name:'Télécharger une sauvegarde chiffrée',exact:true}).waitFor();
   await second.evaluate(()=>{window.ancienneFiche={id:1,nom:'Ancien portefeuille'};});
   await first.evaluate(async()=>{await restaurerSauvegardeLocale({appli:'devis-terrain',version:2,date:new Date().toISOString(),stores:{articles:[],clients:[{id:1,nom:'Nouveau portefeuille'}],devis:[],meta:[]}})});
   const blocked=await second.evaluate(async()=>{try{await putMany('clients',[window.ancienneFiche]);return false}catch(_){return true}});
   assert.equal(blocked,true);
   assert.equal(await first.evaluate(async()=>(await get('clients',1)).nom),'Nouveau portefeuille');
-  await second.reload();await second.getByRole('button',{name:'Télécharger une sauvegarde complète',exact:true}).waitFor();
+  await second.reload();await second.getByRole('button',{name:'Télécharger une sauvegarde chiffrée',exact:true}).waitFor();
   assert.equal(await second.evaluate(async()=>(await get('clients',1)).nom),'Nouveau portefeuille');
   await context.close();
 });

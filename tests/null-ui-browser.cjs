@@ -34,7 +34,7 @@ test('Tournée avec base vide : pas de « null » sous « Coche au moins un gara
 for(const statut of ['','ouvert','comptant'])test('Fiche client, compte « '+(statut||'non renseigné')+' » : pas de « null » dans la section Compte',async()=>{
   const context=await browser.newContext(),page=await context.newPage();
   await page.goto(origin+'/#/reglages');
-  await page.getByRole('button',{name:'Télécharger une sauvegarde complète',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Télécharger une sauvegarde chiffrée',exact:true}).waitFor();
   await page.evaluate(s=>putMany('clients',[{id:1,nom:'GARAGE SYNTHETIQUE NULL',compte:{statut:s},factures:[]}]),statut);
   await page.goto(origin+'/#/client/1');await page.reload();
   await page.getByText('à encaisser',{exact:true}).first().waitFor({state:'attached'});

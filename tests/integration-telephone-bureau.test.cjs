@@ -51,3 +51,14 @@ test('2. le modèle Ma Ville place chaque garage (téléphone + EBP fictif) une 
 test('3. performance : lecture de 1 500 garages et construction du modèle en quelques secondes au plus', () => {
   assert.ok(t.lecture < 5000, 'lecture ' + t.lecture + ' ms'); assert.ok(t.modele < 3000, 'modèle ' + t.modele + ' ms');
 });
+
+test('4. sauvegarde CHIFFRÉE par le téléphone : le Bureau demande la phrase, refuse la mauvaise, lit la bonne sans perte', async () => {
+  const stores = { articles: [], clients: clients.slice(0, 300), devis: [], meta: [['settings', { societe: 'ODICOLOR — INTEGRATION' }]], recuperations: [] };
+  const { file } = await B.encodeChiffre(stores, 'phrase fictive pour le test 2026');
+  await assert.rejects(LS.lire(file), e => e.code === 'PHRASE_REQUISE');
+  await assert.rejects(LS.lire(file, { phrase: 'mauvaise phrase fictive' }), e => e.code === 'PHRASE_INCORRECTE');
+  const r = await LS.lire(file, { phrase: 'phrase fictive pour le test 2026' });
+  assert.equal(r.garages.length, 300); assert.equal(r.telephone.clients[299].nom, clients[299].nom);
+  const claire = await LS.lire((await B.encode(stores)).file);
+  assert.deepEqual(r.garages.map(g => g.nom), claire.garages.map(g => g.nom), 'chiffrée ou non : exactement les mêmes garages');
+});

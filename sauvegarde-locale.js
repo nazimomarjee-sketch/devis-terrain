@@ -6,6 +6,10 @@ const ODICOLOR_BACKUP = (() => {
   const STORES = ['articles', 'clients', 'devis', 'meta'];
   const RECOVERY = 'recuperations';
   const MAGIC = 'ODICOLOR-BACKUP-2\n';
+  // Sauvegarde CHIFFRÉE : la sauvegarde complète ci-dessus (avec ses contrôles d'intégrité) est chiffrée en AES-256-GCM ;
+  // la clé dérive de la phrase secrète (PBKDF2-SHA256, sel aléatoire). La phrase n'est JAMAIS conservée ni écrite.
+  const MAGIC_ENC = 'ODICOLOR-BACKUP-2E\n';
+  const KDF_ITER = 600000, KDF_ITER_MIN = 100000, KDF_ITER_MAX = 5000000, PHRASE_MIN = 10, MAX_ENC_CLAIR = 256 * 1024 * 1024;
   const MAX_FILE = 1024 * 1024 * 1024, MAX_HEADER = 64 * 1024 * 1024;
   const MAX_ATTACHMENT = 128 * 1024 * 1024, MAX_LEGACY = 25 * 1024 * 1024;
   const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
@@ -285,8 +289,9 @@ const ODICOLOR_BACKUP = (() => {
     return {file,summary,warning};
   }
 
-  async function decode(file) {
+  async function decode(file, options={}) {
     if (!(file instanceof Blob) || !file.size || file.size>MAX_FILE) fail('Fichier vide ou trop volumineux (1 Go maximum).');
+    if (await estChiffre(file)) return decode(await dechiffrer(file,options.phrase));
     const prefix=await file.slice(0,MAGIC.length).text();
     if (prefix!==MAGIC) {
       if(prefix.startsWith('ODICOLOR-BACKUP-'))fail('Version de sauvegarde ODICOLOR non prise en charge.');
@@ -314,6 +319,52 @@ const ODICOLOR_BACKUP = (() => {
     if (cursor!==file.size) fail('Contenu supplémentaire inattendu dans la sauvegarde.');
     const o={appli:header.appli,version:header.version,date:header.date,stores:unpack(header.data,blobs)};
     validate(o);return o;
+  }
+
+  // ----- chiffrement par phrase secrète -----
+  const b64 = a => { let t=''; const u=new Uint8Array(a); for (let i=0;i<u.length;i+=8192) t+=String.fromCharCode.apply(null,u.subarray(i,i+8192)); return btoa(t); };
+  const unb64 = t => { try { return Uint8Array.from(atob(t),c=>c.charCodeAt(0)); } catch (_) { fail('En-tête de chiffrement illisible.'); } };
+  function phraseOk(phrase) {
+    if (typeof phrase!=='string') fail('Phrase secrète absente.');
+    const p=phrase.normalize('NFC');
+    if ([...p].length<PHRASE_MIN) fail('Phrase secrète trop courte : '+PHRASE_MIN+' caractères minimum.');
+    if (!p.trim()) fail('Phrase secrète vide.');
+    return p;
+  }
+  async function cle(phrase, sel, iterations) {
+    const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(phrase),'PBKDF2',false,['deriveKey']);
+    return crypto.subtle.deriveKey({name:'PBKDF2',hash:'SHA-256',salt:sel,iterations},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+  }
+  async function encodeChiffre(stores, phrase, options={}) {
+    const p=phraseOk(phrase);
+    const {file:clair,summary,warning}=await encode(stores,options);
+    if (clair.size>MAX_ENC_CLAIR) fail('Sauvegarde trop volumineuse pour le chiffrement sur téléphone (256 Mo maximum). Aucune sauvegarde n’a été créée ; rien n’a été modifié.');
+    const sel=crypto.getRandomValues(new Uint8Array(16)), iv=crypto.getRandomValues(new Uint8Array(12));
+    const entete=new TextEncoder().encode(JSON.stringify({appli:'devis-terrain',chiffre:1,kdf:'PBKDF2-SHA256',iterations:KDF_ITER,sel:b64(sel),iv:b64(iv),algo:'AES-256-GCM',taille:clair.size}));
+    const taille=new Uint8Array(4);new DataView(taille.buffer).setUint32(0,entete.length,true);
+    const aad=new Uint8Array([...new TextEncoder().encode(MAGIC_ENC),...entete]);
+    const chiffre=await crypto.subtle.encrypt({name:'AES-GCM',iv,additionalData:aad},await cle(p,sel,KDF_ITER),await clair.arrayBuffer());
+    return {file:new Blob([MAGIC_ENC,taille,entete,chiffre],{type:'application/octet-stream'}),summary,warning,chiffre:true};
+  }
+  async function estChiffre(file) {
+    return file instanceof Blob && file.size>=MAGIC_ENC.length && (await file.slice(0,MAGIC_ENC.length).text())===MAGIC_ENC;
+  }
+  async function dechiffrer(file, phrase) {
+    if (typeof phrase!=='string' || !phrase) throw Object.assign(new Error('Cette sauvegarde est chiffrée : saisis sa phrase secrète.'),{code:'PHRASE_REQUISE'});
+    const p=phrase.normalize('NFC'), o=MAGIC_ENC.length;
+    if (file.size<o+4+16) fail('Sauvegarde chiffrée tronquée.');
+    const len=new DataView(await file.slice(o,o+4).arrayBuffer()).getUint32(0,true);
+    if (!len || len>65536 || o+4+len>=file.size) fail('En-tête de chiffrement invalide ou tronqué.');
+    const bytes=new Uint8Array(await file.slice(o+4,o+4+len).arrayBuffer());
+    let h;try { h=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes)); } catch (_) { fail('En-tête de chiffrement illisible.'); }
+    if (!object(h)||h.appli!=='devis-terrain'||h.chiffre!==1||h.kdf!=='PBKDF2-SHA256'||h.algo!=='AES-256-GCM'||!integer(h.iterations,KDF_ITER_MIN,KDF_ITER_MAX)) fail('Chiffrement de version inconnue.');
+    const sel=unb64(h.sel), iv=unb64(h.iv);
+    if (sel.length!==16||iv.length!==12) fail('Paramètres de chiffrement invalides.');
+    const aad=new Uint8Array([...new TextEncoder().encode(MAGIC_ENC),...bytes]);
+    let clair;
+    try { clair=await crypto.subtle.decrypt({name:'AES-GCM',iv,additionalData:aad},await cle(p,sel,h.iterations),await file.slice(o+4+len).arrayBuffer()); }
+    catch (_) { throw Object.assign(new Error('Phrase secrète incorrecte, ou fichier modifié ou corrompu. Aucune donnée n’a été touchée.'),{code:'PHRASE_INCORRECTE'}); }
+    return new Blob([clair],{type:'application/octet-stream'});
   }
 
   function restore(db, backup, options={}) {
@@ -390,6 +441,6 @@ const ODICOLOR_BACKUP = (() => {
       signalements:m.get('signalements')||[],point:m.get('point')||null,comparateur:m.get('comparateur')||null,
       appels:m.get('appels')||[],tournees:m.get('tournees')||{},pcActions:m.get('pcActions')||[]};
   }
-  return {schema,read,validate,validateStores,legacy,encode,decode,restore,createV47Copy,pcExchange,STORES,RECOVERY,MAX_FILE};
+  return {schema,read,validate,validateStores,legacy,encode,encodeChiffre,estChiffre,decode,PHRASE_MIN,restore,createV47Copy,pcExchange,STORES,RECOVERY,MAX_FILE};
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports=ODICOLOR_BACKUP;

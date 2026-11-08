@@ -45,7 +45,7 @@ async function telephoneAvecPlan(heure) {
   page.on('pageerror', e => erreurs.push(e.message)); page.on('dialog', d => d.accept());
   await page.clock.setFixedTime(new Date('2026-11-06T' + heure + ':00'));
   await page.goto(origin + '/#/reglages');
-  await page.getByRole('button', { name: 'Télécharger une sauvegarde complète', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Télécharger une sauvegarde chiffrée', exact: true }).waitFor();
   await page.evaluate(() => putMany('clients', [{ id: 1, nom: 'GARAGE FICTIF OMEGA', ville: 'Massy', statutCrm: 'client' }, { id: 2, nom: 'GARAGE FICTIF KAPPA', ville: 'Palaiseau', statutCrm: 'client' }]));
   await page.click('text=Plan commercial du PC');
   await page.getByLabel('Plan PC à importer').setInputFiles(path.join(dossier, 'plan.json'));

@@ -35,7 +35,7 @@ async function installer() {
   page.on('pageerror', e => erreurs.push(e.message));
   page.on('dialog', d => d.accept());
   await page.goto(origin + '/#/reglages');
-  await page.getByRole('button', { name: 'Télécharger une sauvegarde complète', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Télécharger une sauvegarde chiffrée', exact: true }).waitFor();
   await page.evaluate(() => navigator.serviceWorker.ready);
   await page.reload();
   await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
@@ -66,7 +66,7 @@ test('parcours Samsung hors connexion : restauration, prix au Catalogue, photos 
     await context.setOffline(true);
     const avant = requetes;
     await page.reload();
-    await page.getByRole('button', { name: 'Télécharger une sauvegarde complète', exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Télécharger une sauvegarde chiffrée', exact: true }).waitFor();
     await restaurerDepuisReglages(page, chemin);
 
     // Données restaurées (lecture directe d'IndexedDB par les fonctions de l'appli).
