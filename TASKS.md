@@ -12,7 +12,7 @@ Légende : ✅ fait et testé · 🟡 partiel · ⬜ à faire
 - ⬜ T8 Rappels/rendez-vous + recherche rapide (<300 ms à 2000 fiches).
 ## P2 cockpit
 - 🟡 T9 Cockpit MOBILE (téléphone, sans PC, hors ligne) : CA facturé vs rythme des jours ouvrés, comptes bloqués, devis acceptés à commander, règlements en retard, rappels, devis à relancer, prospects prioritaires, clients à ne pas laisser dormir — chaque ligne avec sa raison. *Tests : cockpit-telephone (5), cockpit-browser (1).* Reste : mise en page grand écran du Bureau, secteur/analyse, import EBP.
-- ⬜ T10 Import EBP avec contrôle des doublons (existant à auditer avant de refaire).
+- ✅ T10 Import EBP du CA facturé (téléphone) : aperçu avant écriture, factures+avoirs HT seulement, doublons identiques ignorés, conflits jamais écrasés, traçabilité fichier+ligne, annulation d'import en bloc. *Tests : ca-ebp-telephone (9), ca-facture-browser (+2).* Colonnes EBP = hypothèse (aucun export réel reçu).
 - ⬜ T11 Commandes / facturé / encaissé en trois colonnes cohérentes.
 ## P3 carte & Ville
 - ⬜ T12 Carte >1 000 garages : filtres, clusters, couverture vs conquête ; import « Marché à prospecter » depuis le CSV officiel (convertisseur prêt).

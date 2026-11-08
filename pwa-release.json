@@ -1,5 +1,5 @@
 {
-  "id": "540cb142280306ba0c36efbe17ad29b46d5e07916231195d86a352a311fe92a7",
+  "id": "b60fa0b1569033293fa215e8d2cbd2f1169147e97dcad8b3533ce781652cc78a",
   "assets": [
     {
       "path": "accueil-v23.css",
@@ -19,7 +19,7 @@
     },
     {
       "path": "app.js",
-      "sha256": "2432a265d34a772ba444cd1ef1e5d7f359668a704181b475a7f1af4663c271f1"
+      "sha256": "99d8394cd328db7e65ca0a24960df828f2c5632789ba0108079987ae6fe9af87"
     },
     {
       "path": "apparence-v26.css",
@@ -38,8 +38,12 @@
       "sha256": "2515494e8cc2ca07c86ea78766cfa104b796aa6ed5d66821c01d51dbb0b52bce"
     },
     {
+      "path": "ca-ebp-v48.js",
+      "sha256": "3982268d234cbc6d73a14ff156c18b086c5d16f943de8678bf4db3f808a51da1"
+    },
+    {
       "path": "ca-facture-v48.js",
-      "sha256": "d5c18f45eb3bc5ee623772f4b564a1d5157101002f266b30771275dcfc3e453e"
+      "sha256": "a6b700fbab68e791d486f33ab6af7e32c9422c5902ff8dbc57c544cacb0c03e6"
     },
     {
       "path": "catalogues-pdf-v32.css",
@@ -103,7 +107,7 @@
     },
     {
       "path": "index.html",
-      "sha256": "f25bb1b90186214c502e232839b8a895b20bac82eccc62a1625bcc08e24bb2a7"
+      "sha256": "455d6b8c3d0a93c6a7955e539677b2f3a4b971f73a20e580c0276efec438d0e8"
     },
     {
       "path": "logo-96.png",
@@ -147,7 +151,7 @@
     },
     {
       "path": "pwa-client.js",
-      "sha256": "fdb973890ed397d1cca7bf2246b77fed6752c98028d8ad625b697b7df329dea7"
+      "sha256": "f435d2bab2ea3597d1b4cc5508894b6c60ee26b48bdba171d7184a8ac468aca1"
     },
     {
       "path": "rappels-produits-v24.js",
@@ -155,7 +159,7 @@
     },
     {
       "path": "recuperation-v47.html",
-      "sha256": "11e4bfe611508145253ee30a827d4430b87d75270e352fcb1352f92b5ffecbb6"
+      "sha256": "abe4c572c1c1f842b2f388879f94285e34f91dde8347b7920d5aa33cbf4d4788"
     },
     {
       "path": "recuperation-v47.js",
@@ -163,7 +167,7 @@
     },
     {
       "path": "sauvegarde-locale.js",
-      "sha256": "2ebb6c5a24d9defe9326c6642163b1d999c6f35cf9702c903ae9cbc1fc06196d"
+      "sha256": "2c10ba1492d33d1a258c972e3a87a1f1cac1fc6dec85ba125711d6a16272a15d"
     },
     {
       "path": "style-v22.css",

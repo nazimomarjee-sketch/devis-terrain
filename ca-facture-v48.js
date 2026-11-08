@@ -42,7 +42,7 @@ const ODICOLOR_CA = (() => {
     if (c.avertissements.length && !ctx.confirme) throw Object.assign(new Error('Confirmation nécessaire : ' + c.avertissements.join(' ')), { controle: c, confirmation: true });
     const entree = { id: ctx.id, type: e.type, numero: String(e.numero).trim().slice(0, 40), date: e.date, montantHt: e.montantHt,
       clientId: e.clientId == null ? null : e.clientId, clientNom: String(e.clientNom || '').trim().slice(0, 120), source: SOURCES.includes(e.source) ? e.source : 'saisie', saisiLe: ctx.maintenant };
-    return { version: 1, entrees: [...m.entrees, entree] };
+    return { ...m, version: 1, entrees: [...m.entrees, entree] };
   }
   function annuler(magasin, id, motif, ctx) {
     const m = normaliserMagasin(magasin), i = m.entrees.findIndex(x => x.id === id);
@@ -50,7 +50,7 @@ const ODICOLOR_CA = (() => {
     if (m.entrees[i].annule) throw new Error('Pièce déjà annulée.');
     if (!String(motif || '').trim()) throw new Error('Indique le motif de l’annulation.');
     const copie = m.entrees.slice(); copie[i] = { ...copie[i], annule: { le: ctx.maintenant, motif: String(motif).trim().slice(0, 200) } };
-    return { version: 1, entrees: copie };
+    return { ...m, version: 1, entrees: copie };
   }
   // CA d'une période [debut, fin] (jours ISO inclus) : factures − avoirs, pièces annulées ignorées.
   function calculer(magasin, debut, fin) {
@@ -76,6 +76,7 @@ const ODICOLOR_CA = (() => {
       if (e.annule != null && (typeof e.annule !== 'object' || !String(e.annule.motif || '').trim())) throw new Error('CA facturé : annulation sans motif.');
       if (!e.annule) { const k = cle(e); if (cles.has(k)) throw new Error('CA facturé : doublon de numéro ' + e.numero + '.'); cles.add(k); }
     }
+    if (m.imports != null) { if (!Array.isArray(m.imports)) throw new Error('CA facturé : historique des imports invalide.'); const iid = new Set(); for (const x of m.imports) { if (!x || typeof x.id !== 'string' || !x.id || iid.has(x.id)) throw new Error('CA facturé : import invalide ou répété.'); iid.add(x.id); } }
     return { pieces: m.entrees.length };
   }
   return { controler, ajouter, annuler, calculer, calculerMois, aDesPieces, valider, numeroNorm, vide, finDeMois };

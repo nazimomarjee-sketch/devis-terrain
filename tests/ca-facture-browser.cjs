@@ -65,3 +65,36 @@ test('rechargement : le CA saisi est conservé, et la sauvegarde chiffrée le re
   const octets=await page.evaluate(async()=>{const d=await ODICOLOR_BACKUP.read(DB.db),{file}=await ODICOLOR_BACKUP.encodeChiffre(d,'phrase fictive de test CA');const o=await ODICOLOR_BACKUP.decode(file,{phrase:'phrase fictive de test CA'});return new Map(o.stores.meta).get('caFacture').entrees.map(e=>[e.numero,e.montantHt]);});
   assert.deepEqual(octets,[['F-OFF',12345]]);assert.deepEqual(errs,[]);await context.close();
 });
+
+test('import EBP : aperçu sans écriture, import, réimport sans doublon, conflit non écrasé, annulation de l’import — CSV Windows-1252',async()=>{
+  const {context,page,errs}=await ouvrir();
+  const d1=iso(new Date(auj.getTime()-2*864e5)).split('-').reverse().join('/');
+  const csv=l=>Buffer.from(l.join('\r\n'),'latin1');
+  const f1=csv(['Type;N° de pièce;Date;Nom du client;Total HT','Facture;FA-100;'+d1+';GARAGE FICTIF É;1 000,00','Facture;FA-101;'+d1+';GARAGE FICTIF B;250,50','Avoir;AV-100;'+d1+';GARAGE FICTIF B;-50,00','Devis;DE-1;'+d1+';GARAGE FICTIF C;9 999,00']);
+  await page.goto(origin+'/#/ca/import');
+  await page.getByLabel('Export EBP des pièces').setInputFiles({name:'export-ebp-test.csv',mimeType:'text/csv',buffer:f1});
+  await page.getByText('3 pièce(s) à ajouter').waitFor();await page.getByText(/1 devis/).waitFor();
+  assert.equal(await page.evaluate(()=>get('meta','caFacture')),undefined,'rien n’est écrit avant confirmation');
+  await page.getByRole('button',{name:'Importer ces 3 pièces'}).click();await page.waitForURL(/#\/ca$/);
+  await page.getByText('1 200,50 €').first().waitFor();                       // 1000 + 250,50 − 50
+  // réimport du même fichier : 0 nouvelle
+  await page.goto(origin+'/#/ca/import');await page.getByLabel('Export EBP des pièces').setInputFiles({name:'export-ebp-test.csv',mimeType:'text/csv',buffer:f1});
+  await page.getByText('0 pièce(s) à ajouter').waitFor();await page.getByText(/3 déjà présente/).waitFor();
+  // conflit : même numéro, autre montant
+  const f2=csv(['Type;N° de pièce;Date;Nom du client;Total HT','Facture;FA-100;'+d1+';GARAGE FICTIF É;2 000,00']);
+  await page.getByLabel('Export EBP des pièces').setInputFiles({name:'export-modifie.csv',mimeType:'text/csv',buffer:f2});
+  await page.getByText(/1 conflit\(s\) non importé/).waitFor();
+  assert.equal((await page.evaluate(()=>get('meta','caFacture'))).entrees.length,3,'aucun écrasement');
+  // historique + annulation de l’import
+  await page.goto(origin+'/#/ca');await page.getByText(/export-ebp-test\.csv/).first().waitFor();
+  page.once('dialog',d=>d.accept('Mauvais fichier de test'));await page.getByRole('button',{name:'Annuler cet import'}).click();
+  await page.getByText(/export-ebp-test\.csv · annulé/).waitFor();
+  const m=await page.evaluate(()=>get('meta','caFacture'));assert.equal(m.entrees.length,3);assert.ok(m.entrees.every(e=>e.annule&&e.source==='ebp'&&e.import.fichier==='export-ebp-test.csv'));
+  assert.deepEqual(errs,[]);await context.close();
+});
+test('import EBP : fichier sans colonne HT refusé avec un message clair, rien écrit',async()=>{
+  const {context,page,errs}=await ouvrir();
+  await page.goto(origin+'/#/ca/import');await page.getByLabel('Export EBP des pièces').setInputFiles({name:'ttc.csv',mimeType:'text/csv',buffer:Buffer.from('Type;N° de pièce;Date;Client;Total TTC\r\nFacture;FA-1;01/11/2026;G;120')});
+  await page.getByText(/Colonne\(s\) obligatoire\(s\) introuvable\(s\)/).waitFor();assert.equal(await page.evaluate(()=>get('meta','caFacture')),undefined);
+  assert.deepEqual(errs,[]);await context.close();
+});

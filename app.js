@@ -377,6 +377,7 @@ async function route() {
     else if (p[0] === 'comparateur') await pageComparateur();
     else if (p[0] === 'evolution') await pageEvolution();
     else if (p[0] === 'travail') await pageTravail(p[1]);
+    else if (p[0] === 'ca' && p[1] === 'import') await pageCAImport();
     else if (p[0] === 'ca') await pageCA();
     else if (p[0] === 'cockpit') await pageCockpit();
     else nonTrouve();
@@ -1974,8 +1975,15 @@ async function pageCA() {
     h('div', { class: 'carte obj hero' }, h('small', { class: 'etiq' }, 'CA facturé HT · ' + mois), h('div', { class: 'gros-chiffre' }, ODICOLOR_CA.aDesPieces(magasin) ? eur(m.totalCents) : 'Non renseigné'),
       h('p', { class: 'mut' }, ODICOLOR_CA.aDesPieces(magasin) ? m.nFactures + ' facture(s) − ' + m.nAvoirs + ' avoir(s)' + (obj ? ' · objectif ' + eur(obj.cents) : '') : 'Aucune pièce saisie ce mois : le CA n’est pas estimé à partir des commandes.')),
     h('p', { class: 'mut' }, 'Le CA = factures HT émises moins avoirs, à leur date. Les commandes et les encaissements sont suivis à part. Un futur import EBP utilisera les mêmes règles (le numéro évite les doublons).'),
+    h('div', { class: 'actions' }, h('a', { class: 'btn sec', href: '#/ca/import' }, 'Importer un export EBP (factures et avoirs HT)')),
     h('h2', {}, 'Ajouter une pièce'), type, num, dt, mt, cli, msg,
     h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onclick: () => enregistrer(false) }, 'Enregistrer')),
+    (magasin && magasin.imports && magasin.imports.length ? [h('h2', {}, 'Imports EBP'), magasin.imports.slice().reverse().map(ev => h('div', { class: 'carte', style: ev.annule ? 'opacity:.55' : '' },
+      h('strong', {}, ev.fichier + (ev.annule ? ' · annulé' : '')), h('p', { class: 'mut' }, new Date(ev.le).toLocaleString('fr-FR') + ' · ' + ev.ajoutees + ' ajoutée(s), ' + ev.identiques + ' déjà présente(s), ' + ev.conflits + ' conflit(s), ' + ev.ignorees + ' ignorée(s)' + (ev.annule ? ' · motif : ' + ev.annule.motif : '')),
+      ev.annule ? null : h('button', { class: 'btn sec', type: 'button', onclick: async () => {
+        const motif = prompt('Motif de l’annulation de cet import (les pièces restent dans l’historique) :'); if (!motif || !motif.trim()) return;
+        try { await put('meta', ODICOLOR_CA_EBP.annulerImport(await get('meta', 'caFacture'), ev.id, motif, { maintenant: new Date().toISOString() }), 'caFacture'); toast('Import annulé.'); pageCA(); } catch (er) { toast(er.message, true); }
+      } }, 'Annuler cet import')))] : null),
     h('h2', {}, 'Historique'), lignes.length ? lignes : h('p', { class: 'vide' }, 'Aucune pièce.'));
 }
 
@@ -2000,6 +2008,38 @@ async function pageCockpit() {
     h('div', { class: 'actions' }, h('a', { class: 'btn', href: '#/tournee' }, 'Préparer ma tournée'), h('a', { class: 'btn sec', href: '#/ca' }, 'CA facturé'), h('a', { class: 'btn sec', href: '#/feuille' }, 'Plan de la semaine')),
     cartes.length ? cartes : h('p', { class: 'vide' }, 'Rien d’urgent d’après tes données : ' + cl.length + ' garage(s), ' + dv.length + ' devis. Ajoute des rappels et des priorités sur les fiches pour alimenter le cockpit.'),
     h('p', { class: 'mut' }, 'Chaque ligne vient de ce que tu as saisi (visites, rappels, devis, factures). Rien n’est deviné.'));
+}
+
+// ---------- Import EBP du CA facturé : aperçu obligatoire avant écriture ----------
+async function pageCAImport() {
+  const file = h('input', { type: 'file', accept: '.xlsx,.xlsm,.csv,.txt', 'aria-label': 'Export EBP des pièces' }), zone = h('div');
+  montrer('Importer le CA depuis EBP',
+    h('a', { class: 'btn sec', href: '#/ca' }, '‹ CA facturé'),
+    h('p', { class: 'mut' }, 'Choisis l’export EBP des pièces (factures et avoirs). Seuls les montants HT des factures et avoirs comptent ; devis, commandes et bons de livraison sont ignorés. Un aperçu s’affiche : rien n’est enregistré avant ta confirmation. Réimporter le même fichier ne crée aucun doublon.'),
+    file, zone);
+  file.addEventListener('change', async () => {
+    const f = file.files[0]; if (!f) return;
+    try {
+      const feuilles = await lireFichier(f), magasin = await get('meta', 'caFacture'), auj = jourLocal(new Date());
+      let fe = feuilles.find(x => ODICOLOR_CA_EBP.associer(x.rows).ok) || feuilles[0];
+      const ap = ODICOLOR_CA_EBP.apercu(fe.rows, { auj, existantes: magasin ? magasin.entrees : [] });
+      if (!ap.ok) { zone.replaceChildren(h('div', { class: 'carte erreur', role: 'alert' }, 'Import impossible : ' + ap.erreur)); return; }
+      const liste = (titre, arr, f2) => arr.length ? h('details', { class: 'carte' }, h('summary', {}, titre + ' · ' + arr.length), arr.slice(0, 30).map(x => h('p', { class: 'mut' }, f2(x))), arr.length > 30 ? h('p', { class: 'mut' }, '+ ' + (arr.length - 30) + ' autre(s)') : null) : null;
+      const hc = Object.entries(ap.horsCa).map(([k, n]) => n + ' ' + k).join(', ');
+      zone.replaceChildren(
+        h('div', { class: 'carte' }, h('strong', {}, f.name), h('p', { class: 'mut' }, 'Colonnes retenues : ' + ap.correspondance.map(c => c.libelle + ' ← « ' + c.colonne + ' »').join(' · ')),
+          h('div', { class: 'gros-chiffre' }, ap.nouvelles.length + ' pièce(s) à ajouter'), h('p', {}, 'Effet sur le CA : ' + (ap.totaux.nouvellesCents < 0 ? '− ' : '') + eur(Math.abs(ap.totaux.nouvellesCents)) + ' HT (factures − avoirs)'),
+          h('p', { class: 'mut' }, ap.identiques.length + ' déjà présente(s) · ' + ap.conflits.length + ' conflit(s) non importé(s) · ' + ap.ignorees.length + ' ligne(s) ignorée(s)' + (hc ? ' · hors CA : ' + hc : ''))),
+        liste('Conflits (même numéro, montant ou date différents : à vérifier à la main, rien n’est écrasé)', ap.conflits, x => x.numero + ' : export ' + eur(x.montantHt) + ' le ' + x.date + ' ≠ enregistré ' + eur(x.existant.montantHt) + ' le ' + x.existant.date),
+        liste('Lignes ignorées', ap.ignorees, x => 'Ligne ' + x.ligne + ' : ' + x.motif),
+        liste('Pièces à ajouter', ap.nouvelles, x => (x.type === 'avoir' ? 'Avoir ' : 'Facture ') + x.numero + ' · ' + x.date + ' · ' + eur(x.montantHt) + (x.clientNom ? ' · ' + x.clientNom : '')),
+        h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', disabled: ap.nouvelles.length === 0, onclick: async ev => {
+          ev.currentTarget.disabled = true;
+          try { const maintenant = new Date().toISOString(), m2 = ODICOLOR_CA_EBP.appliquer(await get('meta', 'caFacture'), ap, { idImport: nouvelUid(), nouvelId: nouvelUid, maintenant, fichier: f.name, auj }); await put('meta', m2, 'caFacture'); toast(ap.nouvelles.length + ' pièce(s) importée(s).'); location.hash = '#/ca'; }
+          catch (e) { toast('Import annulé : ' + e.message, true); ev.currentTarget.disabled = false; }
+        } }, ap.nouvelles.length ? 'Importer ces ' + ap.nouvelles.length + ' pièces' : 'Rien à importer'), h('a', { class: 'btn sec', href: '#/ca' }, 'Annuler')));
+    } catch (e) { zone.replaceChildren(h('div', { class: 'carte erreur', role: 'alert' }, 'Import impossible : ' + e.message)); }
+  });
 }
 
 async function pageReglages() {
