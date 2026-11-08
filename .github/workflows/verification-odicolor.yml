@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main, fix/lot1-f01-f03-recuperation]
+    branches: [main, fix/lot1-f01-f03-recuperation, ccr-b491dc52-ckgq60]
 
 concurrency:
   group: odicolor-${{ github.event.pull_request.head.ref || github.ref_name }}
@@ -14,7 +14,7 @@ jobs:
   securite-et-syntaxe:
     # Figé : ubuntu-latest est passé à 26.04 le 06/11/2026, non pris en charge par Playwright 1.56.1.
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 30
     steps:
       - name: Récupérer le projet
         uses: actions/checkout@v4
@@ -64,6 +64,9 @@ jobs:
           node tests/visite-browser.cjs
           node tests/carte-browser.cjs
           node tests/ville-telephone-browser.cjs
+      - name: Tester le Bureau et l'application locale (navigateur, données fictives)
+        run: |
+          for f in tests/*navigateur.cjs; do echo "== $f"; node "$f" || exit 1; done
       - name: Préparer les paquets Samsung (aucun déploiement)
         run: >-
           node scripts/preparer-preview-samsung.cjs
