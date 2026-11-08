@@ -2025,7 +2025,7 @@ async function pageCockpit() {
     sec.lignes.map(x => ligne(sec, x)), sec.total > sec.lignes.length ? h('p', { class: 'mut' }, '+ ' + (sec.total - sec.lignes.length) + ' autre(s)') : null));
   montrer('Cockpit', carteCA,
     h('div', { class: 'actions' }, h('a', { class: 'btn', href: '#/proposition' }, 'Proposer ma tournée du jour'), h('a', { class: 'btn sec', href: '#/tournee' }, 'Ma tournée'), h('a', { class: 'btn sec', href: '#/carte' }, 'Carte'), h('a', { class: 'btn sec', href: '#/ca' }, 'CA facturé'), h('a', { class: 'btn sec', href: '#/feuille' }, 'Plan de la semaine')),
-    cartes.length ? cartes : h('p', { class: 'vide' }, 'Rien d’urgent d’après tes données : ' + cl.length + ' garage(s), ' + dv.length + ' devis. Ajoute des rappels et des priorités sur les fiches pour alimenter le cockpit.'),
+    cartes.length ? h('div', { class: 'cg-grille' }, cartes) : h('p', { class: 'vide' }, 'Rien d’urgent d’après tes données : ' + cl.length + ' garage(s), ' + dv.length + ' devis. Ajoute des rappels et des priorités sur les fiches pour alimenter le cockpit.'),
     h('p', { class: 'mut' }, 'Chaque ligne vient de ce que tu as saisi (visites, rappels, devis, factures). Rien n’est deviné.'));
 }
 

@@ -1,0 +1,9 @@
+/* Pages du cockpit sur grand écran (tablette, ordinateur) : mêmes pages que sur le téléphone, élargies. Aucun effet sous 900 px. */
+.cg-grille{display:grid;gap:12px}
+@media (min-width:900px){
+  main:has(.cg-grille),main:has(.vc-hote),main:has(canvas[data-groupes]){max-width:1180px}
+  .cg-grille{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+  .cg-grille>.carte{margin:0}
+  canvas[data-groupes]{height:68vh!important}
+}
+@media (min-width:1300px){main:has(.cg-grille){max-width:1360px}.cg-grille{grid-template-columns:repeat(3,minmax(0,1fr))}}

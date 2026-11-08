@@ -1,5 +1,5 @@
 {
-  "id": "14f613d7a6a12ed6fd303e5db158b00503af0b79fb55617326b6554732aa3745",
+  "id": "a4ce4e92ce5077994a686d817242f06f3db4f318eef4cdc4144d4547311ac12f",
   "assets": [
     {
       "path": "accueil-v23.css",
@@ -19,7 +19,7 @@
     },
     {
       "path": "app.js",
-      "sha256": "6a42383ee5304168ef9c5e3d5162b9a71e590b69ac9b1c505cf2a6f9a6fedfc6"
+      "sha256": "48a8a59c4b4bab04bc9c3a75e3b1b90abb5462f17185e1dd1393bbe0bd1e614c"
     },
     {
       "path": "apparence-v26.css",
@@ -118,6 +118,10 @@
       "sha256": "6c2d6b1813c51f585ef48394238174d54a6b1c503e99926d0e2e75a1bf7c54d5"
     },
     {
+      "path": "grand-ecran-v48.css",
+      "sha256": "7f47d1e40db7c1e6246f66fdd16a74f5aafc6fc964408aa27d4f9f85cc004c8d"
+    },
+    {
       "path": "icon-192.png",
       "sha256": "9503044e08539f524d14cccf0fd5e668c87b6add22615a272b76b21905e1caae"
     },
@@ -143,7 +147,7 @@
     },
     {
       "path": "index.html",
-      "sha256": "9003f530e6454d291f38494f21ecd4293f9d51ff019b6c51d30ff1b54819c0ba"
+      "sha256": "88303cb6a101e0f46119be51e234e140ea1fcf8f411d0dae9c913ff4a0ffdd63"
     },
     {
       "path": "logo-96.png",
@@ -187,7 +191,7 @@
     },
     {
       "path": "pwa-client.js",
-      "sha256": "c051d2cd0bff5f925c451babb852a342b0f1ab9e6345d570fca31ce25c1045cf"
+      "sha256": "b95c060df55d7565cc359c8eb9e17760819de3c80bba5e1f94f738736a9d6092"
     },
     {
       "path": "rappels-produits-v24.js",
