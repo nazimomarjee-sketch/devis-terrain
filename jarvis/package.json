@@ -1,0 +1,15 @@
+{
+  "name": "jarvis-prototype",
+  "version": "0.1.0",
+  "private": true,
+  "description": "JARVIS — prototype d'orchestrateur multi-agents persistant, supervisé, données fictives uniquement",
+  "type": "module",
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "demo": "node --disable-warning=ExperimentalWarning src/demarrer.js",
+    "scenario": "node --disable-warning=ExperimentalWarning scripts/scenario.js",
+    "sante": "node --disable-warning=ExperimentalWarning scripts/sante.js",
+    "test": "node --disable-warning=ExperimentalWarning --test tests/*.test.js"
+  },
+  "license": "UNLICENSED"
+}

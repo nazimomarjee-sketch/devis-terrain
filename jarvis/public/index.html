@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0f14">
+<title>JARVIS — Centre de contrôle</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>JARVIS <span>centre de contrôle</span></h1>
+  <div id="bandeau" class="bandeau" role="status"></div>
+</header>
+
+<main id="app" aria-live="polite">
+  <section id="connexion" hidden>
+    <p>Jeton d’accès (affiché au démarrage du service) :</p>
+    <input id="jeton" type="password" autocomplete="off" aria-label="Jeton d’accès">
+    <button id="ok-jeton" class="principal">Se connecter</button>
+  </section>
+
+  <section id="priorite" hidden>
+    <h2>À faire maintenant</h2>
+    <div id="carte-priorite"></div>
+  </section>
+
+  <section id="nouvelle">
+    <h2>Nouvelle mission</h2>
+    <textarea id="demande" rows="3" maxlength="2000" placeholder="Ex. : prépare un devis pour le garage Martin : 3 vernis, 2 durcisseurs et 10 abrasifs"></textarea>
+    <button id="envoyer" class="principal">Envoyer à JARVIS</button>
+    <p class="aide">Dictée vocale : touche le micro du clavier Android (Gboard). Aucune dictée n’est intégrée à JARVIS.</p>
+  </section>
+
+  <section>
+    <h2>Vue d’ensemble</h2>
+    <div id="tuiles" class="tuiles"></div>
+  </section>
+
+  <section>
+    <h2>Alertes</h2>
+    <ul id="alertes" class="liste"></ul>
+  </section>
+
+  <section>
+    <h2>Agents</h2>
+    <ul id="agents" class="liste"></ul>
+  </section>
+
+  <section>
+    <h2>Missions récentes</h2>
+    <ul id="missions" class="liste"></ul>
+  </section>
+
+  <section class="urgence">
+    <button id="arret" class="danger">ARRÊT D’URGENCE</button>
+    <button id="reprise" class="secondaire">Reprendre</button>
+    <button id="deconnexion" class="secondaire">Se déconnecter</button>
+  </section>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

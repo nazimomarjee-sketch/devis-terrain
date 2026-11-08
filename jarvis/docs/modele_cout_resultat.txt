@@ -1,0 +1,5 @@
+Scénario                              Matériel  Élec/an  12 mois (bas–haut)   36 mois (bas–haut)
+A  VPS Linux 4 vCPU/8 Go (HT)            0–    0      0     144–  360          432– 1080
+B  Mini-PC N150 16 Go/512 Go           409–  764     32     501–  976          684– 1399
+C  Mini-PC 32 Go/1 To                 1010– 1365     49    1119– 1594         1337– 2052
+D  Station IA locale + GPU 16 Go      1490– 2055    128    1648– 2303         1964– 2799

@@ -1,0 +1,50 @@
+ok 1 - devis nominal : montants, fichiers, et approbation humaine obligatoire
+ok 2 - le PDF généré a une table xref valide (offsets exacts)
+ok 3 - quantités et références ambiguës : JARVIS bloque et pose une question, il ne devine pas
+ok 4 - tarif ancien : le devis est préparé mais l’avertissement est obligatoire
+ok 5 - références explicites (codes) acceptées, remise client différente appliquée
+ok 6 - l’auditeur recalcule indépendamment : propriété sur 200 combinaisons aléatoires
+ok 7 - l’auditeur rejette un résultat falsifié (client, prix, total, EBP)
+ok 8 - reprise après crash : ouvrier mort + redémarrage complet du processus, la mission aboutit
+ok 9 - plafond de reprises : 4 interruptions consécutives sans jamais terminer → ECHEC et escalade
+ok 10 - aucun doublon d’exécution entre plusieurs PROCESSUS qui se disputent la file
+ok 11 - idempotence : le même dépôt envoyé deux fois (réseau instable) ne crée qu’une mission
+ok 12 - un ouvrier qui a perdu son bail ne peut pas écraser le résultat
+ok 13 - erreur volontaire « prix_faux » : détectée, corrigée automatiquement, puis validée
+ok 14 - erreur volontaire PERSISTANTE « prix_faux » : 3 corrections puis escalade humaine, jamais d’envoi
+ok 15 - erreur volontaire « total_faux » : détectée, corrigée automatiquement, puis validée
+ok 16 - erreur volontaire PERSISTANTE « total_faux » : 3 corrections puis escalade humaine, jamais d’envoi
+ok 17 - erreur volontaire « client_invente » : détectée, corrigée automatiquement, puis validée
+ok 18 - erreur volontaire PERSISTANTE « client_invente » : 3 corrections puis escalade humaine, jamais d’envoi
+ok 19 - erreur volontaire « copie_notes » : détectée, corrigée automatiquement, puis validée
+ok 20 - erreur volontaire PERSISTANTE « copie_notes » : 3 corrections puis escalade humaine, jamais d’envoi
+ok 21 - erreur volontaire « ligne_omise » : détectée, corrigée automatiquement, puis validée
+ok 22 - erreur volontaire PERSISTANTE « ligne_omise » : 3 corrections puis escalade humaine, jamais d’envoi
+ok 23 - erreur volontaire « remise_ignoree » : détectée, corrigée automatiquement, puis validée
+ok 24 - erreur volontaire PERSISTANTE « remise_ignoree » : 3 corrections puis escalade humaine, jamais d’envoi
+ok 25 - erreur volontaire « avertissement_masque » : détectée, corrigée automatiquement, puis validée
+ok 26 - erreur volontaire PERSISTANTE « avertissement_masque » : 3 corrections puis escalade humaine, jamais d’envoi
+ok 27 - panne volontaire de l’agent (exception) : récupérée, puis escalade si persistante
+ok 28 - délai maximum : un agent trop lent est interrompu puis la mission est relancée
+ok 29 - arrêt d’urgence : par paramètre OU par fichier ARRET, aucune mission traitée
+ok 30 - budget : une mission qui dépasse le budget du jour bloque les suivantes AVANT tout travail
+ok 31 - porte humaine : approbation impossible si le résultat ou un fichier a été modifié après l’audit
+ok 32 - agent inconnu : une demande sans agent compétent est bloquée avec une question
+ok 33 - métriques calculées sur l’état réel (réussite, erreurs détectées, corrections, interventions)
+ok 34 - un mail, un PDF ou un site ne peut PAS donner d’ordre : seule la source authentifiée est acceptée
+ok 35 - note client piégée (injection) : jamais recopiée dans le PDF ni le mail
+ok 36 - détection d’injection et de secrets : vrais positifs, pas de faux positif sur les textes normaux
+ok 37 - journaux : emails, téléphones, IBAN et jetons sont masqués avant écriture
+ok 38 - journal d’audit : toute modification a posteriori est détectée et alertée
+ok 39 - aucun secret ni donnée réelle dans le code source du prototype
+ok 40 - API : refuse sans jeton / avec mauvais jeton, accepte avec le bon, en-têtes de sécurité présents
+ok 41 - API : protection contre le DNS rebinding (Host inconnu refusé)
+ok 42 - API : verrouillage après 5 jetons erronés, corps trop grand refusé, traversée de chemin impossible
+ok 43 - API : parcours complet depuis le téléphone — dépôt, exécution, PDF, approbation (envoi simulé)
+ok 44 - API : un jeton trop court est refusé à la création du serveur
+ok 45 - sauvegarde chiffrée : aller-retour, mauvaise clé et fichier altéré rejetés, aucune donnée en clair
+ok 46 - sauvegarde : une sauvegarde trop ancienne déclenche une alerte
+# tests 46
+# pass 46
+# fail 0
+# duration_ms 1214.834756

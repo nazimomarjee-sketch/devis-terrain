@@ -1,0 +1,11 @@
+# Jamais de données d'exploitation, de secrets ni de sauvegardes dans Git.
+data/exploitation/
+sorties/
+sauvegardes/
+*.sqlite
+*.sqlite-*
+*.enc
+.env
+.env.*
+node_modules/
+ARRET
