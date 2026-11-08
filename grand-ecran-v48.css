@@ -7,3 +7,7 @@
   canvas[data-groupes]{height:68vh!important}
 }
 @media (min-width:1300px){main:has(.cg-grille){max-width:1360px}.cg-grille{grid-template-columns:repeat(3,minmax(0,1fr))}}
+
+/* Bannière permanente tant que la démonstration (données fictives) est chargée. */
+body[data-demo]::before{content:'DÉMONSTRATION — DONNÉES FICTIVES';position:fixed;top:0;left:0;right:0;z-index:9999;background:#F0952B;color:#0D0F12;text-align:center;font:700 12px system-ui;letter-spacing:.08em;padding:3px 0;pointer-events:none}
+body[data-demo]{padding-top:20px}

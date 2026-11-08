@@ -354,7 +354,9 @@ function apparition() {
 }
 addEventListener('scroll', () => { const on = scrollY > 110; document.body.classList.toggle('defile', on); }, { passive: true });
 function nonTrouve() { montrer('Introuvable', h('p', { class: 'vide' }, 'Cette page n’existe pas. '), h('a', { class: 'btn', href: '#/' }, 'Retour')); }
+async function marquerDemo() { try { document.body.toggleAttribute('data-demo', !!(await get('meta', 'demo'))); } catch (e) { /* sans effet */ } }
 async function route() {
+  marquerDemo();
   const p = (location.hash || '#/').slice(2).split('?')[0].split('/');
   { const q = p[0] || 'accueil', tab = q === 'accueil' ? 'accueil' : q === 'tournee' ? 'tournee' : (q === 'clients' || q === 'client') ? 'clients' : (q === 'devis' || q === 'nouveau') ? 'devis' : (q === 'catalogue' || q === 'article' || q === 'catalogues-pdf') ? 'catalogue' : 'plus'; document.querySelectorAll('.onglets a').forEach(x => x.classList.toggle('on', x.dataset.p === tab)); }
   try {
@@ -382,6 +384,7 @@ async function route() {
     else if (p[0] === 'ca') await pageCA();
     else if (p[0] === 'cockpit') await pageCockpit();
     else if (p[0] === 'carte') await pageCarte();
+    else if (p[0] === 'demo') await pageDemo();
     else if (p[0] === 'agenda') await pageAgenda(p[1] === 'nouveau' ? Number(p[2]) || null : null);
     else if (p[0] === 'secteurs') await pageSecteurs(p[1]);
     else if (p[0] === 'proposition') await pageProposition();
@@ -1191,7 +1194,7 @@ async function pageComparateur() {
 }
 function pagePlus() {
   const L = (href, t, d) => h('a', { class: 'ligne', href, style: 'color:inherit;text-decoration:none' }, h('span', { class: 'g' }, h('strong', {}, t), h('br'), h('small', {}, d)), h('span', {}, '›'));
-  montrer('Plus', L('#/agenda', 'Rendez-vous', 'Ton agenda avec heures ; intégré à la tournée du jour'), L('#/secteurs', 'Secteurs', 'CA, clients actifs/dormants, prospects et priorités par département et commune'), L('#/clients-ebp', 'Clients EBP', 'Relier les codes clients EBP à tes garages (tu valides chaque lien)'), L('#/ville', 'Ma Ville', 'Tes garages commune par commune, en vue LEGO tactile'), L('#/carte', 'Carte commerciale', 'Tous tes garages sur la carte, regroupés, hors ligne'), L('#/cockpit', 'Cockpit', 'Tes priorités du jour : CA, relances, devis, prospects, clients à voir'), L('#/ca', 'CA facturé HT', 'Tes factures et avoirs HT : le chiffre d’affaires, sans doublon'), L('#/travail', 'Mon travail', 'Tes 6 chiffres : visites, devis, commandes, factures, impayés'), L('#/point', 'Point du lundi', 'Le récap de la semaine écoulée : bilan, UN changement, engagements'), L('#/feuille', 'Feuille de route', 'Le plan de la semaine qui commence, jour par jour'), L('#/pc', 'Lien avec le PC', 'Envoyer ta sauvegarde au PC, recevoir le plan de la semaine'), L('#/evolution', 'Évolution', 'Tous les indicateurs, semaine par semaine, avec leur courbe'), L('#/signalements', 'Signalements', 'Problèmes remontés avec photo et leur suivi'), L('#/signaler', 'Signaler un problème', 'Photo + note envoyées à ton responsable'),
+  montrer('Plus', L('#/demo', 'Démonstration (données fictives)', 'Charger un jeu 100 % fictif sur un téléphone vide, fichiers d’essai EBP'), L('#/agenda', 'Rendez-vous', 'Ton agenda avec heures ; intégré à la tournée du jour'), L('#/secteurs', 'Secteurs', 'CA, clients actifs/dormants, prospects et priorités par département et commune'), L('#/clients-ebp', 'Clients EBP', 'Relier les codes clients EBP à tes garages (tu valides chaque lien)'), L('#/ville', 'Ma Ville', 'Tes garages commune par commune, en vue LEGO tactile'), L('#/carte', 'Carte commerciale', 'Tous tes garages sur la carte, regroupés, hors ligne'), L('#/cockpit', 'Cockpit', 'Tes priorités du jour : CA, relances, devis, prospects, clients à voir'), L('#/ca', 'CA facturé HT', 'Tes factures et avoirs HT : le chiffre d’affaires, sans doublon'), L('#/travail', 'Mon travail', 'Tes 6 chiffres : visites, devis, commandes, factures, impayés'), L('#/point', 'Point du lundi', 'Le récap de la semaine écoulée : bilan, UN changement, engagements'), L('#/feuille', 'Feuille de route', 'Le plan de la semaine qui commence, jour par jour'), L('#/pc', 'Lien avec le PC', 'Envoyer ta sauvegarde au PC, recevoir le plan de la semaine'), L('#/evolution', 'Évolution', 'Tous les indicateurs, semaine par semaine, avec leur courbe'), L('#/signalements', 'Signalements', 'Problèmes remontés avec photo et leur suivi'), L('#/signaler', 'Signaler un problème', 'Photo + note envoyées à ton responsable'),
     L('#/comparateur', 'Comparateur de coût', 'Coût réel au m² : produit actuel contre produit proposé'), L('#/reglages', 'Réglages', 'Objectifs, responsable, TVA, sauvegarde'));
 }
 
@@ -2332,6 +2335,22 @@ async function pageAgenda(clientPre) {
     h('div', { class: 'actions' }, h('a', { class: 'btn', href: '#/proposition' }, 'Proposer ma tournée du jour')),
     jours.length ? jours.map(j => [h('h2', {}, j === auj ? 'Aujourd’hui' : dateFr(j + 'T12:00:00')), aVenir.filter(r => r.date === j).map(carteRdv)]) : h('p', { class: 'vide' }, 'Aucun rendez-vous à venir.'),
     h('h2', {}, 'Nouveau rendez-vous'), cli, dt, hr, du, ob, msg, h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onclick: () => creer(false) }, 'Enregistrer')), h('div', { style: 'height:96px' }));
+}
+
+// ---------- Démonstration : données 100 % fictives, uniquement sur une base vide ----------
+async function pageDemo() {
+  const [cl, dv, ar, demo] = [await getAll('clients'), await getAll('devis'), await getAll('articles'), await get('meta', 'demo')], auj = jourLocal(new Date());
+  const vide = !cl.length && !dv.length && !ar.length, d = ODICOLOR_DEMO.generer(auj, ODICOLOR_COMMUNES_CENTRES);
+  const telecharger2 = (nom, texte) => telecharger(nom, texte, 'text/csv');
+  montrer('Démonstration',
+    h('div', { class: 'carte alerte' }, h('strong', {}, 'DONNÉES 100 % FICTIVES. '), 'Garages « DÉMO », montants inventés. Jamais mélangé à tes vraies données : le chargement n’est possible que sur un téléphone VIDE.'),
+    demo ? h('div', { class: 'carte' }, h('strong', {}, 'Démonstration chargée le ' + dateFr(demo.creeLe + 'T12:00:00')), h('p', { class: 'mut' }, 'Quitter efface ces données fictives (une copie de récupération reste dans Réglages).'),
+      h('button', { class: 'btn danger', type: 'button', onclick: async () => { if (!confirm('Quitter la démonstration et effacer les données fictives ?')) return; try { await restaurerSauvegardeLocale({ appli: 'devis-terrain', version: 2, date: new Date().toISOString(), stores: { articles: [], clients: [], devis: [], meta: [] } }); DB.db.close(); location.hash = '#/'; location.reload(); } catch (e) { toast('Impossible : ' + e.message, true); } } }, 'Quitter la démonstration'))
+      : h('div', { class: 'carte' }, h('strong', {}, d.resume.garages + ' garages (' + d.resume.clients + ' clients, ' + d.resume.prospects + ' prospects) · ' + d.resume.devis + ' devis · 2 rendez-vous'),
+        vide ? h('button', { class: 'btn', type: 'button', onclick: async () => { try { await restaurerSauvegardeLocale({ appli: 'devis-terrain', version: 2, date: new Date().toISOString(), stores: { articles: [], clients: d.clients, devis: d.devis, meta: [['settings', { ...SET_DEF, ...d.settings }], ['agenda', d.agenda], ['demo', { version: 1, creeLe: auj }]] } }); DB.db.close(); location.hash = '#/cockpit'; location.reload(); } catch (e) { toast('Chargement impossible : ' + e.message, true); } } }, 'Charger la démonstration')
+          : h('p', { class: 'mut' }, 'Ce téléphone contient déjà des données (' + cl.length + ' garage(s), ' + dv.length + ' devis) : la démonstration ne peut pas y être chargée, pour ne rien mélanger ni remplacer. Utilise un autre profil de navigateur ou un téléphone vide.')),
+    h('h2', {}, 'Fichiers d’essai EBP (fictifs)'), h('p', { class: 'mut' }, 'À importer pour essayer tout le parcours : clients (Plus › Clients EBP), puis pièces (CA facturé › Importer un export EBP), puis recensement (Carte). Noms de colonnes EBP = hypothèse, à confirmer avec un vrai export.'),
+    Object.entries(d.fichiers).map(([nom, txt]) => h('div', { class: 'actions' }, h('button', { class: 'btn sec', type: 'button', onclick: () => telecharger2(nom, txt) }, 'Télécharger ' + nom))), h('div', { style: 'height:96px' }));
 }
 
 async function pageReglages() {

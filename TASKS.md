@@ -27,3 +27,6 @@ Légende : ✅ fait et testé · 🟡 partiel · ⬜ à faire
 - ⬜ À faire : seuil de réachat réglable.
 
 - ✅ T8b Rendez-vous avec heure et intégration aux tournées (rdv-telephone 7, agenda-browser 3).
+
+## Démonstration privée
+- ✅ Mode démonstration 100 % fictif (base vide obligatoire, bannière, sortie propre) + 3 fichiers d'essai EBP/recensement ; parcours complet testé. *Tests : demo-telephone (5), demo-browser (2).* Hébergement privé : préparé, non publié (B9). Doc : `docs/DEMO_PRIVEE.md`.

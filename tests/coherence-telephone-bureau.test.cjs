@@ -43,3 +43,22 @@ test('les indicateurs du cockpit sont cohérents avec les données : un garage c
   for(const s of r.sections){assert.equal(new Set(s.lignes.map(l=>l.id)).size,s.lignes.length,s.id+' : doublon');assert.ok(s.total>=s.lignes.length);}
   assert.equal(r.sections.find(s=>s.id==='rappels').total,clients.filter(c=>c.rappel).length);
 });
+test('Secteurs, Carte et Ma Ville comptent les garages par commune de la même façon (même placement) ; écarts listés, jamais silencieux',()=>{
+  const CEN=require('../communes-centres.js'),K=require('../carte-v48.js'),S=require('../secteur-v48.js');K.charger(CEN);
+  const rows=CEN.filter(r=>r[4]),clients=Array.from({length:600},(_,i)=>{const r=rows[(i*11)%rows.length];return {id:i+1,nom:'GARAGE FICTIF '+i,ville:r[1],cp:r[4].split(' ')[0],statutCrm:i%3?'prospect':'client'}});
+  clients.push({id:9001,nom:'SANS LIEU'},{id:9002,nom:'LIEU INCONNU',ville:'Nulle-Part',cp:'99999'});
+  const m=MC.construire({arrete:AUJ,dates:{Terrain:AUJ},terrain:clients,clientsEbp:[],piecesEbp:[],annuaire:[],liaisonsValidees:[]}),ag=MC.agreger(m,{portee:'mes_garages'});
+  const sec=S.calculer({auj:AUJ,clients,facturation:{},communes:new Map(CEN.map(r=>[r[0],{nom:r[1]}])),marche:[],placer:c=>{const p=K.placer(c);return p.insee?{insee:p.insee,commune:p.commune}:null}});
+  const vVille=new Map(ag.parCommune.map(c=>[c.insee,c.total])),vSect=new Map(sec.communes.map(c=>[c.id,c.garages]));
+  const ecarts=[...new Set([...vVille.keys(),...vSect.keys()])].filter(k=>(vVille.get(k)||0)!==(vSect.get(k)||0));
+  assert.equal(ag.idf.total+ag.aClasser.total,602,'Ma Ville : aucun garage perdu');assert.equal(sec.communes.reduce((s,c)=>s+c.garages,0)+sec.sans.garages,602,'Secteurs : aucun garage perdu');
+  assert.deepEqual(ecarts,[],'communes où Ma Ville et Secteurs divergent : '+ecarts.join(', '));
+});
+test('sauvegarde complète avec TOUTES les données de cockpit : le Bureau lit les garages et ignore sans erreur agenda, CA, clients EBP, marché ; les liaisons EBP des fiches sont conservées',async()=>{
+  const R=require('../rdv-v48.js'),EC=require('../ebp-clients-v48.js');
+  const g=[{id:1,nom:'GARAGE FICTIF A',ville:'Massy',cp:'91300',statutCrm:'client'}],ebp=new Map([['C1',{code:'C1',nom:'GARAGE FICTIF A',bloque:true,famille:'',commercial:'',statut:''}]]),lie=EC.appliquer(g,[{code:'C1',id:1}],ebp,{auj:AUJ,fichier:'f.csv'}).modifies[0];
+  const agenda=R.ajouter(R.vide(),{clientId:1,clientNom:'A',date:'2026-12-01',heure:'10:00',duree:30},{id:'r',maintenant:'t',auj:AUJ});
+  const stores={articles:[],clients:[lie],devis:[],meta:[['settings',{}],['agenda',agenda],['caFacture',CAP.vide()],['ebpClients',{version:1,fichier:'f',importeLe:'t',clients:[{code:'C1',nom:'A'}]}],['marche',{version:1,fichier:'f',importeLe:'t',note:'n',communes:[['91174',3]]}]],recuperations:[]};
+  const {file}=await PH.encodeChiffre(stores,'phrase fictive tout cockpit 1'),lu=await LS.lire(file,{phrase:'phrase fictive tout cockpit 1'}),dec=await PH.decode(file,{phrase:'phrase fictive tout cockpit 1'});
+  assert.equal(lu.telephone.clients.length,1);assert.equal(lu.telephone.clients[0].codeEbp,'C1');assert.equal(dec.stores.clients[0].liaisonEbp.methode,'manuel');assert.equal(new Map(dec.stores.meta).get('agenda').rdv.length,1);
+});
