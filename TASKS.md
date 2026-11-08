@@ -30,3 +30,5 @@ Légende : ✅ fait et testé · 🟡 partiel · ⬜ à faire
 
 ## Démonstration privée
 - ✅ Mode démonstration 100 % fictif (base vide obligatoire, bannière, sortie propre) + 3 fichiers d'essai EBP/recensement ; parcours complet testé. *Tests : demo-telephone (5), demo-browser (2).* Hébergement privé : préparé, non publié (B9). Doc : `docs/DEMO_PRIVEE.md`.
+
+- ✅ Mise en ligne de test privée (Railway, accès protégé, domaine isolé, commit 9c911e0 épinglé, CI verte) + autotest embarqué sur le téléphone (8 contrôles) ; recette réduite à 6 gestes.

@@ -1,6 +1,12 @@
 # Environnement de démonstration privé (données 100 % fictives)
 
-**Statut : préparé, NON publié.** Aucune mise en ligne n'a été faite (accord explicite requis, voir BLOCKERS B9).
+**Statut : EN LIGNE (test privé, données fictives uniquement) depuis le 08/11/2026.** Accord explicite du propriétaire.
+- Adresse : `https://demo-odicolor-production.up.railway.app/` (domaine propre = stockage du navigateur ISOLÉ de l'application réelle).
+- Accès : authentification par mot de passe (identifiant et mot de passe remis au propriétaire dans la conversation, jamais dans le dépôt ; stockés comme variables du service Railway ; modifiables dans Railway).
+- Version déployée : commit `9c911e0` (CI verte), épinglé : aucune mise à jour automatique. Serveur : `scripts/serveur-demo.cjs` (aucune dépendance, 5 tests Node + 2 tests navigateur), qui ne sert que les fichiers de l'application, bloque 5 échecs/minute, `noindex`.
+- Bannière orange « ESPACE DE TEST PRIVÉ » sur ce domaine ; la démonstration ne se charge que sur une base vide.
+- Pour arrêter : supprimer le projet Railway `odicolor-demo-privee`.
+- Limite : la page n'a pas pu être appelée depuis l'environnement de développement (réseau limité volontairement) ; l'état « sain » vient du contrôle d'état de Railway (`/sante`) et des tests du serveur.
 
 ## Ce qui existe
 - **Mode démonstration dans l'application** (Plus › Démonstration) : 150 garages « DÉMO » répartis sur les communes des départements 91, 95, 94, 77, 93, des devis, 2 rendez-vous, un objectif fictif.

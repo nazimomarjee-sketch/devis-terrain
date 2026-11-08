@@ -8,5 +8,5 @@
 | B5 | Pappers / avis Google : coût et conditions d'utilisation | Étape « peinture réelle » du recensement | Décision de dépense |
 | B6 | Plugin Ralph Loop (catalogue officiel, non activé, portée « privileged ») | Boucle automatique | L'activer dans les réglages Claude si souhaité ; cap d'itérations à fixer |
 | B7 | RÉSOLU 08/11 : réseau de l'environnement ramené à « limité » (paquets seulement) | — | — |
-| B9 | Espace de TEST en ligne pour ta recette Samsung (jamais la production) : exige ton accord explicite et une action de ta part | Aucune validation vrai Samsung sans | Dire « mise en ligne de test autorisée » (`docs/RECETTE_SAMSUNG_FINALE.md`) |
+| B9 | (RÉSOLU 08/11 : espace de test privé en ligne, accord du propriétaire) | Espace de TEST en ligne pour ta recette Samsung (jamais la production) : exige ton accord explicite et une action de ta part | Aucune validation vrai Samsung sans | Dire « mise en ligne de test autorisée » (`docs/RECETTE_SAMSUNG_FINALE.md`) |
 | B8 | Cinq chiffres 45.20A livrés : validation par le propriétaire non reçue | Import « Marché à prospecter » | Valider ou contester |
