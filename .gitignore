@@ -1,3 +1,8 @@
 
 # Recensement 45.20A : résultats de l'extraction (données du registre, jamais dans le dépôt public)
 recensement-sortie/
+node_modules/
+scratch/
+*.odicolor
+sauvegarde-devis-*.json
+odicolor-echange-pc-*.json
