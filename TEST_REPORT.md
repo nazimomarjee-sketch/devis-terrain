@@ -8,5 +8,7 @@ Environnement : Node, Chromium/Playwright émulé (profil Galaxy S9+). **Simulat
 | Suites `*-navigateur.cjs` du Bureau + local (13 fichiers) sur le code combiné | 13/13 OK (émulation Chromium) |
 | Chiffrement `.odicolor` (10 tests) + lecture Bureau chiffrée + CA facturé téléphone (8 unitaires + 3 navigateur) | OK |
 | Ensemble après T3/T6 : 31 fichiers Node, 13 navigateur Bureau/local, 7 navigateur téléphone, build PWA `--check` | tout OK (émulation) |
+| Cycle 3 : import EBP du CA (10 unit.), visite 4 touches (7 unit. + 4 nav.), carte >1 000 garages (7 unit. + 3 nav., 10 000 garages < 60 ms/geste en Node), Ma Ville téléphone (3 nav.), cohérence téléphone⇄Bureau (3) | OK (émulation) |
+| Ensemble fin cycle 3 : 36 fichiers Node, 13 navigateur Bureau/local, 11 navigateur téléphone, build PWA `--check` | tout OK (émulation Chromium) |
 | Vrai Samsung | **NON TESTÉ** |
 | Données réelles | **NON TESTÉ** (interdit, B2) |

@@ -16,5 +16,9 @@ Légende : ✅ fait et testé · 🟡 partiel · ⬜ à faire
 - ⬜ T11 Commandes / facturé / encaissé en trois colonnes cohérentes.
 ## P3 carte & Ville
 - ✅ T12 (téléphone) Carte commerciale hors ligne, regroupée en grille d'écran : 10 000 garages < 60 ms par geste (Node), 1 600 garages vérifiés en navigateur ; placement GPS sinon centre de commune (annoncé « pas à l'adresse »), non placés listés ; filtres ; toucher = liste + Visiter/Fiche ; marché recensé importable par commune (nombres seulement, jamais « peinture »). Centres de communes : source publique geo.api.gouv.fr (971 communes). *Tests : carte-telephone (7), carte-browser (3).* Reste : Bureau grand écran (Leaflet existant), fond de carte facultatif.
-- ⬜ T13 Ville : sélection tactile, 5 personnages/commune, fluide mobile — sans modifier la Ville LEGO validée sans accord.
+- ✅ T13 (téléphone) Ma Ville tactile dans la PWA : liste des communes, vue Commune (même modèle et même dessin que le Bureau, Ville LEGO du Bureau inchangée), 1er toucher = aperçu, 2e = fiche du téléphone, lisible sur écran de téléphone, hors ligne. *Tests : ville-telephone-browser (3, dont absence de « null/undefined/NaN » sur 8 pages).* Reste : personnages/agence hors périmètre actuel, CA par commune (besoin code client EBP).
 ## P4 optimisation — plus tard.
+
+## Cohérence (tâche 5)
+- ✅ `tests/coherence-telephone-bureau.test.cjs` : même export EBP fictif → même CA du mois (téléphone = Bureau) ; même sauvegarde (claire/chiffrée) → mêmes garages et même modèle Ma Ville ; indicateurs du cockpit sans doublon.
+- ⬜ À faire : lien automatique facture→client du téléphone (code client EBP sur la fiche), CA par garage et par commune sur le téléphone.

@@ -87,8 +87,9 @@ const ODICOLOR_CA_EBP = (() => {
       else if (ex.date === p.date && ex.montantHt === montantHt) identiques.push(entree);
       else conflits.push({ ...entree, existant: { date: ex.date, montantHt: ex.montantHt, source: ex.source } });
     }
+    const multi = [...pieces.values()].filter(p => p.lignes > 1).map(p => p.numero);
     const somme = l => l.reduce((s, e) => s + (e.type === 'avoir' ? -e.montantHt : e.montantHt), 0);
-    return { ok: true, correspondance: a.correspondance, nouvelles, identiques, conflits, ignorees, horsCa, totaux: { nouvellesCents: somme(nouvelles), nNouvelles: nouvelles.length } };
+    return { ok: true, correspondance: a.correspondance, multiLignes: multi, nouvelles, identiques, conflits, ignorees, horsCa, totaux: { nouvellesCents: somme(nouvelles), nNouvelles: nouvelles.length } };
   }
   /* APPLICATION : n'écrit que les NOUVELLES pièces ; les conflits restent à traiter à la main. Ajoute un événement d'import à l'historique. ctx = { idImport, nouvelId(), maintenant, fichier, auj } */
   function appliquer(magasin, ap, ctx) {

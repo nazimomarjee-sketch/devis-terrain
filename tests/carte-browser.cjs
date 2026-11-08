@@ -24,11 +24,14 @@ test('1 600 garages : la carte s’affiche en groupes, rapide, sans perte, aucun
   const {context,page,errs}=await ouvrir();await peupler(page,1600);
   await page.goto(origin+'/#/carte');await page.locator('canvas[data-groupes]').waitFor();
   await page.getByText(/1600 garage\(s\) sur la carte/).waitFor();
+  const nulls=async()=>page.evaluate(()=>(document.body.innerText.match(/\b(null|undefined|NaN)\b/g)||[]).length);
+  assert.equal(await nulls(),0,'aucun « null » affiché');
   const d=await page.locator('canvas').evaluate(c=>({g:+c.dataset.groupes,v:+c.dataset.visibles,ms:+c.dataset.ms}));
   assert.equal(d.v,1600,'tous les garages sont dans la vue « tout voir »');assert.ok(d.g>3&&d.g<500,'groupes '+d.g);assert.ok(d.ms<120,'premier rendu '+d.ms+' ms');
   // 30 gestes de zoom/déplacement : temps moyen par rendu
   const moy=await page.evaluate(async()=>{const c=document.querySelector('canvas');const t=performance.now();for(let i=0;i<30;i++){c.dispatchEvent(new WheelEvent('wheel',{deltaY:i%2?100:-100,clientX:150,clientY:200,offsetX:150,offsetY:200,bubbles:true,cancelable:true}));await new Promise(r=>requestAnimationFrame(r));}return (performance.now()-t)/30;});
   assert.ok(moy<80,'moyenne par geste '+moy.toFixed(1)+' ms');
+  assert.equal(await page.evaluate(()=>[...document.body.querySelectorAll('*')].filter(e=>e.children.length===0&&/^(null|undefined|NaN)$/.test(e.textContent.trim())).length),0,'aucun texte null/undefined/NaN');
   assert.deepEqual(errs,[]);await context.close();
 });
 test('toucher une zone : liste des garages avec Visiter / Fiche ; le filtre « Clients » réduit la vue',async()=>{

@@ -381,6 +381,7 @@ async function route() {
     else if (p[0] === 'ca') await pageCA();
     else if (p[0] === 'cockpit') await pageCockpit();
     else if (p[0] === 'carte') await pageCarte();
+    else if (p[0] === 'ville') await pageVille(p[1]);
     else if (p[0] === 'visite' && /^\d+$/.test(p[1] || '')) await pageVisite(Number(p[1]));
     else nonTrouve();
   } catch (e) { console.error(e); toast('Erreur : ' + e.message, true); }
@@ -1186,7 +1187,7 @@ async function pageComparateur() {
 }
 function pagePlus() {
   const L = (href, t, d) => h('a', { class: 'ligne', href, style: 'color:inherit;text-decoration:none' }, h('span', { class: 'g' }, h('strong', {}, t), h('br'), h('small', {}, d)), h('span', {}, '›'));
-  montrer('Plus', L('#/carte', 'Carte commerciale', 'Tous tes garages sur la carte, regroupés, hors ligne'), L('#/cockpit', 'Cockpit', 'Tes priorités du jour : CA, relances, devis, prospects, clients à voir'), L('#/ca', 'CA facturé HT', 'Tes factures et avoirs HT : le chiffre d’affaires, sans doublon'), L('#/travail', 'Mon travail', 'Tes 6 chiffres : visites, devis, commandes, factures, impayés'), L('#/point', 'Point du lundi', 'Le récap de la semaine écoulée : bilan, UN changement, engagements'), L('#/feuille', 'Feuille de route', 'Le plan de la semaine qui commence, jour par jour'), L('#/pc', 'Lien avec le PC', 'Envoyer ta sauvegarde au PC, recevoir le plan de la semaine'), L('#/evolution', 'Évolution', 'Tous les indicateurs, semaine par semaine, avec leur courbe'), L('#/signalements', 'Signalements', 'Problèmes remontés avec photo et leur suivi'), L('#/signaler', 'Signaler un problème', 'Photo + note envoyées à ton responsable'),
+  montrer('Plus', L('#/ville', 'Ma Ville', 'Tes garages commune par commune, en vue LEGO tactile'), L('#/carte', 'Carte commerciale', 'Tous tes garages sur la carte, regroupés, hors ligne'), L('#/cockpit', 'Cockpit', 'Tes priorités du jour : CA, relances, devis, prospects, clients à voir'), L('#/ca', 'CA facturé HT', 'Tes factures et avoirs HT : le chiffre d’affaires, sans doublon'), L('#/travail', 'Mon travail', 'Tes 6 chiffres : visites, devis, commandes, factures, impayés'), L('#/point', 'Point du lundi', 'Le récap de la semaine écoulée : bilan, UN changement, engagements'), L('#/feuille', 'Feuille de route', 'Le plan de la semaine qui commence, jour par jour'), L('#/pc', 'Lien avec le PC', 'Envoyer ta sauvegarde au PC, recevoir le plan de la semaine'), L('#/evolution', 'Évolution', 'Tous les indicateurs, semaine par semaine, avec leur courbe'), L('#/signalements', 'Signalements', 'Problèmes remontés avec photo et leur suivi'), L('#/signaler', 'Signaler un problème', 'Photo + note envoyées à ton responsable'),
     L('#/comparateur', 'Comparateur de coût', 'Coût réel au m² : produit actuel contre produit proposé'), L('#/reglages', 'Réglages', 'Objectifs, responsable, TVA, sauvegarde'));
 }
 
@@ -2035,6 +2036,7 @@ async function pageCAImport() {
         h('div', { class: 'carte' }, h('strong', {}, f.name), h('p', { class: 'mut' }, 'Colonnes retenues : ' + ap.correspondance.map(c => c.libelle + ' ← « ' + c.colonne + ' »').join(' · ')),
           h('div', { class: 'gros-chiffre' }, ap.nouvelles.length + ' pièce(s) à ajouter'), h('p', {}, 'Effet sur le CA : ' + (ap.totaux.nouvellesCents < 0 ? '− ' : '') + eur(Math.abs(ap.totaux.nouvellesCents)) + ' HT (factures − avoirs)'),
           h('p', { class: 'mut' }, ap.identiques.length + ' déjà présente(s) · ' + ap.conflits.length + ' conflit(s) non importé(s) · ' + ap.ignorees.length + ' ligne(s) ignorée(s)' + (hc ? ' · hors CA : ' + hc : ''))),
+        ap.multiLignes.length ? h('div', { class: 'carte alerte', role: 'alert' }, h('strong', {}, ap.multiLignes.length + ' pièce(s) totalisée(s) sur plusieurs lignes : '), 'vérifie que l’export n’est pas dupliqué (' + ap.multiLignes.slice(0, 8).join(', ') + (ap.multiLignes.length > 8 ? '…' : '') + ').') : null,
         liste('Conflits (même numéro, montant ou date différents : à vérifier à la main, rien n’est écrasé)', ap.conflits, x => x.numero + ' : export ' + eur(x.montantHt) + ' le ' + x.date + ' ≠ enregistré ' + eur(x.existant.montantHt) + ' le ' + x.existant.date),
         liste('Lignes ignorées', ap.ignorees, x => 'Ligne ' + x.ligne + ' : ' + x.motif),
         liste('Pièces à ajouter', ap.nouvelles, x => (x.type === 'avoir' ? 'Avoir ' : 'Facture ') + x.numero + ' · ' + x.date + ' · ' + eur(x.montantHt) + (x.clientNom ? ' · ' + x.clientNom : '')),
@@ -2091,10 +2093,10 @@ async function pageCarte() {
   const feuille = h('div'), info = h('p', { class: 'mut', role: 'status' }), chips = h('div', { class: 'actions' });
   let vue = CARTE_ETAT.vue, groupes = [], dessinPrevu = false;
   const taille = () => { const r = canvas.getBoundingClientRect(), d = Math.min(2, window.devicePixelRatio || 1); canvas.width = Math.max(1, Math.round(r.width * d)); canvas.height = Math.max(1, Math.round(r.height * d)); return { l: r.width, h: r.height, d }; };
-  const rayonDe = n => Math.min(30, 11 + Math.sqrt(n) * 2.6);
+  const rayonDe = n => Math.min(21, 8 + Math.sqrt(n) * 1.7);
   const dessiner = () => {
     dessinPrevu = false; const { l, h: ht, d } = taille(); if (!vue) vue = K.cadrer(prep, l, ht, CARTE_ETAT.marche); vue.largeur = l; vue.hauteur = ht; CARTE_ETAT.vue = vue;
-    const t0 = performance.now(), r = K.regrouper(prep, vue, { filtre: filtreFn, marche: CARTE_ETAT.marche, rayon: 44 }); groupes = r.groupes;
+    const t0 = performance.now(), r = K.regrouper(prep, vue, { filtre: filtreFn, marche: CARTE_ETAT.marche, rayon: 48 }); groupes = r.groupes;
     const g = canvas.getContext('2d'); g.setTransform(d, 0, 0, d, 0, 0); g.clearRect(0, 0, l, ht); g.textAlign = 'center'; g.textBaseline = 'middle';
     for (const gr of groupes.sort((a, b) => a.n - b.n)) {
       const nGar = gr.n - gr.marche, dom = ['client', 'prospect_prio', 'prospect', 'refus'].filter(k => gr.cats[k]).sort((a, b) => gr.cats[b] - gr.cats[a])[0];
@@ -2107,8 +2109,8 @@ async function pageCarte() {
     info.textContent = prep.points.length + ' garage(s) sur la carte (' + prep.approx + ' placés au centre de leur commune, pas à l’adresse)' + (prep.nonPlaces.length ? ' · ' + prep.nonPlaces.length + ' sans position' : '') + ' · ' + r.visibles + ' dans la vue' + (marche ? ' · marché recensé : ' + marche.communes.reduce((a, c) => a + c[1], 0) + ' établissements' : '');
   };
   const planifier = () => { if (!dessinPrevu) { dessinPrevu = true; requestAnimationFrame(dessiner); } };
-  const chipsRendre = () => chips.replaceChildren(...filtres.map(([k, l]) => h('button', { class: 'btn ' + (CARTE_ETAT.filtre === k ? '' : 'sec'), type: 'button', 'aria-pressed': String(CARTE_ETAT.filtre === k), onclick: () => { CARTE_ETAT.filtre = k; chipsRendre(); feuille.replaceChildren(); planifier(); } }, l)),
-    marche ? h('button', { class: 'btn ' + (CARTE_ETAT.marche ? '' : 'sec'), type: 'button', 'aria-pressed': String(CARTE_ETAT.marche), onclick: () => { CARTE_ETAT.marche = !CARTE_ETAT.marche; chipsRendre(); planifier(); } }, 'Marché recensé') : null);
+  const chipsRendre = () => chips.replaceChildren(...[...filtres.map(([k, l]) => h('button', { class: 'btn ' + (CARTE_ETAT.filtre === k ? '' : 'sec'), type: 'button', 'aria-pressed': String(CARTE_ETAT.filtre === k), onclick: () => { CARTE_ETAT.filtre = k; chipsRendre(); feuille.replaceChildren(); planifier(); } }, l)),
+    marche ? h('button', { class: 'btn ' + (CARTE_ETAT.marche ? '' : 'sec'), type: 'button', 'aria-pressed': String(CARTE_ETAT.marche), onclick: () => { CARTE_ETAT.marche = !CARTE_ETAT.marche; chipsRendre(); planifier(); } }, 'Marché recensé') : null].filter(Boolean));
   // Gestes : glisser, pincer, molette ; un toucher bref ouvre la zone touchée.
   const ptrs = new Map(); let depart = null, dist0 = 0;
   canvas.addEventListener('pointerdown', e => { canvas.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.offsetX, y: e.offsetY }); depart = { x: e.offsetX, y: e.offsetY, t: Date.now(), bouge: false }; if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; dist0 = Math.hypot(a.x - b.x, a.y - b.y); depart.bouge = true; } });
@@ -2158,6 +2160,32 @@ async function pageCarte() {
     h('div', { style: 'height:96px' }));
   chipsRendre(); planifier();
 }
+
+// ---------- Ma Ville sur le téléphone : même modèle et même dessin que le Bureau, alimentés par les fiches du téléphone ----------
+async function modeleVille() {
+  const cl = await getAll('clients');
+  return { cl, m: ModeleCommune.construire({ arrete: jourLocal(new Date()), dates: { Terrain: jourLocal(new Date()) }, terrain: cl, clientsEbp: [], piecesEbp: [], annuaire: [], liaisonsValidees: [] }) };
+}
+async function pageVille(insee) {
+  const { cl, m } = await modeleVille();
+  if (!insee) {
+    const a = ModeleCommune.agreger(m, { portee: 'mes_garages' }), tete = h('p', { class: 'mut' }, cl.length + ' garage(s) · ' + a.idf.total + ' placé(s) dans une commune' + (a.aClasser.total ? ' · ' + a.aClasser.total + ' à classer (commune inconnue)' : '') + '. Données : celles de ce téléphone.');
+    const parDep = a.parDep.map(d => h('div', { class: 'carte' }, h('strong', {}, (L0nom(d.dep)) + ' (' + d.dep + ')'), h('small', { class: 'mut' }, ' · ' + d.total + ' garage(s)'),
+      a.parCommune.filter(c => c.dep === d.dep).sort((x, y) => y.total - x.total || x.commune.localeCompare(y.commune, 'fr')).map(c => h('a', { class: 'ligne', href: '#/ville/' + c.insee, style: 'color:inherit;text-decoration:none;display:flex;min-height:48px;align-items:center;gap:8px' },
+        h('span', { style: 'flex:1' }, h('strong', {}, c.commune), h('br'), h('small', { class: 'mut' }, c.en_compte + ' en compte · ' + c.sans_compte + ' sans compte · ' + c.a_verifier + ' à vérifier')), h('strong', {}, String(c.total)), h('span', {}, '›')))));
+    montrer('Ma Ville', tete, parDep.length ? parDep : h('p', { class: 'vide' }, 'Aucun garage placé dans une commune. Renseigne la ville et le code postal sur les fiches.'),
+      a.aClasser.total ? h('details', { class: 'carte' }, h('summary', {}, a.aClasser.total + ' garage(s) à classer'), m.aClasser.slice(0, 60).map(e => h('p', { class: 'mut' }, e.nom.valeur))) : null, h('div', { style: 'height:96px' }));
+    return;
+  }
+  const c = ModeleCommune.commune(m, insee);
+  if (!c) { montrer('Ma Ville', h('a', { class: 'btn sec', href: '#/ville' }, '‹ Toutes les communes'), h('p', { class: 'vide' }, 'Aucun garage dans cette commune.')); return; }
+  const hote = h('div', { class: 'vc-hote' });
+  montrer(c.commune, h('a', { class: 'btn sec', href: '#/ville' }, '‹ Toutes les communes'), hote, h('div', { style: 'height:96px' }));
+  VueCommune.monter(hote, c, { fictif: false, etiquette: 'MES GARAGES', sources: ['Fiches de ce téléphone'], portee: 'mes_garages', compte: 'tous',
+    fil: [{ libelle: 'Ma Ville', href: '#/ville' }, { libelle: c.commune }],
+    ouvrirFiche: (uid, e) => { const ref = e.sources.find(x => /^tel:/.test(x.ref)); if (ref) location.hash = '#/client/' + ref.ref.slice(4); else toast('Cette fiche ne vient pas de ce téléphone.', true); } });
+}
+const L0nom = dep => { const D = BureauLogique.depInfo(dep); return D ? D.nom : 'Département ' + dep; };
 
 async function pageReglages() {
   const tva = h('input', { value: pct(S.tva100), inputmode: 'decimal', 'aria-label': 'TVA %' }),

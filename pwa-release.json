@@ -1,5 +1,5 @@
 {
-  "id": "aca3891a2f9f60868298c634d68bfdededf88d33e3bf3802f90fd70720fefaa4",
+  "id": "1c3b38c381710aebcccab1f6ac4eef0d1ba4b536dc0ad4a3f6ac41386959a9cd",
   "assets": [
     {
       "path": "accueil-v23.css",
@@ -19,7 +19,7 @@
     },
     {
       "path": "app.js",
-      "sha256": "c83133908724d2c39240c224004f8bdb0470fab5f3c59891afaa2198a3261234"
+      "sha256": "e232941f92173a60df1ab60c5aefce4a8c104102da8be6b55ab9d64172a9b637"
     },
     {
       "path": "apparence-v26.css",
@@ -38,8 +38,36 @@
       "sha256": "2515494e8cc2ca07c86ea78766cfa104b796aa6ed5d66821c01d51dbb0b52bce"
     },
     {
+      "path": "bureau/bureau-logique.js",
+      "sha256": "de0a6463b3018288304b4bdd44ab107b16c8da89333cd18163ea2aae47f15506"
+    },
+    {
+      "path": "bureau/communes-idf.js",
+      "sha256": "4d7b851314650e4bb827f61dad23407162de950dd6c7308a1104d7cdf2626157"
+    },
+    {
+      "path": "bureau/ma-ville.js",
+      "sha256": "aa3cadec9b02bfbfaf9e80f38e6b181d87940b7eb827d36f24cbafc8821d4430"
+    },
+    {
+      "path": "bureau/ville/dessin-iso.js",
+      "sha256": "17fe51821acbf8e841a4acff6c4a35ac25c278a1da90a71d74ccfca54d936d46"
+    },
+    {
+      "path": "bureau/ville/modele-commune.js",
+      "sha256": "574903f546dd088f0fd5425dc9a2464b14e595f7cc19ada378e154077624a230"
+    },
+    {
+      "path": "bureau/ville/ville-commune.css",
+      "sha256": "c6301089a744c8e54caac336838799ce579eb1d48d0cffa03dfeeea2409326c0"
+    },
+    {
+      "path": "bureau/ville/vue-commune.js",
+      "sha256": "759b4e28a03886be51205df9d83b52e33d962a404419311cc9afeca8cf3dd694"
+    },
+    {
       "path": "ca-ebp-v48.js",
-      "sha256": "3982268d234cbc6d73a14ff156c18b086c5d16f943de8678bf4db3f808a51da1"
+      "sha256": "d0a8f8922edd8221cdf18ce4ce334ca0fb37534fdee51b999f8e6d5a54e734bb"
     },
     {
       "path": "ca-facture-v48.js",
@@ -115,7 +143,7 @@
     },
     {
       "path": "index.html",
-      "sha256": "6dfa3f121d75a62afd83069d500912124634472ece9d1874913e9819aba01a75"
+      "sha256": "e61bdb91ac04586e029bcf18ca9c11b71223ab00765668c2be69fb740e84040f"
     },
     {
       "path": "logo-96.png",
@@ -159,7 +187,7 @@
     },
     {
       "path": "pwa-client.js",
-      "sha256": "6af1cba414b2b1c21aa2aec8f0127cf6c8c1501397bd7ab1b39ab144d24923d5"
+      "sha256": "106798eefc5107c8dc0d820e8672a64cb5a98c622da09eafb9567086ad406b41"
     },
     {
       "path": "rappels-produits-v24.js",

@@ -15,6 +15,10 @@ test('une pièce exportée ligne par article est totalisée ; date divergente po
   const ap=E.apercu(lignes(['Facture','FA-010','05/11/2026','G','100'],['Facture','FA-010','05/11/2026','G','50,25'],['Facture','FA-011','05/11/2026','G','10'],['Facture','FA-011','06/11/2026','G','10']),{auj:AUJ,existantes:[]});
   assert.equal(ap.nouvelles.find(e=>e.numero==='FA-010').montantHt,15025);assert.match(ap.ignorees[0].motif,/date différente/);
 });
+test('lignes multiples pour un même numéro : signalées (risque d’export dupliqué)',()=>{
+  const ap=E.apercu(lignes(['Facture','FA-10','05/11/2026','G','100'],['Facture','FA-10','05/11/2026','G','100'],['Facture','FA-11','05/11/2026','G','5']),{auj:AUJ,existantes:[]});
+  assert.deepEqual(ap.multiLignes,['FA-10']);assert.equal(ap.nouvelles.find(e=>e.numero==='FA-10').montantHt,20000);
+});
 test('réimport du même fichier : tout est « identique », rien n’est ajouté ni doublé',()=>{
   const rows=lignes(['Facture','FA-001','05/11/2026','G','1000'],['Avoir','AV-1','06/11/2026','G','100']);
   let m=E.appliquer(CA.vide(),E.apercu(rows,{auj:AUJ,existantes:[]}),ctx());assert.equal(m.entrees.length,2);

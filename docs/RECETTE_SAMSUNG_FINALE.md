@@ -18,6 +18,8 @@
 | 9 | Réglages → phrase secrète (≥10 caractères, note-la sur papier) ×2 → « Télécharger une sauvegarde chiffrée » | « Copie chiffrée et relue » + fichier `.odicolor` dans Téléchargements |
 | 10 | Mode avion → ouvre l'application → ajoute une visite | Tout fonctionne hors ligne ; rien ne se perd à la reconnexion |
 | 11 | Réglages → Restaurer : choisis le fichier, mauvaise phrase d'abord, puis la bonne | Mauvaise phrase = refus sans rien changer ; bonne = garages, photo, PDF et CA retrouvés |
+| 11b | Plus → Carte : touche une bulle, puis « Visiter » ; Plus → Ma Ville : ouvre une commune, touche un garage deux fois | La carte et la Ville restent fluides, la fiche du bon garage s'ouvre |
+| 11c | Cockpit → touche un prospect → Résultat → Ressorti → Suite | Visite enregistrée en 4 touches ; « Annuler cette visite » la retire |
 | 12 | Envoie le fichier `.odicolor` vers un stockage hors du téléphone (Drive, e-mail à toi-même) et rouvre-le de là | Fichier conservé hors du téléphone |
 
 ## Ce que tu me renvoies
