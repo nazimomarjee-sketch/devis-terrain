@@ -380,6 +380,7 @@ async function route() {
     else if (p[0] === 'ca' && p[1] === 'import') await pageCAImport();
     else if (p[0] === 'ca') await pageCA();
     else if (p[0] === 'cockpit') await pageCockpit();
+    else if (p[0] === 'carte') await pageCarte();
     else if (p[0] === 'visite' && /^\d+$/.test(p[1] || '')) await pageVisite(Number(p[1]));
     else nonTrouve();
   } catch (e) { console.error(e); toast('Erreur : ' + e.message, true); }
@@ -1185,7 +1186,7 @@ async function pageComparateur() {
 }
 function pagePlus() {
   const L = (href, t, d) => h('a', { class: 'ligne', href, style: 'color:inherit;text-decoration:none' }, h('span', { class: 'g' }, h('strong', {}, t), h('br'), h('small', {}, d)), h('span', {}, '›'));
-  montrer('Plus', L('#/cockpit', 'Cockpit', 'Tes priorités du jour : CA, relances, devis, prospects, clients à voir'), L('#/ca', 'CA facturé HT', 'Tes factures et avoirs HT : le chiffre d’affaires, sans doublon'), L('#/travail', 'Mon travail', 'Tes 6 chiffres : visites, devis, commandes, factures, impayés'), L('#/point', 'Point du lundi', 'Le récap de la semaine écoulée : bilan, UN changement, engagements'), L('#/feuille', 'Feuille de route', 'Le plan de la semaine qui commence, jour par jour'), L('#/pc', 'Lien avec le PC', 'Envoyer ta sauvegarde au PC, recevoir le plan de la semaine'), L('#/evolution', 'Évolution', 'Tous les indicateurs, semaine par semaine, avec leur courbe'), L('#/signalements', 'Signalements', 'Problèmes remontés avec photo et leur suivi'), L('#/signaler', 'Signaler un problème', 'Photo + note envoyées à ton responsable'),
+  montrer('Plus', L('#/carte', 'Carte commerciale', 'Tous tes garages sur la carte, regroupés, hors ligne'), L('#/cockpit', 'Cockpit', 'Tes priorités du jour : CA, relances, devis, prospects, clients à voir'), L('#/ca', 'CA facturé HT', 'Tes factures et avoirs HT : le chiffre d’affaires, sans doublon'), L('#/travail', 'Mon travail', 'Tes 6 chiffres : visites, devis, commandes, factures, impayés'), L('#/point', 'Point du lundi', 'Le récap de la semaine écoulée : bilan, UN changement, engagements'), L('#/feuille', 'Feuille de route', 'Le plan de la semaine qui commence, jour par jour'), L('#/pc', 'Lien avec le PC', 'Envoyer ta sauvegarde au PC, recevoir le plan de la semaine'), L('#/evolution', 'Évolution', 'Tous les indicateurs, semaine par semaine, avec leur courbe'), L('#/signalements', 'Signalements', 'Problèmes remontés avec photo et leur suivi'), L('#/signaler', 'Signaler un problème', 'Photo + note envoyées à ton responsable'),
     L('#/comparateur', 'Comparateur de coût', 'Coût réel au m² : produit actuel contre produit proposé'), L('#/reglages', 'Réglages', 'Objectifs, responsable, TVA, sauvegarde'));
 }
 
@@ -2009,7 +2010,7 @@ async function pageCockpit() {
   const cartes = K.sections.filter(sec => sec.total).map(sec => h('div', { class: 'carte' }, h('div', { class: 'elan-tete' }, h('strong', {}, sec.titre), h('small', { class: 'mut' }, sec.total + (sec.montant ? ' · ' + eur(sec.montant) : ''))),
     sec.lignes.map(x => ligne(sec, x)), sec.total > sec.lignes.length ? h('p', { class: 'mut' }, '+ ' + (sec.total - sec.lignes.length) + ' autre(s)') : null));
   montrer('Cockpit', carteCA,
-    h('div', { class: 'actions' }, h('a', { class: 'btn', href: '#/tournee' }, 'Préparer ma tournée'), h('a', { class: 'btn sec', href: '#/ca' }, 'CA facturé'), h('a', { class: 'btn sec', href: '#/feuille' }, 'Plan de la semaine')),
+    h('div', { class: 'actions' }, h('a', { class: 'btn', href: '#/tournee' }, 'Préparer ma tournée'), h('a', { class: 'btn sec', href: '#/carte' }, 'Carte'), h('a', { class: 'btn sec', href: '#/ca' }, 'CA facturé'), h('a', { class: 'btn sec', href: '#/feuille' }, 'Plan de la semaine')),
     cartes.length ? cartes : h('p', { class: 'vide' }, 'Rien d’urgent d’après tes données : ' + cl.length + ' garage(s), ' + dv.length + ' devis. Ajoute des rappels et des priorités sur les fiches pour alimenter le cockpit.'),
     h('p', { class: 'mut' }, 'Chaque ligne vient de ce que tu as saisi (visites, rappels, devis, factures). Rien n’est deviné.'));
 }
@@ -2076,6 +2077,86 @@ async function pageVisite(id) {
   montrer('Visite · ' + c.nom, h('a', { class: 'btn sec', href: deTournee ? '#/tournee' : '#/client/' + id, style: 'margin-bottom:6px' }, '‹ Retour'), ...entete(1, 3, 'Résultat de la visite'),
     V.RESULTATS.map(r => gros(r[1], r[2], () => { choix.resultat = r[0]; r[0] === 'vu' ? etapeRetour() : etapeSuite(); }, r[0] === 'vu' ? 'vert' : 'sec')),
     h('p', { class: 'mut' }, 'Chaque réponse est un seul toucher. Le dernier enregistre la visite ; tu peux l’annuler juste après.'));
+}
+
+// ---------- Carte commerciale : garages regroupés par zone, hors ligne, sans fond de carte externe ----------
+const CARTE_ETAT = { filtre: 'tous', marche: true, vue: null };
+async function pageCarte() {
+  const K = ODICOLOR_CARTE; K.charger(ODICOLOR_COMMUNES_CENTRES);
+  const clients = await getAll('clients'), marche = await get('meta', 'marche'), prep = K.preparer(clients, marche), parId = new Map(clients.map(c => [c.id, c]));
+  const COUL = { client: '#3BD38A', prospect_prio: '#FF2D3D', prospect: '#FFC873', refus: '#8A8F98', marche: '#6E737B' };
+  const filtres = [['tous', 'Tous'], ['client', 'Clients'], ['prospect', 'Prospects'], ['prio', 'À visiter (A/B)']];
+  const filtreFn = p => CARTE_ETAT.filtre === 'tous' ? true : CARTE_ETAT.filtre === 'client' ? p.cat === 'client' : CARTE_ETAT.filtre === 'prospect' ? (p.cat === 'prospect' || p.cat === 'prospect_prio') : p.cat === 'prospect_prio';
+  const canvas = h('canvas', { role: 'img', 'aria-label': 'Carte des garages regroupés par zone', style: 'width:100%;height:62vh;min-height:320px;touch-action:none;background:#0D0F12;border-radius:14px;display:block' });
+  const feuille = h('div'), info = h('p', { class: 'mut', role: 'status' }), chips = h('div', { class: 'actions' });
+  let vue = CARTE_ETAT.vue, groupes = [], dessinPrevu = false;
+  const taille = () => { const r = canvas.getBoundingClientRect(), d = Math.min(2, window.devicePixelRatio || 1); canvas.width = Math.max(1, Math.round(r.width * d)); canvas.height = Math.max(1, Math.round(r.height * d)); return { l: r.width, h: r.height, d }; };
+  const rayonDe = n => Math.min(30, 11 + Math.sqrt(n) * 2.6);
+  const dessiner = () => {
+    dessinPrevu = false; const { l, h: ht, d } = taille(); if (!vue) vue = K.cadrer(prep, l, ht, CARTE_ETAT.marche); vue.largeur = l; vue.hauteur = ht; CARTE_ETAT.vue = vue;
+    const t0 = performance.now(), r = K.regrouper(prep, vue, { filtre: filtreFn, marche: CARTE_ETAT.marche, rayon: 44 }); groupes = r.groupes;
+    const g = canvas.getContext('2d'); g.setTransform(d, 0, 0, d, 0, 0); g.clearRect(0, 0, l, ht); g.textAlign = 'center'; g.textBaseline = 'middle';
+    for (const gr of groupes.sort((a, b) => a.n - b.n)) {
+      const nGar = gr.n - gr.marche, dom = ['client', 'prospect_prio', 'prospect', 'refus'].filter(k => gr.cats[k]).sort((a, b) => gr.cats[b] - gr.cats[a])[0];
+      const ray = rayonDe(gr.n);
+      if (gr.marche) { g.beginPath(); g.arc(gr.x, gr.y, ray + (nGar ? 4 : 0), 0, 7); g.strokeStyle = COUL.marche; g.lineWidth = 2; g.setLineDash([4, 3]); g.stroke(); g.setLineDash([]); if (!nGar) { g.fillStyle = 'rgba(110,115,123,.25)'; g.fill(); } }
+      if (nGar) { g.beginPath(); g.arc(gr.x, gr.y, rayonDe(nGar), 0, 7); g.fillStyle = COUL[dom]; g.fill(); }
+      g.fillStyle = nGar ? '#0D0F12' : '#C9CDD3'; g.font = '700 ' + (ray > 18 ? 14 : 12) + 'px system-ui'; g.fillText(String(nGar || gr.marche), gr.x, gr.y);
+    }
+    canvas.dataset.groupes = String(groupes.length); canvas.dataset.visibles = String(r.visibles); canvas.dataset.ms = (performance.now() - t0).toFixed(1);
+    info.textContent = prep.points.length + ' garage(s) sur la carte (' + prep.approx + ' placés au centre de leur commune, pas à l’adresse)' + (prep.nonPlaces.length ? ' · ' + prep.nonPlaces.length + ' sans position' : '') + ' · ' + r.visibles + ' dans la vue' + (marche ? ' · marché recensé : ' + marche.communes.reduce((a, c) => a + c[1], 0) + ' établissements' : '');
+  };
+  const planifier = () => { if (!dessinPrevu) { dessinPrevu = true; requestAnimationFrame(dessiner); } };
+  const chipsRendre = () => chips.replaceChildren(...filtres.map(([k, l]) => h('button', { class: 'btn ' + (CARTE_ETAT.filtre === k ? '' : 'sec'), type: 'button', 'aria-pressed': String(CARTE_ETAT.filtre === k), onclick: () => { CARTE_ETAT.filtre = k; chipsRendre(); feuille.replaceChildren(); planifier(); } }, l)),
+    marche ? h('button', { class: 'btn ' + (CARTE_ETAT.marche ? '' : 'sec'), type: 'button', 'aria-pressed': String(CARTE_ETAT.marche), onclick: () => { CARTE_ETAT.marche = !CARTE_ETAT.marche; chipsRendre(); planifier(); } }, 'Marché recensé') : null);
+  // Gestes : glisser, pincer, molette ; un toucher bref ouvre la zone touchée.
+  const ptrs = new Map(); let depart = null, dist0 = 0;
+  canvas.addEventListener('pointerdown', e => { canvas.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.offsetX, y: e.offsetY }); depart = { x: e.offsetX, y: e.offsetY, t: Date.now(), bouge: false }; if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; dist0 = Math.hypot(a.x - b.x, a.y - b.y); depart.bouge = true; } });
+  canvas.addEventListener('pointermove', e => {
+    const p = ptrs.get(e.pointerId); if (!p) return; const dx = e.offsetX - p.x, dy = e.offsetY - p.y;
+    if (ptrs.size === 2) { ptrs.set(e.pointerId, { x: e.offsetX, y: e.offsetY }); const [a, b] = [...ptrs.values()], dn = Math.hypot(a.x - b.x, a.y - b.y); if (dist0 > 0 && dn > 0) { vue = K.zoomer(vue, dn / dist0, (a.x + b.x) / 2, (a.y + b.y) / 2); dist0 = dn; planifier(); } return; }
+    if (Math.hypot(e.offsetX - depart.x, e.offsetY - depart.y) > 6) depart.bouge = true;
+    if (depart.bouge) { vue = K.deplacer(vue, dx, dy); ptrs.set(e.pointerId, { x: e.offsetX, y: e.offsetY }); planifier(); }
+  });
+  const fin = e => { const bref = depart && !depart.bouge && Date.now() - depart.t < 600; ptrs.delete(e.pointerId); if (bref && ptrs.size === 0) ouvrirZone(e.offsetX, e.offsetY); if (ptrs.size === 0) depart = null; };
+  canvas.addEventListener('pointerup', fin); canvas.addEventListener('pointercancel', e => { ptrs.delete(e.pointerId); depart = null; });
+  canvas.addEventListener('wheel', e => { e.preventDefault(); vue = K.zoomer(vue, e.deltaY < 0 ? 1.25 : 0.8, e.offsetX, e.offsetY); planifier(); }, { passive: false });
+  const ouvrirZone = (x, y) => {
+    let best = null, bd = 1e9; for (const g of groupes) { const dd = Math.hypot(g.x - x, g.y - y); if (dd < Math.max(rayonDe(g.n) + 8, 26) && dd < bd) { best = g; bd = dd; } }
+    if (!best) { feuille.replaceChildren(); return; }
+    const nGar = best.n - best.marche, lignes = best.ids.map(id => parId.get(id)).filter(Boolean);
+    feuille.replaceChildren(h('div', { class: 'carte', role: 'region', 'aria-label': 'Zone touchée' },
+      h('strong', {}, nGar + ' garage(s)' + (best.marche ? ' · ' + best.marche + ' établissement(s) recensé(s)' : '')),
+      best.marche ? h('p', { class: 'mut' }, 'Marché recensé (' + best.communes.join(', ') + (best.communes.length >= 12 ? '…' : '') + ') : établissements 45.20A, PAS des carrosseries-peinture qualifiées.') : null,
+      lignes.map(c => { const pos = K.placer(c); return h('div', { class: 'ligne', style: 'display:flex;gap:8px;align-items:center' },
+        h('span', { class: 'g', style: 'flex:1' }, h('strong', {}, c.nom), h('br'), h('small', {}, (c.statutCrm === 'client' ? 'Client' : 'Prospect') + (c.priorite ? ' · priorité ' + c.priorite : '') + ' · ' + (c.ville || pos.commune || '—') + (pos.precision === 'commune' ? ' (position = centre de la commune)' : ''))),
+        h('a', { class: 'btn', href: '#/visite/' + c.id, style: 'min-height:44px' }, 'Visiter'), h('a', { class: 'btn sec', href: '#/client/' + c.id, style: 'min-height:44px' }, 'Fiche')); }),
+      nGar > lignes.length ? h('p', { class: 'mut' }, '+ ' + (nGar - lignes.length) + ' autre(s) : zoome pour les voir un par un.') : null));
+  };
+  const importer = h('input', { type: 'file', accept: '.csv,.txt', 'aria-label': 'Recensement par commune (CSV)' });
+  importer.addEventListener('change', async () => {
+    const f = importer.files[0]; if (!f) return;
+    try {
+      const rows = parseCSV((new TextDecoder('utf-8').decode(await f.arrayBuffer())).replace(/^﻿/, '')).filter(r => r.some(c => clean(c) !== '')), ent = (rows[0] || []).map(c => clean(c).toLowerCase());
+      const iI = ent.indexOf('commune_insee'), iN = ent.findIndex(c => c === 'etablissements');
+      if (iI < 0 || iN < 0) throw new Error('Colonnes « commune_insee » et « etablissements » introuvables (colonnes lues : ' + ent.join(', ') + ').');
+      const com = [], vus = new Set(); let rejets = 0;
+      for (const r of rows.slice(1)) { const insee = clean(r[iI]), n = Number(clean(r[iN])); if (!/^\d{5}$/.test(insee) || !Number.isInteger(n) || n < 0 || vus.has(insee)) { rejets++; continue; } vus.add(insee); com.push([insee, n]); }
+      if (!com.length) throw new Error('Aucune ligne valide.');
+      await put('meta', { version: 1, fichier: f.name, importeLe: new Date().toISOString(), note: 'Établissements 45.20A recensés par commune (source : fichier fourni). Pas des carrosseries-peinture qualifiées.', communes: com }, 'marche');
+      toast(com.length + ' communes importées' + (rejets ? ', ' + rejets + ' ligne(s) refusée(s)' : '') + '.'); pageCarte();
+    } catch (e) { toast('Import impossible : ' + e.message, true); }
+  });
+  montrer('Carte commerciale', chips, canvas, info,
+    h('div', { class: 'actions' }, h('button', { class: 'btn sec', type: 'button', 'aria-label': 'Zoom avant', onclick: () => { vue = K.zoomer(vue, 1.6, vue.largeur / 2, vue.hauteur / 2); planifier(); } }, '＋'), h('button', { class: 'btn sec', type: 'button', 'aria-label': 'Zoom arrière', onclick: () => { vue = K.zoomer(vue, 1 / 1.6, vue.largeur / 2, vue.hauteur / 2); planifier(); } }, '－'),
+      h('button', { class: 'btn sec', type: 'button', onclick: () => { vue = K.cadrer(prep, vue.largeur, vue.hauteur, CARTE_ETAT.marche); planifier(); } }, 'Tout voir')),
+    h('p', { class: 'mut' }, h('span', { style: 'color:#3BD38A' }, '● client '), h('span', { style: 'color:#FF2D3D' }, '● prospect A/B '), h('span', { style: 'color:#FFC873' }, '● prospect '), h('span', { style: 'color:#8A8F98' }, '● refus '), '◌ marché recensé (pointillés). Pas de fond de carte : fonctionne hors ligne.'),
+    feuille,
+    prep.nonPlaces.length ? h('details', { class: 'carte' }, h('summary', {}, prep.nonPlaces.length + ' garage(s) sans position'), prep.nonPlaces.slice(0, 40).map(n => h('p', { class: 'mut' }, h('a', { href: '#/client/' + n.id }, n.nom), ' — ' + n.motif))) : null,
+    h('details', { class: 'carte' }, h('summary', {}, 'Marché recensé : importer un fichier'), h('p', { class: 'mut' }, 'Fichier CSV « par commune » du recensement (colonnes commune_insee ; etablissements). Il apporte seulement des nombres par commune, pas de noms ni d’adresses.'), importer,
+      marche ? h('p', { class: 'mut' }, 'Chargé : ' + marche.fichier + ' (' + marche.communes.length + ' communes)') : null),
+    h('div', { style: 'height:96px' }));
+  chipsRendre(); planifier();
 }
 
 async function pageReglages() {

@@ -15,6 +15,6 @@ Légende : ✅ fait et testé · 🟡 partiel · ⬜ à faire
 - ✅ T10 Import EBP du CA facturé (téléphone) : aperçu avant écriture, factures+avoirs HT seulement, doublons identiques ignorés, conflits jamais écrasés, traçabilité fichier+ligne, annulation d'import en bloc. *Tests : ca-ebp-telephone (9), ca-facture-browser (+2).* Colonnes EBP = hypothèse (aucun export réel reçu).
 - ⬜ T11 Commandes / facturé / encaissé en trois colonnes cohérentes.
 ## P3 carte & Ville
-- ⬜ T12 Carte >1 000 garages : filtres, clusters, couverture vs conquête ; import « Marché à prospecter » depuis le CSV officiel (convertisseur prêt).
+- ✅ T12 (téléphone) Carte commerciale hors ligne, regroupée en grille d'écran : 10 000 garages < 60 ms par geste (Node), 1 600 garages vérifiés en navigateur ; placement GPS sinon centre de commune (annoncé « pas à l'adresse »), non placés listés ; filtres ; toucher = liste + Visiter/Fiche ; marché recensé importable par commune (nombres seulement, jamais « peinture »). Centres de communes : source publique geo.api.gouv.fr (971 communes). *Tests : carte-telephone (7), carte-browser (3).* Reste : Bureau grand écran (Leaflet existant), fond de carte facultatif.
 - ⬜ T13 Ville : sélection tactile, 5 personnages/commune, fluide mobile — sans modifier la Ville LEGO validée sans accord.
 ## P4 optimisation — plus tard.

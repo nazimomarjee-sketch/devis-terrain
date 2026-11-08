@@ -62,6 +62,7 @@ jobs:
           node tests/ca-facture-browser.cjs
           node tests/cockpit-browser.cjs
           node tests/visite-browser.cjs
+          node tests/carte-browser.cjs
       - name: Préparer les paquets Samsung (aucun déploiement)
         run: >-
           node scripts/preparer-preview-samsung.cjs

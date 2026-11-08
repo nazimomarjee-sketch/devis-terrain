@@ -1,5 +1,5 @@
 {
-  "id": "b81570619f50c5ac33d2509f4b4159708afd56ab26afdafeb786ffb63b54f85d",
+  "id": "aca3891a2f9f60868298c634d68bfdededf88d33e3bf3802f90fd70720fefaa4",
   "assets": [
     {
       "path": "accueil-v23.css",
@@ -19,7 +19,7 @@
     },
     {
       "path": "app.js",
-      "sha256": "e4448d53cdeef1869fb891e876d6aa93a8eeb6c4b6c368a9e8ff999dc8ef83ea"
+      "sha256": "c83133908724d2c39240c224004f8bdb0470fab5f3c59891afaa2198a3261234"
     },
     {
       "path": "apparence-v26.css",
@@ -46,6 +46,10 @@
       "sha256": "a6b700fbab68e791d486f33ab6af7e32c9422c5902ff8dbc57c544cacb0c03e6"
     },
     {
+      "path": "carte-v48.js",
+      "sha256": "d9e809ad7c469ad1f971d88241915275cf116ffdf00f6457d31862700becbb53"
+    },
+    {
       "path": "catalogues-pdf-v32.css",
       "sha256": "e972018d4892d8f0ce08019a40cf9641c39bb7adef8db9a1949acff846c20f8e"
     },
@@ -60,6 +64,10 @@
     {
       "path": "commercial-v22.js",
       "sha256": "7ea0c73683c773faad644d6aff13660b664fc6eb1bdca9d39c4ff52fbb5e6b92"
+    },
+    {
+      "path": "communes-centres.js",
+      "sha256": "c621bbd2c6ad18e0837ced7d272c93b0eb651d8ac2d44912f6b926aa4910c245"
     },
     {
       "path": "correctif-v25.css",
@@ -107,7 +115,7 @@
     },
     {
       "path": "index.html",
-      "sha256": "6d05a4f79b2b4e78db20d9982e0edc38bb8f2a3593d0491c16571a418ac11a4d"
+      "sha256": "6dfa3f121d75a62afd83069d500912124634472ece9d1874913e9819aba01a75"
     },
     {
       "path": "logo-96.png",
@@ -151,7 +159,7 @@
     },
     {
       "path": "pwa-client.js",
-      "sha256": "9ef17d56b4e43c8600524ccd23624c4176fab0583e7bdaff26cd66f42c4a554a"
+      "sha256": "6af1cba414b2b1c21aa2aec8f0127cf6c8c1501397bd7ab1b39ab144d24923d5"
     },
     {
       "path": "rappels-produits-v24.js",
@@ -159,7 +167,7 @@
     },
     {
       "path": "recuperation-v47.html",
-      "sha256": "abe4c572c1c1f842b2f388879f94285e34f91dde8347b7920d5aa33cbf4d4788"
+      "sha256": "06665552c7968b9e492eb23e4f6e90006679d219375a3ef9ede6099b23a3c579"
     },
     {
       "path": "recuperation-v47.js",
@@ -167,7 +175,7 @@
     },
     {
       "path": "sauvegarde-locale.js",
-      "sha256": "2c10ba1492d33d1a258c972e3a87a1f1cac1fc6dec85ba125711d6a16272a15d"
+      "sha256": "b4ccebacccc34b67a93b8057557e29d5d865e0bea72bf625fe99d15e35769530"
     },
     {
       "path": "style-v22.css",
