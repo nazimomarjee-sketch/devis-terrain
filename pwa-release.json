@@ -1,5 +1,5 @@
 {
-  "id": "144ac1954d84417bc1ff9b8b430858cae714b1e6e90b32a32f1f4195d5aab92f",
+  "id": "49556a90ca1d855f8df08236517526299367e9020f3a1412755b5f21dba48187",
   "assets": [
     {
       "path": "accueil-v23.css",
@@ -19,7 +19,7 @@
     },
     {
       "path": "app.js",
-      "sha256": "ccf9843f549c26636d1fa55c78f0b6362923bf50e062e73e6692b88acb2945d3"
+      "sha256": "8a12c7d9c0094eba8a72d6be1d73e2a48225230c5f645a5c94f2d52405f50286"
     },
     {
       "path": "apparence-v26.css",
@@ -127,7 +127,7 @@
     },
     {
       "path": "grand-ecran-v48.css",
-      "sha256": "3f3d2dd66e1933adc197cd23069f3cab3fcdbf0e6dcc1cb6b7d24b32ee2f721e"
+      "sha256": "3666dbbfd44e1b32d52574dca960b6cdcc4dac1bc54ff948b380c717de96b0f5"
     },
     {
       "path": "icon-192.png",
@@ -155,7 +155,7 @@
     },
     {
       "path": "index.html",
-      "sha256": "e40b1e3e4d2c2dec57d965b02a55e30a4bdc37cbb46142e307544b49695dc199"
+      "sha256": "0437fda6a7522fb90d0cc2701468c0756348bc9c11b8c4031d355179283e980a"
     },
     {
       "path": "logo-96.png",
@@ -199,7 +199,7 @@
     },
     {
       "path": "pwa-client.js",
-      "sha256": "f39bdb11fed13208d74f4476236e4056fed8e6421210fef55e8798d0bf9f23c5"
+      "sha256": "dc3feb18ae9a94f984edd0a8eae7cfc0701257823b6de3a40fc2e73718164849"
     },
     {
       "path": "rappels-produits-v24.js",

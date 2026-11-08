@@ -1,27 +1,25 @@
-# Recette finale sur ton Samsung — une seule fois, environ 25 minutes
+# Recette Samsung — environ 10 minutes (le reste est automatisé)
 
-**Rien de ce qui suit n'est validé tant que tu ne l'as pas fait sur ton téléphone.** Les tests automatiques (émulation Chromium) ne remplacent pas le vrai appareil. Tout se fait sur la **démonstration 100 % fictive** : aucune vraie donnée.
+**Rien de ce qui suit n'est validé tant que tu ne l'as pas fait sur ton téléphone.** Les tests automatiques (émulation Chromium) ne remplacent pas l'appareil réel. Tout se fait sur l'**espace de test privé, avec des données 100 % fictives** : n'y saisis jamais de donnée réelle (une bannière orange le rappelle).
 
-**Pré-requis** : un espace de test en ligne (jamais la production), mis en place seulement après ton accord explicite « mise en ligne de test autorisée » (`audit/MISE_EN_LIGNE_SAMSUNG.md`). Utilise un téléphone/navigateur **vide** : la démonstration refuse de se charger sinon (protection voulue).
+## Ce qui est automatisé (tu n'as rien à faire)
+- Toute la logique métier (CA facturé, imports EBP, rapprochement des codes, secteurs, rendez-vous, tournées, carte, Ma Ville) et la sécurité de la sauvegarde sont vérifiées par ~50 fichiers de tests, rejoués à chaque modification (CI GitHub).
+- **L'autotest embarqué** (étape 3) refait sur TON téléphone les contrôles qui dépendent de l'appareil : stockage IndexedDB, chiffrement, sauvegarde chiffrée aller-retour avec photo et PDF, copie hors ligne complète, vitesse de la carte et de Ma Ville.
 
-## Les 12 étapes (note « OK » ou ce que tu vois)
+## Les 6 gestes à faire toi-même
 | # | Action | Résultat attendu |
 |---|---|---|
-| 1 | Ouvre l'adresse de test dans Chrome → « Ajouter à l'écran d'accueil » → ouvre l'icône | Plein écran, thème sombre |
-| 2 | Plus → **Démonstration** → « Charger la démonstration » | Bannière orange « DONNÉES FICTIVES » ; le Cockpit s'ouvre avec des priorités |
-| 3 | Plus → Démonstration → télécharge les 3 fichiers d'essai | 3 fichiers dans Téléchargements |
-| 4 | Plus → **Clients EBP** → fichier `demo-ebp-clients` → « Tout cocher » → « Lier les liens cochés » | « N lien(s) enregistré(s) » ; un « sans garage » et un homonyme restent à traiter |
-| 5 | Plus → **CA facturé** → « Importer un export EBP » → `demo-ebp-pieces` → « Importer » | Aperçu (devis et commandes ignorés), puis CA du mois ; réimporter le même fichier = 0 nouvelle |
-| 6 | Cockpit → touche un prospect → **Résultat → Ressorti → Suite** | Visite enregistrée en 4 touches ; « Annuler cette visite » la retire |
-| 7 | Plus → **Rendez-vous** : un rendez-vous à l'heure de ton choix ; Cockpit → « Proposer ma tournée du jour » → « Valider » | Le rendez-vous apparaît avec son heure dans la tournée |
-| 8 | Plus → **Carte** (puis importe `demo-recensement`), touche une bulle → « Visiter » ; Plus → **Ma Ville** → ouvre une commune → touche un garage deux fois ; Plus → **Secteurs** | Carte et Ville fluides au doigt ; la bonne fiche s'ouvre ; chiffres cohérents |
-| 9 | Fiche d'un garage → prends une **photo** et ajoute un **PDF** | Photo et PDF visibles |
-| 10 | Réglages → phrase secrète (≥ 10 caractères, **note-la sur papier**) ×2 → « Télécharger une sauvegarde chiffrée » | « Copie chiffrée et relue » + fichier `.odicolor` |
-| 11 | **Mode avion** → ouvre l'application → ajoute une visite → remets le réseau → Réglages → Restaurer : **mauvaise phrase d'abord**, puis la bonne | Tout marche hors ligne ; mauvaise phrase = refus sans rien changer ; bonne = tout retrouvé (garages, photo, PDF, CA, agenda) |
-| 12 | Envoie le fichier `.odicolor` hors du téléphone (Drive, e-mail à toi-même) et rouvre-le de là ; puis Plus → Démonstration → « Quitter la démonstration » | Fichier conservé ; le téléphone est vide de données fictives |
+| 1 | Ouvre le lien reçu dans Chrome, saisis l'identifiant et le mot de passe, puis menu ⋮ → **Ajouter à l'écran d'accueil** et ouvre l'icône | L'application s'ouvre en plein écran |
+| 2 | Plus → **Démonstration** → « Charger la démonstration » | Bannière orange « DONNÉES FICTIVES » ; le Cockpit affiche des priorités |
+| 3 | Plus → **Autotest** → attends la fin → **Copier le rapport** → colle-le dans la conversation | « Tous les contrôles automatiques réussis » (ou la liste de ce qui échoue) |
+| 4 | **Mode avion** → ouvre l'application depuis l'icône → ouvre une fiche, ajoute une visite → remets le réseau | Tout marche hors ligne, rien ne se perd |
+| 5 | Fiche d'un garage → **prends une photo** et **ajoute un PDF** ; puis Réglages → phrase secrète (≥ 10 caractères, **note-la sur papier**) ×2 → « Télécharger une sauvegarde chiffrée » ; puis Réglages → Restaurer, fichier choisi dans *Téléchargements* : **mauvaise phrase d'abord (refus attendu), puis la bonne** | Photo et PDF retrouvés après restauration |
+| 6 | Carte puis Ma Ville, au doigt (glisser, pincer, toucher une bulle puis un garage) | Fluide ? Dis-moi « fluide » ou « saccadé à tel endroit » |
+
+Ensuite : Plus → Démonstration → « Quitter la démonstration ».
 
 ## Ce que tu me renvoies
-Une ligne : « tout OK » ou le numéro d'étape + ce que tu vois (capture d'écran bienvenue).
+Le rapport de l'autotest (étape 3) + une ligne pour les étapes 4 à 6 (« OK » ou ce que tu vois).
 
 ## Après la recette (données réelles)
-Seulement si tout est OK : importer tes vrais fichiers EBP, **puis** faire une sauvegarde chiffrée et vérifier sa restauration (étapes 10–12 sur les vraies données) avant tout usage quotidien. Les noms de colonnes d'EBP sont une hypothèse : le premier vrai import affichera les colonnes retenues, à contrôler.
+Pas avant. Seulement si tout est OK : sur l'application réelle (pas l'espace de test), importer tes vrais fichiers EBP (les colonnes retenues s'affichent : à contrôler, les noms de colonnes d'EBP sont une hypothèse), puis faire une sauvegarde chiffrée et vérifier sa restauration avant tout usage quotidien.

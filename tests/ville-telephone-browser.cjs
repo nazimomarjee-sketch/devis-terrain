@@ -45,7 +45,7 @@ test('Ma Ville : lisible sur un écran de téléphone (pas de défilement horizo
 });
 test('toutes les nouvelles pages (base vide puis garnie) : jamais de « null », « undefined » ou « NaN » affiché',async()=>{
   const {context,page,errs}=await ouvrir();
-  const pages=['#/plus','#/agenda','#/agenda/nouveau/1','#/secteurs','#/secteurs/91','#/clients-ebp','#/cockpit','#/ca','#/ca/import','#/carte','#/ville','#/visite/1','#/ville/91174'];
+  const pages=['#/plus','#/autotest','#/agenda','#/agenda/nouveau/1','#/secteurs','#/secteurs/91','#/clients-ebp','#/cockpit','#/ca','#/ca/import','#/carte','#/ville','#/visite/1','#/ville/91174'];
   const verifier=async()=>{for(const h of pages){await page.goto(origin+'/'+h);await page.waitForTimeout(250);const t=await page.evaluate(()=>document.body.innerText);const m=t.match(/\b(null|undefined|NaN)\b/g);assert.equal(m,null,h+' affiche '+(m||[]).join(','));}};
   await verifier();
   await page.evaluate(()=>putMany('clients',[{id:1,nom:'GARAGE FICTIF A',ville:'Corbeil-Essonnes',cp:'91100',statutCrm:'client',rappel:'2026-01-01',factures:[{num:'F1',montant:100,echeance:'2026-01-02'}]},{id:2,nom:'GARAGE FICTIF B',priorite:'A'}]));

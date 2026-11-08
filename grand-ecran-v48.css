@@ -11,3 +11,5 @@
 /* Bannière permanente tant que la démonstration (données fictives) est chargée. */
 body[data-demo]::before{content:'DÉMONSTRATION — DONNÉES FICTIVES';position:fixed;top:0;left:0;right:0;z-index:9999;background:#F0952B;color:#0D0F12;text-align:center;font:700 12px system-ui;letter-spacing:.08em;padding:3px 0;pointer-events:none}
 body[data-demo]{padding-top:20px}
+body[data-test-env]:not([data-demo])::before{content:'ESPACE DE TEST PRIVÉ — N’Y SAISIS AUCUNE DONNÉE RÉELLE';position:fixed;top:0;left:0;right:0;z-index:9999;background:#F0952B;color:#0D0F12;text-align:center;font:700 12px system-ui;letter-spacing:.06em;padding:3px 0;pointer-events:none}
+body[data-test-env]:not([data-demo]){padding-top:20px}
