@@ -9,7 +9,9 @@ import { Jarvis } from './orchestrateur.js';
 import { configurerEspace, verifierCloisonnement, PROFILS } from './espaces.js';
 import { creerServeur } from './serveur.js';
 import { diagnostic } from './sante.js';
-import { sauvegarder, derniereSauvegarde } from './sauvegarde.js';
+import { sauvegarder, derniereSauvegarde, exercerRestauration } from './sauvegarde.js';
+import { backendsDisponibles } from './confinement.js';
+import { definirParam, param } from './db.js';
 import { horloge } from './horloge.js';
 
 const racineCode = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -29,7 +31,14 @@ verifierCloisonnement([espace]);
 
 mkdirSync(espace.dossier, { recursive: true });
 const db = ouvrir(espace.dbChemin);
-const jarvis = new Jarvis({ db, espace, isolation: process.env.JARVIS_ISOLATION !== 'non', racineCode });
+// Confinement : « auto » choisit le meilleur backend DISPONIBLE ; le NIVEAU réel est ensuite ATTESTÉ par des sondes (jamais présumé).
+const utilisateurAgent = process.env[`JARVIS_${ID}_AGENT_USER`] ?? null;
+const choix = process.env.JARVIS_CONFINEMENT ?? 'auto';
+const dispo = backendsDisponibles({ utilisateurAgent });
+const backend = choix === 'auto' ? (dispo.includes('linux-os') ? 'linux-os' : 'permission') : choix;
+if (!dispo.includes(backend) && backend !== 'echange') { console.error(`Backend de confinement « ${backend} » indisponible ici (disponibles : ${dispo.join(', ')})`); process.exit(2); }
+const jarvis = new Jarvis({ db, espace, isolation: process.env.JARVIS_ISOLATION !== 'non', racineCode, confinement: { backend, utilisateurAgent } });
+if (param(db, 'double_execution') === null) definirParam(db, 'double_execution', process.env.JARVIS_DOUBLE_EXECUTION ?? 'sensibles'); // contrôle par défaut en service
 const serveur = creerServeur({
   jarvis, jeton: espace.jeton, jetonAdmin: espace.jetonAdmin, dossierPublic: join(racineCode, 'public'),
   dossierSauvegardes: espace.dossierSauvegardes, cleSauvegarde: espace.cleSauvegarde,
@@ -41,17 +50,32 @@ serveur.listen(espace.port, process.env.JARVIS_ADRESSE ?? '127.0.0.1', () => {
   console.log(`JARVIS « ${espace.libelle} » (données fictives) : http://127.0.0.1:${espace.port} — agents isolés : ${jarvis.isolation}`);
 });
 
-let enCours = false;
-const boucle = setInterval(async () => { if (enCours) return; enCours = true; try { await jarvis.tick(); } catch (e) { console.error('Erreur de boucle :', e.message); } finally { enCours = false; } }, 2000);
+// Auto-test de l'auditeur et attestation du confinement : au démarrage puis périodiquement. Échec ⇒ échec fermé (voir orchestrateur).
+const verifs = async () => {
+  try { const t = await jarvis.autotester(); if (!t.ok) console.error(`ALERTE AUDITEUR_DEFAILLANT : ${t.echecs[0]}`); } catch (e) { console.error('Auto-test impossible :', e.message); }
+  try { const a = await jarvis.attester(); console.log(`Confinement attesté : niveau « ${a.niveau} » (backend ${a.backend})${a.niveau === 'os' ? '' : ' — INSUFFISANT pour des données réelles'}`); } catch (e) { console.error('Attestation impossible :', e.message); }
+};
+await verifs();
+const periodiques = setInterval(verifs, 30 * 60 * 1000);
+
+// Disjoncteur de l'orchestrateur : trop d'erreurs de boucle consécutives ⇒ sortie (code 3) pour laisser le SUPERVISEUR redémarrer proprement.
+let enCours = false; let erreursConsecutives = 0;
+const boucle = setInterval(async () => {
+  if (enCours) return; enCours = true;
+  try { await jarvis.tick(); erreursConsecutives = 0; } catch (e) { erreursConsecutives++; console.error(`Erreur de boucle (${erreursConsecutives}) :`, e.message); if (erreursConsecutives >= 5) { journaliser(db, { acteur: 'service', evenement: 'DISJONCTEUR_ORCHESTRATEUR', detail: { message: e.message } }); console.error('Disjoncteur : arrêt pour redémarrage par le superviseur'); process.exit(3); } }
+  finally { enCours = false; }
+}, 2000);
 const surveillance = setInterval(() => {
   try {
     for (const a of diagnostic(db, { dossierDonnees: espace.dossier }).alertes.filter((x) => x.niveau === 'critique')) console.error(`ALERTE ${a.code} : ${a.message}`);
     const s = derniereSauvegarde(db);
     if (!s || horloge.maintenant() - Date.parse(s.ts) > 24 * 3600 * 1000) sauvegarder(db, espace.dossierSauvegardes, espace.cleSauvegarde);
+    const r = param(db, 'derniere_restauration_testee'); const rj = r ? JSON.parse(r) : null;
+    if (derniereSauvegarde(db) && (!rj || horloge.maintenant() - Date.parse(rj.ts) > 7 * 86400000)) exercerRestauration(db, espace.dossierSauvegardes, espace.cleSauvegarde);
   } catch (e) { console.error('Erreur de surveillance :', e.message); }
 }, 30000);
 function arreter() {
-  clearInterval(boucle); clearInterval(surveillance); serveur.close();
+  clearInterval(boucle); clearInterval(surveillance); clearInterval(periodiques); serveur.close();
   const a = setInterval(() => { if (!enCours) { clearInterval(a); journaliser(db, { acteur: 'service', evenement: 'ARRET_PROPRE', detail: {} }); db.close(); process.exit(0); } }, 100);
 }
 process.on('SIGINT', arreter); process.on('SIGTERM', arreter);

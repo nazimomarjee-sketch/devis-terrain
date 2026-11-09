@@ -15,8 +15,10 @@ export async function lancerSondes(C) {
   await sonde('lire_environnement_processus', () => fs.readFileSync('/proc/1/environ', 'utf8').length);
   await sonde('lancer_processus', async () => { const { execSync } = await import('node:child_process'); return execSync('id').toString(); });
   await sonde('worker', async () => { const { Worker } = await import('node:worker_threads'); new Worker('1', { eval: true }); return 'worker'; });
-  await sonde('tuer_autre_processus', () => { process.kill(C.pid, 'SIGTERM'); return 'signal envoyé'; });
-  await sonde('debogueur_autre_processus', () => { process._debugProcess(C.pid); return 'débogueur activé'; });
+  // Un « refus » n'est RETENU que s'il prouve un refus de permission (EPERM/EACCES) : ESRCH (cible déjà morte) ou toute autre erreur est INDÉTERMINÉ ⇒ compté comme échec (conservateur).
+  const signal = (f) => { try { f(); return 'REUSSI'; } catch (e) { return ['EPERM', 'EACCES', 'ERR_ACCESS_DENIED'].includes(e.code) ? 'REFUSE' : `INDETERMINE:${e.code ?? e.message}`; } };
+  { const r = signal(() => process.kill(C.pidKill, 'SIGTERM')); R.tuer_autre_processus = { passe: r !== 'REFUSE', detail: r }; }
+  { const r = signal(() => process._debugProcess(C.pidDebug)); R.debogueur_autre_processus = { passe: r !== 'REFUSE', detail: r }; }
   await sonde('connexion_tcp', () => new Promise((ok, ko) => { const s = net.connect(C.portTcp, '127.0.0.1', () => { s.destroy(); ok('connecté'); }); s.on('error', ko); }));
   await sonde('envoi_udp', () => new Promise((ok, ko) => { const s = dgram.createSocket('udp4'); s.send('x', C.portTcp, '127.0.0.1', (e) => { s.close(); e ? ko(e) : ok('envoyé'); }); }));
   await sonde('socket_unix', () => new Promise((ok, ko) => { const s = net.connect(C.socketUnix, () => { s.destroy(); ok('connecté'); }); s.on('error', ko); }));

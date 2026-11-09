@@ -1,7 +1,7 @@
 // AGENT — Produits. Contrôle le catalogue (références, tarifs, marges, compatibilités) et produit des fiches. Lecture seule.
 import { norm, decimalVersEntier, joursEntre, bloque, regleActive, citerRegle, fautesGenerales } from './commun.js';
 
-const margeBp = (prix, achat) => Math.floor(((prix - achat) * 10000) / prix);
+const margeBp = (prix, achat) => Math.trunc(((prix - achat) * 10000) / prix);
 
 export function creerAgentProduits({ defaut = null } = {}) {
   return {

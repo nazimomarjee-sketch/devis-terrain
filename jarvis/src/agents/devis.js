@@ -126,7 +126,7 @@ export function creerAgentDevis({ defaut = null } = {}) {
         l.remise_cents = arrondi(l.brut_cents * bp, 10000);
         l.net_cents = l.brut_cents - l.remise_cents;
         const marge = l.net_cents - l.qte * l.achat_cents;
-        if (faute !== 'marge_ignoree' && Math.floor((marge * 10000) / l.net_cents) < seuilBp) {
+        if (faute !== 'marge_ignoree' && Math.trunc((marge * 10000) / l.net_cents) < seuilBp) {
           return bloque('MARGE_SOUS_SEUIL', `La marge de ${l.ref} après remise est sous le seuil configuré (${rMarge.regle.valeur.pct} %).`, 'Valider une dérogation de marge, ou changer la remise ou l’article ?');
         }
         totalHt += l.net_cents;

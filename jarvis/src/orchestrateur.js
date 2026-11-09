@@ -15,6 +15,7 @@ import { SENSIBLE_PAR_TYPE } from './auditeurs/commun.js';
 import { executerDirect, executerIsole } from './executeur.js';
 import { attester, enregistrerAttestation, confinementSuffisantPourReel } from './confinement.js';
 import { autotestAuditeurs } from './autotest.js';
+import { validerJeux } from './validation.js';
 import { router } from './routage.js';
 
 export class Jarvis {
@@ -80,7 +81,7 @@ export class Jarvis {
     if (this.auditeurSain === false) return { action: 'auditeur_defaillant' }; // échec fermé : aucune mission n'est prise sans auditeur fiable
     recupererBaux(db);
     const delai = Number(param(db, 'delai_mission_ms', '30000'));
-    const m = reclamer(db, this.ouvrier, delai + 30000);
+    const m = reclamer(db, this.ouvrier, delai + Number(param(db, 'marge_bail_ms', '30000')));
     if (!m) return { action: 'rien' };
 
     // Attribution
@@ -119,6 +120,12 @@ export class Jarvis {
         return { action: 'bloque_autorisation', id: m.id };
       }
       throw e;
+    }
+    const v = validerJeux(jeux.donnees);
+    if (!v.ok) {
+      this.#finir(m, { statut: 'BLOQUE', raison: `Données incohérentes : ${v.erreurs.length} erreur(s) de structure (ex. ${v.erreurs[0]}).`, question: 'Corriger la source de données (aucun calcul n’est fait sur des données douteuses).' });
+      journaliser(db, { missionId: m.id, acteur: 'validation', evenement: 'DONNEES_REFUSEES', detail: { erreurs: v.erreurs.slice(0, 5), total: v.erreurs.length } });
+      return { action: 'bloque_donnees', id: m.id };
     }
     if (!jeux.fictif && !confinementSuffisantPourReel(db, { backend: this.confinement.backend, isolation: this.isolation })) {
       this.#finir(m, { statut: 'BLOQUE', raison: 'Confinement des agents insuffisant pour des données réelles.', question: 'Aucune attestation récente de niveau « os » (compte distinct, réseau coupé, ressources limitées) : exécuter l’attestation sur la machine cible, ou rester en mode démonstration.' });

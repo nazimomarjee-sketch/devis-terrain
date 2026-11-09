@@ -85,8 +85,10 @@ test('AUCUN double envoi : deux processus approuvent la même mission en même t
   const e = environnement();
   try {
     const m = await traiter(e, DEMANDE_TYPE); e.db.close();
-    const lancer = () => promisify(execFile)(process.execPath, ['--disable-warning=ExperimentalWarning', join(ici, 'approbateur.js'), e.racine, m.id, String(horloge.gele)]);
-    const sorties = (await Promise.all([lancer(), lancer(), lancer()])).map((s) => JSON.parse(s.stdout));
+    const lancer = () => promisify(execFile)(process.execPath, ['--disable-warning=ExperimentalWarning', join(ici, 'approbateur.js'), e.racine, m.id, String(horloge.gele)])
+      .then((s) => { try { return JSON.parse(s.stdout); } catch { return { erreur: `SORTIE ILLISIBLE : ${s.stdout.slice(0, 200)} | ${s.stderr.slice(0, 200)}` }; } })
+      .catch((err) => ({ erreur: `PROCESSUS EN ÉCHEC : ${String(err.message).slice(0, 300)}` })); // diagnostic complet en cas d'intermittence
+    const sorties = await Promise.all([lancer(), lancer(), lancer()]);
     // Propriété : JAMAIS plus d'un envoi. Sous forte charge, un processus peut échouer sur un verrou occupé : on tolère 0 succès (puis reprise), jamais 2.
     const oks = sorties.filter((s) => s.ok); assert.ok(oks.length <= 1, `DOUBLE ENVOI : ${JSON.stringify(sorties)}`);
     assert.ok(sorties.every((s) => s.ok || s.erreur), JSON.stringify(sorties));

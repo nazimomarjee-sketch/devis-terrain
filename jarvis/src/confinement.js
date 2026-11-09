@@ -74,14 +74,15 @@ export async function attester({ backend = 'permission', utilisateurAgent = null
   const serviceDir = join(base, 'service'); const sortie = join(base, 'sortie'); const hors = join(base, 'hors');
   for (const d of [serviceDir, sortie, hors]) mkdirSync(d, { recursive: true });
   const secret = join(serviceDir, 'secret.txt'); writeFileSync(secret, 'SECRET-DU-SERVICE'); chmodSync(secret, 0o600); chmodSync(serviceDir, 0o700); chmodSync(hors, 0o700);
-  const cible = spawn('sleep', ['120'], { stdio: 'ignore' }); // processus « service » que l'agent ne doit pas pouvoir toucher
+  const cible = spawn('sleep', ['120'], { stdio: 'ignore' }); // processus « service » (cible du kill) que l'agent ne doit pas pouvoir toucher
+  const cible2 = spawn('sleep', ['120'], { stdio: 'ignore' }); // second témoin, DISTINCT (cible du débogueur) : une sonde ne doit pas dépendre du résultat d'une autre
   let connexions = 0;
   const ecouteur = createServer((s) => { connexions++; s.end(); }); await new Promise((ok) => ecouteur.listen(0, '127.0.0.1', ok));
   const socketUnix = join(serviceDir, 'u.sock'); const unix = createServer((s) => { connexions++; s.end(); }); await new Promise((ok) => unix.listen(socketUnix, ok)); chmodSync(socketUnix, 0o600);
   try {
     const u = backend === 'linux-os' ? resoudreUtilisateur(utilisateurAgent) : null;
     if (u) { chmodSync(base, 0o755); chmodSync(sortie, 0o700); execFileSync('chown', ['-R', `${u.uid}:${u.gid}`, sortie]); }
-    const canaris = { secret, dossierSortie: sortie, pid: cible.pid, portTcp: ecouteur.address().port, socketUnix, dossierHors: hors };
+    const canaris = { secret, dossierSortie: sortie, pidKill: cible.pid, pidDebug: cible2.pid, portTcp: ecouteur.address().port, socketUnix, dossierHors: hors };
     let sorties;
     if (backend === 'echange') {
       // Même sondes, exécutées par le lanceur du compte agent (Windows : tâche planifiée). `preparer` donne au compte agent l'accès à son dossier de sortie.
@@ -99,7 +100,8 @@ export async function attester({ backend = 'permission', utilisateurAgent = null
       p.stdin.end(JSON.stringify({ canaris }));
     });
     }
-    const cibleVivante = (() => { try { process.kill(cible.pid, 0); return true; } catch { return false; } })();
+    const vivant = (p) => { try { process.kill(p, 0); return true; } catch { return false; } };
+    const cibleVivante = vivant(cible.pid) && vivant(cible2.pid);
     const echecs = [];
     for (const [nom, r] of Object.entries(sorties)) if (r.passe) echecs.push(`${nom} : a RÉUSSI (${r.detail})`);
     if (connexions > 0) echecs.push(`un écouteur du service a reçu ${connexions} connexion(s) de l'agent`);
@@ -109,7 +111,7 @@ export async function attester({ backend = 'permission', utilisateurAgent = null
     return { niveau, backend, plateforme, sondes: Object.fromEntries(Object.entries(sorties).map(([k, v]) => [k, v.passe ? 'PASSE' : 'REFUSÉ'])), echecs, date: horloge.iso(),
       note: niveau === 'os' ? 'Toutes les sondes refusées par le système.' : niveau === 'permission' ? 'Fichiers et processus protégés ; kill/débogueur/réseau/ressources NON isolés.' : 'Protections de fichiers insuffisantes.' };
   } finally {
-    cible.kill('SIGKILL'); ecouteur.close(); unix.close();
+    cible.kill('SIGKILL'); cible2.kill('SIGKILL'); ecouteur.close(); unix.close();
     try { rmSync(base, { recursive: true, force: true }); } catch { /* nettoyage best-effort */ }
   }
 }

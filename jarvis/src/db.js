@@ -102,7 +102,8 @@ export const PARAMETRES_PAR_DEFAUT = {
 
 export function ouvrir(chemin = ':memory:') {
   const db = new DatabaseSync(chemin);
-  db.exec('PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; PRAGMA foreign_keys=ON;');
+  db.exec('PRAGMA busy_timeout=5000;'); // EN PREMIER : tout accès concurrent à l'ouverture attend au lieu d'échouer
+  db.exec('PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;');
   db.exec(SCHEMA);
   // La base n'est lisible que par le compte du service (jamais par un compte agent), y compris les fichiers WAL/SHM.
   if (chemin !== ':memory:') for (const f of [chemin, `${chemin}-wal`, `${chemin}-shm`]) if (existsSync(f)) { try { chmodSync(f, 0o600); } catch { /* best-effort (Windows : ACL NTFS) */ } }

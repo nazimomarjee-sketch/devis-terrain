@@ -63,7 +63,7 @@ export function creerAgentFinance({ defaut = null } = {}) {
         commandes_ht_par_statut_cents: cmdTotal,
         marge_brute_cents: faute === 'marge_gonflee' ? marge + 1000 : marge,
         base_marge_ht_cents: caLignes,
-        marge_brute_bp: caLignes > 0 ? Math.floor((marge * 10000) / caLignes) : null,
+        marge_brute_bp: caLignes > 0 ? Math.trunc((marge * 10000) / caLignes) : null,
         factures_sans_lignes_exclues_de_la_marge: sansLignes,
       };
       return { statut: 'OK', resultat: { type: 'analyse_finance', action_sensible: false, donnees_fictives: ctx.fictif, date: ctx.aujourdhui, regles_utilisees: [...regleTva.values()],

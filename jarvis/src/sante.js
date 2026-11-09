@@ -3,6 +3,8 @@ import { verifierJournal, param, sha256 } from './db.js';
 import { horloge } from './horloge.js';
 import { arretUrgence, depenseDuJour } from './moteur.js';
 import { derniereSauvegarde } from './sauvegarde.js';
+import { verifierTracabilite } from './tracabilite.js';
+const sauvegardeExiste = (db) => !!derniereSauvegarde(db);
 
 export function diagnostic(db, { dossierDonnees = null, exigerBattement = false } = {}) {
   const alertes = [];
@@ -39,6 +41,13 @@ export function diagnostic(db, { dossierDonnees = null, exigerBattement = false 
   if (atj && !atj.ok) add('critique', 'AUDITEUR_DEFAILLANT', `Auto-test de l'auditeur négatif : ${atj.echecs[0]}`);
   else if (!atj) add('info', 'AUTOTEST_JAMAIS_EXECUTE', "L'auto-test de l'auditeur n'a jamais été exécuté.");
   else if (now - Date.parse(atj.date) > 2 * 3600 * 1000) add('avertissement', 'AUTOTEST_ANCIEN', "Dernier auto-test de l'auditeur il y a plus de 2 h.");
+
+  const rest = param(db, 'derniere_restauration_testee'); const restj = rest ? JSON.parse(rest) : null;
+  if (restj && !restj.ok) add('critique', 'RESTAURATION_ECHEC', 'Le dernier exercice de restauration a échoué : les sauvegardes ne sont PAS fiables.');
+  else if (sauvegardeExiste(db) && (!restj || now - Date.parse(restj.ts) > 8 * 86400000)) add('avertissement', 'RESTAURATION_NON_TESTEE', 'Aucun exercice de restauration réussi depuis plus de 8 jours.');
+
+  const trace = verifierTracabilite(db, 300);
+  if (!trace.ok) add('critique', 'TRACABILITE_INCOMPLETE', `${trace.problemes.length} incohérence(s) entre état et journal (ex. ${trace.problemes[0]}).`);
 
   const orphelines = db.prepare(`SELECT COUNT(*) AS n FROM missions WHERE statut='EN_COURS' AND bail_jusqua < ?`).get(now).n;
   if (orphelines) add('avertissement', 'MISSIONS_ORPHELINES', `${orphelines} mission(s) interrompue(s) en attente de reprise.`);

@@ -78,3 +78,23 @@ export function derniereSauvegarde(db) {
   const v = param(db, 'derniere_sauvegarde_verifiee');
   return v ? JSON.parse(v) : null;
 }
+
+/**
+ * EXERCICE DE RESTAURATION : restaure la dernière sauvegarde dans un fichier temporaire, contrôle intégrité, chaîne du journal et
+ * cohérence (la sauvegarde ne contient pas plus de missions que la base vivante), puis détruit la copie. Une sauvegarde qu'on n'a
+ * jamais restaurée n'est pas une sauvegarde.
+ */
+export function exercerRestauration(db, dossier, phrase) {
+  const derniere = derniereSauvegarde(db);
+  if (!derniere || !existsSync(derniere.fichier)) throw new Error('Aucune sauvegarde à restaurer');
+  const tmp = join(dossier, `exercice-${Date.now()}.sqlite`);
+  try {
+    const v = restaurer(derniere.fichier, phrase, tmp);
+    const vivantes = db.prepare('SELECT COUNT(*) AS n FROM missions').get().n;
+    const coherent = v.ok && v.missions <= vivantes;
+    definirParam(db, 'derniere_restauration_testee', JSON.stringify({ ts: horloge.iso(), fichier: derniere.fichier, ok: coherent, missions: v.missions }));
+    journaliser(db, { acteur: 'sauvegarde', evenement: coherent ? 'EXERCICE_RESTAURATION_OK' : 'EXERCICE_RESTAURATION_ECHEC', detail: { missions: v.missions, vivantes } });
+    if (!coherent) throw new Error(`Exercice de restauration négatif : ${JSON.stringify(v)}`);
+    return { ok: true, missions: v.missions };
+  } finally { for (const f of [tmp, `${tmp}-wal`, `${tmp}-shm`]) if (existsSync(f)) rmSync(f); }
+}
