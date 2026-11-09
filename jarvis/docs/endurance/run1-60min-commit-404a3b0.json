@@ -1,0 +1,1600 @@
+{
+ "protocole": {
+  "duree_demandee_min": 60,
+  "duree_charge_reelle_s": 3600,
+  "duree_totale_reelle_s": 3671,
+  "graine": 11,
+  "chaos_moyen_s": 90,
+  "horloge_acceleree": false,
+  "node": "v22.23.4",
+  "commit": "404a3b0"
+ },
+ "simule": [
+  "humain (approbateur automatique, 85 % approuve / 15 % refuse / double clic 25 %)",
+  "boîte Gmail (fichiers .eml locaux)",
+  "données ODICOLOR (fictives)"
+ ],
+ "reel": [
+  "processus (service, 2e travailleur, agents isolés)",
+  "signaux kill -9 / SIGSTOP",
+  "SQLite WAL",
+  "disque"
+ ],
+ "chaos": {
+  "redemarrages_service": 14,
+  "redemarrages_ouvrier": 7,
+  "kill9_service": 10,
+  "kill9_ouvrier": 7,
+  "gel_service": 4,
+  "pannes_integration": 12,
+  "pannes_integration_s": 571,
+  "evenements": 33,
+  "alertes_superviseur": {
+   "SERVICE_MORT": 14,
+   "ALERTES_CRITIQUES": 458
+  }
+ },
+ "charge": {
+  "decisions": {
+   "approuve": 305,
+   "refuse": 47,
+   "double_clic": 84,
+   "erreurs": 0
+  }
+ },
+ "invariants": {
+  "missions_acceptees_par_l_api": 890,
+  "missions_perdues": 0,
+  "missions_en_base": 890,
+  "missions_dupliquees": 0,
+  "statuts": {
+   "REFUSE": 47,
+   "VALIDE": 843
+  },
+  "missions_non_terminees": 0,
+  "missions_rejouees_apres_interruption": 0,
+  "missions_executees_plus_d_une_fois": 0,
+  "executions_totales": 890,
+  "erreurs_agents": 0,
+  "audits_refuses_puis_corriges": 0,
+  "resultats_contradictoires": 0,
+  "resultats_abandonnes_bail_perdu": 0,
+  "reprises_apres_interruption_journalisees": 0,
+  "demarrages_journalises": 15,
+  "sorties": 305,
+  "sorties_distinctes": 305,
+  "approbations_en_base": 305,
+  "sorties_sans_approbation": 0,
+  "outbox": {
+   "FAIT": 139
+  },
+  "outbox_tentatives_max": 6,
+  "outbox_actions_ayant_du_etre_retentees": 18,
+  "brouillons_dans_la_boite": 139,
+  "brouillons_attendus": 139,
+  "doublons_de_brouillon": 0,
+  "alertes_critiques_finales": [
+   "TRACABILITE_INCOMPLETE"
+  ],
+  "journal_chaine_intact": true,
+  "journal_lignes": 5186,
+  "tracabilite_ok": true,
+  "tracabilite_problemes": []
+ },
+ "memoire": {
+  "service": {
+   "debut_mo": 73.6,
+   "fin_mo": 116.9,
+   "max_mo": 120,
+   "mediane_premier_tiers_mo": 80.1,
+   "mediane_dernier_tiers_mo": 117.2
+  },
+  "ouvrier": {
+   "debut_mo": 1.8,
+   "fin_mo": 77.2,
+   "max_mo": 77.2,
+   "mediane_premier_tiers_mo": 70.5,
+   "mediane_dernier_tiers_mo": 70.2
+  }
+ },
+ "croissance": {
+  "journal_lignes": [
+   3,
+   5186
+  ],
+  "db_mo": [
+   0.26,
+   8.55
+  ],
+  "dossier_mo": [
+   0.29,
+   9.68
+  ],
+  "octets_par_mission_en_base": 10073,
+  "lignes_de_journal_par_mission": 5.8
+ },
+ "echantillons": 121,
+ "verdict": "INVARIANTS_RESPECTES_SUR_CETTE_DUREE",
+ "serie": [
+  {
+   "t": "2026-11-09T03:56:06.102Z",
+   "service_rss_mo": 73.6484375,
+   "ouvrier_rss_mo": 1.796875,
+   "dossier_mo": 0.29,
+   "journal_lignes": 3,
+   "missions": 0,
+   "outbox": {},
+   "db_mo": 0.26
+  },
+  {
+   "t": "2026-11-09T03:56:36.104Z",
+   "service_rss_mo": 71.09375,
+   "ouvrier_rss_mo": 66.6171875,
+   "dossier_mo": 1.39,
+   "journal_lignes": 40,
+   "missions": 7,
+   "outbox": {},
+   "db_mo": 1.36
+  },
+  {
+   "t": "2026-11-09T03:57:06.106Z",
+   "service_rss_mo": 70.234375,
+   "ouvrier_rss_mo": 68.17578125,
+   "dossier_mo": 2.34,
+   "journal_lignes": 66,
+   "missions": 11,
+   "outbox": {},
+   "db_mo": 2.21
+  },
+  {
+   "t": "2026-11-09T03:57:36.108Z",
+   "service_rss_mo": 72.765625,
+   "ouvrier_rss_mo": 68.48046875,
+   "dossier_mo": 3.35,
+   "journal_lignes": 98,
+   "missions": 17,
+   "outbox": {},
+   "db_mo": 3.22
+  },
+  {
+   "t": "2026-11-09T03:58:06.110Z",
+   "service_rss_mo": 73.3984375,
+   "ouvrier_rss_mo": 68.8046875,
+   "dossier_mo": 4.25,
+   "journal_lignes": 151,
+   "missions": 25,
+   "outbox": {
+    "A_FAIRE": 2
+   },
+   "db_mo": 4.1
+  },
+  {
+   "t": "2026-11-09T03:58:36.112Z",
+   "service_rss_mo": 74.1015625,
+   "ouvrier_rss_mo": 68.96875,
+   "dossier_mo": 4.25,
+   "journal_lignes": 169,
+   "missions": 28,
+   "outbox": {
+    "FAIT": 2
+   },
+   "db_mo": 4.1
+  },
+  {
+   "t": "2026-11-09T03:59:06.114Z",
+   "service_rss_mo": 74.36328125,
+   "ouvrier_rss_mo": 63.484375,
+   "dossier_mo": 4.25,
+   "journal_lignes": 201,
+   "missions": 34,
+   "outbox": {
+    "FAIT": 2
+   },
+   "db_mo": 4.1
+  },
+  {
+   "t": "2026-11-09T03:59:36.117Z",
+   "service_rss_mo": 75.0390625,
+   "ouvrier_rss_mo": 67.10546875,
+   "dossier_mo": 4.39,
+   "journal_lignes": 261,
+   "missions": 43,
+   "outbox": {
+    "A_FAIRE": 3,
+    "FAIT": 2
+   },
+   "db_mo": 4.22
+  },
+  {
+   "t": "2026-11-09T04:00:06.119Z",
+   "service_rss_mo": 75.55859375,
+   "ouvrier_rss_mo": 68.51953125,
+   "dossier_mo": 4.39,
+   "journal_lignes": 299,
+   "missions": 50,
+   "outbox": {
+    "A_FAIRE": 2,
+    "FAIT": 3
+   },
+   "db_mo": 4.22
+  },
+  {
+   "t": "2026-11-09T04:00:36.121Z",
+   "service_rss_mo": 75.81640625,
+   "ouvrier_rss_mo": 68.7421875,
+   "dossier_mo": 4.4,
+   "journal_lignes": 345,
+   "missions": 58,
+   "outbox": {
+    "A_FAIRE": 1,
+    "FAIT": 5
+   },
+   "db_mo": 4.22
+  },
+  {
+   "t": "2026-11-09T04:01:06.123Z",
+   "service_rss_mo": 76.59375,
+   "ouvrier_rss_mo": 69.25,
+   "dossier_mo": 4.54,
+   "journal_lignes": 422,
+   "missions": 71,
+   "outbox": {
+    "A_FAIRE": 1,
+    "FAIT": 8
+   },
+   "db_mo": 4.34
+  },
+  {
+   "t": "2026-11-09T04:01:36.126Z",
+   "service_rss_mo": null,
+   "ouvrier_rss_mo": 69.38671875,
+   "dossier_mo": 4.54,
+   "journal_lignes": 443,
+   "missions": 75,
+   "outbox": {
+    "A_FAIRE": 1,
+    "FAIT": 8
+   },
+   "db_mo": 4.34
+  },
+  {
+   "t": "2026-11-09T04:02:06.130Z",
+   "service_rss_mo": 74.390625,
+   "ouvrier_rss_mo": 69.88671875,
+   "dossier_mo": 4.54,
+   "journal_lignes": 505,
+   "missions": 85,
+   "outbox": {
+    "FAIT": 9
+   },
+   "db_mo": 4.34
+  },
+  {
+   "t": "2026-11-09T04:02:36.133Z",
+   "service_rss_mo": 73.62890625,
+   "ouvrier_rss_mo": 70.25,
+   "dossier_mo": 4.64,
+   "journal_lignes": 543,
+   "missions": 92,
+   "outbox": {
+    "FAIT": 9
+   },
+   "db_mo": 4.44
+  },
+  {
+   "t": "2026-11-09T04:03:06.135Z",
+   "service_rss_mo": 74.6015625,
+   "ouvrier_rss_mo": 70.49609375,
+   "dossier_mo": 4.64,
+   "journal_lignes": 577,
+   "missions": 98,
+   "outbox": {
+    "FAIT": 9
+   },
+   "db_mo": 4.44
+  },
+  {
+   "t": "2026-11-09T04:03:36.138Z",
+   "service_rss_mo": 75.3671875,
+   "ouvrier_rss_mo": 70.85546875,
+   "dossier_mo": 4.65,
+   "journal_lignes": 613,
+   "missions": 105,
+   "outbox": {
+    "FAIT": 10
+   },
+   "db_mo": 4.44
+  },
+  {
+   "t": "2026-11-09T04:04:06.141Z",
+   "service_rss_mo": 76.390625,
+   "ouvrier_rss_mo": 71.5390625,
+   "dossier_mo": 4.81,
+   "journal_lignes": 677,
+   "missions": 115,
+   "outbox": {
+    "FAIT": 13
+   },
+   "db_mo": 4.57
+  },
+  {
+   "t": "2026-11-09T04:04:36.144Z",
+   "service_rss_mo": 77.09375,
+   "ouvrier_rss_mo": 71.8671875,
+   "dossier_mo": 4.81,
+   "journal_lignes": 712,
+   "missions": 121,
+   "outbox": {
+    "FAIT": 14
+   },
+   "db_mo": 4.57
+  },
+  {
+   "t": "2026-11-09T04:05:06.148Z",
+   "service_rss_mo": 80.109375,
+   "ouvrier_rss_mo": 72.3671875,
+   "dossier_mo": 4.82,
+   "journal_lignes": 761,
+   "missions": 130,
+   "outbox": {
+    "FAIT": 15
+   },
+   "db_mo": 4.57
+  },
+  {
+   "t": "2026-11-09T04:05:36.152Z",
+   "service_rss_mo": 80.78125,
+   "ouvrier_rss_mo": 72.50390625,
+   "dossier_mo": 4.82,
+   "journal_lignes": 789,
+   "missions": 135,
+   "outbox": {
+    "FAIT": 16
+   },
+   "db_mo": 4.57
+  },
+  {
+   "t": "2026-11-09T04:06:06.155Z",
+   "service_rss_mo": 80.78125,
+   "ouvrier_rss_mo": 72.54296875,
+   "dossier_mo": 4.92,
+   "journal_lignes": 836,
+   "missions": 144,
+   "outbox": {
+    "FAIT": 16
+   },
+   "db_mo": 4.68
+  },
+  {
+   "t": "2026-11-09T04:06:36.157Z",
+   "service_rss_mo": 81.78125,
+   "ouvrier_rss_mo": 73.3359375,
+   "dossier_mo": 4.93,
+   "journal_lignes": 865,
+   "missions": 149,
+   "outbox": {
+    "FAIT": 17
+   },
+   "db_mo": 4.68
+  },
+  {
+   "t": "2026-11-09T04:07:06.161Z",
+   "service_rss_mo": 76.41796875,
+   "ouvrier_rss_mo": 61.29296875,
+   "dossier_mo": 4.95,
+   "journal_lignes": 917,
+   "missions": 157,
+   "outbox": {
+    "FAIT": 20
+   },
+   "db_mo": 4.68
+  },
+  {
+   "t": "2026-11-09T04:07:36.165Z",
+   "service_rss_mo": 80.1875,
+   "ouvrier_rss_mo": 68.0546875,
+   "dossier_mo": 5.07,
+   "journal_lignes": 950,
+   "missions": 163,
+   "outbox": {
+    "FAIT": 20
+   },
+   "db_mo": 4.8
+  },
+  {
+   "t": "2026-11-09T04:08:06.170Z",
+   "service_rss_mo": 82.46875,
+   "ouvrier_rss_mo": 68.5859375,
+   "dossier_mo": 5.08,
+   "journal_lignes": 1007,
+   "missions": 173,
+   "outbox": {
+    "FAIT": 22
+   },
+   "db_mo": 4.8
+  },
+  {
+   "t": "2026-11-09T04:08:36.176Z",
+   "service_rss_mo": 83.421875,
+   "ouvrier_rss_mo": 68.921875,
+   "dossier_mo": 5.25,
+   "journal_lignes": 1076,
+   "missions": 184,
+   "outbox": {
+    "FAIT": 25
+   },
+   "db_mo": 4.94
+  },
+  {
+   "t": "2026-11-09T04:09:06.181Z",
+   "service_rss_mo": 83.79296875,
+   "ouvrier_rss_mo": 69.65234375,
+   "dossier_mo": 5.26,
+   "journal_lignes": 1105,
+   "missions": 189,
+   "outbox": {
+    "FAIT": 26
+   },
+   "db_mo": 4.94
+  },
+  {
+   "t": "2026-11-09T04:09:36.187Z",
+   "service_rss_mo": 84.2265625,
+   "ouvrier_rss_mo": 70.3671875,
+   "dossier_mo": 5.27,
+   "journal_lignes": 1172,
+   "missions": 200,
+   "outbox": {
+    "FAIT": 28
+   },
+   "db_mo": 4.94
+  },
+  {
+   "t": "2026-11-09T04:10:06.193Z",
+   "service_rss_mo": 84.328125,
+   "ouvrier_rss_mo": 70.76953125,
+   "dossier_mo": 5.39,
+   "journal_lignes": 1217,
+   "missions": 208,
+   "outbox": {
+    "FAIT": 29
+   },
+   "db_mo": 5.05
+  },
+  {
+   "t": "2026-11-09T04:10:36.197Z",
+   "service_rss_mo": 84.4140625,
+   "ouvrier_rss_mo": 71.0703125,
+   "dossier_mo": 5.4,
+   "journal_lignes": 1270,
+   "missions": 217,
+   "outbox": {
+    "FAIT": 31
+   },
+   "db_mo": 5.05
+  },
+  {
+   "t": "2026-11-09T04:11:06.200Z",
+   "service_rss_mo": 84.6640625,
+   "ouvrier_rss_mo": 71.234375,
+   "dossier_mo": 5.41,
+   "journal_lignes": 1337,
+   "missions": 230,
+   "outbox": {
+    "FAIT": 31
+   },
+   "db_mo": 5.05
+  },
+  {
+   "t": "2026-11-09T04:11:36.204Z",
+   "service_rss_mo": 84.78125,
+   "ouvrier_rss_mo": 71.83984375,
+   "dossier_mo": 5.54,
+   "journal_lignes": 1391,
+   "missions": 238,
+   "outbox": {
+    "A_FAIRE": 2,
+    "FAIT": 32
+   },
+   "db_mo": 5.17
+  },
+  {
+   "t": "2026-11-09T04:12:06.208Z",
+   "service_rss_mo": 86.80078125,
+   "ouvrier_rss_mo": 72,
+   "dossier_mo": 5.54,
+   "journal_lignes": 1439,
+   "missions": 245,
+   "outbox": {
+    "A_FAIRE": 4,
+    "FAIT": 32
+   },
+   "db_mo": 5.17
+  },
+  {
+   "t": "2026-11-09T04:12:36.215Z",
+   "service_rss_mo": 87.25390625,
+   "ouvrier_rss_mo": 72.33203125,
+   "dossier_mo": 5.55,
+   "journal_lignes": 1471,
+   "missions": 252,
+   "outbox": {
+    "A_FAIRE": 3,
+    "FAIT": 33
+   },
+   "db_mo": 5.17
+  },
+  {
+   "t": "2026-11-09T04:13:06.219Z",
+   "service_rss_mo": 87.2578125,
+   "ouvrier_rss_mo": 72.5546875,
+   "dossier_mo": 5.68,
+   "journal_lignes": 1520,
+   "missions": 259,
+   "outbox": {
+    "A_FAIRE": 2,
+    "FAIT": 35
+   },
+   "db_mo": 5.29
+  },
+  {
+   "t": "2026-11-09T04:13:36.224Z",
+   "service_rss_mo": 87.84765625,
+   "ouvrier_rss_mo": 72.81640625,
+   "dossier_mo": 5.69,
+   "journal_lignes": 1554,
+   "missions": 265,
+   "outbox": {
+    "A_FAIRE": 2,
+    "FAIT": 36
+   },
+   "db_mo": 5.29
+  },
+  {
+   "t": "2026-11-09T04:14:06.228Z",
+   "service_rss_mo": 87.84765625,
+   "ouvrier_rss_mo": 73.13671875,
+   "dossier_mo": 5.69,
+   "journal_lignes": 1605,
+   "missions": 273,
+   "outbox": {
+    "A_FAIRE": 4,
+    "FAIT": 36
+   },
+   "db_mo": 5.29
+  },
+  {
+   "t": "2026-11-09T04:14:36.232Z",
+   "service_rss_mo": 88.3515625,
+   "ouvrier_rss_mo": 73.3828125,
+   "dossier_mo": 5.83,
+   "journal_lignes": 1661,
+   "missions": 282,
+   "outbox": {
+    "A_FAIRE": 2,
+    "FAIT": 40
+   },
+   "db_mo": 5.41
+  },
+  {
+   "t": "2026-11-09T04:15:06.239Z",
+   "service_rss_mo": 89.56640625,
+   "ouvrier_rss_mo": 73.5703125,
+   "dossier_mo": 5.83,
+   "journal_lignes": 1700,
+   "missions": 289,
+   "outbox": {
+    "A_FAIRE": 2,
+    "FAIT": 40
+   },
+   "db_mo": 5.41
+  },
+  {
+   "t": "2026-11-09T04:15:36.247Z",
+   "service_rss_mo": 73.59375,
+   "ouvrier_rss_mo": 73.89453125,
+   "dossier_mo": 5.83,
+   "journal_lignes": 1729,
+   "missions": 294,
+   "outbox": {
+    "A_FAIRE": 2,
+    "FAIT": 40
+   },
+   "db_mo": 5.41
+  },
+  {
+   "t": "2026-11-09T04:16:06.253Z",
+   "service_rss_mo": 77.62890625,
+   "ouvrier_rss_mo": 74.07421875,
+   "dossier_mo": 5.93,
+   "journal_lignes": 1767,
+   "missions": 300,
+   "outbox": {
+    "A_FAIRE": 2,
+    "FAIT": 42
+   },
+   "db_mo": 5.5
+  },
+  {
+   "t": "2026-11-09T04:16:36.258Z",
+   "service_rss_mo": 85.96484375,
+   "ouvrier_rss_mo": null,
+   "dossier_mo": 5.93,
+   "journal_lignes": 1800,
+   "missions": 306,
+   "outbox": {
+    "A_FAIRE": 2,
+    "FAIT": 42
+   },
+   "db_mo": 5.5
+  },
+  {
+   "t": "2026-11-09T04:17:06.266Z",
+   "service_rss_mo": 88.39453125,
+   "ouvrier_rss_mo": 66.92578125,
+   "dossier_mo": 5.95,
+   "journal_lignes": 1862,
+   "missions": 317,
+   "outbox": {
+    "A_FAIRE": 2,
+    "FAIT": 44
+   },
+   "db_mo": 5.5
+  },
+  {
+   "t": "2026-11-09T04:17:36.272Z",
+   "service_rss_mo": 90.6953125,
+   "ouvrier_rss_mo": 68.15234375,
+   "dossier_mo": 6.07,
+   "journal_lignes": 1889,
+   "missions": 322,
+   "outbox": {
+    "A_FAIRE": 2,
+    "FAIT": 44
+   },
+   "db_mo": 5.62
+  },
+  {
+   "t": "2026-11-09T04:18:06.278Z",
+   "service_rss_mo": 92.125,
+   "ouvrier_rss_mo": 68.85546875,
+   "dossier_mo": 6.08,
+   "journal_lignes": 1930,
+   "missions": 329,
+   "outbox": {
+    "A_FAIRE": 2,
+    "FAIT": 45
+   },
+   "db_mo": 5.62
+  },
+  {
+   "t": "2026-11-09T04:18:36.282Z",
+   "service_rss_mo": 92.16796875,
+   "ouvrier_rss_mo": 69.14453125,
+   "dossier_mo": 6.08,
+   "journal_lignes": 1964,
+   "missions": 337,
+   "outbox": {
+    "A_FAIRE": 2,
+    "FAIT": 45
+   },
+   "db_mo": 5.62
+  },
+  {
+   "t": "2026-11-09T04:19:06.287Z",
+   "service_rss_mo": 92.19921875,
+   "ouvrier_rss_mo": 69.5078125,
+   "dossier_mo": 6.2,
+   "journal_lignes": 2026,
+   "missions": 346,
+   "outbox": {
+    "A_FAIRE": 2,
+    "FAIT": 47
+   },
+   "db_mo": 5.73
+  },
+  {
+   "t": "2026-11-09T04:19:36.293Z",
+   "service_rss_mo": 92.52734375,
+   "ouvrier_rss_mo": 69.8515625,
+   "dossier_mo": 6.22,
+   "journal_lignes": 2080,
+   "missions": 355,
+   "outbox": {
+    "FAIT": 51
+   },
+   "db_mo": 5.73
+  },
+  {
+   "t": "2026-11-09T04:20:06.299Z",
+   "service_rss_mo": 93.57421875,
+   "ouvrier_rss_mo": 70.12890625,
+   "dossier_mo": 6.23,
+   "journal_lignes": 2122,
+   "missions": 362,
+   "outbox": {
+    "FAIT": 53
+   },
+   "db_mo": 5.73
+  },
+  {
+   "t": "2026-11-09T04:20:36.308Z",
+   "service_rss_mo": 93.6015625,
+   "ouvrier_rss_mo": 70.35546875,
+   "dossier_mo": 6.35,
+   "journal_lignes": 2164,
+   "missions": 370,
+   "outbox": {
+    "FAIT": 53
+   },
+   "db_mo": 5.85
+  },
+  {
+   "t": "2026-11-09T04:21:06.316Z",
+   "service_rss_mo": 95.01953125,
+   "ouvrier_rss_mo": 71.01171875,
+   "dossier_mo": 6.36,
+   "journal_lignes": 2200,
+   "missions": 376,
+   "outbox": {
+    "FAIT": 55
+   },
+   "db_mo": 5.85
+  },
+  {
+   "t": "2026-11-09T04:21:36.324Z",
+   "service_rss_mo": 95.82421875,
+   "ouvrier_rss_mo": 71.21484375,
+   "dossier_mo": 6.38,
+   "journal_lignes": 2237,
+   "missions": 382,
+   "outbox": {
+    "FAIT": 57
+   },
+   "db_mo": 5.85
+  },
+  {
+   "t": "2026-11-09T04:22:06.330Z",
+   "service_rss_mo": 96.1328125,
+   "ouvrier_rss_mo": 71.48046875,
+   "dossier_mo": 6.5,
+   "journal_lignes": 2278,
+   "missions": 390,
+   "outbox": {
+    "FAIT": 57
+   },
+   "db_mo": 5.97
+  },
+  {
+   "t": "2026-11-09T04:22:36.336Z",
+   "service_rss_mo": 96.2578125,
+   "ouvrier_rss_mo": 71.88671875,
+   "dossier_mo": 6.52,
+   "journal_lignes": 2335,
+   "missions": 400,
+   "outbox": {
+    "FAIT": 59
+   },
+   "db_mo": 5.97
+  },
+  {
+   "t": "2026-11-09T04:23:06.342Z",
+   "service_rss_mo": null,
+   "ouvrier_rss_mo": 72.30078125,
+   "dossier_mo": 6.53,
+   "journal_lignes": 2367,
+   "missions": 405,
+   "outbox": {
+    "FAIT": 61
+   },
+   "db_mo": 5.97
+  },
+  {
+   "t": "2026-11-09T04:23:36.348Z",
+   "service_rss_mo": 83.90625,
+   "ouvrier_rss_mo": 72.640625,
+   "dossier_mo": 6.64,
+   "journal_lignes": 2405,
+   "missions": 411,
+   "outbox": {
+    "FAIT": 62
+   },
+   "db_mo": 6.08
+  },
+  {
+   "t": "2026-11-09T04:24:06.356Z",
+   "service_rss_mo": 95.2421875,
+   "ouvrier_rss_mo": 72.69921875,
+   "dossier_mo": 6.66,
+   "journal_lignes": 2455,
+   "missions": 419,
+   "outbox": {
+    "FAIT": 65
+   },
+   "db_mo": 6.08
+  },
+  {
+   "t": "2026-11-09T04:24:36.363Z",
+   "service_rss_mo": 95.8515625,
+   "ouvrier_rss_mo": 73.39453125,
+   "dossier_mo": 6.67,
+   "journal_lignes": 2474,
+   "missions": 422,
+   "outbox": {
+    "FAIT": 66
+   },
+   "db_mo": 6.08
+  },
+  {
+   "t": "2026-11-09T04:25:06.369Z",
+   "service_rss_mo": 95.63671875,
+   "ouvrier_rss_mo": 72.74609375,
+   "dossier_mo": 6.81,
+   "journal_lignes": 2530,
+   "missions": 432,
+   "outbox": {
+    "FAIT": 67
+   },
+   "db_mo": 6.21
+  },
+  {
+   "t": "2026-11-09T04:25:36.379Z",
+   "service_rss_mo": 95.71875,
+   "ouvrier_rss_mo": 72.890625,
+   "dossier_mo": 6.82,
+   "journal_lignes": 2601,
+   "missions": 444,
+   "outbox": {
+    "A_FAIRE": 2,
+    "FAIT": 67
+   },
+   "db_mo": 6.21
+  },
+  {
+   "t": "2026-11-09T04:26:06.390Z",
+   "service_rss_mo": 97.6015625,
+   "ouvrier_rss_mo": 73.109375,
+   "dossier_mo": 6.83,
+   "journal_lignes": 2638,
+   "missions": 450,
+   "outbox": {
+    "FAIT": 70
+   },
+   "db_mo": 6.21
+  },
+  {
+   "t": "2026-11-09T04:26:36.397Z",
+   "service_rss_mo": 107.7265625,
+   "ouvrier_rss_mo": 73.31640625,
+   "dossier_mo": 6.99,
+   "journal_lignes": 2684,
+   "missions": 458,
+   "outbox": {
+    "FAIT": 72
+   },
+   "db_mo": 6.35
+  },
+  {
+   "t": "2026-11-09T04:27:06.404Z",
+   "service_rss_mo": 79.046875,
+   "ouvrier_rss_mo": 73.54296875,
+   "dossier_mo": 7,
+   "journal_lignes": 2741,
+   "missions": 468,
+   "outbox": {
+    "FAIT": 73
+   },
+   "db_mo": 6.35
+  },
+  {
+   "t": "2026-11-09T04:27:36.415Z",
+   "service_rss_mo": 88.9765625,
+   "ouvrier_rss_mo": 73.6953125,
+   "dossier_mo": 7,
+   "journal_lignes": 2767,
+   "missions": 473,
+   "outbox": {
+    "FAIT": 73
+   },
+   "db_mo": 6.35
+  },
+  {
+   "t": "2026-11-09T04:28:06.422Z",
+   "service_rss_mo": 95.79296875,
+   "ouvrier_rss_mo": 73.9296875,
+   "dossier_mo": 7.12,
+   "journal_lignes": 2826,
+   "missions": 483,
+   "outbox": {
+    "FAIT": 75
+   },
+   "db_mo": 6.46
+  },
+  {
+   "t": "2026-11-09T04:28:36.429Z",
+   "service_rss_mo": 96.39453125,
+   "ouvrier_rss_mo": 74.53515625,
+   "dossier_mo": 7.13,
+   "journal_lignes": 2868,
+   "missions": 490,
+   "outbox": {
+    "FAIT": 77
+   },
+   "db_mo": 6.46
+  },
+  {
+   "t": "2026-11-09T04:29:06.437Z",
+   "service_rss_mo": 102.3984375,
+   "ouvrier_rss_mo": 74.7109375,
+   "dossier_mo": 7.13,
+   "journal_lignes": 2904,
+   "missions": 498,
+   "outbox": {
+    "FAIT": 77
+   },
+   "db_mo": 6.46
+  },
+  {
+   "t": "2026-11-09T04:29:36.444Z",
+   "service_rss_mo": 109.98046875,
+   "ouvrier_rss_mo": 75.1015625,
+   "dossier_mo": 7.29,
+   "journal_lignes": 2954,
+   "missions": 504,
+   "outbox": {
+    "FAIT": 81
+   },
+   "db_mo": 6.59
+  },
+  {
+   "t": "2026-11-09T04:30:06.452Z",
+   "service_rss_mo": 112.93359375,
+   "ouvrier_rss_mo": 75.3515625,
+   "dossier_mo": 7.31,
+   "journal_lignes": 3009,
+   "missions": 513,
+   "outbox": {
+    "FAIT": 84
+   },
+   "db_mo": 6.59
+  },
+  {
+   "t": "2026-11-09T04:30:36.459Z",
+   "service_rss_mo": 112.83203125,
+   "ouvrier_rss_mo": 75.42578125,
+   "dossier_mo": 7.31,
+   "journal_lignes": 3031,
+   "missions": 517,
+   "outbox": {
+    "FAIT": 84
+   },
+   "db_mo": 6.59
+  },
+  {
+   "t": "2026-11-09T04:31:06.468Z",
+   "service_rss_mo": 113.35546875,
+   "ouvrier_rss_mo": 75.90234375,
+   "dossier_mo": 7.44,
+   "journal_lignes": 3073,
+   "missions": 524,
+   "outbox": {
+    "FAIT": 86
+   },
+   "db_mo": 6.71
+  },
+  {
+   "t": "2026-11-09T04:31:36.475Z",
+   "service_rss_mo": 113.95703125,
+   "ouvrier_rss_mo": 75.51171875,
+   "dossier_mo": 7.45,
+   "journal_lignes": 3113,
+   "missions": 531,
+   "outbox": {
+    "FAIT": 87
+   },
+   "db_mo": 6.71
+  },
+  {
+   "t": "2026-11-09T04:32:06.485Z",
+   "service_rss_mo": 114.0390625,
+   "ouvrier_rss_mo": 75.71875,
+   "dossier_mo": 7.45,
+   "journal_lignes": 3150,
+   "missions": 538,
+   "outbox": {
+    "FAIT": 87
+   },
+   "db_mo": 6.71
+  },
+  {
+   "t": "2026-11-09T04:32:36.494Z",
+   "service_rss_mo": 114.1484375,
+   "ouvrier_rss_mo": 75.96484375,
+   "dossier_mo": 7.58,
+   "journal_lignes": 3205,
+   "missions": 548,
+   "outbox": {
+    "FAIT": 87
+   },
+   "db_mo": 6.83
+  },
+  {
+   "t": "2026-11-09T04:33:06.502Z",
+   "service_rss_mo": 73.5859375,
+   "ouvrier_rss_mo": 76.0546875,
+   "dossier_mo": 7.58,
+   "journal_lignes": 3227,
+   "missions": 552,
+   "outbox": {
+    "FAIT": 87
+   },
+   "db_mo": 6.83
+  },
+  {
+   "t": "2026-11-09T04:33:36.510Z",
+   "service_rss_mo": 95.7890625,
+   "ouvrier_rss_mo": 65.765625,
+   "dossier_mo": 7.58,
+   "journal_lignes": 3256,
+   "missions": 557,
+   "outbox": {
+    "FAIT": 87
+   },
+   "db_mo": 6.83
+  },
+  {
+   "t": "2026-11-09T04:34:06.518Z",
+   "service_rss_mo": 97.05859375,
+   "ouvrier_rss_mo": 67.93359375,
+   "dossier_mo": 7.7,
+   "journal_lignes": 3323,
+   "missions": 569,
+   "outbox": {
+    "FAIT": 89
+   },
+   "db_mo": 6.94
+  },
+  {
+   "t": "2026-11-09T04:34:36.526Z",
+   "service_rss_mo": 115.9609375,
+   "ouvrier_rss_mo": 68.15625,
+   "dossier_mo": 7.7,
+   "journal_lignes": 3353,
+   "missions": 575,
+   "outbox": {
+    "FAIT": 89
+   },
+   "db_mo": 6.94
+  },
+  {
+   "t": "2026-11-09T04:35:06.537Z",
+   "service_rss_mo": 119.59765625,
+   "ouvrier_rss_mo": 69.44921875,
+   "dossier_mo": 7.7,
+   "journal_lignes": 3387,
+   "missions": 581,
+   "outbox": {
+    "A_FAIRE": 1,
+    "FAIT": 89
+   },
+   "db_mo": 6.94
+  },
+  {
+   "t": "2026-11-09T04:35:36.547Z",
+   "service_rss_mo": null,
+   "ouvrier_rss_mo": 69.67578125,
+   "dossier_mo": 7.71,
+   "journal_lignes": 3427,
+   "missions": 588,
+   "outbox": {
+    "FAIT": 91
+   },
+   "db_mo": 6.94
+  },
+  {
+   "t": "2026-11-09T04:36:06.555Z",
+   "service_rss_mo": 87.46875,
+   "ouvrier_rss_mo": 69.734375,
+   "dossier_mo": 7.83,
+   "journal_lignes": 3456,
+   "missions": 593,
+   "outbox": {
+    "FAIT": 91
+   },
+   "db_mo": 7.05
+  },
+  {
+   "t": "2026-11-09T04:36:36.564Z",
+   "service_rss_mo": 101.765625,
+   "ouvrier_rss_mo": 70,
+   "dossier_mo": 7.83,
+   "journal_lignes": 3501,
+   "missions": 601,
+   "outbox": {
+    "A_FAIRE": 1,
+    "FAIT": 91
+   },
+   "db_mo": 7.05
+  },
+  {
+   "t": "2026-11-09T04:37:06.576Z",
+   "service_rss_mo": 112.015625,
+   "ouvrier_rss_mo": 70.3828125,
+   "dossier_mo": 7.84,
+   "journal_lignes": 3545,
+   "missions": 608,
+   "outbox": {
+    "A_FAIRE": 2,
+    "FAIT": 91
+   },
+   "db_mo": 7.05
+  },
+  {
+   "t": "2026-11-09T04:37:36.585Z",
+   "service_rss_mo": 73.39453125,
+   "ouvrier_rss_mo": 70.625,
+   "dossier_mo": 7.94,
+   "journal_lignes": 3569,
+   "missions": 612,
+   "outbox": {
+    "A_FAIRE": 1,
+    "FAIT": 92
+   },
+   "db_mo": 7.16
+  },
+  {
+   "t": "2026-11-09T04:38:06.594Z",
+   "service_rss_mo": 90.4453125,
+   "ouvrier_rss_mo": 71.1171875,
+   "dossier_mo": 7.96,
+   "journal_lignes": 3617,
+   "missions": 620,
+   "outbox": {
+    "A_FAIRE": 1,
+    "FAIT": 94
+   },
+   "db_mo": 7.16
+  },
+  {
+   "t": "2026-11-09T04:38:36.603Z",
+   "service_rss_mo": 88.51171875,
+   "ouvrier_rss_mo": 71.140625,
+   "dossier_mo": 7.97,
+   "journal_lignes": 3665,
+   "missions": 628,
+   "outbox": {
+    "A_FAIRE": 1,
+    "FAIT": 95
+   },
+   "db_mo": 7.16
+  },
+  {
+   "t": "2026-11-09T04:39:06.612Z",
+   "service_rss_mo": 106.625,
+   "ouvrier_rss_mo": 71.3515625,
+   "dossier_mo": 8.09,
+   "journal_lignes": 3704,
+   "missions": 635,
+   "outbox": {
+    "FAIT": 97
+   },
+   "db_mo": 7.27
+  },
+  {
+   "t": "2026-11-09T04:39:36.626Z",
+   "service_rss_mo": 113.109375,
+   "ouvrier_rss_mo": 71.73046875,
+   "dossier_mo": 8.09,
+   "journal_lignes": 3736,
+   "missions": 641,
+   "outbox": {
+    "FAIT": 97
+   },
+   "db_mo": 7.27
+  },
+  {
+   "t": "2026-11-09T04:40:06.638Z",
+   "service_rss_mo": 118.5390625,
+   "ouvrier_rss_mo": 72.06640625,
+   "dossier_mo": 8.1,
+   "journal_lignes": 3765,
+   "missions": 646,
+   "outbox": {
+    "FAIT": 98
+   },
+   "db_mo": 7.27
+  },
+  {
+   "t": "2026-11-09T04:40:36.646Z",
+   "service_rss_mo": 120.0078125,
+   "ouvrier_rss_mo": 72.28125,
+   "dossier_mo": 8.11,
+   "journal_lignes": 3817,
+   "missions": 655,
+   "outbox": {
+    "FAIT": 99
+   },
+   "db_mo": 7.27
+  },
+  {
+   "t": "2026-11-09T04:41:06.655Z",
+   "service_rss_mo": 119.6015625,
+   "ouvrier_rss_mo": 64.65625,
+   "dossier_mo": 8.23,
+   "journal_lignes": 3872,
+   "missions": 664,
+   "outbox": {
+    "FAIT": 101
+   },
+   "db_mo": 7.38
+  },
+  {
+   "t": "2026-11-09T04:41:36.664Z",
+   "service_rss_mo": 117.421875,
+   "ouvrier_rss_mo": 67.4609375,
+   "dossier_mo": 8.23,
+   "journal_lignes": 3910,
+   "missions": 671,
+   "outbox": {
+    "FAIT": 101
+   },
+   "db_mo": 7.38
+  },
+  {
+   "t": "2026-11-09T04:42:06.674Z",
+   "service_rss_mo": 118.10546875,
+   "ouvrier_rss_mo": 67.85546875,
+   "dossier_mo": 8.23,
+   "journal_lignes": 3946,
+   "missions": 678,
+   "outbox": {
+    "FAIT": 101
+   },
+   "db_mo": 7.38
+  },
+  {
+   "t": "2026-11-09T04:42:36.684Z",
+   "service_rss_mo": 117.5859375,
+   "ouvrier_rss_mo": 68.3125,
+   "dossier_mo": 8.34,
+   "journal_lignes": 3993,
+   "missions": 686,
+   "outbox": {
+    "FAIT": 103
+   },
+   "db_mo": 7.48
+  },
+  {
+   "t": "2026-11-09T04:43:06.694Z",
+   "service_rss_mo": 117.6640625,
+   "ouvrier_rss_mo": 68.6328125,
+   "dossier_mo": 8.35,
+   "journal_lignes": 4039,
+   "missions": 694,
+   "outbox": {
+    "A_FAIRE": 1,
+    "FAIT": 103
+   },
+   "db_mo": 7.48
+  },
+  {
+   "t": "2026-11-09T04:43:36.704Z",
+   "service_rss_mo": 117.65625,
+   "ouvrier_rss_mo": 69.4453125,
+   "dossier_mo": 8.36,
+   "journal_lignes": 4057,
+   "missions": 697,
+   "outbox": {
+    "A_FAIRE": 1,
+    "FAIT": 103
+   },
+   "db_mo": 7.48
+  },
+  {
+   "t": "2026-11-09T04:44:06.713Z",
+   "service_rss_mo": 87.9921875,
+   "ouvrier_rss_mo": 69.765625,
+   "dossier_mo": 8.47,
+   "journal_lignes": 4097,
+   "missions": 703,
+   "outbox": {
+    "A_FAIRE": 1,
+    "FAIT": 105
+   },
+   "db_mo": 7.59
+  },
+  {
+   "t": "2026-11-09T04:44:36.723Z",
+   "service_rss_mo": 98.4453125,
+   "ouvrier_rss_mo": 69.9140625,
+   "dossier_mo": 8.48,
+   "journal_lignes": 4147,
+   "missions": 712,
+   "outbox": {
+    "A_FAIRE": 1,
+    "FAIT": 106
+   },
+   "db_mo": 7.59
+  },
+  {
+   "t": "2026-11-09T04:45:06.733Z",
+   "service_rss_mo": 113.078125,
+   "ouvrier_rss_mo": 70.1796875,
+   "dossier_mo": 8.48,
+   "journal_lignes": 4196,
+   "missions": 721,
+   "outbox": {
+    "A_FAIRE": 1,
+    "FAIT": 106
+   },
+   "db_mo": 7.59
+  },
+  {
+   "t": "2026-11-09T04:45:36.742Z",
+   "service_rss_mo": 116.625,
+   "ouvrier_rss_mo": 70.8359375,
+   "dossier_mo": 8.62,
+   "journal_lignes": 4237,
+   "missions": 728,
+   "outbox": {
+    "A_FAIRE": 1,
+    "FAIT": 107
+   },
+   "db_mo": 7.72
+  },
+  {
+   "t": "2026-11-09T04:46:06.752Z",
+   "service_rss_mo": 117.84375,
+   "ouvrier_rss_mo": 71.64453125,
+   "dossier_mo": 8.64,
+   "journal_lignes": 4298,
+   "missions": 738,
+   "outbox": {
+    "FAIT": 111
+   },
+   "db_mo": 7.72
+  },
+  {
+   "t": "2026-11-09T04:46:36.762Z",
+   "service_rss_mo": 117.2890625,
+   "ouvrier_rss_mo": 72.1484375,
+   "dossier_mo": 8.66,
+   "journal_lignes": 4342,
+   "missions": 745,
+   "outbox": {
+    "A_FAIRE": 2,
+    "FAIT": 112
+   },
+   "db_mo": 7.72
+  },
+  {
+   "t": "2026-11-09T04:47:06.771Z",
+   "service_rss_mo": 117.296875,
+   "ouvrier_rss_mo": 64.90625,
+   "dossier_mo": 8.8,
+   "journal_lignes": 4377,
+   "missions": 751,
+   "outbox": {
+    "FAIT": 115
+   },
+   "db_mo": 7.85
+  },
+  {
+   "t": "2026-11-09T04:47:36.782Z",
+   "service_rss_mo": 117.1640625,
+   "ouvrier_rss_mo": 67.2265625,
+   "dossier_mo": 8.8,
+   "journal_lignes": 4421,
+   "missions": 759,
+   "outbox": {
+    "A_FAIRE": 1,
+    "FAIT": 115
+   },
+   "db_mo": 7.85
+  },
+  {
+   "t": "2026-11-09T04:48:06.793Z",
+   "service_rss_mo": 117.41796875,
+   "ouvrier_rss_mo": 67.67578125,
+   "dossier_mo": 8.82,
+   "journal_lignes": 4469,
+   "missions": 767,
+   "outbox": {
+    "FAIT": 118
+   },
+   "db_mo": 7.85
+  },
+  {
+   "t": "2026-11-09T04:48:36.804Z",
+   "service_rss_mo": 117.60546875,
+   "ouvrier_rss_mo": 65.31640625,
+   "dossier_mo": 8.92,
+   "journal_lignes": 4515,
+   "missions": 776,
+   "outbox": {
+    "FAIT": 118
+   },
+   "db_mo": 7.95
+  },
+  {
+   "t": "2026-11-09T04:49:06.815Z",
+   "service_rss_mo": 118,
+   "ouvrier_rss_mo": 67.8203125,
+   "dossier_mo": 8.93,
+   "journal_lignes": 4555,
+   "missions": 782,
+   "outbox": {
+    "FAIT": 119
+   },
+   "db_mo": 7.95
+  },
+  {
+   "t": "2026-11-09T04:49:36.834Z",
+   "service_rss_mo": 118.24609375,
+   "ouvrier_rss_mo": 67.66015625,
+   "dossier_mo": 8.95,
+   "journal_lignes": 4595,
+   "missions": 788,
+   "outbox": {
+    "FAIT": 122
+   },
+   "db_mo": 7.95
+  },
+  {
+   "t": "2026-11-09T04:50:06.844Z",
+   "service_rss_mo": 118.2578125,
+   "ouvrier_rss_mo": 68.34765625,
+   "dossier_mo": 9.1,
+   "journal_lignes": 4636,
+   "missions": 794,
+   "outbox": {
+    "FAIT": 125
+   },
+   "db_mo": 8.08
+  },
+  {
+   "t": "2026-11-09T04:50:36.854Z",
+   "service_rss_mo": 118.2578125,
+   "ouvrier_rss_mo": 68.640625,
+   "dossier_mo": 9.11,
+   "journal_lignes": 4662,
+   "missions": 800,
+   "outbox": {
+    "FAIT": 125
+   },
+   "db_mo": 8.08
+  },
+  {
+   "t": "2026-11-09T04:51:06.863Z",
+   "service_rss_mo": 118.265625,
+   "ouvrier_rss_mo": 69.0546875,
+   "dossier_mo": 9.13,
+   "journal_lignes": 4716,
+   "missions": 807,
+   "outbox": {
+    "FAIT": 129
+   },
+   "db_mo": 8.08
+  },
+  {
+   "t": "2026-11-09T04:51:36.873Z",
+   "service_rss_mo": 73.41796875,
+   "ouvrier_rss_mo": 69.3984375,
+   "dossier_mo": 9.28,
+   "journal_lignes": 4764,
+   "missions": 815,
+   "outbox": {
+    "FAIT": 130
+   },
+   "db_mo": 8.21
+  },
+  {
+   "t": "2026-11-09T04:52:06.887Z",
+   "service_rss_mo": 96.8828125,
+   "ouvrier_rss_mo": 69.85546875,
+   "dossier_mo": 9.29,
+   "journal_lignes": 4820,
+   "missions": 824,
+   "outbox": {
+    "FAIT": 132
+   },
+   "db_mo": 8.21
+  },
+  {
+   "t": "2026-11-09T04:52:36.897Z",
+   "service_rss_mo": 111.60546875,
+   "ouvrier_rss_mo": 71.28515625,
+   "dossier_mo": 9.29,
+   "journal_lignes": 4867,
+   "missions": 833,
+   "outbox": {
+    "FAIT": 132
+   },
+   "db_mo": 8.21
+  },
+  {
+   "t": "2026-11-09T04:53:06.909Z",
+   "service_rss_mo": 116.78125,
+   "ouvrier_rss_mo": 71.68359375,
+   "dossier_mo": 9.42,
+   "journal_lignes": 4916,
+   "missions": 842,
+   "outbox": {
+    "FAIT": 133
+   },
+   "db_mo": 8.34
+  },
+  {
+   "t": "2026-11-09T04:53:36.920Z",
+   "service_rss_mo": 116.68359375,
+   "ouvrier_rss_mo": 71.8203125,
+   "dossier_mo": 9.43,
+   "journal_lignes": 4945,
+   "missions": 847,
+   "outbox": {
+    "FAIT": 134
+   },
+   "db_mo": 8.34
+  },
+  {
+   "t": "2026-11-09T04:54:06.931Z",
+   "service_rss_mo": 117.19140625,
+   "ouvrier_rss_mo": 72.25390625,
+   "dossier_mo": 9.43,
+   "journal_lignes": 4992,
+   "missions": 856,
+   "outbox": {
+    "FAIT": 134
+   },
+   "db_mo": 8.34
+  },
+  {
+   "t": "2026-11-09T04:54:36.943Z",
+   "service_rss_mo": 117.44921875,
+   "ouvrier_rss_mo": 72.6015625,
+   "dossier_mo": 9.55,
+   "journal_lignes": 5054,
+   "missions": 867,
+   "outbox": {
+    "FAIT": 135
+   },
+   "db_mo": 8.44
+  },
+  {
+   "t": "2026-11-09T04:55:06.954Z",
+   "service_rss_mo": 117.0859375,
+   "ouvrier_rss_mo": 72.92578125,
+   "dossier_mo": 9.55,
+   "journal_lignes": 5098,
+   "missions": 875,
+   "outbox": {
+    "FAIT": 136
+   },
+   "db_mo": 8.44
+  },
+  {
+   "t": "2026-11-09T04:55:36.966Z",
+   "service_rss_mo": 116.8125,
+   "ouvrier_rss_mo": 73.06640625,
+   "dossier_mo": 9.56,
+   "journal_lignes": 5126,
+   "missions": 880,
+   "outbox": {
+    "FAIT": 136
+   },
+   "db_mo": 8.44
+  },
+  {
+   "t": "2026-11-09T04:57:16.433Z",
+   "service_rss_mo": 116.8671875,
+   "ouvrier_rss_mo": 77.2109375,
+   "dossier_mo": 9.68,
+   "journal_lignes": 5186,
+   "missions": 890,
+   "outbox": {
+    "FAIT": 139
+   },
+   "db_mo": 8.55
+  }
+ ]
+}
