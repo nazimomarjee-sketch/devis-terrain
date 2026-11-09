@@ -99,7 +99,7 @@ test('OUTBOX : crash pendant l’exécution (bail expiré) → reprise ; échecs
     let n = 0; const ok = { x: { executer: async () => { n++; } } };
     assert.equal(await traiterOutbox(e.db, ok), 0, 'bail encore valide : on n’exécute pas en double'); horloge.decalageMs = 5000; assert.equal(await traiterOutbox(e.db, ok), 1); assert.equal(n, 1);
     enfiler(e.db, { connecteur: 'y', action: 'A', cle: 'cle-echec-0001', charge: {} }); const ko = { y: { executer: async () => { throw new Error('API indisponible'); } } };
-    await traiterOutbox(e.db, ko, { maxTentatives: 3 }); const r = e.db.prepare(`SELECT etat, tentatives, derniere_erreur FROM outbox WHERE cle_idempotence='cle-echec-0001'`).get(); assert.deepEqual([r.etat, r.tentatives, r.derniere_erreur], ['ECHEC', 3, 'API indisponible']);
+    await traiterOutbox(e.db, ko, { maxTentatives: 3, backoffMs: [0] }); const r = e.db.prepare(`SELECT etat, tentatives, derniere_erreur FROM outbox WHERE cle_idempotence='cle-echec-0001'`).get(); assert.deepEqual([r.etat, r.tentatives, r.derniere_erreur], ['ECHEC', 3, 'API indisponible']);
     assert.ok(e.db.prepare(`SELECT 1 FROM journal WHERE evenement='ACTION_EXTERNE_ECHEC'`).get()); enfiler(e.db, { connecteur: 'zz', action: 'A', cle: 'cle-absent-0001', charge: {} }); await traiterOutbox(e.db, {}, { maxTentatives: 1 });
     assert.equal(e.db.prepare(`SELECT etat FROM outbox WHERE cle_idempotence='cle-absent-0001'`).get().etat, 'ECHEC');
   } finally { e.nettoyer(); }

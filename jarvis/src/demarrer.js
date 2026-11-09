@@ -15,6 +15,9 @@ import { Interpreteur } from './modeles.js';
 import { lanceurSchtasks } from './echange.js';
 import { fournisseurAnthropic } from './fournisseurs/anthropic.js';
 import { definirParam, param } from './db.js';
+import { connecteurGmail } from './connecteurs/gmail.js';
+import { connecteurAirtable } from './connecteurs/airtable.js';
+import { traiter as traiterOutbox } from './outbox.js';
 import { horloge } from './horloge.js';
 
 const racineCode = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -43,13 +46,16 @@ if (!dispo.includes(backend) && backend !== 'echange') { console.error(`Backend 
 // IA en ligne : activée SEULEMENT si clé, modèle et tarifs sont fournis (aucun défaut présumé) ; son usage exige en plus l'autorisation « ia_en_ligne ».
 let interpreteur = null;
 if (process.env.JARVIS_IA_CLE && process.env.JARVIS_IA_MODELE) {
-  try { interpreteur = new Interpreteur({ fournisseurs: { en_ligne: fournisseurAnthropic({ cle: process.env.JARVIS_IA_CLE, modele: process.env.JARVIS_IA_MODELE, tarifEntreeCentsParMillion: Number(process.env.JARVIS_IA_TARIF_ENTREE), tarifSortieCentsParMillion: Number(process.env.JARVIS_IA_TARIF_SORTIE) }) } }); console.log('IA en ligne configurée (inactive tant que l’autorisation « ia_en_ligne » n’est pas accordée)'); }
+  // JARVIS_IA_URL_BASE : réservé aux ESSAIS contre un serveur simulé local.
+  try { interpreteur = new Interpreteur({ fournisseurs: { en_ligne: fournisseurAnthropic({ cle: process.env.JARVIS_IA_CLE, modele: process.env.JARVIS_IA_MODELE, tarifEntreeCentsParMillion: Number(process.env.JARVIS_IA_TARIF_ENTREE), tarifSortieCentsParMillion: Number(process.env.JARVIS_IA_TARIF_SORTIE), ...(process.env.JARVIS_IA_URL_BASE ? { urlBase: process.env.JARVIS_IA_URL_BASE, hotesAutorises: (process.env.JARVIS_IA_HOTES ?? '').split(',').filter(Boolean), autoriserHttpLocal: process.env.JARVIS_IA_ESSAI_HTTP_LOCAL === 'oui' } : {}) }) } }); console.log('IA en ligne configurée (inactive tant que l’autorisation « ia_en_ligne » n’est pas accordée)'); }
   catch (e) { console.error(`IA en ligne NON activée : ${e.message}`); }
 }
 // Backend « échange » (Windows) : le lanceur démarre la tâche planifiée du compte agent de l'espace.
 const confinement = backend === 'echange' ? { backend, dossierEchange: join(espace.dossier, 'echange'), lanceur: lanceurSchtasks(id), dossierSortieAttestation: join(espace.dossierSorties, '_attestation') } : { backend, utilisateurAgent };
 const jarvis = new Jarvis({ db, espace, isolation: process.env.JARVIS_ISOLATION !== 'non', racineCode, confinement, interpreteur });
 if (param(db, 'double_execution') === null) definirParam(db, 'double_execution', process.env.JARVIS_DOUBLE_EXECUTION ?? 'sensibles'); // contrôle par défaut en service
+// Connecteurs SYNTHÉTIQUES (aucun accès réel) : exécutés par l'outbox, jamais en direct.
+const connecteurs = { gmail: connecteurGmail({ db, dossierBoite: join(espace.dossier, 'boite-synthetique') }), airtable: connecteurAirtable({ db, fichierBase: join(espace.dossier, 'airtable-synthetique.json') }) };
 const serveur = creerServeur({
   jarvis, jeton: espace.jeton, jetonAdmin: espace.jetonAdmin, dossierPublic: join(racineCode, 'public'),
   dossierSauvegardes: espace.dossierSauvegardes, cleSauvegarde: espace.cleSauvegarde,
@@ -73,7 +79,7 @@ const periodiques = setInterval(verifs, 30 * 60 * 1000);
 let enCours = false; let erreursConsecutives = 0;
 const boucle = setInterval(async () => {
   if (enCours) return; enCours = true;
-  try { await jarvis.tick(); erreursConsecutives = 0; } catch (e) { erreursConsecutives++; console.error(`Erreur de boucle (${erreursConsecutives}) :`, e.message); if (erreursConsecutives >= 5) { journaliser(db, { acteur: 'service', evenement: 'DISJONCTEUR_ORCHESTRATEUR', detail: { message: e.message } }); console.error('Disjoncteur : arrêt pour redémarrage par le superviseur'); process.exit(3); } }
+  try { await jarvis.tick(); await traiterOutbox(db, connecteurs); erreursConsecutives = 0; } catch (e) { erreursConsecutives++; console.error(`Erreur de boucle (${erreursConsecutives}) :`, e.message); if (erreursConsecutives >= 5) { journaliser(db, { acteur: 'service', evenement: 'DISJONCTEUR_ORCHESTRATEUR', detail: { message: e.message } }); console.error('Disjoncteur : arrêt pour redémarrage par le superviseur'); process.exit(3); } }
   finally { enCours = false; }
 }, 2000);
 const surveillance = setInterval(() => {

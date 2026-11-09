@@ -15,14 +15,16 @@ function reclamer(db, bailMs) {
   return transaction(db, () => {
     const now = horloge.maintenant();
     db.prepare(`UPDATE outbox SET etat='A_FAIRE', maj_le=? WHERE etat='EN_COURS' AND bail_jusqua < ?`).run(horloge.iso(), now); // reprise après crash
-    const a = db.prepare(`SELECT * FROM outbox WHERE etat='A_FAIRE' ORDER BY id LIMIT 1`).get(); if (!a) return null;
+    const a = db.prepare(`SELECT * FROM outbox WHERE etat='A_FAIRE' AND prochaine_tentative <= ? ORDER BY id LIMIT 1`).get(now); if (!a) return null;
     db.prepare(`UPDATE outbox SET etat='EN_COURS', tentatives=tentatives+1, bail_jusqua=?, maj_le=? WHERE id=?`).run(now + bailMs, horloge.iso(), a.id);
     return { ...a, tentatives: a.tentatives + 1 };
   });
 }
 
 /** Traite l'outbox. `connecteurs` : { nom: { executer(action, charge, cleIdempotence) } }. Retourne le nombre d'actions faites. */
-export async function traiter(db, connecteurs, { maxTentatives = 3, bailMs = 60_000 } = {}) {
+// Attente PROGRESSIVE entre tentatives (intégration indisponible : on ne martèle pas, on ne renonce pas trop tôt). Échec définitif après maxTentatives.
+export const ATTENTE_PAR_DEFAUT_MS = [2_000, 10_000, 30_000, 120_000, 300_000, 900_000, 900_000];
+export async function traiter(db, connecteurs, { maxTentatives = 8, bailMs = 60_000, backoffMs = ATTENTE_PAR_DEFAUT_MS } = {}) {
   let faites = 0;
   for (let i = 0; i < 100; i++) {
     const a = reclamer(db, bailMs); if (!a) break;
@@ -34,9 +36,22 @@ export async function traiter(db, connecteurs, { maxTentatives = 3, bailMs = 60_
       journaliser(db, { missionId: a.mission_id, acteur: 'outbox', evenement: 'ACTION_EXTERNE_FAITE', detail: { connecteur: a.connecteur, action: a.action } }); faites++;
     } catch (e) {
       const definitif = a.tentatives >= maxTentatives;
-      db.prepare(`UPDATE outbox SET etat=?, bail_jusqua=NULL, derniere_erreur=?, maj_le=? WHERE id=?`).run(definitif ? 'ECHEC' : 'A_FAIRE', String(e.message).slice(0, 200), horloge.iso(), a.id);
+      const attente = backoffMs[Math.min(a.tentatives - 1, backoffMs.length - 1)] ?? 0;
+      db.prepare(`UPDATE outbox SET etat=?, bail_jusqua=NULL, prochaine_tentative=?, derniere_erreur=?, maj_le=? WHERE id=?`).run(definitif ? 'ECHEC' : 'A_FAIRE', horloge.maintenant() + attente, String(e.message).slice(0, 200), horloge.iso(), a.id);
       journaliser(db, { missionId: a.mission_id, acteur: 'outbox', evenement: definitif ? 'ACTION_EXTERNE_ECHEC' : 'ACTION_EXTERNE_RETENTEE', detail: { connecteur: a.connecteur, message: String(e.message).slice(0, 120) } });
     }
   }
   return faites;
+}
+
+/** Relance manuelle (administrateur) d'une action en ÉCHEC définitif : repart à zéro tentative, même clé d'idempotence (aucun doublon possible). */
+export function rejouer(db, id, par = 'administrateur') {
+  const r = db.prepare(`UPDATE outbox SET etat='A_FAIRE', tentatives=0, prochaine_tentative=0, derniere_erreur=NULL, maj_le=? WHERE id=? AND etat='ECHEC'`).run(horloge.iso(), id);
+  if (r.changes !== 1) throw new Error('Action introuvable ou pas en échec');
+  journaliser(db, { acteur: par, evenement: 'ACTION_EXTERNE_REJOUEE', detail: { id } });
+}
+
+export function etatOutbox(db) {
+  const n = Object.fromEntries(db.prepare('SELECT etat, COUNT(*) AS n FROM outbox GROUP BY etat').all().map((r) => [r.etat, r.n]));
+  return { a_faire: n.A_FAIRE ?? 0, en_cours: n.EN_COURS ?? 0, fait: n.FAIT ?? 0, echec: n.ECHEC ?? 0 };
 }

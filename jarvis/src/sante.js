@@ -49,6 +49,10 @@ export function diagnostic(db, { dossierDonnees = null, exigerBattement = false 
   const trace = verifierTracabilite(db, 300);
   if (!trace.ok) add('critique', 'TRACABILITE_INCOMPLETE', `${trace.problemes.length} incohérence(s) entre état et journal (ex. ${trace.problemes[0]}).`);
 
+  const ob = db.prepare(`SELECT SUM(etat='ECHEC') AS echec, MIN(CASE WHEN etat='A_FAIRE' THEN cree_le END) AS plusAncienne FROM outbox`).get();
+  if (ob.echec) add('critique', 'OUTBOX_EN_ECHEC', `${ob.echec} action(s) externe(s) en échec définitif (intégration indisponible trop longtemps) : à rejouer par l'administrateur.`);
+  if (ob.plusAncienne && now - Date.parse(ob.plusAncienne) > 10 * 60000) add('avertissement', 'OUTBOX_EN_ATTENTE', 'Une action externe attend depuis plus de 10 minutes : intégration indisponible ?');
+
   const orphelines = db.prepare(`SELECT COUNT(*) AS n FROM missions WHERE statut='EN_COURS' AND bail_jusqua < ?`).get(now).n;
   if (orphelines) add('avertissement', 'MISSIONS_ORPHELINES', `${orphelines} mission(s) interrompue(s) en attente de reprise.`);
 

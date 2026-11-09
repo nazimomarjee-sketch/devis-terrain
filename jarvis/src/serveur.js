@@ -12,6 +12,8 @@ import { horloge } from './horloge.js';
 import { listerRegles, definirRegle, listerAutorisations, accorder, revoquer, autorise } from './regles.js';
 import { etatIntegrations } from './integrations.js';
 import { creerSuiveurAcces } from './acces.js';
+import { etatOutbox, rejouer } from './outbox.js';
+import { definirParam, journaliser } from './db.js';
 import { param } from './db.js';
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.webmanifest': 'application/manifest+json', '.png': 'image/png' };
@@ -65,6 +67,7 @@ export function creerServeur({ jarvis, jeton, jetonAdmin, dossierPublic, dossier
     return {
       heure: horloge.iso(),
       espace: { id: espace.id, libelle: espace.libelle, description: espace.description, donnees_reelles_autorisees: autorise(db, 'donnees_reelles'), liens: liensEspaces },
+      outbox: etatOutbox(db), connecteur_gmail: param(db, 'connecteur_gmail', 'desactive'),
       ia: jarvis.interpreteur ? jarvis.interpreteur.etat(db) : { fournisseurs: [], fonctions_locales: 'ok' },
       integrations: etatIntegrations(db), connecteur_cockpit_autorise: autorise(db, 'connecteur:cockpit'),
       mode: autorise(db, 'donnees_reelles') ? 'donnees-reelles-autorisees' : 'demo-donnees-fictives',
@@ -104,6 +107,12 @@ export function creerServeur({ jarvis, jeton, jetonAdmin, dossierPublic, dossier
         if (!admin) { acces.escalade({ route: 'admin', jeton: 'utilisateur' }); return repondre(res, 403, { erreur: 'Jeton administrateur requis' }); }
         if (req.method === 'POST' && chemin === '/api/admin/regles') { const b = await corpsJson(req); definirRegle(db, b, 'administrateur'); return repondre(res, 200, { ok: true }); }
         if (req.method === 'POST' && chemin === '/api/admin/autorisations') { const b = await corpsJson(req); return repondre(res, 201, { id: accorder(db, b, 'administrateur') }); }
+        if (req.method === 'POST' && chemin === '/api/admin/parametres') {
+          const b = await corpsJson(req); const OK = { connecteur_gmail: (v) => ['desactive', 'synthetique'].includes(v), double_execution: (v) => ['non', 'sensibles', 'toutes'].includes(v), budget_jour_cents: (v) => /^\d{1,6}$/.test(v) };
+          if (!OK[b.cle] || !OK[b.cle](String(b.valeur))) return repondre(res, 400, { erreur: 'Paramètre ou valeur non autorisés' });
+          definirParam(db, b.cle, String(b.valeur)); journaliser(db, { acteur: 'administrateur', evenement: 'PARAMETRE_MODIFIE', detail: { cle: b.cle, valeur: String(b.valeur) } }); return repondre(res, 200, { ok: true });
+        }
+        if (req.method === 'POST' && (m = /^\/api\/admin\/outbox\/(\d+)\/rejouer$/.exec(chemin))) { rejouer(db, Number(m[1])); return repondre(res, 200, { ok: true }); }
         if (req.method === 'POST' && (m = /^\/api\/admin\/autorisations\/(\d+)\/revoquer$/.exec(chemin))) { revoquer(db, Number(m[1]), 'administrateur'); return repondre(res, 200, { ok: true }); }
         return repondre(res, 404, { erreur: 'Introuvable' });
       }

@@ -91,6 +91,7 @@ CREATE TABLE IF NOT EXISTS outbox (
   etat TEXT NOT NULL DEFAULT 'A_FAIRE' CHECK (etat IN ('A_FAIRE','EN_COURS','FAIT','ECHEC')),
   tentatives INTEGER NOT NULL DEFAULT 0,
   bail_jusqua INTEGER,
+  prochaine_tentative INTEGER NOT NULL DEFAULT 0,
   derniere_erreur TEXT,
   cree_le TEXT NOT NULL,
   maj_le TEXT NOT NULL
