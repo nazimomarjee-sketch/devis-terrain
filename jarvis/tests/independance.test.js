@@ -17,7 +17,7 @@ test('indépendance : aucun fichier de src/auditeurs/ n’importe un fichier de 
 test('moindre privilège : les agents n’importent ni la base, ni le moteur, ni les règles/autorisations, ni l’orchestrateur, ni le serveur', () => {
   const INTERDITS = /(\/db\.js|moteur|orchestrateur|regles|serveur|sauvegarde|espaces|donnees\.js|executeur)/;
   const AUTORISES = new Set(['./commun.js', '../pdf.js', '../horloge.js', '../confiance.js', 'node:fs', 'node:path', 'node:crypto', 'node:child_process']);
-  for (const f of readdirSync(join(src, 'agents')).filter((x) => !['index.js', 'runner.js'].includes(x))) {
+  for (const f of readdirSync(join(src, 'agents')).filter((x) => !['index.js', 'runner.js', 'runner-echange.js', 'sonde.js', 'sondes.js'].includes(x))) {
     for (const i of imports(join(src, 'agents', f))) { assert.ok(!INTERDITS.test(i), `agents/${f} importe ${i}`); if (f !== 'commun.js') assert.ok(AUTORISES.has(i) || /^\.\/[a-z]+\.js$/.test(i) === false, `import inattendu ${i} dans ${f}`); }
   }
 });

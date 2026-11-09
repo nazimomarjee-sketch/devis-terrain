@@ -4,7 +4,7 @@ import { detecterInjection } from '../confiance.js';
 export function auditerClients({ mission, resultat: r, regles, aujourdhui, dossierJeu }) {
   const C = [];
   const ds = ['clients', 'commandes', 'factures', 'paiements', 'devis_historique'];
-  controlesGeneraux(C, { resultat: r, regles, datasets: ds, dossierJeu, typeAttendu: 'dossier_client' });
+  controlesGeneraux(C, { resultat: r, regles, datasets: ds, dossierJeu, aujourdhui, typeAttendu: 'dossier_client' });
   const L = Object.fromEntries(ds.map((n) => [n, charger(dossierJeu, n).lignes]));
   const e = [];
   const demande = norm(mission.demande);
@@ -14,6 +14,12 @@ export function auditerClients({ mission, resultat: r, regles, aujourdhui, dossi
   if (c) {
     if (r.client.id !== c.id) e.push(`client ${r.client.id} ≠ ${c.id} demandé`);
     if (r.client.nom !== c.nom || r.client.territoire !== c.territoire || r.client.remise_pct !== c.remise_pct) e.push('identité commerciale ≠ base');
+    if (r.client.remise_justification !== c.remise_justification) e.push('justification de remise ≠ base');
+    if (r.client.contact_disponible !== !!c.email) e.push('contact_disponible ≠ base');
+    const att3 = [...L.commandes.filter((x) => x.client_id === c.id)].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.id < b.id ? 1 : -1)).slice(0, 3).map((x) => JSON.stringify([x.id, x.date, x.statut, String(x.lignes.reduce((s, l) => s + BigInt(l.qte) * BigInt(l.pu_ht_cents), 0n))]));
+    const ob3 = r.commandes.dernieres.map((x) => JSON.stringify([x.id, x.date, x.statut, String(x.total_ht_cents)]));
+    if (JSON.stringify(att3) !== JSON.stringify(ob3)) e.push('dernières commandes ≠ base');
+    if (r.avertissement !== 'Historique issu de la base fournie ; il reste déclaratif tant qu’il n’est pas rapproché d’EBP.') e.push('avertissement ≠ texte attendu');
     const total = (x) => x.lignes.reduce((s, l) => BigInt(s) + BigInt(l.qte) * BigInt(l.pu_ht_cents), 0n);
     const cmd = L.commandes.filter((x) => x.client_id === c.id);
     if (r.commandes.nombre !== cmd.length) e.push('nombre de commandes faux');

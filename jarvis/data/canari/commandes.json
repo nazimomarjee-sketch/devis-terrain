@@ -1,0 +1,11 @@
+{
+  "genere": "FICTIF",
+  "commandes": [
+    { "id": "CMD-2026-020", "client_id": "C004", "date": "2026-08-20", "statut": "enregistree_ebp", "statut_le": "2026-08-21", "lignes": [ { "ref": "PEI-0002", "qte": 1, "pu_ht_cents": 14900 } ] },
+    { "id": "CMD-2026-030", "client_id": "C002", "date": "2026-09-03", "statut": "enregistree_ebp", "statut_le": "2026-09-04", "lignes": [ { "ref": "PEI-0001", "qte": 2, "pu_ht_cents": 5800 } ] },
+    { "id": "CMD-2026-031", "client_id": "C001", "date": "2026-11-02", "statut": "envoyee", "statut_le": "2026-11-02", "lignes": [ { "ref": "DUR-2500", "qte": 4, "pu_ht_cents": 3120 } ] },
+    { "id": "CMD-2026-032", "client_id": "C002", "date": "2026-11-05", "statut": "preparee", "statut_le": "2026-11-05", "lignes": [ { "ref": "MAS-0001", "qte": 6, "pu_ht_cents": 1240 } ] },
+    { "id": "CMD-2026-033", "client_id": "C003", "date": "2026-10-28", "statut": "enregistree_ebp", "statut_le": "2026-10-29", "lignes": [ { "ref": "VRN-5000", "qte": 1, "pu_ht_cents": 8490 } ] },
+    { "id": "CMD-2026-034", "client_id": "C005", "date": "2026-11-03", "statut": "enregistree_ebp", "statut_le": "2026-11-04", "lignes": [ { "ref": "ADH-0001", "qte": 10, "pu_ht_cents": 500 }, { "ref": "MSK-0050", "qte": 1, "pu_ht_cents": 400 } ] }
+  ]
+}

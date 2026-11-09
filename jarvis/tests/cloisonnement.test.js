@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, cpSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { environnement, traiter, auditer, requete, json, lire, DEMANDE_TYPE, RACINE, FICTIF } from './aide.js';
+import { environnement, traiter, auditer, requete, json, lire, DEMANDE_TYPE, RACINE, FICTIF, compteAgent } from './aide.js';
 import { configurerEspace, verifierCloisonnement, PROFILS } from '../src/espaces.js';
 import { creerServeur } from '../src/serveur.js';
 import { sauvegarder, restaurer } from '../src/sauvegarde.js';
@@ -120,22 +120,28 @@ test('jetons : un jeton (utilisateur ou administrateur) d’un espace n’ouvre 
   } finally { for (const s of Object.values(S)) s.close(); for (const e of Object.values(E)) e.nettoyer(); }
 });
 
-test('ODICOLOR : données réelles et intégrations DÉSACTIVÉES par défaut ; sans autorisation, tout est refusé et journalisé', async () => {
+test('ODICOLOR : données réelles DÉSACTIVÉES par défaut ; autorisation + règles validées + CONFINEMENT OS attesté sont TOUS nécessaires', async (t) => {
   const racineJeu = mkdtempSync(join(tmpdir(), 'jeu-reel-'));
   const jeu = join(racineJeu, 'odicolor'); cpSync(FICTIF, jeu, { recursive: true });
   for (const f of ['catalogue.json', 'clients.json']) { const j = JSON.parse(readFileSync(join(jeu, f), 'utf8')); j.genere = 'REEL'; writeFileSync(join(jeu, f), JSON.stringify(j)); } // jeux marqués « réels » (contenu de test)
-  const e = environnement({ dossierJeu: jeu });
+  const compte = compteAgent('jvagent');
+  const e = environnement({ dossierJeu: jeu, isolation: !!compte, confinement: compte ? { backend: 'linux-os', utilisateurAgent: compte } : { backend: 'permission' } });
   try {
     assert.equal(autorise(e.db, 'donnees_reelles'), false);
     // 1) Sans autorisation : blocage + trace.
     const m1 = await traiter(e, DEMANDE_TYPE);
     assert.equal(m1.statut, 'BLOQUE'); assert.match(m1.raison, /Données réelles non autorisées/); assert.match(m1.question, /donnees_reelles/);
     assert.ok(e.db.prepare(`SELECT 1 FROM journal WHERE evenement='ACCES_REFUSE_SANS_AUTORISATION'`).get());
-    // 2) Autorisation accordée (par l'administrateur) : les règles « démonstration » ne suffisent PLUS pour des données réelles.
+    // 2) Autorisation accordée : les règles « démonstration » ne suffisent PLUS, et le confinement doit être attesté.
     const id = accorder(e.db, { type: 'donnees_reelles', portee: 'Accord écrit ODICOLOR (cas de test)', jours: 1 }, 'administrateur');
     e.jarvis.relancer(m1.id); await e.jarvis.executerJusquaVide();
+    assert.match(lire(e.db, m1.id).raison, /Confinement des agents insuffisant/, 'sans attestation OS, AUCUN traitement de données réelles');
+    assert.ok(e.db.prepare(`SELECT 1 FROM journal WHERE evenement='REEL_REFUSE_CONFINEMENT_INSUFFISANT'`).get());
+    if (!compte) { t.diagnostic('SAUTÉ : suite du scénario exige root + Linux (attestation « os » impossible ici)'); return; }
+    const att = await e.jarvis.attester(); assert.equal(att.niveau, 'os', att.echecs.join(' ; '));
+    e.jarvis.relancer(m1.id); await e.jarvis.executerJusquaVide();
     const m2 = lire(e.db, m1.id); assert.equal(m2.statut, 'BLOQUE'); assert.match(m2.raison, /pas validée/);
-    // 3) L'administrateur valide chaque règle (justification + source) : le devis passe, sans mention « fictif ».
+    // 3) L'administrateur valide chaque règle : le devis passe, calculé par un agent confiné sous un compte distinct.
     const valeurs = { 'tva|reunion|vente_locale': { taux_pct: '8.5' }, 'remise_max_pct|*': { pct: '20' }, 'marge_min_pct|*': { pct: '10' }, 'tarif_ancien_jours|*': { jours: 90 } };
     for (const [k, v] of Object.entries(valeurs)) { const [type, ...cle] = k.split('|'); definirRegle(e.db, { type, cle: cle.join('|'), valeur: v, justification: 'Validé (cas de test)', source: 'validation fictive de test', statut: 'VALIDE' }, 'administrateur'); }
     e.jarvis.relancer(m1.id); await e.jarvis.executerJusquaVide();
@@ -143,12 +149,12 @@ test('ODICOLOR : données réelles et intégrations DÉSACTIVÉES par défaut ; 
     const r = JSON.parse(m3.resultat); assert.equal(r.donnees_fictives, false); assert.equal(r.tva_regle.statut, 'VALIDE');
     assert.ok(!/FICTIFS/.test(readFileSync(join(e.dossierSorties, r.fichiers.pdf.chemin)).toString('latin1')), 'aucune mention fictive sur des données réelles');
     assert.equal(auditer(e, 'devis', m3, { ...r, donnees_fictives: true }).verdict, 'A_CORRIGER', 'déclarer « fictif » des données réelles est détecté');
-    // 4) Expiration puis révocation : refus de nouveau.
-    horloge.decalageMs = 2 * 86400000; assert.equal(autorise(e.db, 'donnees_reelles'), false);
-    const m4 = await traiter(e, 'devis pour le garage Durand : 1 vernis'); assert.equal(m4.statut, 'BLOQUE'); assert.match(m4.raison, /Données réelles non autorisées/);
+    // 4) Attestation périmée (25 h) : refus de nouveau ; puis expiration puis révocation de l'autorisation.
+    horloge.decalageMs = 25 * 3600 * 1000;
+    const m4 = await traiter(e, 'devis pour le garage Durand : 1 vernis'); assert.equal(m4.statut, 'BLOQUE'); assert.match(m4.raison, /Données réelles non autorisées/, 'autorisation de 1 jour expirée');
     horloge.decalageMs = 0; const id2 = accorder(e.db, { type: 'donnees_reelles', portee: 'nouvel accord (test)' }, 'administrateur'); assert.equal(autorise(e.db, 'donnees_reelles'), true);
-    revoquer(e.db, id2, 'administrateur'); assert.equal(autorise(e.db, 'donnees_reelles'), true, 'la première autorisation (non expirée à cette date) est encore valide : la révocation est PAR autorisation');
-    revoquer(e.db, id, 'administrateur'); assert.equal(autorise(e.db, 'donnees_reelles'), false); assert.throws(() => revoquer(e.db, id2, 'x'), /déjà révoquée/);
+    horloge.decalageMs = 25 * 3600 * 1000; const m5 = await traiter(e, 'devis pour le garage Durand : 2 vernis'); assert.match(m5.raison, /Confinement des agents insuffisant/, 'attestation de plus de 24 h = périmée');
+    horloge.decalageMs = 0; revoquer(e.db, id2, 'administrateur'); revoquer(e.db, id, 'administrateur'); assert.equal(autorise(e.db, 'donnees_reelles'), false); assert.throws(() => revoquer(e.db, id2, 'x'), /déjà révoquée/);
   } finally { e.nettoyer(); rmSync(racineJeu, { recursive: true, force: true }); }
 });
 

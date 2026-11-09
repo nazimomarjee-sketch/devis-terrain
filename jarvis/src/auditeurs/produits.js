@@ -23,7 +23,7 @@ export function attendusProduits(cat, regles, aujourdhui) {
 
 export function auditerProduits({ mission, resultat: r, regles, aujourdhui, dossierJeu }) {
   const C = []; const cat = charger(dossierJeu, 'catalogue').lignes;
-  controlesGeneraux(C, { resultat: r, regles, datasets: ['catalogue'], dossierJeu, typeAttendu: 'rapport_produits' });
+  controlesGeneraux(C, { resultat: r, regles, datasets: ['catalogue'], dossierJeu, aujourdhui, typeAttendu: 'rapport_produits' });
   const e = [];
   if (r.mode === 'controle_catalogue') {
     const att = attendusProduits(cat, regles, aujourdhui); const obt = new Set(r.anomalies.map((a) => `${a.code}|${a.ref}`));

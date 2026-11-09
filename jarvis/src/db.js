@@ -1,4 +1,5 @@
 import { DatabaseSync } from 'node:sqlite';
+import { chmodSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { horloge } from './horloge.js';
 import { masquer } from './confiance.js';
@@ -88,6 +89,8 @@ CREATE TABLE IF NOT EXISTS sorties (
   simule INTEGER NOT NULL,
   contenu TEXT NOT NULL
 );
+-- Idempotence après incident : un même envoi (mission, type) ne peut JAMAIS exister deux fois.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sorties_unique ON sorties(mission_id, type);
 `;
 
 // Seuls des paramètres d'EXPLOITATION figurent ici. Les règles métier (TVA, remises, marges…)
@@ -101,6 +104,8 @@ export function ouvrir(chemin = ':memory:') {
   const db = new DatabaseSync(chemin);
   db.exec('PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; PRAGMA foreign_keys=ON;');
   db.exec(SCHEMA);
+  // La base n'est lisible que par le compte du service (jamais par un compte agent), y compris les fichiers WAL/SHM.
+  if (chemin !== ':memory:') for (const f of [chemin, `${chemin}-wal`, `${chemin}-shm`]) if (existsSync(f)) { try { chmodSync(f, 0o600); } catch { /* best-effort (Windows : ACL NTFS) */ } }
   for (const [cle, valeur] of Object.entries(PARAMETRES_PAR_DEFAUT)) {
     db.prepare('INSERT OR IGNORE INTO parametres(cle, valeur) VALUES (?, ?)').run(cle, valeur);
   }

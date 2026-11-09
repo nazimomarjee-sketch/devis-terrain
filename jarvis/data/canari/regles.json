@@ -1,0 +1,129 @@
+{
+  "genere": "FICTIF",
+  "avertissement": "Jeu CANARI figé : sert à l'auto-test de l'auditeur, jamais à du travail réel.",
+  "regles": [
+    {
+      "type": "tva",
+      "cle": "reunion|vente_locale",
+      "valeur": {
+        "taux_pct": "8.5"
+      },
+      "justification": "Exemple de démonstration (taux normal appliqué dans certains DOM). À faire valider par un expert-comptable.",
+      "source": "démonstration",
+      "statut": "FICTIF_DEMO"
+    },
+    {
+      "type": "tva",
+      "cle": "metropole|vente_locale",
+      "valeur": {
+        "taux_pct": "20"
+      },
+      "justification": "Exemple de démonstration (taux normal métropole). À faire valider.",
+      "source": "démonstration",
+      "statut": "FICTIF_DEMO"
+    },
+    {
+      "type": "tva",
+      "cle": "metropole|export",
+      "valeur": {
+        "taux_pct": "0"
+      },
+      "justification": "Exemple de démonstration : exportation hors UE. Conditions et justificatifs d'exportation à faire valider.",
+      "source": "démonstration",
+      "statut": "FICTIF_DEMO"
+    },
+    {
+      "type": "tva",
+      "cle": "guyane|vente_locale",
+      "valeur": {
+        "taux_pct": "0"
+      },
+      "justification": "Exemple de démonstration. À faire valider (régime local).",
+      "source": "démonstration",
+      "statut": "FICTIF_DEMO"
+    },
+    {
+      "type": "remise_max_pct",
+      "cle": "*",
+      "valeur": {
+        "pct": "20"
+      },
+      "justification": "Plafond de démonstration. L'ancien plafond de 60 % du prototype n'avait aucune justification : à fixer par la direction commerciale.",
+      "source": "démonstration",
+      "statut": "FICTIF_DEMO"
+    },
+    {
+      "type": "marge_min_pct",
+      "cle": "*",
+      "valeur": {
+        "pct": "10"
+      },
+      "justification": "Seuil de démonstration (marge sur prix de vente après remise). À fixer par la direction.",
+      "source": "démonstration",
+      "statut": "FICTIF_DEMO"
+    },
+    {
+      "type": "tarif_ancien_jours",
+      "cle": "*",
+      "valeur": {
+        "jours": 90
+      },
+      "justification": "Ancienneté au-delà de laquelle un tarif est signalé. Valeur de démonstration.",
+      "source": "démonstration",
+      "statut": "FICTIF_DEMO"
+    },
+    {
+      "type": "prospection_poids",
+      "cle": "*",
+      "valeur": {
+        "potentiel_diviseur": 100,
+        "potentiel_max": 50,
+        "points_par_technicien": 3,
+        "technicien_max": 30,
+        "jamais_contacte": 10,
+        "ancien_jours": 90,
+        "ancien_points": 10,
+        "recent_jours": 30,
+        "recent_points": -10
+      },
+      "justification": "Pondérations de démonstration pour prioriser les prospects. À calibrer sur des résultats commerciaux réels.",
+      "source": "démonstration",
+      "statut": "FICTIF_DEMO"
+    },
+    {
+      "type": "relance",
+      "cle": "*",
+      "valeur": {
+        "niveau2_jours": 15,
+        "niveau3_jours": 45,
+        "delai_entre_relances_jours": 7,
+        "devis_sans_reponse_jours": 7
+      },
+      "justification": "Délais de relance de démonstration. À valider par la direction commerciale et le service comptable.",
+      "source": "démonstration",
+      "statut": "FICTIF_DEMO"
+    },
+    {
+      "type": "commande",
+      "cle": "*",
+      "valeur": {
+        "envoyee_non_enregistree_jours": 3,
+        "preparee_non_envoyee_jours": 2
+      },
+      "justification": "Seuils d'alerte de suivi des commandes (démonstration).",
+      "source": "démonstration",
+      "statut": "FICTIF_DEMO"
+    },
+    {
+      "type": "planning",
+      "cle": "*",
+      "valeur": {
+        "capacite_min": 420,
+        "max_priorites": 3
+      },
+      "justification": "Journée de 7 h et trois priorités maximum, d'après les instructions de l'agent commercial existant.",
+      "source": "CLAUDE_AGENT01_INSTRUCTIONS.md",
+      "statut": "FICTIF_DEMO"
+    }
+  ]
+}

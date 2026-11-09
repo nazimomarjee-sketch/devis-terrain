@@ -45,8 +45,9 @@ export function conclure(controles, verdictSiOk = 'VALIDE') {
 export function ctrl(controles, nom, erreurs) { controles.push({ nom, ok: erreurs.length === 0, detail: erreurs }); }
 
 /** Contrôles génériques communs à tous les agents. */
-export function controlesGeneraux(controles, { resultat: r, regles, datasets, dossierJeu, typeAttendu }) {
+export function controlesGeneraux(controles, { resultat: r, regles, datasets, dossierJeu, typeAttendu, aujourdhui }) {
   const e = [];
+  if (aujourdhui !== undefined && r?.date !== aujourdhui) e.push(`date ${r?.date} ≠ ${aujourdhui}`);
   if (r?.type !== typeAttendu) e.push(`type ${r?.type} ≠ ${typeAttendu}`);
   const genere = datasets.map((n) => charger(dossierJeu, n)).filter((x) => x.present);
   const fictifReel = genere.every((x) => x.fictif);

@@ -26,8 +26,13 @@ export function auditerDevis({ mission, resultat: r, regles, aujourdhui, dossier
   const C = [];
   const es = structure(r); ctrl(C, 'structure', es); if (es.length) return conclure(C);
   const cat = charger(dossierJeu, 'catalogue').lignes; const clients = charger(dossierJeu, 'clients').lignes;
-  const fictif = controlesGeneraux(C, { resultat: r, regles, datasets: ['catalogue', 'clients'], dossierJeu, typeAttendu: 'devis' });
+  const fictif = controlesGeneraux(C, { resultat: r, regles, datasets: ['catalogue', 'clients'], dossierJeu, aujourdhui, typeAttendu: 'devis' });
 
+  const idErr = [];
+  if (r.version !== 2) idErr.push(`version ${r.version}`);
+  if (r.mission_id !== mission.id) idErr.push('mission_id ≠ mission');
+  if (r.numero_provisoire !== `DRAFT-${mission.id}`) idErr.push('numéro provisoire ≠ DRAFT-<mission>');
+  ctrl(C, 'identifiants', idErr);
   const cl = clients.find((c) => c.id === r.client.id);
   ctrl(C, 'provenance_client', !cl ? [`client ${r.client.id} inexistant`] : [cl.nom !== r.client.nom && 'nom différent', cl.email !== r.client.email && 'email différent', cl.territoire !== r.territoire && 'territoire différent'].filter(Boolean));
   const refs = new Map(cat.map((x) => [x.ref, x]));
@@ -47,7 +52,7 @@ export function auditerDevis({ mission, resultat: r, regles, aujourdhui, dossier
   if (r.operation !== opAttendue) eRg.push(`opération ${r.operation} ≠ ${opAttendue} (demande)`);
   const rTva = regles[`tva|${cl?.territoire}|${opAttendue}`];
   if (!rTva) eRg.push('aucune règle de TVA pour ce territoire/opération');
-  else { if (r.tva_pct !== rTva.valeur.taux_pct) eRg.push(`TVA ${r.tva_pct} % ≠ règle ${rTva.valeur.taux_pct} %`); if (r.tva_regle?.statut !== rTva.statut) eRg.push('statut de règle TVA différent'); }
+  else { if (r.tva_pct !== rTva.valeur.taux_pct) eRg.push(`TVA ${r.tva_pct} % ≠ règle ${rTva.valeur.taux_pct} %`); if (r.tva_regle?.statut !== rTva.statut) eRg.push('statut de règle TVA différent'); if (r.tva_regle?.type !== 'tva' || r.tva_regle?.cle !== rTva.cle) eRg.push('règle TVA citée ≠ règle appliquée'); if (r.tva_regle?.justification !== rTva.justification) eRg.push('justification de la règle TVA ≠ base'); }
   const rRem = regles['remise_max_pct|*']; const rMg = regles['marge_min_pct|*']; const rAnc = regles['tarif_ancien_jours|*'];
   if (!rRem || !rMg || !rAnc) eRg.push('règles remise/marge/ancienneté absentes');
   if (cl && r.remise_pct !== cl.remise_pct) eRg.push(`remise ${r.remise_pct} % ≠ fiche client ${cl.remise_pct} %`);

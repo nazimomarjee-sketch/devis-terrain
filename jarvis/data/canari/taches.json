@@ -1,0 +1,12 @@
+{
+  "genere": "FICTIF",
+  "taches": [
+    { "id": "T001", "titre": "Appeler Garage Martin pour confirmer la commande", "type": "commande", "echeance": "2026-11-09", "duree_min": 20, "valeur_eur": 400 },
+    { "id": "T002", "titre": "Préparer la visite Carrosserie Sud", "type": "rdv", "echeance": "2026-11-10", "duree_min": 60, "valeur_eur": 1800 },
+    { "id": "T003", "titre": "Relancer la facture FAC-2026-098", "type": "relance", "echeance": "2026-11-05", "duree_min": 15, "valeur_eur": 176 },
+    { "id": "T004", "titre": "Mettre à jour les tarifs du mastic", "type": "admin", "echeance": "2026-11-20", "duree_min": 90, "valeur_eur": 0 },
+    { "id": "T005", "titre": "Tournée Nord (3 garages)", "type": "rdv", "echeance": "2026-11-09", "duree_min": 240, "valeur_eur": 900 },
+    { "id": "T006", "titre": "Rapport hebdomadaire", "type": "admin", "echeance": "2026-11-13", "duree_min": 45, "valeur_eur": 0 },
+    { "id": "T007", "titre": "Formation produit (fictive)", "type": "admin", "echeance": "2026-12-01", "duree_min": 180, "valeur_eur": 0 }
+  ]
+}

@@ -3,7 +3,7 @@ import { charger, centimes, demiSup, jours, conclure, ctrl, controlesGeneraux } 
 export function auditerFinance({ resultat: r, regles, aujourdhui, dossierJeu }) {
   const C = [];
   const ds = ['factures', 'paiements', 'commandes', 'clients', 'catalogue'];
-  const fictif = controlesGeneraux(C, { resultat: r, regles, datasets: ds, dossierJeu, typeAttendu: 'analyse_finance' });
+  const fictif = controlesGeneraux(C, { resultat: r, regles, datasets: ds, dossierJeu, aujourdhui, typeAttendu: 'analyse_finance' });
   const L = Object.fromEntries(ds.map((n) => [n, charger(dossierJeu, n).lignes]));
   const e = []; const att = new Set(); const vus = new Set(); const uniq = [];
   for (const f of L.factures) { if (vus.has(f.id)) att.add(`NUMERO_EN_DOUBLE|${f.id}`); else { vus.add(f.id); uniq.push(f); } }
@@ -36,7 +36,8 @@ export function auditerFinance({ resultat: r, regles, aujourdhui, dossierJeu }) 
   const ob = new Set(r.anomalies.map((a) => `${a.code}|${a.ref}`));
   for (const x of att) if (!ob.has(x)) e.push(`anomalie omise : ${x}`);
   for (const x of ob) if (!att.has(x)) e.push(`anomalie inventée : ${x}`);
-  if (!r.definitions?.ca_ht_facture || !r.definitions?.encours) e.push('définitions des indicateurs absentes (risque de confusion)');
+  const DEFS = { ca_ht_facture: 'somme HT des factures uniques', commandes: 'montants HT par statut de commande, distincts du CA', paiements_recus: 'somme des encaissements, y compris orphelins', encours: 'TTC facturé non réglé (factures uniques)', marge: 'sur les lignes dont le prix d’achat est connu' };
+  if (JSON.stringify(r.definitions) !== JSON.stringify(DEFS)) e.push('définitions des indicateurs ≠ attendues (risque de confusion entre CA, commandes, encaissements, encours)');
   ctrl(C, 'recalcul_finance', e);
   return conclure(C);
 }

@@ -3,10 +3,11 @@ import { detecterInjection } from '../confiance.js';
 
 export function auditerProspection({ mission, resultat: r, regles, aujourdhui, dossierJeu }) {
   const C = []; const ps = charger(dossierJeu, 'prospects').lignes;
-  controlesGeneraux(C, { resultat: r, regles, datasets: ['prospects'], dossierJeu, typeAttendu: 'classement_prospects' });
+  controlesGeneraux(C, { resultat: r, regles, datasets: ['prospects'], dossierJeu, aujourdhui, typeAttendu: 'classement_prospects' });
   const w = regles['prospection_poids|*']?.valeur; const e = [];
   if (!w) e.push('pondérations absentes'); else {
     const n = Math.min(20, Math.max(1, Number(/top\s*(\d+)/i.exec(mission.demande)?.[1] ?? 5)));
+    const AVERT = 'Un prospect n’est pas un client : aucun compte n’est déclaré ouvert. Le potentiel est déclaratif tant qu’il n’est pas vérifié.';
     const att = ps.map((p) => {
       const pot = p.potentiel_mensuel_eur == null ? 0 : Math.min(Math.trunc(p.potentiel_mensuel_eur / w.potentiel_diviseur), w.potentiel_max);
       const tec = Math.min(p.techniciens * w.points_par_technicien, w.technicien_max);
@@ -14,18 +15,22 @@ export function auditerProspection({ mission, resultat: r, regles, aujourdhui, d
       if (p.potentiel_mensuel_eur == null) flags.push('potentiel à vérifier');
       if (p.dernier_contact == null) { rec = w.jamais_contacte; flags.push('jamais contacté (à vérifier)'); } else { const j = jours(p.dernier_contact, aujourdhui); rec = j > w.ancien_jours ? w.ancien_points : j < w.recent_jours ? w.recent_points : 0; }
       if (p.notes && detecterInjection(p.notes).length) flags.push('NOTE_SUSPECTE_EXCLUE');
-      return { id: p.id, score: pot + tec + rec, detail: { potentiel: pot, techniciens: tec, recence: rec }, flags };
+      return { id: p.id, nom: p.nom, ville: p.ville, question: /inconnue/i.test(p.marque_actuelle) ? 'Quelle marque utilisez-vous aujourd’hui ?' : 'Qu’est-ce qui vous ferait changer de fournisseur ?', score: pot + tec + rec, detail: { potentiel: pot, techniciens: tec, recence: rec }, flags };
     }).sort((a, b) => b.score - a.score || (a.id < b.id ? -1 : 1)).slice(0, n);
     if (r.top.length !== att.length) e.push(`${r.top.length} prospects au lieu de ${att.length}`);
     att.forEach((a, i) => {
       const o = r.top[i]; if (!o) return;
       if (o.id !== a.id) e.push(`rang ${i + 1} : ${o.id} au lieu de ${a.id}`);
+      if (o.rang !== i + 1) e.push(`rang affiché ${o.rang} ≠ ${i + 1}`);
+      if (o.nom !== a.nom || o.ville !== a.ville) e.push(`rang ${i + 1} : nom ou ville ≠ base`);
+      if (o.prochaine_question !== a.question) e.push(`rang ${i + 1} : question ≠ règle`);
       if (o.score !== a.score) e.push(`rang ${i + 1} (${o.id}) : score ${o.score} ≠ ${a.score}`);
       if (JSON.stringify(o.detail) !== JSON.stringify(a.detail)) e.push(`rang ${i + 1} : détail du score faux`);
       if (JSON.stringify([...o.a_verifier].sort()) !== JSON.stringify([...a.flags].sort())) e.push(`rang ${i + 1} : points « à vérifier » différents`);
     });
     for (const o of r.top) if (!ps.some((p) => p.id === o.id)) e.push(`prospect hors base : ${o.id}`);
-    if (!/aucun compte n’est déclaré ouvert/.test(r.avertissement ?? '')) e.push('avertissement « aucun compte ouvert » absent');
+    if (r.avertissement !== AVERT) e.push('avertissement ≠ texte réglementaire attendu');
+    if (r.nb_prospects !== ps.length) e.push(`nb_prospects ${r.nb_prospects} ≠ ${ps.length}`);
   }
   ctrl(C, 'recalcul_classement', e);
   return conclure(C);

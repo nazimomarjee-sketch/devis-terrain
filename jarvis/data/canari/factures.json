@@ -1,0 +1,14 @@
+{
+  "genere": "FICTIF",
+  "factures": [
+    { "id": "FAC-2026-090", "client_id": "C004", "commande_id": "CMD-2026-020", "date": "2026-08-21", "echeance": "2026-09-01", "ht_cents": 20000, "tva_cents": 1700, "ttc_cents": 21700, "lignes": [], "derniere_relance": null },
+    { "id": "FAC-2026-098", "client_id": "C001", "commande_id": null, "date": "2026-09-20", "echeance": "2026-10-20", "ht_cents": 25470, "tva_cents": 2165, "ttc_cents": 27635, "lignes": [ { "ref": "VRN-5000", "qte": 3, "pu_ht_cents": 8490 } ], "derniere_relance": null },
+    { "id": "FAC-2026-099", "client_id": "C002", "commande_id": "CMD-2026-030", "date": "2026-09-05", "echeance": "2026-10-05", "ht_cents": 11600, "tva_cents": 986, "ttc_cents": 12586, "lignes": [ { "ref": "PEI-0001", "qte": 2, "pu_ht_cents": 5800 } ], "derniere_relance": null },
+    { "id": "FAC-2026-100", "client_id": "C005", "commande_id": "CMD-2026-034", "date": "2026-10-30", "echeance": "2026-11-29", "ht_cents": 5000, "tva_cents": 1000, "ttc_cents": 6000, "lignes": [ { "ref": "ADH-0001", "qte": 10, "pu_ht_cents": 500 } ], "derniere_relance": null },
+    { "id": "FAC-2026-101", "client_id": "C003", "commande_id": "CMD-2026-033", "date": "2026-10-28", "echeance": "2026-11-27", "ht_cents": 8490, "tva_cents": 722, "ttc_cents": 9212, "lignes": [ { "ref": "VRN-5000", "qte": 1, "pu_ht_cents": 8490 } ], "derniere_relance": null },
+    { "id": "FAC-2026-101", "client_id": "C003", "commande_id": "CMD-2026-033", "date": "2026-10-28", "echeance": "2026-11-27", "ht_cents": 8490, "tva_cents": 722, "ttc_cents": 9212, "lignes": [ { "ref": "VRN-5000", "qte": 1, "pu_ht_cents": 8490 } ], "derniere_relance": null },
+    { "id": "FAC-2026-103", "client_id": "C001", "commande_id": "CMD-2026-031", "date": "2026-11-03", "echeance": "2026-12-03", "ht_cents": 6000, "tva_cents": 510, "ttc_cents": 6600, "lignes": [], "derniere_relance": null },
+    { "id": "FAC-2026-104", "client_id": "C005", "commande_id": "CMD-2026-034", "date": "2026-11-04", "echeance": "2026-12-04", "ht_cents": 400, "tva_cents": 80, "ttc_cents": 480, "lignes": [ { "ref": "MSK-0050", "qte": 1, "pu_ht_cents": 400 } ], "derniere_relance": null },
+    { "id": "FAC-2026-105", "client_id": "C002", "commande_id": "CMD-2026-030", "date": "2026-09-10", "echeance": "2026-10-10", "ht_cents": 10000, "tva_cents": 2000, "ttc_cents": 12000, "lignes": [], "derniere_relance": "2026-11-06" }
+  ]
+}

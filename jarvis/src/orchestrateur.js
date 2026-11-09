@@ -3,6 +3,7 @@
 // Le statut vient de l'auditeur, jamais de la déclaration de l'agent. L'orchestrateur ne se donne AUCUN droit :
 // droits des agents, règles et autorisations ne sont modifiables que par l'administrateur via l'API.
 import { join } from 'node:path';
+import { rmSync } from 'node:fs';
 import { transaction, journaliser, param, definirParam, sha256 } from './db.js';
 import { horloge } from './horloge.js';
 import { deposer as deposerMission, reclamer, recupererBaux, terminerSiBail, arretUrgence, budgetAtteint, enregistrerDepense, MAX_CORRECTIONS } from './moteur.js';
@@ -12,6 +13,8 @@ import { FABRIQUES, NOMS_AGENTS } from './agents/index.js';
 import { AUDITEURS, auditerUnBlocage } from './auditeurs/index.js';
 import { SENSIBLE_PAR_TYPE } from './auditeurs/commun.js';
 import { executerDirect, executerIsole } from './executeur.js';
+import { attester, enregistrerAttestation, confinementSuffisantPourReel } from './confinement.js';
+import { autotestAuditeurs } from './autotest.js';
 import { router } from './routage.js';
 
 export class Jarvis {
@@ -20,8 +23,10 @@ export class Jarvis {
    * @param agents   [{ nom, options }] — options = erreurs volontaires pour les tests ; défaut : agents de l'espace
    * @param isolation true = chaque agent dans un processus restreint (production) ; false = direct (tests rapides)
    */
-  constructor({ db, espace, agents = null, isolation = false, racineCode, ouvrier = 'jarvis-1', interpreteur = null }) {
+  constructor({ db, espace, agents = null, isolation = false, racineCode, ouvrier = 'jarvis-1', interpreteur = null, confinement = { backend: 'permission' } }) {
     this.interpreteur = interpreteur;
+    this.confinement = confinement;
+    this.auditeurSain = null; // null = pas encore testé ; true/false après l'auto-test
     this.db = db;
     this.espace = espace;
     this.dossierDonnees = espace.dossier;
@@ -50,6 +55,18 @@ export class Jarvis {
     }).concat([{ nom: 'auditeur', role: 'Auditeur indépendant', description: 'Contrôle chaque résultat par recalcul depuis les sources ; n’importe aucun code d’agent.', droits: { lire: ['sources en lecture seule'], ecrire: ['rapport d’audit'], reseau: false, envoyer: false }, criteres: ['Détecte toute erreur introduite volontairement', 'Ne se fie jamais au rapport de l’agent'], etat: 'actif' }]);
   }
 
+  /** Attestation du confinement par sondes d'accès interdits ; le résultat conditionne le traitement de données réelles. */
+  async attester() { const att = await attester({ backend: this.confinement.backend, utilisateurAgent: this.confinement.utilisateurAgent }); enregistrerAttestation(this.db, att); return att; }
+
+  /** Auto-test de l'auditeur sur le jeu canari. Défaillance ⇒ échec fermé (plus de validation ni d'approbation). */
+  async autotester() {
+    const r = await autotestAuditeurs({ agents: Object.keys(this.agents) });
+    const avant = this.auditeurSain; this.auditeurSain = r.ok;
+    definirParam(this.db, 'autotest_auditeur', JSON.stringify({ ok: r.ok, date: horloge.iso(), echecs: r.echecs, verifies: r.verifies }));
+    if (avant !== r.ok) journaliser(this.db, { acteur: 'autotest', evenement: r.ok ? 'AUDITEUR_SAIN' : 'AUDITEUR_DEFAILLANT', detail: { echecs: r.echecs.slice(0, 5) } });
+    return r;
+  }
+
   deposer(demande, { projet = 'demo', source, cle = null } = {}) { return deposerMission(this.db, { demande, projet, source, cle }); }
   deposerParUtilisateur(demande, { projet = 'demo', cle = null } = {}) { return this.deposer(demande, { projet, source: 'canal_utilisateur', cle }); }
 
@@ -60,6 +77,7 @@ export class Jarvis {
     const { db } = this;
     if (arretUrgence(db, this.dossierDonnees)) return { action: 'arret_urgence' };
     definirParam(db, 'battement', horloge.maintenant());
+    if (this.auditeurSain === false) return { action: 'auditeur_defaillant' }; // échec fermé : aucune mission n'est prise sans auditeur fiable
     recupererBaux(db);
     const delai = Number(param(db, 'delai_mission_ms', '30000'));
     const m = reclamer(db, this.ouvrier, delai + 30000);
@@ -102,17 +120,17 @@ export class Jarvis {
       }
       throw e;
     }
+    if (!jeux.fictif && !confinementSuffisantPourReel(db, { backend: this.confinement.backend, isolation: this.isolation })) {
+      this.#finir(m, { statut: 'BLOQUE', raison: 'Confinement des agents insuffisant pour des données réelles.', question: 'Aucune attestation récente de niveau « os » (compte distinct, réseau coupé, ressources limitées) : exécuter l’attestation sur la machine cible, ou rester en mode démonstration.' });
+      journaliser(db, { missionId: m.id, acteur: 'securite', evenement: 'REEL_REFUSE_CONFINEMENT_INSUFFISANT', detail: {} });
+      return { action: 'bloque_confinement', id: m.id };
+    }
     if (agent.droits.lire.includes('missions_en_attente')) jeux.donnees.missions_en_attente = this.#enAttente();
     const ctx = { donnees: jeux.donnees, regles: reglesEnDict(db), fictif: jeux.fictif, retours: m.retours ? JSON.parse(m.retours) : [], aujourdhui: horloge.aujourdhui(), dossierSortie: join(this.dossierSorties, m.id) };
     const mission = { id: m.id, demande: m.demande, corrections: m.corrections };
 
     let sortie; let depenses;
-    try {
-      const run = this.isolation
-        ? await executerIsole({ nomAgent: r.agent, options: this.options[r.agent], mission, ctx, dossierSortie: ctx.dossierSortie, racineCode: this.racineCode, delaiMs: delai })
-        : await executerDirect({ nomAgent: r.agent, options: this.options[r.agent], mission, ctx, delaiMs: delai });
-      ({ sortie, depenses } = run);
-    } catch (e) {
+    try { ({ sortie, depenses } = await this.#executerAgent(r.agent, mission, ctx, delai, ctx.dossierSortie)); } catch (e) {
       journaliser(db, { missionId: m.id, acteur: agent.nom, evenement: 'AGENT_ERREUR', detail: { message: e.message } });
       return this.#echecOuCorrection(m, [`exécution : ${e.message}`]);
     }
@@ -131,10 +149,31 @@ export class Jarvis {
     journaliser(db, { missionId: m.id, acteur: 'auditeur', evenement: 'AUDIT', detail: { verdict: rap.verdict, echecs: rap.echecs } });
     if (rap.verdict !== 'VALIDE') return this.#echecOuCorrection(m, rap.echecs, rap);
 
+    // Double exécution de contrôle : deux exécutions identiques d'un agent déterministe DOIVENT donner le même résultat.
+    // Détecte ce que l'auditeur ne voit pas (champs libres, code d'agent altéré, non-déterminisme).
+    const mode = param(db, 'double_execution', 'non');
+    if (mode === 'toutes' || (mode === 'sensibles' && SENSIBLE_PAR_TYPE[resultat.type])) {
+      let seconde;
+      try { seconde = await this.#executerAgent(r.agent, mission, ctx, delai, `${ctx.dossierSortie}.verif`); } catch (e) { journaliser(db, { missionId: m.id, acteur: agent.nom, evenement: 'AGENT_ERREUR', detail: { message: `double exécution : ${e.message}` } }); return this.#echecOuCorrection(m, [`double exécution : ${e.message}`]); }
+      try { rmSync(`${ctx.dossierSortie}.verif`, { recursive: true, force: true }); } catch { /* ignoré */ }
+      for (const c of seconde.depenses) enregistrerDepense(db, { missionId: m.id, fournisseur: agent.nom, cents: c });
+      const norm = (x) => JSON.stringify({ ...x, fichiers: undefined });
+      if (seconde.sortie.statut !== 'OK' || norm(seconde.sortie.resultat) !== norm(resultat)) {
+        journaliser(db, { missionId: m.id, acteur: 'jarvis', evenement: 'RESULTATS_CONTRADICTOIRES', detail: { agent: r.agent } });
+        return this.#echecOuCorrection(m, ['résultats contradictoires entre deux exécutions identiques de l’agent']);
+      }
+    }
     const json = JSON.stringify(resultat);
     const statut = SENSIBLE_PAR_TYPE[resultat.type] ? 'EN_ATTENTE_APPROBATION' : 'VALIDE'; // décidé par la table de l'auditeur, pas par l'agent
     this.#finir(m, { statut, resultat: json, resultat_hash: sha256(json), rapport_audit: JSON.stringify(rap), retours: null }, { executions: m.executions, type: resultat.type });
     return { action: 'termine', id: m.id, statut };
+  }
+
+  async #executerAgent(nomAgent, mission, ctx, delai, dossierSortie) {
+    const c = { ...ctx, dossierSortie };
+    return this.isolation
+      ? executerIsole({ nomAgent, options: this.options[nomAgent], mission, ctx: c, dossierSortie, racineCode: this.racineCode, delaiMs: delai, confinement: this.confinement, dossierEspace: this.dossierDonnees })
+      : executerDirect({ nomAgent, options: this.options[nomAgent], mission, ctx: c, delaiMs: delai });
   }
 
   #auditer(nomAgent, m, resultat) {
@@ -185,6 +224,7 @@ export class Jarvis {
         return { statut: 'REFUSE' };
       }
       if (decision !== 'approuver') throw new Error('Décision inconnue');
+      if (this.auditeurSain === false) throw new Error('Auditeur défaillant (auto-test négatif) : approbation refusée par sécurité');
       if (sha256(m.resultat) !== m.resultat_hash) {
         journaliser(db, { missionId: id, acteur: 'securite', evenement: 'APPROBATION_REFUSEE_RESULTAT_MODIFIE', detail: {} });
         throw new Error('Le résultat a été modifié depuis l’audit : approbation refusée.');

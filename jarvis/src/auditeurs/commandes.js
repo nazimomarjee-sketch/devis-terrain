@@ -5,7 +5,7 @@ const total = (c) => c.lignes.reduce((s, l) => s + BigInt(l.qte) * BigInt(l.pu_h
 export function auditerCommandes({ mission, resultat: r, regles, aujourdhui, dossierJeu }) {
   const C = [];
   const ds = ['devis_historique', 'commandes', 'clients', 'catalogue'];
-  controlesGeneraux(C, { resultat: r, regles, datasets: ds, dossierJeu, typeAttendu: r.type });
+  controlesGeneraux(C, { resultat: r, regles, datasets: ds, dossierJeu, aujourdhui, typeAttendu: ['suivi_commandes', 'commande_brouillon'].includes(r.type) ? r.type : 'commande_brouillon' });
   const L = Object.fromEntries(ds.map((n) => [n, charger(dossierJeu, n).lignes]));
   const w = regles['commande|*']?.valeur; const e = [];
   if (!w) e.push('règle de commande absente');
@@ -35,6 +35,8 @@ export function auditerCommandes({ mission, resultat: r, regles, aujourdhui, dos
       const sig = new Set(r.avertissements.filter((a) => a.code === 'PRIX_DIFFERENT_CATALOGUE').map((a) => a.ref));
       for (const x of diffs) if (!sig.has(x)) e.push(`écart de prix non signalé : ${x}`);
     }
+    if (r.numero_provisoire !== `CMD-DRAFT-${mission.id}`) e.push('numéro provisoire ≠ CMD-DRAFT-<mission>');
+    if (d && r.client.nom !== L.clients.find((c) => c.id === d.client_id)?.nom) e.push('nom du client ≠ base');
     if (r.statut_commande !== 'PREPAREE_NON_ENVOYEE' || r.envoyee !== false || r.enregistree_ebp !== false) e.push('statut présenté comme envoyé ou enregistré');
   }
   ctrl(C, 'recalcul_commandes', e);

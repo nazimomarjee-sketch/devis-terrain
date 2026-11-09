@@ -1,0 +1,16 @@
+{
+  "genere": "FICTIF",
+  "avertissement": "Références et prix INVENTÉS. Aucun n'est un tarif réel.",
+  "references": [
+    { "ref": "VRN-5000", "designation": "Vernis HS 2K bidon 5 L (fictif)", "categorie": "vernis", "mots": ["vernis"], "multiple": 1, "prix_ht": "84.90", "prix_achat_ht": "55.00", "date_prix": "2026-10-15", "compatible_avec": ["DUR-2500", "PEI-0001", "PEI-0002"] },
+    { "ref": "DUR-2500", "designation": "Durcisseur standard 2,5 L (fictif)", "categorie": "durcisseur", "mots": ["durcisseur"], "multiple": 1, "prix_ht": "31.20", "prix_achat_ht": "19.50", "date_prix": "2026-10-15", "compatible_avec": ["VRN-5000"] },
+    { "ref": "ABR-P400", "designation": "Disque abrasif P400, lot de 10 (fictif), prix par disque", "categorie": "abrasif", "mots": ["abrasif"], "multiple": 10, "prix_ht": "0.85", "prix_achat_ht": "0.50", "date_prix": "2026-10-20", "compatible_avec": ["MAS-0001"] },
+    { "ref": "PEI-0001", "designation": "Peinture base bicouche 1 L (fictif)", "categorie": "peinture", "mots": ["peinture"], "multiple": 1, "prix_ht": "58.00", "prix_achat_ht": "38.00", "date_prix": "2026-10-15", "compatible_avec": ["VRN-5000"] },
+    { "ref": "PEI-0002", "designation": "Peinture base bicouche 3 L (fictif)", "categorie": "peinture", "mots": ["peinture"], "multiple": 1, "prix_ht": "149.00", "prix_achat_ht": "98.00", "date_prix": "2026-10-15", "compatible_avec": ["VRN-5000"] },
+    { "ref": "PEI-0003", "designation": "Peinture base bicouche 1 L (fictif)", "categorie": "peinture", "mots": ["peinture"], "multiple": 1, "prix_ht": "58.00", "prix_achat_ht": "38.00", "date_prix": "2026-10-15", "compatible_avec": ["ZZZ-0000"] },
+    { "ref": "MAS-0001", "designation": "Mastic polyester 1,5 kg (fictif)", "categorie": "mastic", "mots": ["mastic"], "multiple": 1, "prix_ht": "12.40", "prix_achat_ht": "7.00", "date_prix": "2026-05-02", "compatible_avec": [] },
+    { "ref": "APP-0001", "designation": "Apprêt garnissant 1 L (fictif)", "categorie": "apprêt", "mots": ["apprêt", "apprêts"], "multiple": 1, "prix_ht": null, "prix_achat_ht": "9.00", "date_prix": null, "compatible_avec": [] },
+    { "ref": "MSK-0050", "designation": "Ruban de masquage 50 m (fictif)", "categorie": "masquage", "mots": ["masquage", "ruban"], "multiple": 1, "prix_ht": "4.00", "prix_achat_ht": "4.50", "date_prix": "2026-10-30", "compatible_avec": [] },
+    { "ref": "ADH-0001", "designation": "Colle de montage 300 ml (fictif)", "categorie": "colle", "mots": ["colle"], "multiple": 1, "prix_ht": "5.00", "prix_achat_ht": "4.70", "date_prix": "2026-10-30", "compatible_avec": [] }
+  ]
+}

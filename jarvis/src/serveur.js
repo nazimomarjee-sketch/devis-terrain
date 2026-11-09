@@ -11,6 +11,8 @@ import { sauvegarder, derniereSauvegarde } from './sauvegarde.js';
 import { horloge } from './horloge.js';
 import { listerRegles, definirRegle, listerAutorisations, accorder, revoquer, autorise } from './regles.js';
 import { etatIntegrations } from './integrations.js';
+import { creerSuiveurAcces } from './acces.js';
+import { param } from './db.js';
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
 const EN_TETES = { 'Content-Security-Policy': "default-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'", 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'Cache-Control': 'no-store' };
@@ -24,8 +26,12 @@ export function creerServeur({ jarvis, jeton, jetonAdmin, dossierPublic, dossier
   const echecs = new Map();
   const hotes = new Set(['localhost', '127.0.0.1', '[::1]', ...hotesAutorises]);
   const { db, espace } = jarvis;
+  const acces = creerSuiveurAcces(db);
+  const minuteur = setInterval(() => { try { acces.vider(); } catch { /* base fermée */ } }, 30_000); minuteur.unref();
 
-  const repondre = (res, code, corps, type = 'application/json; charset=utf-8') => { res.writeHead(code, { 'Content-Type': type, ...EN_TETES }); res.end(typeof corps === 'string' || Buffer.isBuffer(corps) ? corps : JSON.stringify(corps)); };
+  const repondre = (res, code, corps, type = 'application/json; charset=utf-8') => {
+    if ([401, 403, 421, 429].includes(code)) acces.noter(code);
+     res.writeHead(code, { 'Content-Type': type, ...EN_TETES }); res.end(typeof corps === 'string' || Buffer.isBuffer(corps) ? corps : JSON.stringify(corps)); };
   const role = (req) => {
     const m = /^Bearer (.+)$/.exec(req.headers.authorization ?? ''); if (!m) return null;
     const h = empreinte(m[1]);
@@ -77,23 +83,30 @@ export function creerServeur({ jarvis, jeton, jetonAdmin, dossierPublic, dossier
         if (!complet.startsWith(resolve(dossierPublic) + sep) || !existsSync(complet)) return repondre(res, 404, { erreur: 'Introuvable' });
         return repondre(res, 200, readFileSync(complet), TYPES[extname(complet)] ?? 'application/octet-stream');
       }
+      // Sonde de vie MINIMALE, sans jeton ni donnée : pour le superviseur externe (aucun compte, aucun décompte, aucune mission).
+      if (req.method === 'GET' && chemin === '/api/sante') {
+        acces.vider(); // la sonde est interrogée en continu par le superviseur : les refus remontent même pendant une attaque
+        const batt = Number(param(db, 'battement', '0')); const d = diagnostic(db, { dossierDonnees: jarvis.dossierDonnees });
+        return repondre(res, 200, { ok: d.ok, battement_age_s: batt ? Math.round((horloge.maintenant() - batt) / 1000) : null, critiques: d.alertes.filter((a) => a.niveau === 'critique').length });
+      }
       const ip = req.socket.remoteAddress ?? '?'; const f = echecs.get(ip);
       if (f && f.n >= 5 && f.jusqua > Date.now()) return repondre(res, 429, { erreur: 'Trop de tentatives, réessayez plus tard' });
       const qui = role(req);
       if (!qui) { echecs.set(ip, { n: (f && f.jusqua > Date.now() ? f.n : 0) + 1, jusqua: Date.now() + 5 * 60000 }); return repondre(res, 401, { erreur: 'Authentification requise' }); }
       echecs.delete(ip);
       const admin = qui === 'admin';
+      acces.vider();
       let m;
 
       // ----- Administration : jeton administrateur UNIQUEMENT -----
       if (chemin.startsWith('/api/admin/')) {
-        if (!admin) return repondre(res, 403, { erreur: 'Jeton administrateur requis' });
+        if (!admin) { acces.escalade({ route: 'admin', jeton: 'utilisateur' }); return repondre(res, 403, { erreur: 'Jeton administrateur requis' }); }
         if (req.method === 'POST' && chemin === '/api/admin/regles') { const b = await corpsJson(req); definirRegle(db, b, 'administrateur'); return repondre(res, 200, { ok: true }); }
         if (req.method === 'POST' && chemin === '/api/admin/autorisations') { const b = await corpsJson(req); return repondre(res, 201, { id: accorder(db, b, 'administrateur') }); }
         if (req.method === 'POST' && (m = /^\/api\/admin\/autorisations\/(\d+)\/revoquer$/.exec(chemin))) { revoquer(db, Number(m[1]), 'administrateur'); return repondre(res, 200, { ok: true }); }
         return repondre(res, 404, { erreur: 'Introuvable' });
       }
-      if (admin) return repondre(res, 403, { erreur: 'Le jeton administrateur ne sert qu’à l’administration' }); // moindre privilège
+      if (admin) { acces.escalade({ route: 'utilisateur', jeton: 'administrateur' }); return repondre(res, 403, { erreur: 'Le jeton administrateur ne sert qu’à l’administration' }); } // moindre privilège
 
       if (req.method === 'GET' && chemin === '/api/etat') return repondre(res, 200, etat());
       if (req.method === 'GET' && chemin === '/api/regles') return repondre(res, 200, listerRegles(db));

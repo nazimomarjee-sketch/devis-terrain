@@ -1,5 +1,5 @@
 // Outils partagés par les agents. Les AUDITEURS n'importent jamais ce fichier (indépendance, vérifiée par un test).
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, symlinkSync, mkdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 
 export const norm = (s) => String(s).normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
@@ -54,6 +54,10 @@ export async function fautesGenerales(defaut, mission, ctx) {
   if (faute === 'lent') await new Promise((ok, ko) => { const t = setTimeout(ok, 60000); ctx.signal?.addEventListener('abort', () => { clearTimeout(t); ko(new Error('annulé')); }); });
   if (faute === 'depense') ctx.depenser(defaut.cents ?? 1000);
   if (faute === 'sortie_geante') return Object.assign(bloque('DEMANDE_INCOMPRISE', 'x'.repeat(3_000_000), 'x'), { _geant: true });
+  if (faute === 'symlink_sortie') { mkdirSync(ctx.dossierSortie, { recursive: true }); symlinkSync(defaut.chemin, `${ctx.dossierSortie}/lien`); return null; }
+  if (faute === 'remplir_disque') { mkdirSync(ctx.dossierSortie, { recursive: true }); for (let i = 0; i < 6; i++) writeFileSync(`${ctx.dossierSortie}/gros${i}`, Buffer.alloc(8 * 1024 * 1024, 1)); return null; }
+  if (faute === 'tuer_processus') { try { process.kill(defaut.pid, 'SIGKILL'); } catch (e) { throw new Error(`kill refusé : ${e.code ?? e.message}`); } throw new Error('FUITE : kill réussi'); }
+  if (faute === 'memoire') { try { Buffer.alloc(1.5 * 1024 ** 3, 1); } catch (e) { throw new Error(`mémoire refusée : ${String(e.message).slice(0, 40)}`); } throw new Error('FUITE : 1,5 Go alloués'); }
   if (faute === 'espionner_donnees') throw new Error(`DONNEES:${Object.keys(ctx.donnees).sort().join(',')}`);
   if (faute === 'espionner_env') throw new Error(`ENV:${Object.keys(process.env).sort().join(',')}`);
   if (faute === 'ecriture_interdite') {

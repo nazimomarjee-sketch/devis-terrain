@@ -66,6 +66,7 @@ export function creerAgentProduits({ defaut = null } = {}) {
       }
       anomalies.sort((a, b) => (a.code + a.ref).localeCompare(b.code + b.ref));
       if (faute === 'anomalie_omise') anomalies.shift();
+      if (faute === 'detail_aleatoire' && anomalies[0]) anomalies[0].detail += ` #${Math.random()}`; // champ libre : l'auditeur ne le voit pas
       if (faute === 'anomalie_inventee') anomalies.push({ code: 'PRIX_MANQUANT', ref: refs[0].ref, detail: 'anomalie inventée' });
       return { statut: 'OK', resultat: { type: 'rapport_produits', mode: 'controle_catalogue', action_sensible: false, donnees_fictives: ctx.fictif, date: ctx.aujourdhui, regles_utilisees, nb_references: refs.length, anomalies } };
     },

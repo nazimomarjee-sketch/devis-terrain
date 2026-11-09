@@ -22,6 +22,24 @@ export function diagnostic(db, { dossierDonnees = null, exigerBattement = false 
   const sansTrace = db.prepare(`SELECT m.id FROM missions m WHERE m.statut='VALIDE' AND m.decide_par IS NOT NULL AND NOT EXISTS (SELECT 1 FROM journal j WHERE j.mission_id = m.id AND j.evenement IN ('APPROUVE_ENVOI_SIMULE'))`).all();
   if (sansTrace.length) add('critique', 'VALIDATION_SANS_TRACE', `${sansTrace.length} mission(s) validée(s) sans trace d'approbation dans le journal.`);
 
+  const evt = (nom, minutes) => db.prepare(`SELECT COUNT(*) AS n FROM journal WHERE evenement = ? AND ts > ?`).get(nom, new Date(now - minutes * 60000).toISOString()).n;
+  const refus = db.prepare(`SELECT COALESCE(SUM(json_extract(detail,'$.n')),0) AS n FROM journal WHERE evenement='ACCES_REFUSES' AND ts > ?`).get(new Date(now - 10 * 60000).toISOString()).n;
+  if (refus >= 50) add('critique', 'ACCES_NON_AUTORISES', `${refus} accès refusés en 10 minutes (attaque possible).`);
+  else if (refus >= 10) add('avertissement', 'ACCES_NON_AUTORISES', `${refus} accès refusés en 10 minutes.`);
+  if (evt('ESCALADE_PRIVILEGE_TENTEE', 60)) add('critique', 'ESCALADE_PRIVILEGE_TENTEE', 'Un jeton a été utilisé hors de son rôle (utilisateur sur route admin, ou l’inverse).');
+  if (evt('RESULTATS_CONTRADICTOIRES', 24 * 60)) add('critique', 'RESULTATS_CONTRADICTOIRES', 'Deux exécutions identiques d’un agent ont donné des résultats différents.');
+  const erreursAgents = evt('AGENT_ERREUR', 10);
+  if (erreursAgents >= 10) add('critique', 'ERREURS_REPETEES', `${erreursAgents} erreurs d’agents en 10 minutes.`);
+  const missionRepetee = db.prepare(`SELECT mission_id, COUNT(*) AS n FROM journal WHERE evenement='AGENT_ERREUR' AND mission_id IS NOT NULL GROUP BY mission_id HAVING n >= 3 LIMIT 1`).get();
+  if (missionRepetee) add('avertissement', 'MISSION_EN_ERREUR_REPETEE', `La mission ${missionRepetee.mission_id} a échoué ${missionRepetee.n} fois.`);
+  const plusAncienne = db.prepare(`SELECT MIN(cree_le) AS t FROM missions WHERE statut IN ('EN_FILE','A_CORRIGER')`).get().t;
+  const batt = Number(param(db, 'battement', '0'));
+  if (plusAncienne && batt && now - batt < 120000 && now - Date.parse(plusAncienne) > 10 * 60000) add('critique', 'FILE_BLOQUEE', 'Le service est vivant mais une mission attend depuis plus de 10 minutes : orchestrateur bloqué ?');
+  const at = param(db, 'autotest_auditeur'); const atj = at ? JSON.parse(at) : null;
+  if (atj && !atj.ok) add('critique', 'AUDITEUR_DEFAILLANT', `Auto-test de l'auditeur négatif : ${atj.echecs[0]}`);
+  else if (!atj) add('info', 'AUTOTEST_JAMAIS_EXECUTE', "L'auto-test de l'auditeur n'a jamais été exécuté.");
+  else if (now - Date.parse(atj.date) > 2 * 3600 * 1000) add('avertissement', 'AUTOTEST_ANCIEN', "Dernier auto-test de l'auditeur il y a plus de 2 h.");
+
   const orphelines = db.prepare(`SELECT COUNT(*) AS n FROM missions WHERE statut='EN_COURS' AND bail_jusqua < ?`).get(now).n;
   if (orphelines) add('avertissement', 'MISSIONS_ORPHELINES', `${orphelines} mission(s) interrompue(s) en attente de reprise.`);
 
