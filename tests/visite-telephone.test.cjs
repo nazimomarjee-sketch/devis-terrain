@@ -13,7 +13,7 @@ test('vu + intéressé + devis : visite, note commerciale, étape, rappel demain
   assert.equal(c.visites.length,2);assert.deepEqual(c.visites[1],{date:'2026-11-10',res:'vu',note:''});assert.equal(c.reports,0);assert.equal(c.reporteAu,'');
   assert.equal(c.rappel,'2026-11-11');assert.equal(c.etape,'Devis à préparer');assert.equal(c.conv,'contacte');
   assert.equal(c.infosTerrain.length,1);assert.deepEqual([c.infosTerrain[0].nature,c.infosTerrain[0].type,c.infosTerrain[0].suite,c.infosTerrain[0].statut],['note-commerciale','demande','devis','a_faire']);
-  assert.match(resume,/faire un devis/);valide(c);
+  assert.match(resume,/devis à préparer/);valide(c);
 });
 test('vu + rien de particulier + aucune suite : une visite, aucune note inventée, rappel effacé',()=>{
   const {client:c}=V.appliquer(garage(),{resultat:'vu',retour:'rien',suite:'aucune'},ctx);
@@ -33,4 +33,13 @@ test('l’original n’est jamais modifié ; choix incomplet ou inconnu refusé'
 });
 test('un client déjà converti ou en essai garde son statut de conversion',()=>{
   const g=garage();g.conv='converti';assert.equal(V.appliquer(g,{resultat:'vu',retour:'rien',suite:'aucune'},ctx).client.conv,'converti');
+});
+
+test('échéance explicite conservée et dates invalides refusées sans modifier la fiche',()=>{
+  for(const resultat of ['vu','absent','plus_tard']) {
+    const c=V.appliquer(garage(),{resultat,retour:'prix',suite:'rappel7',echeance:'2026-11-14',note:'Repasser après appel'},ctx).client;
+    assert.equal(c.rappel,'2026-11-14');valide(c);
+    if(resultat==='plus_tard') assert.equal(c.infosTerrain[0].texte,'Repasser après appel');
+  }
+  for(const echeance of ['2026-02-30','incorrect','2026-11-09']) assert.throws(()=>V.appliquer(garage(),{resultat:'vu',retour:'prix',suite:'devis',echeance},ctx));
 });

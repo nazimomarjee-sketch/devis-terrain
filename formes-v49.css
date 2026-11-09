@@ -33,3 +33,23 @@ main:has(.t-liste) .v38-page-intro p{display:none}
 main:has(.t-liste) .v38-page-intro{padding-block:6px}
 main:has(.t-liste) .v38-page-intro small{display:none}
 body .v38-page-intro{border-radius:var(--r-carte)}
+/* Accueil et visite : le texte peut grandir sans couper les actions. */
+body.v38-home .v38-accueil-hero{min-height:0;padding:12px 16px;margin-bottom:8px}
+body.v38-home .v38-accueil-hero strong{font-size:1.4rem;line-height:1.25}
+body .v23-objectif,body .v23-prochaine{padding:14px!important}
+body.v38-home .v23-objectif .v23-argent strong{font-size:2rem;overflow-wrap:anywhere}
+body .v23-client{font-size:1.8rem;overflow-wrap:anywhere}
+.v49-ca-details>summary,.v23-preuve>summary,.v23-suite>summary{min-height:48px;display:flex;align-items:center;cursor:pointer}
+.v49-tournee p{margin:6px 0}
+main:has(.v23-objectif) .btn,main:has([aria-label="Note de visite"]) .btn{min-width:48px;min-height:48px;white-space:normal;height:auto;overflow-wrap:anywhere;font-size:1rem}
+main:has([aria-label="Note de visite"]) input,main:has([aria-label="Note de visite"]) textarea{width:100%;min-width:0;max-width:100%;font-size:1rem;min-height:48px}
+main:has([aria-label="Note de visite"]){overflow-wrap:anywhere;padding-bottom:140px}
+main:has(.v23-objectif) .v23-chips{flex-wrap:wrap;overflow:visible}
+main:has(.v23-objectif) .v23-chip{min-width:48px;min-height:48px;font-size:1rem}
+main:has(.v23-objectif) .v23-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,8rem),1fr))}
+main:has(.v23-objectif) .v23-grid span{font-size:.875rem}
+.t-nom strong{font-size:.9375rem}.t-nom small{font-size:.78125rem;overflow-wrap:anywhere}
+.t-visite{font-size:1rem;white-space:normal}
+@media(max-width:360px){.t-rang{flex-wrap:wrap}.t-nom{flex-basis:50%}}
+
+body.v38-home .v38-accueil-hero{height:auto;min-height:100px}

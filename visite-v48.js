@@ -5,9 +5,9 @@
 const ODICOLOR_VISITE = (() => {
   const RESULTATS = [['vu', 'Vu', 'J’ai parlé à quelqu’un'], ['absent', 'Absent', 'Personne / fermé'], ['plus_tard', 'Pas le bon moment', 'À repasser']];
   const RETOURS = [['interet', 'Intéressé / besoin identifié', 'demande'], ['prix', 'Parle du prix', 'prix'], ['concurrent', 'Concurrent en place', 'marque'], ['rien', 'Rien de particulier', null]];
-  const SUITES_VU = [['devis', 'Faire un devis', 'devis'], ['essai', 'Lancer un essai', 'essai'], ['rappel7', 'Rappeler dans 7 jours', 'rappel'], ['aucune', 'Aucune suite', 'aucune']];
+  const SUITES_VU = [['devis', 'Devis à préparer', 'devis'], ['essai', 'Lancer un essai', 'essai'], ['rappel7', 'Programmer une relance', 'rappel'], ['aucune', 'Aucune suite', 'aucune']];
   const SUITES_ABSENT = [['demain', 'Repasser demain', 1], ['rappel2', 'Rappeler dans 2 jours', 2], ['rappel7', 'Repasser dans 7 jours', 7]];
-  const iso = s => typeof s === 'string' && /^\d{4}-\d\d-\d\d$/.test(s) && new Date(s + 'T12:00:00Z').toISOString().slice(0, 10) === s;
+  const iso = s => typeof s === 'string' && /^\d{4}-\d\d-\d\d$/.test(s) && Number.isFinite(Date.parse(s + 'T12:00:00Z')) && new Date(s + 'T12:00:00Z').toISOString().slice(0, 10) === s;
   const plus = (jour, n) => { const d = new Date(jour + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
   // Nombre de touches du parcours (ouverture comprise) : le garde-fou testé par le navigateur.
   const touches = resultat => resultat === 'vu' ? 4 : 3;
@@ -19,17 +19,23 @@ const ODICOLOR_VISITE = (() => {
     if (!iso(ctx.auj)) throw new Error('Date du jour invalide.');
     if (!RESULTATS.some(r => r[0] === choix.resultat)) throw new Error('Résultat de visite inconnu.');
     const c = JSON.parse(JSON.stringify(client)), note = String(choix.note || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 500);
+    if (choix.echeance && (!iso(choix.echeance) || choix.echeance < ctx.auj)) throw new Error('Choisis une échéance valide, aujourd’hui ou plus tard.');
     const ouvre = j => ctx.prochainOuvre ? ctx.prochainOuvre(j) : j;
+    const echeance = n => choix.echeance || ouvre(plus(ctx.auj, n));
     if (!Array.isArray(c.visites)) c.visites = [];
     if (choix.resultat === 'plus_tard') {
       const s = SUITES_ABSENT.find(x => x[0] === choix.suite); if (!s) throw new Error('Choisis quand repasser.');
-      c.reporteAu = ouvre(plus(ctx.auj, s[2])); c.reports = (Number(c.reports) || 0) + 1; c.rappel = c.reporteAu;
+      if (note) {
+        if (!Array.isArray(c.infosTerrain)) c.infosTerrain = [];
+        c.infosTerrain.push({ id: ctx.nouvelId(), nature: 'note-commerciale', texte: note, type: 'autre', source: 'vendeur', statut: 'information', suite: 'rappel', creeLe: ctx.auj, modifieLe: ctx.auj });
+      }
+      c.reporteAu = echeance(s[2]); c.reports = (Number(c.reports) || 0) + 1; c.rappel = c.reporteAu;
       return { client: c, resume: 'Reporté au ' + c.reporteAu };
     }
     if (choix.resultat === 'absent') {
       const s = SUITES_ABSENT.find(x => x[0] === choix.suite); if (!s) throw new Error('Choisis quand repasser.');
       c.visites.push({ date: ctx.auj, res: 'absent', note }); if (c.visites.length > 100) c.visites = c.visites.slice(-100);
-      c.rappel = ouvre(plus(ctx.auj, s[2])); c.reporteAu = ''; return { client: c, resume: 'Absent · rappel le ' + c.rappel };
+      c.rappel = echeance(s[2]); c.reporteAu = ''; return { client: c, resume: 'Absent · rappel le ' + c.rappel };
     }
     const r = RETOURS.find(x => x[0] === choix.retour); if (!r) throw new Error('Choisis ce qui est ressorti de la visite.');
     const s = SUITES_VU.find(x => x[0] === choix.suite); if (!s) throw new Error('Choisis la suite à donner.');
@@ -41,9 +47,9 @@ const ODICOLOR_VISITE = (() => {
       const texte = (r[2] ? r[1] : 'Visite') + (note ? ' — ' + note : '') + (s[0] === 'devis' ? ' (devis à faire)' : s[0] === 'essai' ? ' (essai à lancer)' : '');
       c.infosTerrain.push({ id: ctx.nouvelId(), nature: 'note-commerciale', texte, type: r[2] || 'autre', source: 'vendeur', statut: s[0] === 'devis' || s[0] === 'essai' ? 'a_faire' : 'information', suite: s[2], creeLe: ctx.auj, modifieLe: ctx.auj });
     }
-    if (s[0] === 'devis') { c.etape = 'Devis à préparer'; c.etapeDate = ctx.auj; c.rappel = ouvre(plus(ctx.auj, 1)); }
-    else if (s[0] === 'essai') { c.etape = 'Essai à lancer'; c.etapeDate = ctx.auj; c.rappel = ouvre(plus(ctx.auj, 1)); }
-    else if (s[0] === 'rappel7') c.rappel = ouvre(plus(ctx.auj, 7));
+    if (s[0] === 'devis') { c.etape = 'Devis à préparer'; c.etapeDate = ctx.auj; c.rappel = echeance(1); }
+    else if (s[0] === 'essai') { c.etape = 'Essai à lancer'; c.etapeDate = ctx.auj; c.rappel = echeance(1); }
+    else if (s[0] === 'rappel7') c.rappel = echeance(7);
     return { client: c, resume: 'Vu · ' + (r[2] ? r[1] : 'rien de particulier') + ' · ' + s[1].toLowerCase() };
   }
   return { RESULTATS, RETOURS, SUITES_VU, SUITES_ABSENT, appliquer, etapes, choixSuite, touches };

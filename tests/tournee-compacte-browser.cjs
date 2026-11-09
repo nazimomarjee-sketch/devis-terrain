@@ -57,3 +57,22 @@ test('formes cohérentes : mêmes rayons pour cartes, boutons et champs sur tout
   const css=fs.readFileSync(path.join(root,'formes-v49.css'),'utf8');assert.doesNotMatch(css.split('Tournée compacte')[0].replace(/\/\*[\s\S]*?\*\//g,''),/\.vc/,'aucune règle sur la Ville LEGO');
   assert.deepEqual(errs,[]);await context.close();
 });
+test('accueil : objectif puis action, tournée résumée ; grandes polices à 200 % sur les trois parcours',async()=>{
+  const {context,page,errs}=await ouvrir();
+  await page.goto(origin+'/#/');await page.locator('.v49-tournee').waitFor();
+  assert.equal(await page.locator('.v49-tournee').getByRole('link',{name:'Voir toute la tournée'}).count(),1);
+  assert.equal(await page.locator('.v49-tournee .t-ligne').count(),0);
+  assert.equal(await page.locator('.v23-objectif + .v23-prochaine').count(),1);
+  await page.addStyleTag({content:'html{font-size:200%!important}'});
+  for(const hash of ['#/','#/tournee','#/visite/1']) {
+    await page.goto(origin+'/'+hash);await page.waitForTimeout(250);
+    const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);
+    assert.ok(overflow<=0,hash+' déborde de '+overflow+' px');
+    if(hash==='#/visite/1') {
+      await page.getByRole('button',{name:/^Vu/}).click();await page.getByRole('button',{name:/Intéressé/}).click();
+      assert.ok(await page.getByLabel('Échéance de la prochaine action').isVisible());
+      assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth));
+    }
+  }
+  assert.deepEqual(errs,[]);await context.close();
+});

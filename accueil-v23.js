@@ -29,10 +29,10 @@
       h('div',{class:'v23-argent'},renseigne?[h('strong',{},montant(caSem)),h('span',{class:'mut'},objectif?' / '+montant(objectif):' · objectif à régler')]:h('strong',{},'CA non renseigné')),
       objectif&&renseigne?h('div',{class:'piste',role:'progressbar','aria-valuenow':pct,'aria-valuemin':'0','aria-valuemax':'100','aria-label':'Avancement de l’objectif hebdomadaire en CA facturé'},
         h('div',{class:'rempli',style:'width:'+pct+'%'})):null,
-      h('p',{class:'mut'},!renseigne?'Saisis tes factures et avoirs HT : le CA n’est jamais estimé à partir des commandes.':objectif?(pct+' % · reste '+montant(Math.max(0,objectif-caSem))+' à facturer'):'Définir un objectif pour suivre le CA de la semaine.'),
+      h('p',{class:'mut'},!renseigne?'Saisis tes factures et avoirs HT.':objectif?(pct+' % · reste '+montant(Math.max(0,objectif-caSem))+' à facturer'):'Définir un objectif pour suivre le CA de la semaine.'),
       renseigne&&om?h('p',{class:'mut'},'Mois : '+montant(mois.totalCents)+' sur '+montant(om.cents)+' ('+Math.max(0,Math.min(100,Math.round(mois.totalCents/om.cents*100)))+' %)'):null,
-      h('small',{class:'v23-source'},'Source : factures et avoirs HT saisis par toi · indicateurs séparés ce mois : commandes envoyées '+montant(cmdMois)+' HT · encaissé '+montant(encMois)+' · '+ligneEbp),
-      h('div',{class:'actions'},lien('#/cockpit','Cockpit','sec'),lien('#/ca',renseigne?'CA facturé : voir / saisir':'Saisir mon CA facturé','sec'),!objectif?lien('#/reglages','Régler mon objectif'):null));
+      h('details',{class:'v49-ca-details'},h('summary',{},'Sources et autres montants'),h('small',{class:'v23-source'},'Source : factures et avoirs HT saisis par toi · indicateurs séparés ce mois : commandes envoyées '+montant(cmdMois)+' HT · encaissé '+montant(encMois)+' · '+ligneEbp),h('div',{class:'actions'},lien('#/cockpit','Cockpit','sec'),!objectif?lien('#/reglages','Régler mon objectif'):null)),
+      h('div',{class:'actions'},lien('#/ca',renseigne?'Voir / saisir mon CA':'Saisir mon CA facturé','sec')));
   }
 
   function candidats(dv,cl,pc,tours) {
@@ -169,6 +169,10 @@
     montrer('Bonjour, '+(S.accueilNom||'Mr Omarjee'),
       carteObjectif(dv,pc,now,caStore,cl),
       carteAction(actions),
+      (()=>{const plan=tours&&tours[jourLocal(now)], ids=plan&&Array.isArray(plan.ids)?plan.ids:[], faits=ids.filter(id=>(plan.res||{})[id]).length;
+        return h('section',{class:'carte v49-tournee'},h('strong',{},'Ma tournée'),
+          p(ids.length ? faits+' traité(s) · '+(ids.length-faits)+' restant(s)' : 'Aucune tournée préparée.'),
+          lien('#/tournee',ids.length?'Voir toute la tournée':'Préparer ma tournée'))})(),
       rechercheProduits(rapport),
       raccourcis(dv,pc),
       h('div',{class:'fab noprint'},h('a',{class:'btn gros noir',href:'#/nouveau'},'+ Nouveau devis')),

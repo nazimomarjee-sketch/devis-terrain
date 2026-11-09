@@ -278,8 +278,7 @@
     const headline=h('div',{class:'v38-accueil-hero'},
       h('div',{class:'v38-accueil-rayon','aria-hidden':'true'}),
       h('span',{class:'v38-eyebrow'},'ODICOLOR · ASSISTANT TERRAIN'),
-      h('strong',{},'Mon poste de travail'),
-      h('p',{},'Un garage. Une action. Un résultat à suivre.'));
+      h('strong',{},'Mon terrain'));
     app.prepend(headline);
     // V40 : Objectif en premier sous le bandeau photo, puis action prioritaire.
     // Les valeurs et leurs preuves restent calculées par le moteur existant.
@@ -303,7 +302,7 @@
         h('span',{class:'v38-shortcut-icon'},'✦'),
         h('strong',{},'Mon assistant'),h('small',{},'Claude · Agent 01'))
     );
-    (next||headline).after(shortcuts);
+    (app.querySelector('.v49-tournee')||next||headline).after(shortcuts);
     const oldAgent=app.querySelector('.v35-accueil');
     if(oldAgent)oldAgent.remove();
     // L'objectif reste avant la prochaine action et les raccourcis.

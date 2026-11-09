@@ -2077,20 +2077,22 @@ async function pageCAImport() {
 // ---------- Visite terrain en 4 touches maximum ----------
 async function pageVisite(id) {
   const c = await get('clients', id); if (!c) return nonTrouve();
-  let agendaAvant = null; const V = ODICOLOR_VISITE, choix = {}, avant = JSON.stringify(c), deTournee = /[?&]t=1/.test(location.hash);
-  const noteIn = h('input', { maxlength: 500, placeholder: 'Note (facultatif)', 'aria-label': 'Note de visite', autocomplete: 'off' });
+  let agendaAvant = null, enCours = false; const V = ODICOLOR_VISITE, choix = {}, avant = JSON.stringify(c), deTournee = /[?&]t=1/.test(location.hash);
+  const noteIn = h('textarea', { rows: 2, maxlength: 500, placeholder: 'Note (facultatif)', 'aria-label': 'Note de visite', autocomplete: 'off' });
   const gros = (label, sous, fn, cls) => h('button', { class: 'btn gros ' + (cls || ''), type: 'button', style: 'min-height:68px;text-align:left;display:block;width:100%;margin:8px 0', onclick: fn }, h('strong', {}, label), sous ? h('br') : null, sous ? h('small', {}, sous) : null);
   const entete = (n, total, titre) => [h('div', { class: 'mut' }, 'Étape ' + n + ' sur ' + total + ' · ' + c.nom), h('h2', { style: 'margin:6px 0' }, titre)];
   const total = () => V.etapes(choix.resultat).length;
   const enregistrer = async () => {
+    if (enCours) return;
+    enCours = true;
     try {
       choix.note = noteIn.value;
       const r = V.appliquer(c, choix, { auj: aujourdhui(), nouvelId: nouvelUid, prochainOuvre: j => estOuvre(new Date(j + 'T12:00:00')) ? j : prochainOuvre(new Date(j + 'T12:00:00')) });
       await putMany('clients', [r.client]);
       if (choix.resultat === 'vu') { const ag = await get('meta', 'agenda'), rj = ODICOLOR_RDV.duJour(ag, aujourdhui()).filter(x => x.clientId === id); if (rj.length) { agendaAvant = { val: ag }; let m2 = ag; for (const x of rj) m2 = ODICOLOR_RDV.terminer(m2, x.id, { maintenant: new Date().toISOString() }); await put('meta', m2, 'agenda'); } }
       if (deTournee) { const T = await lireTournees(), j = aujourdhui(), plan = T[j]; if (plan && Array.isArray(plan.ids) && plan.ids.includes(id)) { (plan.res || (plan.res = {}))[id] = choix.resultat === 'vu' ? 'vu' : choix.resultat === 'absent' ? 'absent' : 'reporte'; await ecrireTournees(T); } }
-      fin(r.resume);
-    } catch (e) { toast(e.message, true); }
+      await fin(r.resume);
+    } catch (e) { toast(e.message, true); } finally { enCours = false; }
   };
   const fin = async resume => {
     let suivant = null;
@@ -2100,11 +2102,27 @@ async function pageVisite(id) {
       h('div', { class: 'actions' }, h('a', { class: 'btn sec', href: deTournee ? '#/tournee' : '#/cockpit' }, deTournee ? 'Retour à la tournée' : 'Retour au cockpit'), h('a', { class: 'btn sec', href: '#/client/' + id }, 'Fiche'), h('a', { class: 'btn sec', href: '#/agenda/nouveau/' + id }, 'Fixer un rendez-vous'),
         h('button', { class: 'btn sec', type: 'button', onclick: async () => { await putMany('clients', [JSON.parse(avant)]); if (agendaAvant) { if (agendaAvant.val === undefined) await rq(st('meta', 'readwrite').delete('agenda')); else await put('meta', agendaAvant.val, 'agenda'); } toast('Visite annulée : fiche remise comme avant.'); const cible = '#/visite/' + id + (deTournee ? '?t=1' : ''); if (location.hash === cible) pageVisite(id); else location.hash = cible; } }, 'Annuler cette visite')), h('div', { style: 'height:96px' }));
   };
-  const etapeSuite = () => montrer('Visite · ' + c.nom, ...entete(total(), total(), choix.resultat === 'vu' ? 'Et ensuite ?' : 'Quand repasser ?'), V.choixSuite(choix.resultat).map(s => gros(s[1], '', () => { choix.suite = s[0]; enregistrer(); }, 'sec')), noteIn);
-  const etapeRetour = () => montrer('Visite · ' + c.nom, ...entete(2, total(), 'Qu’est-ce qui est ressorti ?'), V.RETOURS.map(r => gros(r[1], '', () => { choix.retour = r[0]; etapeSuite(); }, 'sec')), noteIn);
-  montrer('Visite · ' + c.nom, h('a', { class: 'btn sec', href: deTournee ? '#/tournee' : '#/client/' + id, style: 'margin-bottom:6px' }, '‹ Retour'), ...entete(1, 3, 'Résultat de la visite'),
+  const dateIn = h('input', { type: 'date', min: aujourdhui(), 'aria-label': 'Échéance de la prochaine action' });
+  const retour = fn => h('button', {class:'btn sec', type:'button', onclick:fn}, '‹ Étape précédente');
+  const etapeSuite = () => {
+    if (choix.resultat === 'vu' && !dateIn.value) dateIn.value = aujourdhui();
+    montrer('Visite · ' + c.nom, retour(choix.resultat === 'vu' ? etapeRetour : etapeResultat),
+      ...entete(total(), total(), choix.resultat === 'vu' ? 'Et ensuite ?' : 'Quand repasser ?'),
+      noteIn, h('label', {}, 'Échéance de la prochaine action', dateIn),
+      h('p', {class:'mut'}, choix.resultat === 'vu' ? 'Date modifiable. « Aucune suite » ne programme rien.' : 'Si tu choisis une date, elle remplace le délai indiqué sur les boutons.'),
+      V.choixSuite(choix.resultat).map(s => gros(s[1], '', () => {
+        if (s[0] !== 'aucune' && (!dateIn.checkValidity() || (choix.resultat === 'vu' && !dateIn.value))) { toast('Choisis une échéance valide.', true); dateIn.focus(); return; }
+        choix.suite = s[0]; choix.echeance = s[0] === 'aucune' ? '' : dateIn.value; enregistrer();
+      }, 'sec')));
+  };
+  const etapeRetour = () => montrer('Visite · ' + c.nom, retour(etapeResultat), ...entete(2, total(), 'Qu’est-ce qui est ressorti ?'), noteIn,
+    V.RETOURS.map(r => gros(r[1], '', () => { choix.retour = r[0]; etapeSuite(); }, 'sec')));
+  const etapeResultat = () => montrer('Visite · ' + c.nom,
+    h('a', { class: 'btn sec', href: deTournee ? '#/tournee' : '#/client/' + id }, '‹ Retour'),
+    ...entete(1, 3, 'Résultat de la visite'), noteIn,
     V.RESULTATS.map(r => gros(r[1], r[2], () => { choix.resultat = r[0]; r[0] === 'vu' ? etapeRetour() : etapeSuite(); }, r[0] === 'vu' ? 'vert' : 'sec')),
-    h('p', { class: 'mut' }, 'Chaque réponse est un seul toucher. Le dernier enregistre la visite ; tu peux l’annuler juste après.'));
+    h('p', { class: 'mut' }, 'Le choix de la suite enregistre la visite. Tu peux revenir à l’étape précédente pour corriger.'));
+  etapeResultat();
 }
 
 // ---------- Carte commerciale : garages regroupés par zone, hors ligne, sans fond de carte externe ----------

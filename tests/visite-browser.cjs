@@ -28,7 +28,7 @@ test('depuis le cockpit : visite avec échange en 4 touches exactement, enregist
   await toucher(page.getByLabel('Visiter GARAGE FICTIF VISITE'));                          // 1 : ouvrir
   await toucher(page.getByRole('button',{name:/^Vu/}));                                     // 2 : résultat
   await toucher(page.getByRole('button',{name:/Intéressé/}));                               // 3 : ce qui est ressorti
-  await toucher(page.getByRole('button',{name:'Faire un devis'}));                          // 4 : suite = enregistre
+  await toucher(page.getByRole('button',{name:'Devis à préparer'}));                          // 4 : suite = enregistre
   await page.locator('#titre',{hasText:'Visite enregistrée'}).waitFor();assert.equal(touches,4);
   const c=await page.evaluate(()=>get('clients',1));
   assert.equal(c.visites.length,1);assert.equal(c.visites[0].res,'vu');assert.equal(c.etape,'Devis à préparer');assert.equal(c.infosTerrain[0].suite,'devis');assert.ok(c.rappel);
@@ -57,7 +57,7 @@ test('depuis la tournée : le garage est marqué traité et « Garage suivant »
 });
 test('hors ligne : la visite s’enregistre et survit au rechargement',async()=>{
   const {context,page,errs}=await ouvrir();
-  await page.goto(origin+'/#/visite/1');await page.getByRole('button',{name:/^Vu/}).click();await page.getByRole('button',{name:/Parle du prix/}).click();await page.getByRole('button',{name:'Rappeler dans 7 jours'}).click();
+  await page.goto(origin+'/#/visite/1');await page.getByRole('button',{name:/^Vu/}).click();await page.getByRole('button',{name:/Parle du prix/}).click();await page.getByRole('button',{name:'Programmer une relance'}).click();
   await page.locator('#titre',{hasText:'Visite enregistrée'}).waitFor();await page.reload();
   const c=await page.evaluate(()=>get('clients',1));assert.equal(c.visites.length,1);assert.equal(c.infosTerrain[0].type,'prix');assert.deepEqual(errs,[]);await context.close();
 });
@@ -72,5 +72,23 @@ test('tournée proposée depuis le cockpit : garages proches et prioritaires, co
   await page.getByLabel('Inclure GARAGE FICTIF PROCHE 0').uncheck();
   await page.getByRole('button',{name:'Valider cette tournée'}).click();await page.waitForURL(/#\/tournee$/);
   const T=await page.evaluate(()=>lireTournees().then(T=>T[aujourdhui()]));assert.equal(T.ids.length,5);assert.ok(!T.ids.includes(10));assert.deepEqual(T.res,{});
+  assert.deepEqual(errs,[]);await context.close();
+});
+
+test('correction des étapes : note conservée et date choisie enregistrée, y compris un week-end',async()=>{
+  const {context,page,errs}=await ouvrir();
+  await page.goto(origin+'/#/visite/1');
+  await page.getByLabel('Note de visite').fill('Besoin de vernis vendredi');
+  await page.getByRole('button',{name:/^Vu/}).click();
+  await page.getByRole('button',{name:/Intéressé/}).click();
+  await page.getByLabel('Échéance de la prochaine action').fill('2030-06-15');
+  await page.getByRole('button',{name:'‹ Étape précédente'}).click();
+  assert.equal(await page.getByLabel('Note de visite').inputValue(),'Besoin de vernis vendredi');
+  await page.getByRole('button',{name:/Parle du prix/}).click();
+  assert.equal(await page.getByLabel('Échéance de la prochaine action').inputValue(),'2030-06-15');
+  await page.getByRole('button',{name:'Devis à préparer'}).click();
+  await page.locator('#titre',{hasText:'Visite enregistrée'}).waitFor();
+  const c=await page.evaluate(()=>get('clients',1));
+  assert.equal(c.rappel,'2030-06-15');assert.equal(c.visites[0].note,'Besoin de vernis vendredi');assert.equal(c.infosTerrain[0].type,'prix');
   assert.deepEqual(errs,[]);await context.close();
 });
