@@ -1,64 +1,64 @@
-# JARVIS — État réel du projet (lire en premier, 5 minutes)
+# JARVIS v2 — État réel (lire en premier, 5 minutes)
 
-Date : 8 novembre 2026. Tout ce qui suit est vérifiable : `cd jarvis && npm test` (46 tests, preuve dans `PREUVES_TESTS.txt`).
+Date : 9 novembre 2026. Preuves : `cd jarvis && npm test` → **175 tests verts** (`PREUVES_TESTS.txt`), captures dans `captures/`, mesures plus bas.
+
+> **« 175 tests verts » ne veut pas dire « terminé ».** Ils prouvent la logique sur des données **fictives**, sous **Linux**. Rien n'a été essayé sur un vrai PC Windows ni sur un vrai Samsung (voir `09_ESSAIS_WINDOWS_SAMSUNG.md`, tous les essais sont marqués « NON RÉALISÉ »).
 
 ## La réponse courte
 
-**Il existe un vrai prototype qui tourne, avec des données 100 % fictives.** Ce n'est pas encore « 8 agents qui travaillent 24/7 » : c'est le **socle** (moteur persistant, contrôle indépendant, sécurité, tableau de bord) plus **1 agent métier sur 8** (Devis). C'est volontaire : un socle solide d'abord, les autres agents ensuite.
+JARVIS est maintenant **un système complet de démonstration** : trois espaces cloisonnés, huit agents opérationnels *sur données fictives*, un auditeur indépendant, une exécution isolée des agents, un tableau de bord Samsung, une administration séparée. Il **n'est pas encore utilisable avec de vraies données** : il manque l'accord d'ODICOLOR, les règles métier validées, l'import EBP et les essais sur le matériel réel.
 
-## 1. Construit ET testé (preuve : 46 tests verts)
+## 1. Construit ET testé
 
-| Brique | Ce qui est prouvé |
+| Domaine | Ce qui est prouvé |
 |---|---|
-| File de missions persistante (SQLite) | Survit à un crash et à un redémarrage du processus |
-| Anti-doublon | 4 processus qui se disputent 30 missions : chaque mission prise **une seule fois** |
-| Reprise après interruption | Ouvrier mort → mission reprise ; après 4 interruptions → échec + alerte (pas de boucle infinie) |
-| Idempotence | Le même dépôt envoyé 2 fois (réseau instable) = 1 seule mission |
-| Délai maximum par tâche | Agent trop lent interrompu, mission relancée |
-| Arrêt d'urgence | Par API **ou** par fichier `ARRET` (marche même si la base ne répond plus) |
-| Budget IA | Budget du jour dépassé → missions suivantes bloquées **avant** tout travail |
-| Agent 02 — Devis | Client et références résolus sans deviner ; conditionnements ; tarifs manquants/anciens signalés ; remise et TVA ; PDF + brouillon mail réels |
-| Calculs d'argent | En entiers (centimes), jamais par un modèle IA. Cas de référence calculé à la main : **317,95 € TTC**, identique au code |
-| Agent 08 — Auditeur | Indépendant (n'importe aucun code d'agent) ; 11 contrôles déterministes ; recalcul BigInt vérifié sur 200 cas aléatoires ; **8 falsifications sur 8 détectées** |
-| Boucle de correction | 7 types d'erreurs volontaires : chacune détectée, corrigée, puis validée ; si l'erreur persiste : **3 corrections puis escalade humaine** |
-| Porte humaine | Aucun envoi sans ton clic ; approbation refusée si le résultat ou un fichier a été modifié après l'audit |
-| Journal d'audit | Chaîné par hachage : toute modification a posteriori est détectée et signalée |
-| Confidentialité des journaux | E-mails, téléphones, IBAN et jetons masqués |
-| Sauvegarde | Chiffrée (AES-256-GCM), vérifiée par **restauration réelle** ; mauvaise clé et fichier altéré rejetés |
-| API | Jeton obligatoire, verrouillage après 5 échecs, protection DNS-rebinding, taille limitée, pas de traversée de chemin |
-| Tableau de bord Samsung | Rendu vérifié par capture (360×780), aucune erreur console, pas de débordement (`captures/`) |
-| Métriques et alertes | Calculées sur l'état réel de la base |
+| **8 agents** | Devis · Produits · Prospection · Clients · Relances · Commandes · Finance · Planification. Chacun : rôle, droits de lecture déclarés, critères mesurables (`07_AGENTS.md`). Résultats vérifiés **à la main** (ex. 317,95 € TTC ; encours 71 001 centimes ; marge 3 180 pb ; plan de journée) |
+| **Auditeur indépendant** | Un module par agent, **recalcul depuis les sources**, aucun code partagé avec l'agent (vérifié mécaniquement). Sur les 8 agents : **36 erreurs volontaires**, chacune détectée, corrigée, puis validée (ou bloquée à bon droit) ; **les mêmes 36 en version persistante → 3 corrections puis escalade** ; **56 falsifications a posteriori** détectées sans lire le rapport de l'agent (+ pannes, délais et sabotages d'isolation testés à part) |
+| **Isolation des agents** | Processus séparé, permissions Node : lecture/écriture hors périmètre **refusées**, processus enfant **refusé**, environnement **vide** (aucun jeton), délai **tué**, sortie démesurée **coupée** |
+| **Cloisonnement** | 3 espaces : base, journal, sorties, sauvegardes, jeton, jeton administrateur, clé de sauvegarde et port **distincts**. Un jeton d'un espace n'ouvre rien dans un autre ; l'espace perso **ne peut pas lire** les fichiers d'ODICOLOR ; la configuration est **refusée** si deux espaces partagent quoi que ce soit |
+| **Données réelles / intégrations** | **Désactivées** : refus + journal sans autorisation ; l'autorisation exige l'administrateur, est limitée, révocable, expirable. EBP/Gmail/Airtable : **non développés**, échec explicite même autorisés |
+| **Règles métier** | TVA selon territoire **et** opération ; remise (plafond + justification) ; marge minimale ; ancienneté des tarifs. **Aucune valeur présumée** : règle absente ou non validée ⇒ blocage + question (`08_REGLES_METIER.md`) |
+| **Humain dans la boucle** | Aucun envoi sans ton clic ; réaudit juste avant ; l'envoi reste **simulé** ; JARVIS **ne peut s'octroyer aucun droit** (testé, y compris par demande textuelle) |
+| **Concurrence** | 4 processus, 24 missions des 8 agents (en direct **et** agents isolés) : chacune exécutée **une seule fois**, journal intact |
+| **Pannes** | Crash puis redémarrage, 4 reprises max, délai, panne d'agent, budget, arrêt d'urgence (API et fichier), `kill -9` du vrai service : l'arrêt d'urgence **survit**, le travail reprend, le journal reste intact |
+| **Supervision** | Détecte : service silencieux, journal altéré, résultat modifié en base, validation sans trace, missions en échec, budget, sauvegarde ancienne |
+| **Sauvegarde** | Chiffrée, **restaurée pour de vrai** et reprise du travail après restauration (approbation possible) |
+| **IA hybride** | Point d'extension **avec garde-fous** (proposition seule, budget, minimisation, repli sans modèle). Aucun fournisseur réel branché |
+| **Interface Samsung** | Prochaine action, validations, en cours, résultats, anomalies, **détail d'une décision**, arrêt d'urgence toujours visible. Vérifiée par capture 360×780 : aucune erreur console, pas de débordement |
 
-## 2. Simulé (ne pas le confondre avec du réel)
+## 2. Mesuré (Linux, 4 cœurs, données fictives)
 
-- **L'envoi de mail est SIMULÉ.** Le prototype n'a aucun accès SMTP/Gmail : « Approuver » écrit une ligne « envoi simulé ».
-- **Toutes les données sont fictives** (catalogue, clients, prix). Les adresses utilisent `.invalid`.
-- **La mise en page du PDF est celle d'un prototype** (texte monospace), pas un devis commercial final.
-- **Le serveur n'a été testé qu'en local** (127.0.0.1), pas depuis un vrai Samsung à travers un VPN.
+- **Latence** : 5 ms/mission en direct, **79 ms/mission avec agent isolé** (12,6 missions/s).
+- **Mémoire** : service ≈ 70 Mo ; agent isolé ≈ 47 Mo de pic. **Trois services + un agent à la fois < 0,5 Go.**
+- Sous Windows, le lancement de processus est généralement plus lent : **non mesuré**.
 
-## 3. Reste à développer
+## 3. Simulé (à ne pas confondre avec du réel)
 
-- Agents 01, 03, 04, 05, 06, 07 : **affichés « prévu »** dans le tableau de bord, aucun n'existe.
-- **Langage libre** : le lecteur de demandes comprend `devis pour <client> : <quantité> <article>, …`. Brancher un modèle IA pour le texte libre est possible, mais **chaque sortie devra repasser par l'auditeur**.
-- Intégrations EBP, Gmail, Airtable : **aucune supposée**, toutes à vérifier (voir `06_FEUILLE_DE_ROUTE.md`).
-- Envoi réel de mail, dictée vocale, fournisseurs IA et routage de modèles, service Windows testé, PWA installable.
+Envoi de mails/relances/commandes · toutes les données · règles « démonstration » · fournisseurs d'IA · « fichiers du cockpit ».
 
-## 4. Ce qui demande TON intervention
+## 4. Pas fait, et pourquoi
 
-1. **Autorisation écrite d'ODICOLOR** avant toute donnée réelle (voir point 2 ci-dessous : c'est le vrai verrou).
-2. **Achat du matériel** : je recommande, tu décides (`03_MATERIEL_ET_COUTS.md`). Rien n'a été acheté.
-3. **Valider les hypothèses métier** : TVA 8,5 %, remise max 60 %, tarif « ancien » après 90 jours.
-4. **Dire quel agent construire ensuite.**
+| Reste | Raison |
+|---|---|
+| Essais sur **Windows réel** et **Samsung réel** | Aucun des deux n'est accessible depuis cette session |
+| **Données réelles, import EBP, Gmail, Airtable** | Exigent ton autorisation écrite et l'accord d'ODICOLOR ; format d'export EBP inconnu |
+| **Langage libre** par un vrai modèle | Aucun fournisseur choisi ni budget ; l'interface et les garde-fous existent |
+| **Règles métier validées** (TVA, remises, marges) | Décision humaine (expert-comptable, direction commerciale) |
+| **Envoi réel** de mail | Volontairement non développé |
+| **Filtrage réseau des agents** | Non assuré par Node 22 : à poser dans le pare-feu Windows (`05`), non testé |
+| Notification push des alertes | Non développée (alertes visibles dans le tableau de bord et la sonde) |
 
-## 5. Ce que je conteste dans le mandat (franchement)
+## 5. Ce qui demande ton intervention
 
-1. **Les données ne sont pas à toi.** `devis-terrain` contient des règles d'**ODICOLOR** (ton employeur, d'après `CLAUDE_AGENT01_INSTRUCTIONS.md`) qui dit : « les données d'entreprise ne doivent être partagées avec Claude qu'avec autorisation ODICOLOR ». Un JARVIS qui envoie des prix, clients ou montants à une API IA ou héberge ça sur ton PC personnel **sans accord** te met en faute, quelle que soit la qualité technique. À l'inverse, `cockpit-carrosserie` se déclare **projet indépendant** : JARVIS doit les cloisonner (espaces et droits séparés).
-2. **« S'améliore par des corrections vérifiées » est limité aujourd'hui** : le système corrige **chaque mission** et mesure ses taux, il n'« apprend » pas encore de ses erreurs d'une mission à l'autre. Promettre l'inverse serait faux.
-3. **8 agents d'un coup = risque de dispersion.** Un seul agent fiable vaut mieux que huit moyens. Ordre conseillé : Devis (fait) → Produits → Commercial → le reste.
-4. **« 24/7 » ne se promet pas.** Un mini-PC Windows redémarre pour ses mises à jour, une coupure internet arrive. Ce qu'on peut garantir : **reprise automatique et alerte**, pas 100 % de disponibilité.
-5. **Windows préféré ≠ Windows nécessaire.** Le cerveau en ligne n'exige pas de grosse machine ; voir le comparatif.
-6. **Limite technique à connaître** : le prototype utilise le module SQLite intégré à Node 22 (`node:sqlite`), encore classé expérimental. Il est stable en pratique ici, mais à surveiller lors des mises à jour de Node.
+1. **Accord écrit d'ODICOLOR** avant toute donnée réelle.
+2. **Valider les règles métier** (TVA par territoire/opération, plafond de remise, marge minimale, ancienneté des tarifs).
+3. **Achat du matériel** — recommandation en `03`. Rien n'a été acheté.
+4. **Essais Windows + Samsung** (je prépare le plan, tu exécutes ou tu me donnes l'accès).
 
-## Où regarder
+## 6. Limites que je ne veux pas te cacher
 
-`01_AUDIT_EXISTANT` · `02_ARCHITECTURE` · `03_MATERIEL_ET_COUTS` · `04_SECURITE` · `05_INSTALLATION_WINDOWS` · `06_FEUILLE_DE_ROUTE` · `captures/` · `PREUVES_TESTS.txt` · `modele_cout.mjs`
+1. **Les agents sont déterministes** : ils appliquent des règles ; ils ne « comprennent » pas le langage libre. L'intelligence viendra d'un modèle branché, **toujours contrôlé** par l'auditeur.
+2. **L'auditeur est indépendant du code des agents, pas des données.** Il vérifie la cohérence avec les sources ; si la source est fausse (ex. mauvais tarif saisi), il ne le voit pas. Le rapprochement avec EBP viendra avec l'import réel.
+3. **L'isolation est celle d'un processus**, pas d'une machine virtuelle : le modèle de permissions de Node n'est pas une frontière de sécurité absolue (son statut de stabilité est à revérifier dans la documentation Node) et ne filtre pas le réseau.
+4. **« 24/7 » reste un objectif, pas une promesse** : reprise automatique et alertes, pas 100 % de disponibilité.
+5. **Aucun utilisateur métier n'a validé** ces agents ; les critères de réussite sont les miens, à confirmer avec toi.

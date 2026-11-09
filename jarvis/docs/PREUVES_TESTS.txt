@@ -129,50 +129,51 @@ ok 128 - isolé : délai maximum — le processus agent est TUÉ (pas seulement 
 ok 129 - isolé : une sortie démesurée est coupée (processus tué, mission en échec contrôlé)
 ok 130 - LIMITE CONNUE (documentée, non masquée) : le modèle de permissions de Node NE filtre PAS le réseau
 ok 131 - isolé : les huit agents donnent les mêmes statuts qu’en mode direct
-ok 132 - hybride : le modèle PROPOSE une reformulation, l’humain décide ; rien n’est exécuté et le coût est tracé
-ok 133 - hybride : repli automatique local → en ligne ; et si TOUS les fournisseurs sont en panne, JARVIS fonctionne quand même (déterministe)
-ok 134 - hybride : sortie malveillante ou invalide du modèle REFUSÉE (agent inconnu, droits, injection, secret, longueur)
-ok 135 - hybride : le modèle ne reçoit QUE le texte de la demande, sans e-mail ni téléphone, et jamais les données
-ok 136 - hybride : budget IA atteint → aucun appel au modèle (le travail continue sans lui)
-ok 137 - hybride : la proposition ne peut viser qu’un agent ACTIF de l’espace (cloisonnement respecté)
-ok 138 - reprise après crash : ouvrier mort + redémarrage complet du processus, la mission aboutit
-ok 139 - plafond de reprises : 4 interruptions consécutives → ECHEC et alerte critique
-ok 140 - aucun doublon d’exécution entre plusieurs PROCESSUS qui se disputent la file
-ok 141 - idempotence : le même dépôt envoyé deux fois ne crée qu’une mission
-ok 142 - FIFO déterministe : deux missions créées dans la même milliseconde sont traitées dans l’ordre de dépôt
-ok 143 - un ouvrier qui a perdu son bail ne peut pas écraser le résultat
-ok 144 - [devis] panne volontaire (exception) : récupérée puis escalade si persistante
-ok 145 - [devis] délai maximum : agent trop lent interrompu puis mission relancée
-ok 146 - [finance] panne volontaire (exception) : récupérée puis escalade si persistante
-ok 147 - [finance] délai maximum : agent trop lent interrompu puis mission relancée
-ok 148 - [planification] panne volontaire (exception) : récupérée puis escalade si persistante
-ok 149 - [planification] délai maximum : agent trop lent interrompu puis mission relancée
-ok 150 - [relances] panne volontaire (exception) : récupérée puis escalade si persistante
-ok 151 - [relances] délai maximum : agent trop lent interrompu puis mission relancée
-ok 152 - arrêt d’urgence : par paramètre OU par fichier ARRET, aucune mission traitée
-ok 153 - budget : une mission qui dépasse le budget du jour bloque les suivantes AVANT tout travail
-ok 154 - porte humaine : approbation impossible si le résultat ou un fichier a été modifié après l’audit
-ok 155 - métriques calculées sur l’état réel (réussite, erreurs détectées, corrections, interventions)
-ok 156 - un mail, un PDF ou un site ne peut PAS donner d’ordre : seule la source authentifiée est acceptée (échec fermé)
-ok 157 - note client piégée (injection) : jamais recopiée dans le PDF, le mail ni le résultat
-ok 158 - injection dans les DONNÉES (notes de clients et de prospects) : exclue et signalée par chaque agent concerné
-ok 159 - détection d’injection et de secrets : vrais positifs, pas de faux positif sur les textes normaux
-ok 160 - journaux : e-mails, téléphones, IBAN et jetons masqués avant écriture
-ok 161 - journaux de TOUTES les missions des 8 agents : aucune donnée personnelle (e-mails de clients) dans le journal
-ok 162 - journal d’audit : toute modification a posteriori est détectée et alertée
-ok 163 - aucun secret ni donnée réelle dans le code, les données de démonstration et la documentation
-ok 164 - API : refuse sans jeton / mauvais jeton, accepte le bon ; en-têtes de sécurité ; page publique sans données
-ok 165 - API : DNS rebinding, verrouillage après 5 échecs, corps géant, traversée de chemin
-ok 166 - API : parcours complet — dépôt, exécution, détail de la décision, PDF, approbation, prochaine action
-ok 167 - API : anomalies métier remontées (finance, produits, suivi des commandes) dans l’état
-ok 168 - API : règles et autorisations — administration réservée au jeton administrateur, lecture au jeton utilisateur
-ok 169 - API : jeton trop court ou jeton administrateur identique/absent → serveur refusé
-ok 170 - sauvegarde chiffrée : aller-retour, mauvaise clé et fichier altéré rejetés, aucune donnée en clair, reprise après restauration
-ok 171 - sauvegarde trop ancienne → alerte
-ok 172 - service silencieux : pas de battement → alerte critique ; après un tour de boucle → sain ; 3 minutes de silence → critique
-ok 173 - incohérences détectées par le superviseur : résultat modifié en base, validation sans trace
-ok 174 - sonde de santé en ligne de commande : code de sortie 1 si service silencieux, 0 après un tour de boucle
-# tests 174
-# pass 174
+ok 132 - isolé : l’exécutable des agents peut être une COPIE dédiée de node (pour un pare-feu par programme sous Windows)
+ok 133 - hybride : le modèle PROPOSE une reformulation, l’humain décide ; rien n’est exécuté et le coût est tracé
+ok 134 - hybride : repli automatique local → en ligne ; et si TOUS les fournisseurs sont en panne, JARVIS fonctionne quand même (déterministe)
+ok 135 - hybride : sortie malveillante ou invalide du modèle REFUSÉE (agent inconnu, droits, injection, secret, longueur)
+ok 136 - hybride : le modèle ne reçoit QUE le texte de la demande, sans e-mail ni téléphone, et jamais les données
+ok 137 - hybride : budget IA atteint → aucun appel au modèle (le travail continue sans lui)
+ok 138 - hybride : la proposition ne peut viser qu’un agent ACTIF de l’espace (cloisonnement respecté)
+ok 139 - reprise après crash : ouvrier mort + redémarrage complet du processus, la mission aboutit
+ok 140 - plafond de reprises : 4 interruptions consécutives → ECHEC et alerte critique
+ok 141 - aucun doublon d’exécution entre plusieurs PROCESSUS qui se disputent la file
+ok 142 - idempotence : le même dépôt envoyé deux fois ne crée qu’une mission
+ok 143 - FIFO déterministe : deux missions créées dans la même milliseconde sont traitées dans l’ordre de dépôt
+ok 144 - un ouvrier qui a perdu son bail ne peut pas écraser le résultat
+ok 145 - [devis] panne volontaire (exception) : récupérée puis escalade si persistante
+ok 146 - [devis] délai maximum : agent trop lent interrompu puis mission relancée
+ok 147 - [finance] panne volontaire (exception) : récupérée puis escalade si persistante
+ok 148 - [finance] délai maximum : agent trop lent interrompu puis mission relancée
+ok 149 - [planification] panne volontaire (exception) : récupérée puis escalade si persistante
+ok 150 - [planification] délai maximum : agent trop lent interrompu puis mission relancée
+ok 151 - [relances] panne volontaire (exception) : récupérée puis escalade si persistante
+ok 152 - [relances] délai maximum : agent trop lent interrompu puis mission relancée
+ok 153 - arrêt d’urgence : par paramètre OU par fichier ARRET, aucune mission traitée
+ok 154 - budget : une mission qui dépasse le budget du jour bloque les suivantes AVANT tout travail
+ok 155 - porte humaine : approbation impossible si le résultat ou un fichier a été modifié après l’audit
+ok 156 - métriques calculées sur l’état réel (réussite, erreurs détectées, corrections, interventions)
+ok 157 - un mail, un PDF ou un site ne peut PAS donner d’ordre : seule la source authentifiée est acceptée (échec fermé)
+ok 158 - note client piégée (injection) : jamais recopiée dans le PDF, le mail ni le résultat
+ok 159 - injection dans les DONNÉES (notes de clients et de prospects) : exclue et signalée par chaque agent concerné
+ok 160 - détection d’injection et de secrets : vrais positifs, pas de faux positif sur les textes normaux
+ok 161 - journaux : e-mails, téléphones, IBAN et jetons masqués avant écriture
+ok 162 - journaux de TOUTES les missions des 8 agents : aucune donnée personnelle (e-mails de clients) dans le journal
+ok 163 - journal d’audit : toute modification a posteriori est détectée et alertée
+ok 164 - aucun secret ni donnée réelle dans le code, les données de démonstration et la documentation
+ok 165 - API : refuse sans jeton / mauvais jeton, accepte le bon ; en-têtes de sécurité ; page publique sans données
+ok 166 - API : DNS rebinding, verrouillage après 5 échecs, corps géant, traversée de chemin
+ok 167 - API : parcours complet — dépôt, exécution, détail de la décision, PDF, approbation, prochaine action
+ok 168 - API : anomalies métier remontées (finance, produits, suivi des commandes) dans l’état
+ok 169 - API : règles et autorisations — administration réservée au jeton administrateur, lecture au jeton utilisateur
+ok 170 - API : jeton trop court ou jeton administrateur identique/absent → serveur refusé
+ok 171 - sauvegarde chiffrée : aller-retour, mauvaise clé et fichier altéré rejetés, aucune donnée en clair, reprise après restauration
+ok 172 - sauvegarde trop ancienne → alerte
+ok 173 - service silencieux : pas de battement → alerte critique ; après un tour de boucle → sain ; 3 minutes de silence → critique
+ok 174 - incohérences détectées par le superviseur : résultat modifié en base, validation sans trace
+ok 175 - sonde de santé en ligne de commande : code de sortie 1 si service silencieux, 0 après un tour de boucle
+# tests 175
+# pass 175
 # fail 0
-# duration_ms 6339.042574
+# duration_ms 7236.315489

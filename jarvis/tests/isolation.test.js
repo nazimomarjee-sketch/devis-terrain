@@ -102,3 +102,11 @@ test('isolé : les huit agents donnent les mêmes statuts qu’en mode direct', 
     for (const d of D) { const x = await traiter(a, d); const y = await traiter(b, d); assert.equal(x.statut, y.statut, d); assert.equal(x.agent, y.agent); assert.equal(JSON.parse(x.rapport_audit).verdict, 'VALIDE'); }
   } finally { a.nettoyer(); b.nettoyer(); }
 });
+
+test('isolé : l’exécutable des agents peut être une COPIE dédiée de node (pour un pare-feu par programme sous Windows)', async () => {
+  const { copyFileSync, chmodSync, mkdtempSync } = await import('node:fs'); const { tmpdir } = await import('node:os');
+  const dedie = join(mkdtempSync(join(tmpdir(), 'node-agent-')), 'node-agent'); copyFileSync(process.execPath, dedie); chmodSync(dedie, 0o755);
+  process.env.JARVIS_NODE_AGENT = dedie;
+  const e = environnement({ isolation: true });
+  try { const m = await traiter(e, 'analyse financière'); assert.equal(m.statut, 'VALIDE'); assert.equal(JSON.parse(m.resultat).indicateurs.encours_cents, 71001); } finally { delete process.env.JARVIS_NODE_AGENT; e.nettoyer(); }
+});

@@ -52,6 +52,36 @@ Relevés web du **8 novembre 2026**, par moteur de recherche. Beaucoup de pages 
 
 *(Totaux = matériel + onduleur + sauvegarde + électricité + hébergement + API, fourchette basse–haute, tels que sortis du script `docs/modele_cout.mjs`.)*
 
+## Configurations minimale et recommandée (fondées sur des MESURES)
+
+Mesuré sous Linux (données fictives) : **service ≈ 70 Mo**, **agent isolé ≈ 47 Mo de pic**, **79 ms/mission** isolée. Trois services (un par espace) + un agent à la fois : **< 0,5 Go**. La mémoire de Windows 11 (≈ 3 à 4 Go au repos) pèse plus que JARVIS.
+
+| | **Minimale** (3 espaces, IA en ligne, usage léger) | **Recommandée** (marge, 24/7, évolutivité) | **Si modèle local plus tard** |
+|---|---|---|---|
+| Système | Windows 11 **Pro** (BitLocker, comptes séparés) | idem | idem |
+| Processeur | 4 cœurs récents (classe Intel N100/N150 ou mieux) | 4–8 cœurs efficients | 8 cœurs ou plus |
+| Mémoire | **8 Go** | **16 Go** | **32 Go minimum** (+ GPU NVIDIA ≥ 12–16 Go si on vise un confort) |
+| Stockage | SSD 256 Go | **SSD 512 Go** | **SSD 1 To** (les modèles pèsent 5–20 Go chacun) |
+| Réseau | Ethernet | Ethernet | Ethernet |
+| Protection | onduleur 700 VA + sauvegarde externe | idem | onduleur dimensionné (à vérifier avec la conso réelle) |
+
+**Vérifié** : la mémoire minimale réelle de JARVIS est très inférieure à 8 Go. **Non vérifié** : le comportement sous Windows (latence de lancement des processus, consommation réelle en watts) — à mesurer lors des essais W2, W13, W14 (`09`).
+
+## Coûts mensuels réels (courant) et amortis — calculés par `modele_cout.mjs`
+
+| Scénario | **Courant** / mois (électricité + hébergement + API) | **Amorti 36 mois** / mois (courant + matériel lissé) |
+|---|---|---|
+| A — VPS Linux | 12,0 – 30,0 € HT | 12,0 – 30,0 € HT |
+| B — Mini-PC 16 Go | **7,6 – 17,6 €** | 19,0 – 38,9 € |
+| C — Mini-PC 32 Go | 9,1 – 19,1 € | 37,1 – 57,0 € |
+| D — Station IA locale | 13,2 – 20,7 € | 54,6 – 77,7 € |
+
+*Hypothèses et incertitudes : voir plus haut (prix web non officiels, consommation non mesurée, API 5–15 €/mois selon un usage de 20 missions/jour — **aujourd'hui l'API n'est pas utilisée**, donc la part API est une réserve). Un **budget journalier** (500 centimes par défaut, réglable) bloque les dépassements.*
+
+## Ajouter un modèle local plus tard
+
+Aucun changement d'architecture : brancher un fournisseur `local` dans `modeles.js` (ordre « local puis en ligne »). Il ne passera **jamais** les données à l'extérieur, et son travail restera contrôlé par l'auditeur. Le surcoût matériel est celui du scénario C/D. **Ne pas acheter de GPU avant d'avoir mesuré, sur tes cas réels, que le local apporte quelque chose.**
+
 ## Recommandation
 
 **Scénario B, avec un modèle de marque connue, en dernier recours le A.** Arguments :

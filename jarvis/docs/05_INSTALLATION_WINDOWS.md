@@ -19,85 +19,104 @@ Version **testée : 22.23.4**. Node 24 non testé. Installer Node 22 (LTS) depui
 
 ```powershell
 git clone https://github.com/nazimomarjee-sketch/devis-terrain C:\jarvis-src
-# ne garder que le dossier jarvis :
 Copy-Item -Recurse C:\jarvis-src\jarvis C:\jarvis
 cd C:\jarvis
-node --disable-warning=ExperimentalWarning --test tests\*.test.js   # doit afficher « fail 0 »
+node --disable-warning=ExperimentalWarning --test tests\*.test.js   # doit afficher « fail 0 » (175 tests)
 ```
 Si un test échoue sous Windows, **ne pas passer à la suite** : c'est exactement ce que cette étape doit détecter.
 
-## 3. Secrets (jamais dans le code ni dans Git)
+## 3. Trois espaces = trois comptes, trois dossiers, trois secrets
+
+Créer **trois comptes Windows standard** (sans droits administrateur) : `jarvis-perso`, `jarvis-odicolor`, `jarvis-cockpit`. Un dossier de données par espace, accessible **uniquement** à son compte (et aux administrateurs) :
 
 ```powershell
-node -e "console.log(require('crypto').randomBytes(24).toString('base64url'))"   # → ton jeton d'accès
+foreach ($e in 'perso','odicolor','cockpit') {
+  New-Item -ItemType Directory -Force "C:\jarvis-data\$e" | Out-Null
+  icacls "C:\jarvis-data\$e" /inheritance:r /grant "jarvis-${e}:(OI)(CI)F" /grant "Administrators:(OI)(CI)F" | Out-Null
+}
 ```
-Créer `C:\jarvis-secrets\env.cmd` (lisible **uniquement** par le compte `jarvis` : clic droit → Propriétés → Sécurité) :
+Pour chaque espace, générer **trois secrets différents** (jeton utilisateur, jeton **administrateur**, clé de sauvegarde) et les ranger dans `C:\jarvis-secrets\<espace>.cmd`, lisible **uniquement** par le compte de l'espace :
 ```
-set JARVIS_TOKEN=<le jeton généré>
-set JARVIS_CLE_SAUVEGARDE=<une phrase de passe longue, aussi rangée dans ton gestionnaire de mots de passe>
+set JARVIS_ESPACE=odicolor
 set JARVIS_DONNEES=C:\jarvis-data
-set JARVIS_HOTES_AUTORISES=<nom du PC dans ton VPN privé, voir §5>
+set JARVIS_ODICOLOR_TOKEN=<jeton utilisateur>
+set JARVIS_ODICOLOR_ADMIN_TOKEN=<jeton administrateur — à garder aussi dans ton gestionnaire de mots de passe>
+set JARVIS_ODICOLOR_CLE_SAUVEGARDE=<phrase de passe longue>
+set JARVIS_ODICOLOR_PORT=8160
+set JARVIS_NODE_AGENT=C:\jarvis\agent-node\node.exe
+set JARVIS_HOTES_AUTORISES=<nom du PC dans ton VPN privé>
 ```
-Créer `C:\jarvis\lancer.cmd` :
+Ports par défaut : perso 8170, ODICOLOR 8160, cockpit 8180. Le démarrage **refuse** une configuration où deux espaces partageraient un port, un jeton ou une clé.
+
+**Exécutable des agents dédié** (pour bloquer SON réseau sans bloquer le service) :
+```powershell
+New-Item -ItemType Directory -Force C:\jarvis\agent-node | Out-Null
+Copy-Item "C:\Program Files\nodejs\node.exe" C:\jarvis\agent-node\node.exe
+New-NetFirewallRule -DisplayName "Jarvis agents : sortie bloquée" -Direction Outbound -Program "C:\jarvis\agent-node\node.exe" -Action Block
+```
+> **NON TESTÉ sous Windows** (essai W8). Le test `isolation.test.js` documente que Node seul **ne filtre pas** le réseau : cette règle est donc la seule barrière réseau des agents.
+
+Lanceur par espace `C:\jarvis\lancer-odicolor.cmd` :
 ```
 @echo off
-call C:\jarvis-secrets\env.cmd
+call C:\jarvis-secrets\odicolor.cmd
 cd /d C:\jarvis
-"C:\Program Files\nodejs\node.exe" --disable-warning=ExperimentalWarning src\demarrer.js >> C:\jarvis-data\service.log 2>&1
+"C:\Program Files\nodejs\node.exe" --disable-warning=ExperimentalWarning src\demarrer.js >> C:\jarvis-data\odicolor\service.log 2>&1
 ```
 
-## 4. Service permanent (Planificateur de tâches, sans logiciel tiers)
+## 4. Services permanents (Planificateur de tâches, sans logiciel tiers)
 
-PowerShell **administrateur** :
+Un service **par espace**, sous **son** compte :
 ```powershell
-$action   = New-ScheduledTaskAction -Execute "C:\jarvis\lancer.cmd"
-$trigger  = New-ScheduledTaskTrigger -AtStartup
-$settings = New-ScheduledTaskSettingsSet -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) `
-            -ExecutionTimeLimit ([TimeSpan]::Zero) -StartWhenAvailable -MultipleInstances IgnoreNew
-Register-ScheduledTask -TaskName "Jarvis" -Action $action -Trigger $trigger -Settings $settings `
-            -User "jarvis" -Password "<mot de passe du compte jarvis>" -RunLevel Limited
-Start-ScheduledTask -TaskName "Jarvis"
+$settings = New-ScheduledTaskSettingsSet -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero) -StartWhenAvailable -MultipleInstances IgnoreNew
+foreach ($e in 'perso','odicolor','cockpit') {
+  $action  = New-ScheduledTaskAction -Execute "C:\jarvis\lancer-$e.cmd"
+  Register-ScheduledTask -TaskName "Jarvis-$e" -Action $action -Trigger (New-ScheduledTaskTrigger -AtStartup) -Settings $settings -User "jarvis-$e" -Password "<mot de passe du compte>" -RunLevel Limited
+  Start-ScheduledTask -TaskName "Jarvis-$e"
+}
 ```
-`-MultipleInstances IgnoreNew` évite deux instances ; en plus, le moteur lui-même empêche tout doublon d'exécution (testé).
-
-**Sonde de santé** (toutes les 5 minutes, code de sortie 1 = alerte critique) :
+**Sonde de santé** par espace (toutes les 5 min ; code de sortie 1 = alerte critique : service silencieux, journal altéré, résultat modifié, échec…) :
 ```powershell
-$a = New-ScheduledTaskAction -Execute "C:\Program Files\nodejs\node.exe" -Argument "--disable-warning=ExperimentalWarning C:\jarvis\scripts\sante.js" -WorkingDirectory "C:\jarvis"
-$t = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 5)
-Register-ScheduledTask -TaskName "Jarvis-sante" -Action $a -Trigger $t -User "jarvis" -Password "<mot de passe>"
+foreach ($e in 'perso','odicolor','cockpit') {
+  $a = New-ScheduledTaskAction -Execute "C:\Program Files\nodejs\node.exe" -Argument "--disable-warning=ExperimentalWarning C:\jarvis\scripts\sante.js" -WorkingDirectory "C:\jarvis"
+  # JARVIS_ESPACE / JARVIS_DONNEES doivent être définies pour la tâche (variables d'environnement du compte jarvis-$e)
+  Register-ScheduledTask -TaskName "Jarvis-sante-$e" -Action $a -Trigger (New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 5)) -User "jarvis-$e" -Password "<mot de passe>"
+}
 ```
-La sonde **détecte** (service silencieux depuis 2 min, journal altéré, missions en échec) ; **aucune notification push n'est encore développée** : les alertes se lisent dans le tableau de bord et le résultat de la tâche.
+Les alertes se lisent dans le tableau de bord et dans le résultat de la tâche ; **aucune notification push n'est développée**.
 
 ## 5. Accès depuis le Samsung — sans ouvrir de port
 
-Le service écoute sur `127.0.0.1`. Pour y accéder à distance **sans exposer le PC à internet** : VPN privé de type Tailscale (application sur le PC et sur le Samsung, même compte), puis `tailscale serve` pour publier le service en HTTPS **à l'intérieur de ton réseau privé uniquement**. Mettre le nom de machine indiqué dans `JARVIS_HOTES_AUTORISES`.
+Chaque service écoute sur `127.0.0.1` (ports 8160/8170/8180). Pour y accéder à distance **sans exposer le PC à internet** : VPN privé de type Tailscale (application sur le PC et sur le Samsung, même compte), puis `tailscale serve` pour publier le service en HTTPS **à l'intérieur de ton réseau privé uniquement**. Mettre le nom de machine indiqué dans `JARVIS_HOTES_AUTORISES`.
 > **Non testé** ici (aucun Samsung ni PC Windows disponible). À vérifier : accès depuis le téléphone en 4G, certificat HTTPS valide, aucune exposition publique (ne **jamais** utiliser « funnel »).
 > Ne pas ouvrir de port sur la box internet.
 
 ## 6. Sauvegarde et restauration
 
-- Automatique : une sauvegarde chiffrée **vérifiée par restauration** toutes les 24 h dans `C:\jarvis-data\sauvegardes\`.
+- Automatique : une sauvegarde chiffrée **vérifiée par restauration** toutes les 24 h dans `C:\jarvis-data\<espace>\sauvegardes\`.
 - Copier ce dossier vers un **disque externe** et une **copie chiffrée hors site**. Le fichier `.enc` est inutile sans ta phrase de passe : **garde-la hors de la machine**.
 - **Exercice de restauration à faire une fois par mois** (le test automatique le prouve en laboratoire, pas sur ta machine) :
 ```powershell
 cd C:\jarvis
-node --disable-warning=ExperimentalWarning -e "import('./src/sauvegarde.js').then(m=>console.log(m.restaurer(process.argv[1], process.env.JARVIS_CLE_SAUVEGARDE, 'C:\\jarvis-data\\restauration-test.sqlite')))" "C:\jarvis-data\sauvegardes\<fichier>.enc"
+node --disable-warning=ExperimentalWarning -e "import('./src/sauvegarde.js').then(m=>console.log(m.restaurer(process.argv[1], process.env.JARVIS_CLE_SAUVEGARDE, 'C:\\jarvis-data\\restauration-test.sqlite')))" "C:\jarvis-data\<espace>\sauvegardes\<fichier>.enc"
 ```
 Résultat attendu : `ok: true` et le bon nombre de missions.
 
 ## 7. Arrêt d'urgence
 
 - Depuis le téléphone : bouton **ARRÊT D'URGENCE**.
-- Depuis le PC, si l'interface ne répond plus : créer un fichier vide `C:\jarvis-data\ARRET` (le service cesse de traiter ; le supprimer pour reprendre).
-- Arrêt total : `Stop-ScheduledTask -TaskName Jarvis`.
+- Depuis le PC, si l'interface ne répond plus : créer un fichier vide `C:\jarvis-data\<espace>\ARRET` (le service cesse de traiter ; le supprimer pour reprendre).
+- Arrêt total : `Stop-ScheduledTask -TaskName Jarvis-<espace>` (un espace) ; le fichier `ARRET` à la racine d'un espace n'arrête que cet espace`.
 
 ## 8. Mises à jour
 
 Jamais de mise à jour automatique du code. Procédure : arrêter → sauvegarder → récupérer la nouvelle version → **lancer les tests** → redémarrer. Mettre à jour Node seulement après avoir relancé les tests (le module SQLite intégré est encore expérimental).
 
-## 9. Ce qu'il faut vérifier lors de la première installation (checklist)
+## 9. Vérifications à la première installation
 
-- [ ] Les 46 tests passent sous Windows
+Voir le plan complet **`09_ESSAIS_WINDOWS_SAMSUNG.md`** (tous les essais y sont « NON RÉALISÉS »). Rappel rapide :
+
+- [ ] Les 175 tests passent sous Windows
 - [ ] Le service redémarre seul après un redémarrage Windows
 - [ ] Une mission en cours au moment d'un arrêt brutal est reprise (débrancher puis rebrancher)
 - [ ] Le tableau de bord s'ouvre sur le Samsung **via le VPN** et pas sans

@@ -39,7 +39,9 @@ export function executerIsole({ nomAgent, options, mission, ctx, dossierSortie, 
       '--disable-warning=ExperimentalWarning',
       join(racineCode, 'src', 'agents', 'runner.js'),
     ];
-    const p = spawn(process.execPath, args, { stdio: ['pipe', 'pipe', 'pipe'], env: { NODE_ENV: 'production' }, cwd: dossierSortie, windowsHide: true });
+    // Exécutable DÉDIÉ aux agents (copie de node.exe) : permet au pare-feu Windows de bloquer SON accès réseau sans bloquer le service.
+    const exe = process.env.JARVIS_NODE_AGENT || process.execPath;
+    const p = spawn(exe, args, { stdio: ['pipe', 'pipe', 'pipe'], env: { NODE_ENV: 'production' }, cwd: dossierSortie, windowsHide: true });
     let out = ''; let err = ''; let fini = false;
     const terminer = (fn, v) => { if (fini) return; fini = true; clearTimeout(timer); fn(v); };
     const timer = setTimeout(() => { p.kill('SIGKILL'); terminer(ko, new Error(`Délai dépassé (${delaiMs} ms) : processus agent arrêté`)); }, delaiMs);
