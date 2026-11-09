@@ -55,6 +55,31 @@ CREATE TABLE IF NOT EXISTS depenses (
   cents INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS regles (
+  type TEXT NOT NULL,
+  cle TEXT NOT NULL,
+  valeur TEXT NOT NULL,
+  justification TEXT NOT NULL,
+  source TEXT NOT NULL,
+  statut TEXT NOT NULL CHECK (statut IN ('NON_VALIDE','FICTIF_DEMO','VALIDE')),
+  valide_par TEXT,
+  valide_le TEXT,
+  maj_par TEXT NOT NULL,
+  maj_le TEXT NOT NULL,
+  PRIMARY KEY (type, cle)
+);
+
+CREATE TABLE IF NOT EXISTS autorisations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  type TEXT NOT NULL,
+  portee TEXT NOT NULL,
+  accorde_par TEXT NOT NULL,
+  accorde_le TEXT NOT NULL,
+  expire_le TEXT,
+  revoque_le TEXT,
+  note TEXT
+);
+
 CREATE TABLE IF NOT EXISTS sorties (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   ts TEXT NOT NULL,
@@ -65,11 +90,9 @@ CREATE TABLE IF NOT EXISTS sorties (
 );
 `;
 
+// Seuls des paramètres d'EXPLOITATION figurent ici. Les règles métier (TVA, remises, marges…)
+// vivent dans la table `regles`, avec justification, source et statut de validation.
 export const PARAMETRES_PAR_DEFAUT = {
-  // HYPOTHÈSES reprises du projet existant (LISEZ-MOI.md) : à faire valider par l'entreprise.
-  tva_pct: '8.5',
-  remise_max_pct: '60',
-  anciennete_tarif_jours: '90',
   budget_jour_cents: '500',
   delai_mission_ms: '30000',
 };

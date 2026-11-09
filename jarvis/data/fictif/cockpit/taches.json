@@ -1,0 +1,7 @@
+{
+  "genere": "FICTIF",
+  "taches": [
+    { "id": "K-T001", "titre": "Vérifier la cabine de peinture (fictif)", "type": "admin", "echeance": "2026-11-09", "duree_min": 45, "valeur_eur": 0 },
+    { "id": "K-T002", "titre": "Appeler le client OR-1002 (fictif)", "type": "relance", "echeance": "2026-11-10", "duree_min": 10, "valeur_eur": 0 }
+  ]
+}

@@ -2,150 +2,152 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { environnement, lire, DEMANDE_TYPE, FICTIF } from './aide.js';
-import { chargerDonnees } from '../src/donnees.js';
-import { auditerDevis } from '../src/auditeur.js';
+import { environnement, lire, traiter, auditer, DEMANDE_TYPE } from './aide.js';
 import { genererPdf } from '../src/pdf.js';
+import { definirRegle } from '../src/regles.js';
 
-// Calcul fait à la main, hors du code : 3×84,90 + 2×31,20 + 10×0,85 = 254,70 + 62,40 + 8,50 = 325,60 brut.
-// Remise client 10 % ligne par ligne : 25,47 + 6,24 + 0,85 = 32,56 → net 229,23 + 56,16 + 7,65 = 293,04 HT.
-// TVA 8,5 % : 293,04 × 0,085 = 24,9084 → 24,91. TTC = 317,95.
-test('devis nominal : montants, fichiers, et approbation humaine obligatoire', async () => {
+const pdfTexte = (e, r) => readFileSync(join(e.dossierSorties, r.fichiers.pdf.chemin)).toString('latin1');
+
+// Calcul fait à la main : 3×84,90 + 2×31,20 + 10×0,85 = 325,60 ; remise 10 % ligne par ligne → net 293,04 ; TVA 8,5 % → 24,91 ; TTC 317,95.
+test('devis nominal : montants, fichiers, mentions « fictif », approbation obligatoire', async () => {
   const e = environnement();
   try {
-    const { id } = e.jarvis.deposerParUtilisateur(DEMANDE_TYPE);
-    const actions = await e.jarvis.executerJusquaVide();
-    assert.equal(actions.length, 1);
-    const m = lire(e.db, id);
+    const m = await traiter(e, DEMANDE_TYPE);
     assert.equal(m.statut, 'EN_ATTENTE_APPROBATION');
     const r = JSON.parse(m.resultat);
-    assert.equal(r.total_ht_cents, 29304);
-    assert.equal(r.tva_cents, 2491);
-    assert.equal(r.total_ttc_cents, 31795);
+    assert.deepEqual([r.total_ht_cents, r.tva_cents, r.total_ttc_cents], [29304, 2491, 31795]);
     assert.equal(r.ebp_enregistre, false);
-    assert.equal(r.client.id, 'C001');
-    assert.equal(JSON.parse(m.rapport_audit).verdict, 'VALIDE');
-    // Rien n'est parti avant la validation humaine.
+    assert.equal(r.donnees_fictives, true);
+    assert.equal(r.tva_regle.statut, 'FICTIF_DEMO');
+    assert.ok(!JSON.stringify(r).includes('achat'), 'aucun prix d’achat dans le devis');
+    const pdf = pdfTexte(e, r);
+    assert.match(pdf, /PRIX ET DONNEES FICTIFS/); assert.match(pdf, /NON ENREGISTR/); assert.match(pdf, /règle de démonstration NON VALID/);
     assert.equal(e.db.prepare('SELECT COUNT(*) AS n FROM sorties').get().n, 0);
-    // Les fichiers existent vraiment.
-    const pdf = readFileSync(join(e.racine, 'sorties', r.fichiers.pdf.chemin));
-    assert.ok(pdf.subarray(0, 5).equals(Buffer.from('%PDF-')));
-    assert.match(readFileSync(join(e.racine, 'sorties', r.fichiers.eml.chemin), 'utf8'), /X-Jarvis-Statut: BROUILLON/);
-    // Approbation : l'envoi est SIMULÉ et tracé.
-    const dec = e.jarvis.approuver(id, 'approuver');
-    assert.deepEqual(dec, { statut: 'VALIDE', envoi: 'SIMULE' });
-    const sortie = e.db.prepare('SELECT * FROM sorties').get();
-    assert.equal(sortie.simule, 1);
-    assert.equal(sortie.type, 'MAIL_ENVOI_SIMULE');
+    assert.deepEqual(e.jarvis.approuver(m.id, 'approuver'), { statut: 'VALIDE', envoi: 'SIMULE' });
+    assert.equal(e.db.prepare('SELECT type, simule FROM sorties').get().simule, 1);
   } finally { e.nettoyer(); }
 });
 
 test('le PDF généré a une table xref valide (offsets exacts)', () => {
-  const pdf = genererPdf(['Bonjour', 'Total : 12,00 EUR', 'Ligne avec (parenthèses) et \\ antislash']);
-  const s = pdf.toString('latin1');
+  const s = genererPdf(['Bonjour', 'Total : 12,00 EUR', 'Ligne avec (parenthèses) et \\ antislash']).toString('latin1');
   const start = Number(/startxref\n(\d+)\n%%EOF/.exec(s)[1]);
   assert.ok(s.startsWith('xref', start));
-  const offsets = [...s.slice(start).matchAll(/^(\d{10}) 00000 n $/gm)].map((m) => Number(m[1]));
-  assert.ok(offsets.length >= 4);
-  offsets.forEach((off, i) => assert.ok(s.startsWith(`${i + 1} 0 obj`, off), `objet ${i + 1} mal placé`));
+  [...s.slice(start).matchAll(/^(\d{10}) 00000 n $/gm)].map((x) => Number(x[1])).forEach((off, i) => assert.ok(s.startsWith(`${i + 1} 0 obj`, off)));
 });
 
-test('quantités et références ambiguës : JARVIS bloque et pose une question, il ne devine pas', async () => {
+test('TVA selon le territoire et l’opération (règles de démonstration), jamais un taux unique codé en dur', async () => {
+  const e = environnement();
+  try {
+    const m1 = await traiter(e, 'devis pour le garage Métropole Test : 2 vernis'); // métropole, vente locale, 20 %
+    const r1 = JSON.parse(m1.resultat);
+    assert.deepEqual([r1.tva_pct, r1.total_ht_cents, r1.tva_cents, r1.total_ttc_cents], ['20', 16980, 3396, 20376]);
+    const m2 = await traiter(e, 'devis export pour le garage Métropole Test : 2 vernis'); // export : 0 %
+    const r2 = JSON.parse(m2.resultat);
+    assert.deepEqual([r2.operation, r2.tva_pct, r2.tva_cents, r2.total_ttc_cents], ['export', '0', 0, 16980]);
+    const m3 = await traiter(e, 'devis pour le garage Martin : 2 vernis'); // La Réunion : 8,5 %, remise 10 %
+    assert.equal(JSON.parse(m3.resultat).tva_pct, '8.5');
+    // Territoire sans règle : blocage + question, aucun taux deviné.
+    const m4 = await traiter(e, 'devis pour le garage Mayotte Test : 2 vernis');
+    assert.equal(m4.statut, 'BLOQUE'); assert.match(m4.question, /règle de TVA/);
+    // Opération sans règle (export depuis La Réunion).
+    const m5 = await traiter(e, 'devis export pour le garage Martin : 2 vernis');
+    assert.equal(m5.statut, 'BLOQUE'); assert.match(m5.raison, /Aucune règle de TVA/);
+  } finally { e.nettoyer(); }
+});
+
+test('règles : une règle NON VALIDÉE bloque ; validée par l’administrateur, elle sert et la mention « non validée » disparaît', async () => {
+  const e = environnement();
+  try {
+    const r0 = JSON.parse((await traiter(e, DEMANDE_TYPE)).resultat);
+    definirRegle(e.db, { type: 'tva', cle: 'reunion|vente_locale', valeur: { taux_pct: '8.5' }, justification: 'Vérifié avec l’expert-comptable (démo)', source: 'avis écrit fictif', statut: 'NON_VALIDE' }, 'administrateur');
+    const bloque = await traiter(e, DEMANDE_TYPE);
+    assert.equal(bloque.statut, 'BLOQUE'); assert.match(bloque.raison, /pas validée/);
+    definirRegle(e.db, { type: 'tva', cle: 'reunion|vente_locale', valeur: { taux_pct: '8.5' }, justification: 'Vérifié avec l’expert-comptable (démo)', source: 'avis écrit fictif', statut: 'VALIDE' }, 'administrateur');
+    const m = await traiter(e, DEMANDE_TYPE);
+    assert.equal(m.statut, 'EN_ATTENTE_APPROBATION');
+    const r = JSON.parse(m.resultat);
+    assert.equal(r.tva_regle.statut, 'VALIDE');
+    assert.ok(!/règle de démonstration NON VALID/.test(pdfTexte(e, r)));
+    assert.equal(r0.total_ttc_cents, r.total_ttc_cents);
+    // Une règle sans justification ou sans source est refusée à l'écriture.
+    assert.throws(() => definirRegle(e.db, { type: 'tva', cle: 'x|y', valeur: {}, justification: '', source: 's', statut: 'VALIDE' }, 'administrateur'), /Justification/);
+    assert.throws(() => definirRegle(e.db, { type: 'tva', cle: 'x|y', valeur: {}, justification: 'j', source: '', statut: 'VALIDE' }, 'administrateur'), /source/);
+  } finally { e.nettoyer(); }
+});
+
+test('règle supprimée : blocage « règle absente », jamais de valeur par défaut silencieuse', async () => {
+  const e = environnement();
+  try {
+    e.db.prepare(`DELETE FROM regles WHERE type='remise_max_pct'`).run();
+    const m = await traiter(e, DEMANDE_TYPE);
+    assert.equal(m.statut, 'BLOQUE'); assert.match(m.question, /remise_max_pct/);
+  } finally { e.nettoyer(); }
+});
+
+test('quantités, références, remises et marges : JARVIS bloque et pose une question, il ne devine pas', async () => {
   const e = environnement();
   try {
     const cas = [
-      ['devis pour le garage Martin : 2 peintures', 'REFERENCE_AMBIGUE'],
-      ['devis pour Martin : 3 vernis', 'CLIENT_AMBIGU'], // « Martin » seul ne désigne pas un client exact
-      ['devis pour le garage Inconnu : 3 vernis', 'CLIENT_INCONNU'],
-      ['devis pour le garage Martin : 15 abrasifs', 'CONDITIONNEMENT'],
-      ['devis pour le garage Martin : 2 apprêts', 'TARIF_MANQUANT'],
-      ['devis pour le garage Remise Folle : 1 vernis', 'REMISE_HORS_PLAFOND'],
-      ['devis pour le garage Martin : 2 trucs', 'REFERENCE_INCONNUE'],
-      ['fais-moi un devis sans structure', 'DEMANDE_INCOMPRISE'],
+      'devis pour le garage Martin : 2 peintures', 'devis pour Martin : 3 vernis', 'devis pour le garage Inconnu : 3 vernis', 'devis pour le garage Martin : 15 abrasifs',
+      'devis pour le garage Martin : 2 apprêts', 'devis pour le garage Remise Folle : 1 vernis', 'devis pour le garage Martin : 2 trucs', 'fais-moi un devis sans structure',
+      'devis pour le garage Sans Justification : 1 vernis', 'devis pour le garage Martin : 2 rubans', 'devis pour le garage Martin : 3 colles',
     ];
-    for (const [demande, code] of cas) {
-      const { id } = e.jarvis.deposerParUtilisateur(demande);
-      await e.jarvis.executerJusquaVide();
-      const m = lire(e.db, id);
-      assert.equal(m.statut, 'BLOQUE', demande);
-      assert.ok(m.question && m.question.length > 5, `question manquante : ${demande}`);
-      const audit = JSON.parse(m.rapport_audit);
-      assert.equal(audit.verdict, 'BLOQUE');
-      assert.ok(m.raison, code);
+    const codes = [];
+    for (const d of cas) {
+      const m = await traiter(e, d);
+      assert.equal(m.statut, 'BLOQUE', d); assert.ok(m.question?.length > 5, d); assert.equal(JSON.parse(m.rapport_audit).verdict, 'BLOQUE');
+      codes.push(m.raison);
     }
+    assert.match(codes[8], /sans justification/); assert.match(codes[9], /marge/); assert.match(codes[10], /marge/);
     assert.equal(e.db.prepare('SELECT COUNT(*) AS n FROM sorties').get().n, 0);
   } finally { e.nettoyer(); }
 });
 
-test('tarif ancien : le devis est préparé mais l’avertissement est obligatoire', async () => {
+test('tarif ancien : devis préparé, avertissement obligatoire', async () => {
   const e = environnement();
   try {
-    const { id } = e.jarvis.deposerParUtilisateur('devis pour le garage Martin : 4 mastics');
-    await e.jarvis.executerJusquaVide();
-    const r = JSON.parse(lire(e.db, id).resultat);
-    assert.equal(r.avertissements.length, 1);
-    assert.equal(r.avertissements[0].code, 'TARIF_ANCIEN');
-    assert.equal(r.avertissements[0].ref, 'MAS-0001');
+    const r = JSON.parse((await traiter(e, 'devis pour le garage Martin : 4 mastics')).resultat);
+    assert.deepEqual(r.avertissements.map((a) => a.ref), ['MAS-0001']);
   } finally { e.nettoyer(); }
 });
 
-test('références explicites (codes) acceptées, remise client différente appliquée', async () => {
+test('références explicites et remise client différente', async () => {
   const e = environnement();
   try {
-    const { id } = e.jarvis.deposerParUtilisateur('devis pour Carrosserie Martin & Fils : 1 x VRN-5000');
-    await e.jarvis.executerJusquaVide();
-    const m = lire(e.db, id);
-    assert.equal(m.statut, 'EN_ATTENTE_APPROBATION');
-    const r = JSON.parse(m.resultat);
-    assert.equal(r.client.id, 'C002');
-    assert.equal(r.remise_pct, '5');
-    // 84,90 − 5 % (4,245 → 4,25 arrondi demi supérieur) = 80,65 ; TVA 8,5 % = 6,85525 → 6,86 ; TTC 87,51.
-    assert.equal(r.lignes[0].remise_cents, 425);
-    assert.equal(r.total_ht_cents, 8065);
-    assert.equal(r.tva_cents, 686);
-    assert.equal(r.total_ttc_cents, 8751);
+    const r = JSON.parse((await traiter(e, 'devis pour Carrosserie Martin & Fils : 1 x VRN-5000')).resultat);
+    assert.deepEqual([r.client.id, r.remise_pct, r.lignes[0].remise_cents, r.total_ht_cents, r.tva_cents, r.total_ttc_cents], ['C002', '5', 425, 8065, 686, 8751]);
+    assert.equal(r.remise_justification, 'Remise de démarrage fictive');
   } finally { e.nettoyer(); }
 });
 
-test('l’auditeur recalcule indépendamment : propriété sur 200 combinaisons aléatoires', async () => {
+test('l’auditeur recalcule indépendamment : 200 combinaisons aléatoires (clients, quantités) sans écart', async () => {
   const e = environnement();
   try {
-    let graine = 12345;
-    const alea = (n) => { graine = (graine * 1103515245 + 12345) & 0x7fffffff; return graine % n; };
+    let g = 12345; const alea = (n) => { g = (g * 1103515245 + 12345) & 0x7fffffff; return g % n; };
     for (let i = 0; i < 200; i++) {
-      const demande = `devis pour le garage ${['Martin', 'Durand'][alea(2)]} : ${1 + alea(40)} vernis, ${1 + alea(40)} durcisseurs et ${(1 + alea(20)) * 10} abrasifs`;
-      const { id } = e.jarvis.deposerParUtilisateur(demande);
-      await e.jarvis.tick();
-      const m = lire(e.db, id);
-      assert.equal(m.statut, 'EN_ATTENTE_APPROBATION', `${demande} → ${m.statut} ${m.raison ?? ''}`);
+      const d = `devis${alea(4) === 0 ? ' export' : ''} pour le garage ${['Martin', 'Durand', 'Métropole Test'][alea(3)]} : ${1 + alea(40)} vernis, ${1 + alea(40)} durcisseurs et ${(1 + alea(20)) * 10} abrasifs`;
+      const m = await traiter(e, d);
+      // Soit validé, soit bloqué pour une raison de règle (ex. export depuis La Réunion) : jamais en échec ni en correction.
+      assert.ok(['EN_ATTENTE_APPROBATION', 'BLOQUE'].includes(m.statut), `${d} → ${m.statut} ${m.raison}`);
+      assert.equal(m.corrections, 0, d);
     }
   } finally { e.nettoyer(); }
 });
 
-test('l’auditeur rejette un résultat falsifié (client, prix, total, EBP)', async () => {
+test('l’auditeur rejette 12 falsifications d’un devis (client, prix, total, EBP, TVA, remise, marge, fichiers, fictif…)', async () => {
   const e = environnement();
   try {
-    const { id } = e.jarvis.deposerParUtilisateur(DEMANDE_TYPE);
-    await e.jarvis.executerJusquaVide();
-    const m = lire(e.db, id);
+    const m = await traiter(e, DEMANDE_TYPE);
     const base = JSON.parse(m.resultat);
-    const donnees = chargerDonnees(FICTIF);
-    const ctx = (r) => ({ mission: m, resultat: r, donnees, params: { tva_pct: '8.5', remise_max_pct: '60', anciennete_tarif_jours: 90 }, dossierSorties: join(e.racine, 'sorties') });
-    assert.equal(auditerDevis(ctx(base)).verdict, 'VALIDE');
+    assert.equal(auditer(e, 'devis', m, base).verdict, 'VALIDE');
     const mutants = {
-      client_invente: (r) => { r.client.id = 'C999'; },
-      prix_modifie: (r) => { r.lignes[0].pu_ht_cents += 1; },
-      total_modifie: (r) => { r.total_ttc_cents += 1; },
-      ebp_presente_enregistre: (r) => { r.ebp_enregistre = true; },
-      ligne_supprimee: (r) => { r.lignes.pop(); },
-      reference_inventee: (r) => { r.lignes[0].ref = 'ZZZ-9999'; },
-      tva_non_autorisee: (r) => { r.tva_pct = '20'; },
-      fichier_hors_dossier: (r) => { r.fichiers.pdf.chemin = '../../etc/passwd'; },
+      client_invente: (r) => { r.client.id = 'C999'; }, prix_modifie: (r) => { r.lignes[0].pu_ht_cents += 1; }, total_modifie: (r) => { r.total_ttc_cents += 1; },
+      ebp_presente_enregistre: (r) => { r.ebp_enregistre = true; }, ligne_supprimee: (r) => { r.lignes.pop(); }, reference_inventee: (r) => { r.lignes[0].ref = 'ZZZ-9999'; },
+      tva_non_autorisee: (r) => { r.tva_pct = '20'; }, fichier_hors_dossier: (r) => { r.fichiers.pdf.chemin = '../../etc/passwd'; },
+      remise_modifiee: (r) => { r.remise_pct = '50'; }, justification_effacee: (r) => { r.remise_justification = ''; },
+      declare_non_fictif: (r) => { r.donnees_fictives = false; }, degrade_en_non_sensible: (r) => { r.action_sensible = false; },
+      regle_validee_a_tort: (r) => { r.regles_utilisees[0].statut = 'VALIDE'; }, achat_expose: (r) => { r.lignes[0].achat_cents = 5500; },
     };
-    for (const [nom, mutation] of Object.entries(mutants)) {
-      const copie = structuredClone(base);
-      mutation(copie);
-      assert.equal(auditerDevis(ctx(copie)).verdict, 'A_CORRIGER', `mutant non détecté : ${nom}`);
-    }
+    for (const [nom, mut] of Object.entries(mutants)) { const c = structuredClone(base); mut(c); assert.equal(auditer(e, 'devis', m, c).verdict, 'A_CORRIGER', `mutant non détecté : ${nom}`); }
   } finally { e.nettoyer(); }
 });

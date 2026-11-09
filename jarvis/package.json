@@ -4,12 +4,15 @@
   "private": true,
   "description": "JARVIS — prototype d'orchestrateur multi-agents persistant, supervisé, données fictives uniquement",
   "type": "module",
-  "engines": { "node": ">=22.13" },
+  "engines": {
+    "node": ">=22.13"
+  },
   "scripts": {
-    "demo": "node --disable-warning=ExperimentalWarning src/demarrer.js",
-    "scenario": "node --disable-warning=ExperimentalWarning scripts/scenario.js",
+    "test": "node --disable-warning=ExperimentalWarning --test tests/*.test.js",
+    "demo": "node --disable-warning=ExperimentalWarning scripts/lancer-tous.js",
+    "service": "node --disable-warning=ExperimentalWarning src/demarrer.js",
     "sante": "node --disable-warning=ExperimentalWarning scripts/sante.js",
-    "test": "node --disable-warning=ExperimentalWarning --test tests/*.test.js"
+    "admin": "node scripts/admin.js"
   },
   "license": "UNLICENSED"
 }

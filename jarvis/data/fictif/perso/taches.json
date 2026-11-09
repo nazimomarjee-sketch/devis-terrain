@@ -1,0 +1,8 @@
+{
+  "genere": "FICTIF",
+  "taches": [
+    { "id": "P-T001", "titre": "Renouveler une assurance (fictif)", "type": "admin", "echeance": "2026-11-12", "duree_min": 30, "valeur_eur": 0 },
+    { "id": "P-T002", "titre": "Rendez-vous médical (fictif)", "type": "rdv", "echeance": "2026-11-09", "duree_min": 60, "valeur_eur": 0 },
+    { "id": "P-T003", "titre": "Préparer un dossier administratif (fictif)", "type": "admin", "echeance": "2026-11-07", "duree_min": 90, "valeur_eur": 0 }
+  ]
+}

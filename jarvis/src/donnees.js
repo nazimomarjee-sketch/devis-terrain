@@ -1,22 +1,29 @@
-import { readFileSync } from 'node:fs';
+// Chargement des jeux de données. Un agent ne reçoit QUE les jeux qu'il déclare dans ses droits de lecture.
+// Un jeu marqué REEL exige une autorisation explicite « donnees_reelles » (sinon refus + journal).
+import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { param } from './db.js';
+import { exiger } from './regles.js';
 
-/** Charge catalogue et clients depuis un dossier (fictif par défaut). Relu à chaque exécution. */
-export function chargerDonnees(dossier) {
-  const catalogue = JSON.parse(readFileSync(join(dossier, 'catalogue.json'), 'utf8'));
-  const clients = JSON.parse(readFileSync(join(dossier, 'clients.json'), 'utf8'));
-  return {
-    catalogue,
-    clients,
-    fictif: catalogue.genere === 'FICTIF' && clients.genere === 'FICTIF',
-  };
-}
+const CLES = {
+  catalogue: 'references', clients: 'clients', devis_historique: 'devis', commandes: 'commandes', factures: 'factures',
+  paiements: 'paiements', prospects: 'prospects', taches: 'taches', ordres_atelier: 'ordres',
+};
 
-export function chargerParametres(db) {
-  return {
-    tva_pct: param(db, 'tva_pct'),
-    remise_max_pct: param(db, 'remise_max_pct'),
-    anciennete_tarif_jours: Number(param(db, 'anciennete_tarif_jours')),
-  };
+/** Charge les jeux demandés. Retourne { donnees:{nom:tableau}, fictif:boolean, absents:[] }. */
+export function chargerJeux(dossierJeu, noms, { db = null } = {}) {
+  const donnees = {};
+  const absents = [];
+  let fictif = true;
+  for (const nom of noms) {
+    const f = join(dossierJeu, `${nom}.json`);
+    if (!existsSync(f)) { absents.push(nom); continue; }
+    const brut = JSON.parse(readFileSync(f, 'utf8'));
+    if (brut.genere !== 'FICTIF') {
+      if (!db) throw new Error(`Jeu « ${nom} » non fictif : base requise pour vérifier l'autorisation`);
+      exiger(db, 'donnees_reelles'); // lève AutorisationRequise + journalise
+      fictif = false;
+    }
+    donnees[nom] = brut[CLES[nom]] ?? [];
+  }
+  return { donnees, fictif, absents };
 }

@@ -1,0 +1,10 @@
+{
+  "genere": "FICTIF",
+  "devis": [
+    { "id": "DEV-2026-014", "client_id": "C001", "date": "2026-10-20", "statut": "envoye", "derniere_relance": null, "lignes": [ { "ref": "VRN-5000", "qte": 2, "pu_ht_cents": 8490 }, { "ref": "DUR-2500", "qte": 2, "pu_ht_cents": 3120 } ] },
+    { "id": "DEV-2026-015", "client_id": "C002", "date": "2026-11-06", "statut": "envoye", "derniere_relance": null, "lignes": [ { "ref": "PEI-0001", "qte": 3, "pu_ht_cents": 5800 } ] },
+    { "id": "DEV-2026-012", "client_id": "C003", "date": "2026-10-10", "statut": "accepte", "derniere_relance": null, "lignes": [ { "ref": "VRN-5000", "qte": 1, "pu_ht_cents": 8490 } ] },
+    { "id": "DEV-2026-016", "client_id": "C005", "date": "2026-10-25", "statut": "envoye", "derniere_relance": "2026-11-05", "lignes": [ { "ref": "ADH-0001", "qte": 10, "pu_ht_cents": 500 } ] },
+    { "id": "DEV-2026-017", "client_id": "C004", "date": "2026-10-28", "statut": "envoye", "derniere_relance": null, "lignes": [ { "ref": "PEI-0002", "qte": 1, "pu_ht_cents": 14900 } ] }
+  ]
+}

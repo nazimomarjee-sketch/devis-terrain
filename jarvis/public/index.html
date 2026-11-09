@@ -9,27 +9,49 @@
 </head>
 <body>
 <header>
-  <h1>JARVIS <span>centre de contrôle</span></h1>
+  <div class="ligne"><h1>JARVIS</h1><span id="espace" class="espace"></span></div>
   <div id="bandeau" class="bandeau" role="status"></div>
+  <nav id="liens" class="liens" aria-label="Autres espaces"></nav>
 </header>
 
 <main id="app" aria-live="polite">
   <section id="connexion" hidden>
-    <p>Jeton d’accès (affiché au démarrage du service) :</p>
+    <p>Jeton d’accès de cet espace (affiché au démarrage du service) :</p>
     <input id="jeton" type="password" autocomplete="off" aria-label="Jeton d’accès">
     <button id="ok-jeton" class="principal">Se connecter</button>
   </section>
 
-  <section id="priorite" hidden>
-    <h2>À faire maintenant</h2>
-    <div id="carte-priorite"></div>
+  <section id="prochaine" hidden>
+    <h2>Prochaine action</h2>
+    <div id="carte-prochaine"></div>
   </section>
 
-  <section id="nouvelle">
+  <section id="validations" hidden>
+    <h2>À valider</h2>
+    <ul id="liste-validations" class="liste"></ul>
+  </section>
+
+  <section>
     <h2>Nouvelle mission</h2>
     <textarea id="demande" rows="3" maxlength="2000" placeholder="Ex. : prépare un devis pour le garage Martin : 3 vernis, 2 durcisseurs et 10 abrasifs"></textarea>
+    <div id="idees" class="idees"></div>
     <button id="envoyer" class="principal">Envoyer à JARVIS</button>
-    <p class="aide">Dictée vocale : touche le micro du clavier Android (Gboard). Aucune dictée n’est intégrée à JARVIS.</p>
+    <p class="aide">Dictée : touche le micro du clavier Android. Aucune dictée n’est intégrée à JARVIS.</p>
+  </section>
+
+  <section>
+    <h2>En cours</h2>
+    <ul id="en-cours" class="liste"></ul>
+  </section>
+
+  <section>
+    <h2>Anomalies et alertes</h2>
+    <ul id="alertes" class="liste"></ul>
+  </section>
+
+  <section>
+    <h2>Résultats récents</h2>
+    <ul id="resultats" class="liste"></ul>
   </section>
 
   <section>
@@ -38,26 +60,28 @@
   </section>
 
   <section>
-    <h2>Alertes</h2>
-    <ul id="alertes" class="liste"></ul>
-  </section>
-
-  <section>
-    <h2>Agents</h2>
+    <h2>Agents et droits</h2>
     <ul id="agents" class="liste"></ul>
   </section>
 
   <section>
-    <h2>Missions récentes</h2>
-    <ul id="missions" class="liste"></ul>
+    <h2>Autorisations et intégrations</h2>
+    <ul id="autorisations" class="liste"></ul>
+    <p class="aide">Seul l’administrateur peut accorder ou retirer une autorisation (jeton distinct, hors de cette interface).</p>
   </section>
 
-  <section class="urgence">
-    <button id="arret" class="danger">ARRÊT D’URGENCE</button>
-    <button id="reprise" class="secondaire">Reprendre</button>
+  <section class="espace-bas">
+    <button id="reprise" class="secondaire">Reprendre après arrêt</button>
     <button id="deconnexion" class="secondaire">Se déconnecter</button>
   </section>
 </main>
+
+<div id="barre-urgence"><button id="arret" class="danger">ARRÊT D’URGENCE</button></div>
+
+<dialog id="detail" aria-labelledby="detail-titre">
+  <div class="detail-tete"><h2 id="detail-titre">Détail de la décision</h2><button id="fermer-detail" class="secondaire petit">Fermer</button></div>
+  <div id="detail-corps"></div>
+</dialog>
 <script src="app.js"></script>
 </body>
 </html>

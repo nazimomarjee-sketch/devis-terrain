@@ -1,0 +1,7 @@
+{
+  "genere": "FICTIF",
+  "regles": [
+    { "type": "planning", "cle": "*", "valeur": { "capacite_min": 420, "max_priorites": 3 }, "justification": "Journée de 7 h, trois priorités maximum (démonstration).", "source": "démonstration", "statut": "FICTIF_DEMO" },
+    { "type": "cockpit_capacite_h_par_jour", "cle": "*", "valeur": { "reception": 8, "demontage": 8, "tolerie": 16, "preparation": 12, "peinture": 6, "remontage": 12, "controle": 4 }, "justification": "Capacités horaires par poste et par jour (démonstration, à calibrer avec l'atelier).", "source": "démonstration", "statut": "FICTIF_DEMO" }
+  ]
+}

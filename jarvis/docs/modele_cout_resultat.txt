@@ -3,3 +3,9 @@ A  VPS Linux 4 vCPU/8 Go (HT)            0–    0      0     144–  360       
 B  Mini-PC N150 16 Go/512 Go           409–  764     32     501–  976          684– 1399
 C  Mini-PC 32 Go/1 To                 1010– 1365     49    1119– 1594         1337– 2052
 D  Station IA locale + GPU 16 Go      1490– 2055    128    1648– 2303         1964– 2799
+
+Scénario                              Courant/mois (bas–haut)   Amorti 36 mois/mois (bas–haut)
+A  VPS Linux 4 vCPU/8 Go (HT)         12.0– 30.0 €               12.0– 30.0 €
+B  Mini-PC N150 16 Go/512 Go           7.6– 17.6 €               19.0– 38.9 €
+C  Mini-PC 32 Go/1 To                  9.1– 19.1 €               37.1– 57.0 €
+D  Station IA locale + GPU 16 Go      13.2– 20.7 €               54.6– 77.7 €

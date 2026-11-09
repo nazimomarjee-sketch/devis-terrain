@@ -1,0 +1,9 @@
+{
+  "genere": "FICTIF",
+  "paiements": [
+    { "id": "PAI-001", "facture_id": "FAC-2026-101", "date": "2026-11-05", "montant_cents": 9212 },
+    { "id": "PAI-002", "facture_id": "FAC-2026-098", "date": "2026-10-25", "montant_cents": 10000 },
+    { "id": "PAI-003", "facture_id": "FAC-2026-100", "date": "2026-11-02", "montant_cents": 7000 },
+    { "id": "PAI-004", "facture_id": "FAC-9999", "date": "2026-11-01", "montant_cents": 5000 }
+  ]
+}

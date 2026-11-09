@@ -1,0 +1,9 @@
+{
+  "genere": "FICTIF",
+  "avertissement": "Ordres de réparation inventés, même structure que le modèle d'import du cockpit.",
+  "ordres": [
+    { "ref": "OR-1001", "vehicule": "Peugeot 208 (fictif)", "entree": "2026-11-09", "restitution": "2026-11-11", "heures": { "reception": 0.5, "demontage": 1.5, "tolerie": 4, "preparation": 3, "peinture": 9, "remontage": 2, "controle": 0.5 } },
+    { "ref": "OR-1002", "vehicule": "Renault Clio V (fictif)", "entree": "2026-11-09", "restitution": "2026-11-11", "heures": { "reception": 0.5, "demontage": 0, "tolerie": 0, "preparation": 2, "peinture": 6, "remontage": 0.5, "controle": 0.5 } },
+    { "ref": "OR-1003", "vehicule": "Dacia Sandero (fictif)", "entree": "2026-11-10", "restitution": "2026-11-11", "heures": { "reception": 0.5, "demontage": 1, "tolerie": 3, "preparation": 2, "peinture": 4, "remontage": 1.5, "controle": 0.5 } }
+  ]
+}

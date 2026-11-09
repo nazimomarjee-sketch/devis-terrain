@@ -23,3 +23,13 @@ for (const [nom, s] of Object.entries(scenarios)) {
   const [a12, b12] = t(12), [a36, b36] = t(36);
   console.log(`${nom.padEnd(36)} ${fmt(initial[0])}–${fmt(initial[1])}  ${fmt(el)}   ${fmt(a12)}–${fmt(b12)}        ${fmt(a36)}–${fmt(b36)}`);
 }
+
+// ---- Coûts MENSUELS réels (courant = ce qui sort chaque mois ; amorti = + matériel lissé sur 36 mois) ----
+console.log('\nScénario                              Courant/mois (bas–haut)   Amorti 36 mois/mois (bas–haut)');
+for (const [nom, s] of Object.entries(scenarios)) {
+  const el = s.watts ? elec(s.watts + 3) : 0;
+  const initial = [s.materiel[0] + s.ups[0] + s.sauv[0], s.materiel[1] + s.ups[1] + s.sauv[1]];
+  const courant = [el / 12 + s.mensuel[0] + s.api[0], el / 12 + s.mensuel[1] + s.api[1]];
+  const f = (n) => n.toFixed(1).padStart(5);
+  console.log(`${nom.padEnd(36)} ${f(courant[0])}–${f(courant[1])} €              ${f(courant[0] + initial[0] / 36)}–${f(courant[1] + initial[1] / 36)} €`);
+}

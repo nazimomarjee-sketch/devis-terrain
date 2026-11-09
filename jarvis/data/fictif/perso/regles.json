@@ -1,0 +1,6 @@
+{
+  "genere": "FICTIF",
+  "regles": [
+    { "type": "planning", "cle": "*", "valeur": { "capacite_min": 300, "max_priorites": 3 }, "justification": "Journée personnelle de 5 h utiles, trois priorités maximum (démonstration).", "source": "démonstration", "statut": "FICTIF_DEMO" }
+  ]
+}
