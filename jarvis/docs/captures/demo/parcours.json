@@ -1,0 +1,65 @@
+{
+ "etapes": [
+  {
+   "n": 0,
+   "nature": "RÉEL",
+   "quoi": "Service JARVIS ODICOLOR démarré (processus Node distinct, SQLite, agents isolés)",
+   "preuve": "port 36543"
+  },
+  {
+   "n": 1,
+   "nature": "SIMULÉ",
+   "quoi": "Téléphone : un navigateur Chromium émulant un Samsung (360×780, tactile) — PAS un vrai téléphone, pas de VPN",
+   "preuve": "1-accueil-telephone.png (bandeau « MODE DÉMO — données et prix fictifs »)"
+  },
+  {
+   "n": 2,
+   "nature": "RÉEL",
+   "quoi": "Demande envoyée depuis l’interface : « prépare un devis pour le garage Martin : 3 vernis, 2 durcisseurs et 10 abrasifs »",
+   "preuve": "POST /api/missions authentifié (jeton utilisateur), 2-demande-saisie.png"
+  },
+  {
+   "n": 3,
+   "nature": "RÉEL",
+   "quoi": "Agent Devis (RÈGLES déterministes, aucun modèle IA) a préparé « Devis Garage Martin » — Total TTC : 317,95 €",
+   "preuve": "plan : [{\"etape\":\"identifier le client\",\"critere\":\"nom exact dans la base, sans ambiguïté\"},{\"eta ; règles utilisées : [{\"type\":\"tva\",\"cle\":\"reunion|vente_locale\",\"statut\":\"FICTIF_DEMO\"},{\"type\":\"remise_max_pct\",\"cle\":\"*\",\"statut\":\"FICTIF_"
+  },
+  {
+   "n": 4,
+   "nature": "RÉEL",
+   "quoi": "Auditeur INDÉPENDANT (recalcul depuis les sources, sans importer le code de l’agent) : 12/12 contrôles réussis",
+   "preuve": "✔ structure | ✔ generaux | ✔ identifiants | ✔ provenance_client | ✔ provenance_references | ✔ conditionnements | ✔ regles_metier | ✔ tarifs_et_anciennete | ✔ calculs | ✔ couverture_demande | ✔ mentions_ebp | ✔ fichiers"
+  },
+  {
+   "n": 5,
+   "nature": "RÉEL",
+   "quoi": "Écran « à valider » et détail de la décision (plan, droits, contrôles, chronologie)",
+   "preuve": "3-a-valider.png, 4-detail-auditeur.png"
+  },
+  {
+   "n": 6,
+   "nature": "RÉEL",
+   "quoi": "Avant validation : brouillons dans la boîte = 0 (rien n’est créé sans décision humaine)",
+   "preuve": "dossier boite-synthetique/brouillons"
+  },
+  {
+   "n": 7,
+   "nature": "SIMULÉ",
+   "quoi": "VALIDATION HUMAINE : ici un clic automatique sur « Approuver » (en usage réel : toi, sur ton téléphone). Le code, lui, est réel : réaudit, puis approbation transactionnelle",
+   "preuve": "POST …/decision"
+  },
+  {
+   "n": 8,
+   "nature": "SIMULÉ",
+   "quoi": "Brouillon de mail : écrit par l’outbox dans une BOÎTE SYNTHÉTIQUE locale (fichier .eml, destinataire .invalid). Aucun appel à Gmail, rien n’est envoyé (le connecteur n’a même pas de méthode d’envoi)",
+   "preuve": "brouillon-M-20261109-e528c4.eml — X-Jarvis-Statut: BROUILLON"
+  },
+  {
+   "n": 9,
+   "nature": "RÉEL",
+   "quoi": "État final de la mission",
+   "preuve": "statut VALIDE (journal chaîné vérifié par la supervision : alertes critiques = 0)"
+  }
+ ],
+ "demande": "prépare un devis pour le garage Martin : 3 vernis, 2 durcisseurs et 10 abrasifs"
+}
