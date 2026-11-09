@@ -4,6 +4,16 @@
 
 L'application forme un ensemble : le LEGO exprime son état d'esprit ludique, pas un décor isolé. Conserver cette identité, le plaisir de progresser, le thème sombre et les accents rouges dans une expérience professionnelle cohérente. Les écrans de travail et la ville doivent se compléter. Ne pas uniformiser la ville en tableau compact ni ajouter une gamification envahissante aux formulaires. Respecter le verrou existant sur la Ville LEGO.
 
+## Intention des formes et de la relation commerciale
+
+Les bords arrondis portent l'intention de marque exprimée par le propriétaire : une société humaine, ouverte d'esprit, souple dans sa manière de commercer, attentive au dialogue et capable de concessions. Il s'agit d'une intention de design à rendre cohérente dans l'expérience, pas d'un effet psychologique garanti par la forme seule.
+
+- Utiliser des angles arrondis cohérents sur les cartes, boutons, champs et panneaux ; centraliser les rayons dans les styles partagés lors de l'implémentation.
+- Garder ces arrondis dans les vues compactes, sans créer de grandes marges inutiles ni réduire les zones tactiles.
+- Associer les formes accueillantes à des mots respectueux, des corrections faciles et des choix compréhensibles ; éviter les messages culpabilisants.
+- Conserver l'identité sombre, rouge, premium et LEGO dans cet ensemble chaleureux et professionnel.
+- L'évocation de concessions ne constitue pas une autorisation de remise automatique ou de contournement des règles commerciales.
+
 ## Optimisation pratique mesurable
 
 Optimiser le temps et l'effort nécessaires pour accomplir correctement les tâches terrain, pas simplement la densité d'affichage ou le nombre de clics.
