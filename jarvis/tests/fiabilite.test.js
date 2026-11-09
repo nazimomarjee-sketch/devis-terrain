@@ -137,3 +137,14 @@ test('attestation : un « refus » par fichier ABSENT (ENOENT) ou erreur anodine
     }
   } finally { rmSync(d, { recursive: true, force: true }); }
 });
+
+test('RÉGRESSION (révélée par l’essai d’endurance) : la traçabilité ne prend pas pour orphelins les envois de missions plus anciennes que la fenêtre examinée', async () => {
+  const e = environnement();
+  try {
+    const m = await traiter(e, DEMANDE_TYPE); e.jarvis.approuver(m.id, 'approuver', 'utilisateur');
+    for (let i = 0; i < 3; i++) { e.jarvis.deposerParUtilisateur('planifie ma journée'); await e.jarvis.executerJusquaVide(); }
+    assert.equal(verifierTracabilite(e.db, 2).ok, true, 'fenêtre de 2 missions : l’envoi de la plus ancienne est légitime');
+    e.db.prepare(`INSERT INTO sorties(ts, mission_id, type, simule, contenu) VALUES ('2026-01-01T00:00:00.000Z','M-INEXISTANTE','devis',1,'{}')`).run();
+    assert.match(verifierTracabilite(e.db, 2).problemes.join('|'), /envoi pour une mission inconnue : M-INEXISTANTE/, 'un vrai orphelin reste détecté');
+  } finally { e.nettoyer(); }
+});

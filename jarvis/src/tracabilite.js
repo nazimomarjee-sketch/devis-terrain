@@ -25,7 +25,9 @@ export function verifierTracabilite(db, limite = 2000) {
     if ((sorties.get(m.id) ?? 0) > 0 && n('APPROUVE_ENVOI_SIMULE') < 1) p('ENVOI enregistré sans approbation tracée');
     if ((depenses.get(m.id) ?? 0) !== (m.cout_cents ?? 0)) p(`coût ${m.cout_cents} ≠ dépenses enregistrées ${depenses.get(m.id) ?? 0}`);
   }
-  const orphelines = [...sorties.keys()].filter((id) => !missions.some((m) => m.id === id));
+  // Orphelines : contrôlées contre TOUTES les missions (pas seulement la fenêtre examinée — défaut révélé par l'essai d'endurance : au-delà de `limite` missions, les envois des plus anciennes étaient pris à tort pour des orphelins).
+  const toutes = new Set(db.prepare('SELECT id FROM missions').all().map((r) => r.id));
+  const orphelines = [...sorties.keys()].filter((id) => !toutes.has(id));
   for (const id of orphelines) problemes.push(`envoi pour une mission inconnue : ${id}`);
   return { ok: problemes.length === 0, problemes, missions: missions.length };
 }

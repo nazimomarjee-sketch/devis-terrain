@@ -71,13 +71,17 @@ async function approbateur() { // SIMULÉ : humain automatique (85 % approuve, 1
 }
 
 // ---------- chaos ----------
+// Les missions durent ~0,1 s : un kill aléatoire tombe presque toujours à vide. On CIBLE donc le moment où une mission est réellement EN_COURS
+// (au mieux pendant 15 s ; sinon on tue quand même) pour exercer pour de bon la reprise après interruption.
+const enVol = async () => { for (let i = 0; i < 150; i++) { try { const d = lecture(); const n = d.prepare(`SELECT COUNT(*) AS n FROM missions WHERE statut='EN_COURS'`).get().n; d.close(); if (n) return true; } catch { /* */ } await dormir(100); } return false; };
+const tues = { en_vol: 0, a_vide: 0 };
 const journalChaos = [];
 async function chaos() {
   while (!fin) {
     await dormir(-Math.log(1 - alea()) * CHAOS_MOYEN_S * 1000); if (fin) break;
     const tirage = alea(); const t0 = Date.now();
-    if (tirage < 0.3 && service) { try { service.kill('SIGKILL'); compt.kill9_service++; journalChaos.push({ t: new Date().toISOString(), evt: 'kill9_service' }); } catch { /* */ } }
-    else if (tirage < 0.5 && ouvrier) { try { ouvrier.kill('SIGKILL'); compt.kill9_ouvrier++; journalChaos.push({ t: new Date().toISOString(), evt: 'kill9_ouvrier' }); } catch { /* */ } }
+    if (tirage < 0.3 && service) { try { (await enVol()) ? tues.en_vol++ : tues.a_vide++; service.kill('SIGKILL'); compt.kill9_service++; journalChaos.push({ t: new Date().toISOString(), evt: 'kill9_service' }); } catch { /* */ } }
+    else if (tirage < 0.5 && ouvrier) { try { (await enVol()) ? tues.en_vol++ : tues.a_vide++; ouvrier.kill('SIGKILL'); compt.kill9_ouvrier++; journalChaos.push({ t: new Date().toISOString(), evt: 'kill9_ouvrier' }); } catch { /* */ } }
     else if (tirage < 0.65 && service) { try { process.kill(service.pid, 'SIGSTOP'); compt.gel_service++; journalChaos.push({ t: new Date().toISOString(), evt: 'gel_service' }); await dormir(15000); try { process.kill(service.pid, 'SIGCONT'); } catch { /* déjà remplacé */ } } catch { /* */ } }
     else { // panne de l'intégration Gmail synthétique : le dossier devient introuvable
       const d = 15000 + alea() * 60000; try { renameSync(BOITE, `${BOITE}.panne`); compt.pannes_integration++; journalChaos.push({ t: new Date().toISOString(), evt: 'panne_integration', duree_s: Math.round(d / 1000) }); await dormir(d); renameSync(`${BOITE}.panne`, BOITE); compt.pannes_integration_s += Math.round((Date.now() - t0) / 1000); } catch { /* */ }
@@ -153,7 +157,7 @@ const rapport = {
   protocole: { duree_demandee_min: MINUTES, duree_charge_reelle_s: dureeChargeS, duree_totale_reelle_s: Math.round((Date.now() - debut) / 1000), graine: GRAINE, chaos_moyen_s: CHAOS_MOYEN_S, horloge_acceleree: false, node: process.version, commit: arg('commit', 'non fourni') },
   simule: ['humain (approbateur automatique, 85 % approuve / 15 % refuse / double clic 25 %)', 'boîte Gmail (fichiers .eml locaux)', 'données ODICOLOR (fictives)'],
   reel: ['processus (service, 2e travailleur, agents isolés)', 'signaux kill -9 / SIGSTOP', 'SQLite WAL', 'disque'],
-  chaos: { ...compt, evenements: journalChaos.length, alertes_superviseur: alertes },
+  chaos: { ...compt, kill9_pendant_une_mission: tues.en_vol, kill9_a_vide: tues.a_vide, evenements: journalChaos.length, alertes_superviseur: alertes },
   charge: { decisions },
   invariants: R,
   memoire: { service: moitie(rs), ouvrier: moitie(ro) },
