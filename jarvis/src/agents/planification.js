@@ -48,6 +48,7 @@ export function creerAgentPlanification({ defaut = null } = {}) {
 
       const w = rp.regle.valeur;
       const taches = [...ctx.donnees.taches];
+      const validations = (ctx.donnees.missions_en_attente ?? []).map((m) => m.id); // instantané DÉCLARÉ : l'auditeur le vérifie, il ne relit pas un état qui a pu changer
       for (const m of ctx.donnees.missions_en_attente ?? []) taches.push({ id: `VAL-${m.id}`, titre: `Valider : ${String(m.demande).slice(0, 60)}`, type: 'validation', echeance: ctx.aujourdhui, duree_min: 5, valeur_eur: 0 });
       let classes = taches.map((t) => ({ ...t, score: scoreTache(t, ctx.aujourdhui) })).sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
       if (faute === 'ordre_inverse' && classes.length > 1) [classes[0], classes[1]] = [classes[1], classes[0]];
@@ -62,7 +63,7 @@ export function creerAgentPlanification({ defaut = null } = {}) {
       const nbPrio = faute === 'trop_de_priorites' ? w.max_priorites + 1 : w.max_priorites;
       const priorites = planifiees.slice(0, nbPrio).map((p) => p.id);
       const enRetardNon = reportees.filter((r) => taches.find((t) => t.id === r.id && t.echeance < ctx.aujourdhui)).map((r) => r.id);
-      return { statut: 'OK', resultat: { type: 'plan_journee', action_sensible: false, donnees_fictives: ctx.fictif, date: ctx.aujourdhui, regles_utilisees: [citerRegle(rp.regle)], capacite_min: w.capacite_min, priorites, planifiees, reportees, minutes_planifiees: minutes,
+      return { statut: 'OK', resultat: { type: 'plan_journee', action_sensible: false, donnees_fictives: ctx.fictif, date: ctx.aujourdhui, regles_utilisees: [citerRegle(rp.regle)], validations_prises_en_compte: validations, capacite_min: w.capacite_min, priorites, planifiees, reportees, minutes_planifiees: minutes,
         prochaine_action: planifiees[0] ? { id: planifiees[0].id, titre: planifiees[0].titre } : null, en_retard_non_planifiees: enRetardNon } };
     },
   };

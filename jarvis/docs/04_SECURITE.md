@@ -1,4 +1,26 @@
-# 04 — Rapport de sécurité (v2)
+# 04 — Rapport de sécurité (v3)
+
+## Audit P0 : limites du modèle de permissions de Node (mesuré, Node 22.23.4, Linux)
+
+| Tentative d'un agent confiné par `--permission` seul | Résultat |
+|---|---|
+| Lire/écrire hors périmètre, lien symbolique, lien dur, `rename`, `mkdir`, `/proc/*/environ`, `import` hors périmètre | **Refusé** |
+| Lancer un processus, `Worker`, addon natif, `process.binding`, inspecteur | **Refusé** |
+| `process.kill(pid)` d'un autre processus **du même compte** | **PASSE** |
+| `process._debugProcess(pid)` d'un autre processus Node du même compte | **PASSE** (peut ouvrir un débogueur dans le service) |
+| Connexion TCP, envoi UDP, résolution DNS, socket Unix | **PASSE** |
+| Allocation de 1,5 Go hors tas (`--max-old-space-size=64`) | **PASSE** |
+| Écriture de 50 Mo dans le dossier de sortie (aucun quota) | **PASSE** |
+
+Sous compte distinct + espace réseau vide + `prlimit` (backend `linux-os`) : `kill` EPERM, débogueur EPERM, TCP/UDP ENETUNREACH, socket Unix EACCES, mémoire refusée, fichier EFBIG. **Seuls restent** la résolution DNS de `localhost` (sans paquet) et la lecture du nom de compte (sans gravité).
+
+**Défenses ajoutées** : compte agent distinct (Linux ; Windows : conçu, non exécuté) ; hygiène de la sortie (pas de lien symbolique/dur/exécutable, quota 20 Mo, 50 fichiers) ; dossier de sortie **neuf** à chaque exécution ; base SQLite en **0600** ; environnement de l'agent **vide** ; attestation par 14 sondes d'accès interdits (refus **avéré** exigé) ; **données réelles refusées sans attestation « os » récente du backend réellement utilisé**.
+
+**Limite assumée** : « os » est prouvé sous **Linux**. Sous Windows, le niveau reste « permission » tant que `verifier-isolation.ps1` n'a pas passé sur la machine cible ; le **trafic loopback n'y est pas filtré** par le pare-feu (un agent compromis pourrait joindre `/api/sante` et tenter des jetons, verrouillés après 5 essais/IP).
+
+---
+
+# Rapport de sécurité (v2, conservé)
 
 Statut : **testé** = test automatique ; **conçu** = prévu dans le code, non couvert par un test automatique ; **à faire** = absent. Périmètre : le prototype `jarvis/` sous Linux, données fictives.
 

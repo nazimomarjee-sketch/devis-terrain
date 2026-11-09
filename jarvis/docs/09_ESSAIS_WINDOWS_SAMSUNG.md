@@ -24,6 +24,14 @@ Légende : ⬜ non réalisé.
 | W13 | Charge | 100 missions déposées d'un coup | Toutes traitées une fois ; mesurer CPU/RAM | ⬜ |
 | W14 | Durée | 7 jours de fonctionnement continu | Aucune alerte critique inexpliquée ; relever la disponibilité **réelle** | ⬜ |
 
+| W15 | **`installer.ps1 -Simuler` puis installation** | Lancer comme décrit en `05` | Comptes, ACL, tâches, règles créés ; aucun message d'erreur | ⬜ |
+| W16 | **`verifier-isolation.ps1`** (ARBITRE) | Fournir les mots de passe des comptes | `rapport-isolation.json`, **0 échec bloquant**, exit 0. Les sondes « INFO » (loopback) à lire | ⬜ |
+| W17 | Tâche agent via `schtasks /Run` depuis le service | Mission réelle (fictive) en mode `echange` | Résultat identique au mode direct ; tâche stoppée par `/End` au délai | ⬜ |
+| W18 | Attestation Windows | Démarrer le service, lire `Confinement attesté : niveau …` | « os » **seulement si** toutes les sondes refusées ; sinon rester en démo | ⬜ |
+| W19 | `exercice-reprise.ps1` | Tuer le service pendant 10 missions | Reprise < 2 min, 0 doublon, journal intact (`npm run sante`) | ⬜ |
+| W20 | Superviseur + boucle de crash | Forcer un échec de démarrage répété | Escalade après 3 redémarrages, alerte visible | ⬜ |
+| W21 | Auto-test de l'auditeur au démarrage | Lire `AUDITEUR_SAIN` dans le journal | Présent ; pas d'`AUDITEUR_DEFAILLANT` | ⬜ |
+
 ## B. Samsung Android
 
 | # | Essai | Procédure | Résultat attendu | Statut |
@@ -39,6 +47,9 @@ Légende : ⬜ non réalisé.
 | S9 | Arrêt d'urgence | Toucher le bouton | Traitement stoppé, bandeau rouge | ⬜ |
 | S10 | Téléphone éteint | Éteindre le téléphone, déposer une mission depuis un autre appareil | Mission traitée ; visible à l'allumage | ⬜ |
 | S11 | Perte du téléphone | Révoquer le jeton, se reconnecter avec un nouveau | Ancien jeton **refusé** | ⬜ |
+| S13 | Installation de la PWA | Chrome → « Installer l'application » | Icône sur l'écran d'accueil, ouverture plein écran | ⬜ |
+| S14 | Hors ligne | Couper le réseau, rouvrir l'appli | Coquille visible, bandeau « HORS LIGNE », **aucune donnée** affichée, arrêt d'urgence désactivé | ⬜ |
+| S15 | Alertes locales | Activer, provoquer une validation | Notification **seulement application ouverte** (pas de push) | ⬜ |
 | S12 | Trois espaces | Basculer perso / ODICOLOR / cockpit | Trois jetons, trois contextes, aucune fuite | ⬜ |
 
 ## C. Essais avec données réelles (SEULEMENT après accord écrit d'ODICOLOR)

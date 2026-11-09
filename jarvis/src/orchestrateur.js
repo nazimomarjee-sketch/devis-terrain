@@ -190,10 +190,16 @@ export class Jarvis {
       : executerDirect({ nomAgent, options: this.options[nomAgent], mission, ctx: c, delaiMs: delai });
   }
 
+  /** Missions sensibles arrivées au stade d'approbation, retrouvées par identifiant (pour vérifier un instantané déclaré). */
+  #validationsDeclarees(resultat) {
+    const ids = Array.isArray(resultat?.validations_prises_en_compte) ? resultat.validations_prises_en_compte.filter((x) => /^M-\d{8}-[0-9a-f]{6}$/.test(x)) : [];
+    return ids.map((id) => this.db.prepare(`SELECT id, demande, resultat_hash, statut FROM missions WHERE id=? AND statut IN ('EN_ATTENTE_APPROBATION','VALIDE','REFUSE') AND resultat_hash IS NOT NULL`).get(id)).filter(Boolean).map((r) => ({ id: r.id, demande: r.demande }));
+  }
+
   #auditer(nomAgent, m, resultat) {
     return AUDITEURS[nomAgent]({
       mission: { id: m.id, demande: m.demande }, resultat, regles: reglesEnDict(this.db), aujourdhui: horloge.aujourdhui(),
-      dossierSorties: this.dossierSorties, dossierJeu: this.dossierJeu, missionsEnAttente: this.#enAttente(), autorisations: this.#autorisationsActives(),
+      dossierSorties: this.dossierSorties, dossierJeu: this.dossierJeu, missionsEnAttente: this.#validationsDeclarees(resultat), autorisations: this.#autorisationsActives(),
     });
   }
 

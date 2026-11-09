@@ -48,3 +48,18 @@ for (const mode of ['direct', 'isole']) {
     } finally { e.nettoyer(); }
   });
 }
+
+test('CHARGE (régression) : 4 processus, 96 missions, agents ISOLÉS — zéro correction, zéro double exécution, zéro échec (le plan du jour ne dépend plus d’un état qui change pendant le calcul)', async () => {
+  const e = environnement();
+  try {
+    for (let i = 0; i < 96; i++) e.jarvis.deposerParUtilisateur(DEMANDES[i % DEMANDES.length]); e.db.close();
+    const gele = String(horloge.gele);
+    await Promise.all(['A', 'B', 'C', 'D'].map((nom) => promisify(execFile)(process.execPath, ['--disable-warning=ExperimentalWarning', join(ici, 'ouvrier-complet.js'), e.racine, nom, gele, 'isole'], { timeout: 240000 })));
+    const { ouvrir } = await import('../src/db.js'); const db = ouvrir(e.fichierDb);
+    const stats = db.prepare('SELECT statut, COUNT(*) AS n FROM missions GROUP BY statut').all(); const etat = Object.fromEntries(stats.map((s) => [s.statut, s.n]));
+    assert.deepEqual(Object.keys(etat).sort(), ['EN_ATTENTE_APPROBATION', 'VALIDE'], JSON.stringify(etat));
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM missions WHERE executions > 1 OR corrections > 0 OR reprises > 0').get().n, 0, 'aucune mission rejouée ni corrigée');
+    assert.equal(db.prepare(`SELECT COUNT(*) AS n FROM journal WHERE evenement IN ('AGENT_ERREUR','CORRECTION_DEMANDEE','ESCALADE_HUMAINE')`).get().n, 0);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM sorties').get().n, 0); db.close();
+  } finally { e.nettoyer(); }
+});

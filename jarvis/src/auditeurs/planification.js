@@ -30,7 +30,14 @@ export function auditerPlanification({ mission, resultat: r, regles, aujourdhui,
     }
   } else {
     const taches = [...charger(dossierJeu, 'taches').lignes];
-    for (const m of missionsEnAttente) taches.push({ id: `VAL-${m.id}`, echeance: aujourdhui, duree_min: 5, valeur_eur: 0 });
+    // Validations prises en compte : DÉCLARÉES par le résultat, VÉRIFIÉES ici (chacune doit être une vraie mission sensible arrivée au stade
+    // d'approbation). On ne compare pas à l'état courant : d'autres travailleurs le font évoluer pendant le calcul.
+    const declarees = Array.isArray(r.validations_prises_en_compte) && r.validations_prises_en_compte.every((x) => typeof x === 'string') ? r.validations_prises_en_compte : null;
+    if (!declarees) e.push('validations_prises_en_compte absent ou invalide');
+    const connues = new Map(missionsEnAttente.map((m) => [m.id, m]));
+    for (const id of declarees ?? []) if (!connues.has(id)) e.push(`validation ${id} inconnue ou non sensible`);
+    if (new Set(declarees ?? []).size !== (declarees ?? []).length) e.push('validations en double');
+    for (const id of declarees ?? []) { const m = connues.get(id); if (m) taches.push({ id: `VAL-${m.id}`, echeance: aujourdhui, duree_min: 5, valeur_eur: 0 }); }
     const classes = taches.map((t) => ({ ...t, s: score(t, aujourdhui) })).sort((a, b) => b.s - a.s || (a.id < b.id ? -1 : 1));
     const plan = []; const rep = []; let min = 0; const fiche = new Map(classes.map((t) => [t.id, t]));
     for (const t of classes) (min + t.duree_min <= w.capacite_min ? (plan.push(t.id), (min += t.duree_min)) : rep.push(t.id));

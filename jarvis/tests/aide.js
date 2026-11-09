@@ -44,7 +44,11 @@ import { AUDITEURS } from '../src/auditeurs/index.js';
 import { reglesEnDict } from '../src/regles.js';
 
 /** Appelle directement l'auditeur indépendant d'un agent sur un résultat (éventuellement falsifié). */
-export function auditer(e, nomAgent, m, resultat, { missionsEnAttente = [], autorisations = [] } = {}) {
+export function auditer(e, nomAgent, m, resultat, { missionsEnAttente = null, autorisations = [] } = {}) {
+  if (missionsEnAttente === null) { // mêmes règles que l'orchestrateur : les validations DÉCLARÉES par le résultat, retrouvées en base
+    const ids = Array.isArray(resultat?.validations_prises_en_compte) ? resultat.validations_prises_en_compte : [];
+    missionsEnAttente = ids.map((id) => e.db.prepare(`SELECT id, demande FROM missions WHERE id=? AND statut IN ('EN_ATTENTE_APPROBATION','VALIDE','REFUSE') AND resultat_hash IS NOT NULL`).get(id)).filter(Boolean).map((r) => ({ id: r.id, demande: r.demande }));
+  }
   return AUDITEURS[nomAgent]({ mission: { id: m.id, demande: m.demande }, resultat, regles: reglesEnDict(e.db), aujourdhui: AUJOURDHUI, dossierSorties: e.dossierSorties, dossierJeu: e.cfg.dossierJeu, missionsEnAttente, autorisations });
 }
 

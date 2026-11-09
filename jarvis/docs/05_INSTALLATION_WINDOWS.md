@@ -1,5 +1,14 @@
 # 05 — Installation sur un PC Windows 11 Pro
 
+> **v3 — procédure recommandée : les scripts `scripts/windows/`** (⚠ **NON EXÉCUTÉS**, écrits sans Windows ni PowerShell) :
+> 1. `installer.ps1 -Simuler` (affiche tout, ne modifie rien) → relire → `installer.ps1` ;
+> 2. **`verifier-isolation.ps1 -MotsDePasse @{…}` : OBLIGATOIRE** — tente 50+ accès interdits sous chaque compte et sort en code 1 au moindre échec bloquant ;
+> 3. `exercice-reprise.ps1 -Espace odicolor -Jeton …` : tue le service et mesure la reprise ;
+> 4. `desinstaller.ps1` (jamais de suppression de données sans `-SupprimerDonnees` + confirmation).
+>
+> Modèle : un **service** (`jv-<espace>`) et un **compte agent** (`ja-<espace>`) par espace ; l'agent est lancé par une **tâche planifiée** sous son compte (backend `echange`, `JARVIS_CONFINEMENT=echange`), n'a de droit d'écriture que sur `sorties` et `echange`, et son **trafic réseau est bloqué par une règle de pare-feu par compte**. Connexion interactive et bureau à distance **refusés** à tous les comptes JARVIS.
+> Les sections ci-dessous (v2) restent valables pour comprendre le principe, mais **le script fait foi**.
+
 > ⚠ **NON TESTÉ sur Windows.** Le prototype a été testé sous Linux (Node 22.23.4). Les commandes ci-dessous sont la procédure prévue ; la première installation servira à la valider et à la corriger. Ne l'applique **qu'avec des données fictives** tant que l'accord d'ODICOLOR n'est pas écrit.
 
 ## 0. Avant de brancher quoi que ce soit

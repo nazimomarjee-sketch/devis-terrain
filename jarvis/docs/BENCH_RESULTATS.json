@@ -10,50 +10,50 @@
     "latence_ms_par_mission": {
       "direct": {
         "missions": 48,
-        "debit_missions_par_s": 196.8,
-        "moyenne_ms": 4.5,
-        "p95_ms": 5.8,
+        "debit_missions_par_s": 179.4,
+        "moyenne_ms": 5,
+        "p95_ms": 10.2,
         "par_agent_moyenne_ms": {
-          "devis": 6.6,
-          "produits": 5.5,
-          "prospection": 3.5,
-          "clients": 4.7,
+          "devis": 7.4,
+          "produits": 5.6,
+          "prospection": 3.9,
+          "clients": 5,
           "relances": 4.4,
           "commandes": 3.8,
-          "finance": 4.2,
-          "planification": 3.6
+          "finance": 5,
+          "planification": 4.6
         }
       },
       "permission-isole": {
         "missions": 48,
-        "debit_missions_par_s": 13.2,
-        "moyenne_ms": 74.9,
-        "p95_ms": 82.7,
+        "debit_missions_par_s": 13,
+        "moyenne_ms": 76.1,
+        "p95_ms": 96.1,
         "par_agent_moyenne_ms": {
-          "devis": 75.2,
-          "produits": 80.6,
-          "prospection": 77.4,
-          "clients": 71.9,
-          "relances": 70.4,
+          "devis": 82.1,
+          "produits": 76.5,
+          "prospection": 76.8,
+          "clients": 71.1,
+          "relances": 73.8,
           "commandes": 69.8,
           "finance": 77.8,
-          "planification": 76.4
+          "planification": 81.1
         }
       },
       "linux-os-isole": {
         "missions": 48,
-        "debit_missions_par_s": 10.6,
-        "moyenne_ms": 93.5,
-        "p95_ms": 98.9,
+        "debit_missions_par_s": 10.2,
+        "moyenne_ms": 97.7,
+        "p95_ms": 107.8,
         "par_agent_moyenne_ms": {
-          "devis": 93.8,
-          "produits": 95.9,
-          "prospection": 95.6,
-          "clients": 91.6,
-          "relances": 88.5,
-          "commandes": 89.4,
-          "finance": 96.2,
-          "planification": 96.8
+          "devis": 97.1,
+          "produits": 101.8,
+          "prospection": 103.2,
+          "clients": 93.3,
+          "relances": 91.7,
+          "commandes": 92.3,
+          "finance": 103.5,
+          "planification": 98.5
         }
       }
     },
@@ -61,25 +61,25 @@
       {
         "factures": 100,
         "taille_json_Mo": 0.03,
-        "duree_ms": 83.4,
+        "duree_ms": 83.6,
         "statut": "VALIDE"
       },
       {
         "factures": 1000,
         "taille_json_Mo": 0.27,
-        "duree_ms": 110.2,
+        "duree_ms": 104.7,
         "statut": "VALIDE"
       },
       {
         "factures": 5000,
         "taille_json_Mo": 1.37,
-        "duree_ms": 190.2,
+        "duree_ms": 189.3,
         "statut": "VALIDE"
       },
       {
         "factures": 20000,
         "taille_json_Mo": 5.5,
-        "duree_ms": 462.3,
+        "duree_ms": 484.1,
         "statut": "VALIDE"
       }
     ],
@@ -87,60 +87,60 @@
       {
         "processus": 1,
         "missions": 96,
-        "duree_ms": 7185,
-        "debit_missions_par_s": 13.4,
+        "duree_ms": 7597,
+        "debit_missions_par_s": 12.6,
         "terminees": 96,
         "executees_deux_fois": 0
       },
       {
         "processus": 2,
         "missions": 96,
-        "duree_ms": 3704,
-        "debit_missions_par_s": 25.9,
+        "duree_ms": 3761,
+        "debit_missions_par_s": 25.5,
         "terminees": 96,
         "executees_deux_fois": 0
       },
       {
         "processus": 4,
         "missions": 96,
-        "duree_ms": 2788,
-        "debit_missions_par_s": 34.4,
-        "terminees": 85,
-        "executees_deux_fois": 12
+        "duree_ms": 2190,
+        "debit_missions_par_s": 43.8,
+        "terminees": 96,
+        "executees_deux_fois": 0
       }
     ],
     "base": {
       "missions": 400,
-      "base_Mo": 5.94,
-      "octets_par_mission": 15564,
+      "base_Mo": 5.98,
+      "octets_par_mission": 15687,
       "journal_lignes": 2001,
       "sorties_Mo": 0.21,
-      "sauvegarde_chiffree_verifiee_ms": 122.3,
-      "sauvegarde_Mo": 2.03,
-      "restauration_ms": 63.4
+      "sauvegarde_chiffree_verifiee_ms": 135.5,
+      "sauvegarde_Mo": 2.1,
+      "restauration_ms": 67.4
     },
     "api_ms_400_missions": {
-      "etat_p50": 27.5,
-      "etat_p95": 45.5,
-      "sante_p50": 19.6,
-      "sante_p95": 30.8
+      "etat_p50": 27.9,
+      "etat_p95": 35.4,
+      "sante_p50": 19.3,
+      "sante_p95": 22.5
     },
     "autotest_auditeur": {
-      "duree_ms": 9.3,
+      "duree_ms": 9,
       "ok": true
     },
     "attestation_permission": {
-      "duree_ms": 1788.7,
+      "duree_ms": 1759.5,
       "niveau": "permission"
     },
     "attestation_linux_os": {
-      "duree_ms": 118.9,
+      "duree_ms": 123.8,
       "niveau": "os"
     },
     "service": {
-      "demarrage_pret_ms": 3803.2,
-      "memoire_RSS_Mo": 75,
-      "reprise_apres_kill9_ms": 216.3
+      "demarrage_pret_ms": 4114.8,
+      "memoire_RSS_Mo": 75.7,
+      "reprise_apres_kill9_ms": 217.4
     }
   }
 }
