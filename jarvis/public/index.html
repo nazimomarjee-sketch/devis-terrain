@@ -5,12 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0b0f14">
 <title>JARVIS — Centre de contrôle</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icone-192.png">
+<link rel="apple-touch-icon" href="icone-192.png">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <header>
   <div class="ligne"><h1>JARVIS</h1><span id="espace" class="espace"></span></div>
   <div id="bandeau" class="bandeau" role="status"></div>
+  <div id="hors-ligne" class="hors-ligne" role="alert" hidden>HORS LIGNE — les données ne sont pas conservées sur cet appareil : reconnecte-toi au VPN. L’arrêt d’urgence n’est PAS disponible hors ligne.</div>
   <nav id="liens" class="liens" aria-label="Autres espaces"></nav>
 </header>
 
@@ -72,6 +76,8 @@
 
   <section class="espace-bas">
     <button id="reprise" class="secondaire">Reprendre après arrêt</button>
+    <button id="alertes-locales" class="secondaire">Activer les alertes sur cet appareil</button>
+    <p class="aide" id="aide-alertes">Alertes visibles seulement quand l’application est ouverte (aucune notification push n’est développée).</p>
     <button id="deconnexion" class="secondaire">Se déconnecter</button>
   </section>
 </main>

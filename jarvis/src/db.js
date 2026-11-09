@@ -81,6 +81,21 @@ CREATE TABLE IF NOT EXISTS autorisations (
   note TEXT
 );
 
+CREATE TABLE IF NOT EXISTS outbox (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  mission_id TEXT,
+  connecteur TEXT NOT NULL,
+  action TEXT NOT NULL,
+  cle_idempotence TEXT NOT NULL UNIQUE,
+  charge TEXT NOT NULL,
+  etat TEXT NOT NULL DEFAULT 'A_FAIRE' CHECK (etat IN ('A_FAIRE','EN_COURS','FAIT','ECHEC')),
+  tentatives INTEGER NOT NULL DEFAULT 0,
+  bail_jusqua INTEGER,
+  derniere_erreur TEXT,
+  cree_le TEXT NOT NULL,
+  maj_le TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS sorties (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   ts TEXT NOT NULL,

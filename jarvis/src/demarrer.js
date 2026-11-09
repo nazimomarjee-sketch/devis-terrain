@@ -11,6 +11,8 @@ import { creerServeur } from './serveur.js';
 import { diagnostic } from './sante.js';
 import { sauvegarder, derniereSauvegarde, exercerRestauration } from './sauvegarde.js';
 import { backendsDisponibles } from './confinement.js';
+import { Interpreteur } from './modeles.js';
+import { fournisseurAnthropic } from './fournisseurs/anthropic.js';
 import { definirParam, param } from './db.js';
 import { horloge } from './horloge.js';
 
@@ -37,7 +39,13 @@ const choix = process.env.JARVIS_CONFINEMENT ?? 'auto';
 const dispo = backendsDisponibles({ utilisateurAgent });
 const backend = choix === 'auto' ? (dispo.includes('linux-os') ? 'linux-os' : 'permission') : choix;
 if (!dispo.includes(backend) && backend !== 'echange') { console.error(`Backend de confinement « ${backend} » indisponible ici (disponibles : ${dispo.join(', ')})`); process.exit(2); }
-const jarvis = new Jarvis({ db, espace, isolation: process.env.JARVIS_ISOLATION !== 'non', racineCode, confinement: { backend, utilisateurAgent } });
+// IA en ligne : activée SEULEMENT si clé, modèle et tarifs sont fournis (aucun défaut présumé) ; son usage exige en plus l'autorisation « ia_en_ligne ».
+let interpreteur = null;
+if (process.env.JARVIS_IA_CLE && process.env.JARVIS_IA_MODELE) {
+  try { interpreteur = new Interpreteur({ fournisseurs: { en_ligne: fournisseurAnthropic({ cle: process.env.JARVIS_IA_CLE, modele: process.env.JARVIS_IA_MODELE, tarifEntreeCentsParMillion: Number(process.env.JARVIS_IA_TARIF_ENTREE), tarifSortieCentsParMillion: Number(process.env.JARVIS_IA_TARIF_SORTIE) }) } }); console.log('IA en ligne configurée (inactive tant que l’autorisation « ia_en_ligne » n’est pas accordée)'); }
+  catch (e) { console.error(`IA en ligne NON activée : ${e.message}`); }
+}
+const jarvis = new Jarvis({ db, espace, isolation: process.env.JARVIS_ISOLATION !== 'non', racineCode, confinement: { backend, utilisateurAgent }, interpreteur });
 if (param(db, 'double_execution') === null) definirParam(db, 'double_execution', process.env.JARVIS_DOUBLE_EXECUTION ?? 'sensibles'); // contrôle par défaut en service
 const serveur = creerServeur({
   jarvis, jeton: espace.jeton, jetonAdmin: espace.jetonAdmin, dossierPublic: join(racineCode, 'public'),

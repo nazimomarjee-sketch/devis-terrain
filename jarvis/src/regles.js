@@ -8,7 +8,7 @@ import { transaction, journaliser } from './db.js';
 import { horloge } from './horloge.js';
 
 export const STATUTS_REGLE = ['NON_VALIDE', 'FICTIF_DEMO', 'VALIDE'];
-export const TYPES_AUTORISATION = ['donnees_reelles', 'integration:ebp', 'integration:gmail', 'integration:airtable', 'connecteur:cockpit', 'envoi_reel'];
+export const TYPES_AUTORISATION = ['donnees_reelles', 'integration:ebp', 'integration:gmail', 'integration:airtable', 'connecteur:cockpit', 'envoi_reel', 'ia_en_ligne'];
 
 export function amorcerRegles(db, dossierJeu) {
   const f = join(dossierJeu, 'regles.json');

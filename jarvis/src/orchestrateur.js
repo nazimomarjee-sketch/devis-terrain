@@ -3,7 +3,7 @@
 // Le statut vient de l'auditeur, jamais de la déclaration de l'agent. L'orchestrateur ne se donne AUCUN droit :
 // droits des agents, règles et autorisations ne sont modifiables que par l'administrateur via l'API.
 import { join } from 'node:path';
-import { rmSync } from 'node:fs';
+import { rmSync, readFileSync } from 'node:fs';
 import { transaction, journaliser, param, definirParam, sha256 } from './db.js';
 import { horloge } from './horloge.js';
 import { deposer as deposerMission, reclamer, recupererBaux, terminerSiBail, arretUrgence, budgetAtteint, enregistrerDepense, MAX_CORRECTIONS } from './moteur.js';
@@ -16,6 +16,7 @@ import { executerDirect, executerIsole } from './executeur.js';
 import { attester, enregistrerAttestation, confinementSuffisantPourReel } from './confinement.js';
 import { autotestAuditeurs } from './autotest.js';
 import { validerJeux } from './validation.js';
+import { enfiler } from './outbox.js';
 import { router } from './routage.js';
 
 export class Jarvis {
@@ -248,6 +249,11 @@ export class Jarvis {
       db.prepare('INSERT INTO sorties(ts, mission_id, type, simule, contenu) VALUES (?,?,?,1,?)').run(horloge.iso(), id, sortie[0], JSON.stringify(sortie[1]));
       db.prepare(`UPDATE missions SET statut='VALIDE', decide_par=?, maj_le=? WHERE id=?`).run(par, horloge.iso(), id);
       journaliser(db, { missionId: id, acteur: par, evenement: 'APPROUVE_ENVOI_SIMULE', detail: { type: resultat.type } });
+      // Action externe : enfilée dans l'outbox DANS LA MÊME TRANSACTION que la décision (jamais d'appel externe direct).
+      if (resultat.type === 'devis' && param(db, 'connecteur_gmail', 'desactive') === 'synthetique') {
+        const eml = readFileSync(join(this.dossierSorties, resultat.fichiers.eml.chemin));
+        enfiler(db, { missionId: id, connecteur: 'gmail', action: 'CREER_BROUILLON', cle: `brouillon-${id}`, charge: { vers: resultat.client.email, eml_base64: eml.toString('base64') } });
+      }
       return { statut: 'VALIDE', envoi: 'SIMULE' };
     });
   }

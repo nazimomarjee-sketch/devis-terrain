@@ -64,3 +64,5 @@ dialog::backdrop { background: rgba(0, 0, 0, .65); }
 .detail-tete { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 dialog h2 { margin: 0; text-transform: none; font-size: 18px; color: var(--texte); letter-spacing: 0; }
 dialog h3 { margin: 14px 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--doux); }
+
+.hors-ligne { margin-top: 6px; padding: 8px 10px; border: 1px solid var(--danger); border-radius: 10px; color: var(--danger); font-size: 13px; }

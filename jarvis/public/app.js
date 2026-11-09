@@ -110,7 +110,18 @@ function rendre(e) {
   $('autorisations').replaceChildren(el('li', {}, e.espace.donnees_reelles_autorisees ? 'Données réelles : AUTORISÉES' : 'Données réelles : désactivées'), ...aut, ...integ);
 }
 
-async function rafraichir() { try { rendre(await api('/api/etat')); } catch { /* connexion ou réseau */ } }
+// --- PWA : service worker (coquille statique seulement), état hors ligne, alertes locales ---
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { /* installation impossible : l'appli reste utilisable en ligne */ });
+const majReseau = () => { $('hors-ligne').hidden = navigator.onLine; $('arret').disabled = !navigator.onLine; };
+window.addEventListener('online', () => { majReseau(); rafraichir(); }); window.addEventListener('offline', majReseau); majReseau();
+let vus = null;
+function alerterLocalement(e) {
+  const courant = new Set([...e.a_valider.map((v) => `V:${v.id}`), ...e.alertes.filter((a) => a.niveau === 'critique').map((a) => `A:${a.code}`)]);
+  if (vus && 'Notification' in window && Notification.permission === 'granted') for (const k of courant) if (!vus.has(k)) new Notification(k.startsWith('V:') ? 'JARVIS : validation demandée' : 'JARVIS : alerte critique', { body: k.slice(2), tag: k });
+  vus = courant;
+}
+$('alertes-locales').onclick = async () => { if (!('Notification' in window)) return alert('Notifications non disponibles sur cet appareil'); const p = await Notification.requestPermission(); $('aide-alertes').textContent = p === 'granted' ? 'Alertes locales activées (application ouverte uniquement).' : 'Alertes refusées.'; };
+async function rafraichir() { try { const e = await api('/api/etat'); rendre(e); alerterLocalement(e); } catch { /* connexion ou réseau */ } }
 $('ok-jeton').onclick = () => { jeton = $('jeton').value.trim(); try { localStorage.setItem('jarvis_jeton', jeton); } catch { /* ignoré */ } $('jeton').value = ''; rafraichir(); };
 $('deconnexion').onclick = () => { jeton = ''; try { localStorage.removeItem('jarvis_jeton'); } catch { /* ignoré */ } $('connexion').hidden = false; };
 $('envoyer').onclick = async () => { const demande = $('demande').value.trim(); if (!demande) return; try { await api('/api/missions', { method: 'POST', body: JSON.stringify({ demande, cle: `ui-${Date.now()}` }) }); $('demande').value = ''; } catch (e) { alert(e.message); } rafraichir(); };

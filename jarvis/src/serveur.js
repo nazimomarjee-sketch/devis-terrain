@@ -14,7 +14,7 @@ import { etatIntegrations } from './integrations.js';
 import { creerSuiveurAcces } from './acces.js';
 import { param } from './db.js';
 
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.webmanifest': 'application/manifest+json', '.png': 'image/png' };
 const EN_TETES = { 'Content-Security-Policy': "default-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'", 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'Cache-Control': 'no-store' };
 const empreinte = (s) => createHash('sha256').update(s).digest();
 const ID = '(M-\\d{8}-[0-9a-f]{6})';
@@ -65,6 +65,7 @@ export function creerServeur({ jarvis, jeton, jetonAdmin, dossierPublic, dossier
     return {
       heure: horloge.iso(),
       espace: { id: espace.id, libelle: espace.libelle, description: espace.description, donnees_reelles_autorisees: autorise(db, 'donnees_reelles'), liens: liensEspaces },
+      ia: jarvis.interpreteur ? jarvis.interpreteur.etat(db) : { fournisseurs: [], fonctions_locales: 'ok' },
       integrations: etatIntegrations(db), connecteur_cockpit_autorise: autorise(db, 'connecteur:cockpit'),
       mode: autorise(db, 'donnees_reelles') ? 'donnees-reelles-autorisees' : 'demo-donnees-fictives',
       prochaine_action: prochaine, agents: jarvis.descriptionAgents(), a_valider: aValider, missions, anomalies, alertes: diag.alertes, metriques: metriques(db),
