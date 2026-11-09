@@ -48,7 +48,7 @@ test('depuis la tournée : le garage est marqué traité et « Garage suivant »
   const {context,page,errs}=await ouvrir();
   await page.evaluate(()=>{const j=aujourdhui();return lireTournees().then(T=>{T[j]={ids:[1,2],res:{}};return ecrireTournees(T)})});
   await page.goto(origin+'/#/tournee');
-  await page.getByRole('link',{name:'Visite en 4 touches'}).first().click();await page.getByText('Résultat de la visite').first().waitFor();
+  await page.getByRole('link',{name:/^Visite chez/}).first().click();await page.getByText('Résultat de la visite').first().waitFor();
   await page.getByRole('button',{name:/^Vu/}).click();await page.getByRole('button',{name:/Rien de particulier/}).click();await page.getByRole('button',{name:'Aucune suite'}).click();
   await page.locator('#titre',{hasText:'Visite enregistrée'}).waitFor();
   await page.getByRole('link',{name:'Garage suivant de la tournée'}).click();await page.getByText(/GARAGE FICTIF DEUX/).first().waitFor();

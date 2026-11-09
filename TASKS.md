@@ -32,3 +32,7 @@ Légende : ✅ fait et testé · 🟡 partiel · ⬜ à faire
 - ✅ Mode démonstration 100 % fictif (base vide obligatoire, bannière, sortie propre) + 3 fichiers d'essai EBP/recensement ; parcours complet testé. *Tests : demo-telephone (5), demo-browser (2).* Hébergement privé : préparé, non publié (B9). Doc : `docs/DEMO_PRIVEE.md`.
 
 - ✅ Mise en ligne de test privée (Railway, accès protégé, domaine isolé, commit 9c911e0 épinglé, CI verte) + autotest embarqué sur le téléphone (8 contrôles) ; recette réduite à 6 gestes.
+
+## Interface (AGENTS.md, 09/11/2026)
+- ✅ Tournée compacte + formes cohérentes. Mesure (Chromium émulé, 8 garages, scénario identique) : garages ENTIÈREMENT visibles sans défiler 0 → 5 sur 360×740, 0 → 8 sur 412×915, 3 sur 320×658 ; hauteur de la page 3 334 → 1 454 px ; aucune cible < 48×48 ; aucun défilement horizontal. *Tests : tournee-compacte-browser (4).*
+- ⬜ À faire ensuite : Accueil (objectif, prochaine action, résumé compact de la tournée), Visite (note avant l'action, échéance de la suite modifiable au lieu de « 7 jours » figé, « Devis à préparer »), taille de texte (l'application est en px : elle ne suit pas encore la police système du Samsung).

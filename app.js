@@ -1412,41 +1412,44 @@ async function pageTournee() {
   const cl = await getAll('clients'), parId = new Map(cl.map(c => [c.id, c]));
   const T = await lireTournees(), auj = jourLocal(new Date()), plan = T[auj];
   const repetes = cl.filter(c => (Number(c.reports) || 0) >= 3);
-  const alerteRep = repetes.length ? h('div', { class: 'carte alerte' }, h('strong', {}, '🔁 Reportés 3 fois ou plus : '), repetes.map(c => c.nom).join(', '), h('br'), h('small', {}, 'Soit tu les vois vraiment, soit tu baisses leur priorité sur la fiche.')) : null;
+  const alerteRep = repetes.length ? h('div', { class: 'carte alerte' }, h('strong', {}, '🔁 Reportés 3 fois ou plus : '), repetes.map(c => c.nom).join(', '), h('br'), h('small', {}, 'Souhaites-tu les voir en priorité, ou baisser leur priorité sur la fiche ?')) : null;
   if (plan && Array.isArray(plan.ids) && plan.ids.length) {
     const st = statsTournee(plan), r = plan.res || (plan.res = {});
     const sauver = async () => { T[auj] = plan; await ecrireTournees(T); };
-    const lignes = plan.ids.map(id => {
+    const tags = { vu: ['Vu', 'ok'], absent: ['Absent', 'warn'], reporte: ['Reporté', 'warn'], auto: ['Reporté (fin de journée)', 'warn'] };
+    // Une ligne compacte par garage : nom, commune, heure si rendez-vous, bouton Visite ; le détail s'ouvre au toucher du nom.
+    const ligne = id => {
       const c = parId.get(id); if (!c) return null;
-      const etat = r[id], tags = { vu: ['Vu', 'ok'], absent: ['Absent', 'warn'], reporte: ['Reporté', 'warn'], auto: ['Reporté (fin de journée)', 'warn'] };
-      const dateR = h('input', { type: 'date', value: prochainOuvre(), 'aria-label': 'Reporter ' + c.nom + ' au', style: 'flex:1 1 140px' });
-      const agir = async (res) => { await marquerVisite(c, res, res === 'reporte' ? dateR.value : ''); r[id] = res; await sauver(); toast(res === 'vu' ? 'Visite notée : ' + c.nom : res === 'absent' ? 'Absent : rappel dans 2 jours.' : 'Reporté au ' + dateFr(c.reporteAu) + '.'); pageTournee(); };
-      return h('div', { class: 'carte' },
-        h('div', { class: 'elan-tete' }, h('strong', {}, (plan.rdv && plan.rdv[id] ? '⏰ ' + plan.rdv[id] + ' · ' : '') + c.nom), etat ? h('span', { class: 'tag ' + tags[etat][1] }, tags[etat][0]) : null),
-        c.etape ? h('small', { class: 'mut' }, 'Étape prévue : ' + c.etape) : null,
-        etat ? null : h('div', { class: 'trio' }, h('button', { class: 'btn vert', onclick: () => agir('vu') }, 'Vu'), h('button', { class: 'btn ambre', onclick: () => agir('absent') }, 'Absent'), h('button', { class: 'btn gris', onclick: () => agir('reporte') }, 'Reporter')),
-        etat ? null : h('label', { class: 'rang' }, h('span', { class: 'mut' }, 'Reporter au'), dateR),
-        h('div', { class: 'actions' }, etat ? null : h('a', { class: 'btn', href: '#/visite/' + c.id + '?t=1' }, 'Visite en 4 touches'), h('a', { class: 'btn sec', href: '#/client/' + c.id }, 'Fiche'), etat ? h('button', { class: 'btn sec', onclick: async () => { delete r[id]; await sauver(); pageTournee(); } }, 'Annuler') : null));
-    });
+      const etat = r[id], heure = plan.rdv && plan.rdv[id], dateR = h('input', { type: 'date', value: prochainOuvre(), 'aria-label': 'Reporter ' + c.nom + ' au' });
+      const agir = async (res) => { await marquerVisite(c, res, res === 'reporte' ? dateR.value : ''); r[id] = res; await sauver(); toast(res === 'vu' ? 'Visite notée : ' + c.nom : res === 'absent' ? 'Noté absent : rappel dans 2 jours.' : 'Reporté au ' + dateFr(c.reporteAu) + '.'); pageTournee(); };
+      const detail = h('div', { class: 't-detail', hidden: true },
+        c.etape ? h('p', { class: 'mut' }, 'Étape prévue : ' + c.etape) : null, c.rappel ? h('p', { class: 'mut' }, 'Rappel prévu le ' + dateFr(c.rappel + 'T12:00:00')) : null,
+        etat ? h('div', { class: 'actions' }, h('a', { class: 'btn sec', href: '#/client/' + c.id }, 'Fiche'), h('button', { class: 'btn sec', type: 'button', onclick: async () => { delete r[id]; await sauver(); pageTournee(); } }, 'Corriger : remettre dans la tournée'))
+          : [h('div', { class: 'trio' }, h('button', { class: 'btn vert', type: 'button', onclick: () => agir('vu') }, 'Vu'), h('button', { class: 'btn ambre', type: 'button', onclick: () => agir('absent') }, 'Absent'), h('button', { class: 'btn gris', type: 'button', onclick: () => agir('reporte') }, 'Reporter')),
+            h('label', { class: 'rang' }, h('span', { class: 'mut' }, 'Reporter au'), dateR), h('div', { class: 'actions' }, h('a', { class: 'btn sec', href: '#/client/' + c.id }, 'Fiche'))]);
+      const nom = h('button', { class: 't-nom', type: 'button', 'aria-expanded': 'false', 'aria-label': (heure ? 'Rendez-vous ' + heure + ' · ' : '') + c.nom + ', détails', onclick: () => { const o = detail.hidden; detail.hidden = !o; nom.setAttribute('aria-expanded', String(o)); } },
+        h('strong', {}, (heure ? '⏰ ' + heure + ' · ' : '') + c.nom), h('small', { class: 'mut' }, [c.ville || c.villeProspection || '', etat ? tags[etat][0] : ''].filter(Boolean).join(' · ') || ' '));
+      return h('div', { class: 't-ligne' + (etat ? ' t-fait' : '') }, h('div', { class: 't-rang' }, nom, etat ? h('span', { class: 'tag ' + tags[etat][1] }, tags[etat][0]) : h('a', { class: 'btn t-visite', href: '#/visite/' + c.id + '?t=1', 'aria-label': 'Visite chez ' + c.nom }, 'Visite')), detail);
+    };
+    const aFaire = plan.ids.filter(id => !r[id]).map(ligne).filter(Boolean), faits = plan.ids.filter(id => r[id]).map(ligne).filter(Boolean);
     const restants = plan.ids.filter(i => !r[i]).map(i => parId.get(i)).filter(Boolean), u = urlItineraire(restants);
     const pc = Math.round((st.prevus - st.restants) / st.prevus * 100);
     montrer('Tournée',
-      h('div', { class: 'carte obj' }, h('div', { class: 'elan-tete' }, h('strong', {}, 'Tournée du ' + dateFr(auj)), h('span', { class: 'tag ' + (plan.termine ? 'ok' : 'warn') }, plan.termine ? 'Terminée' : 'En cours')),
-        h('div', { class: 'gros-chiffre' }, (st.prevus - st.restants) + '/' + st.prevus, h('span', {}, ' garages traités')),
-        h('div', { class: 'piste', role: 'img', 'aria-label': pc + ' % de la tournée traitée' }, h('div', { class: 'rempli' + (st.restants ? '' : ' ok'), style: 'width:' + pc + '%' })),
-        h('div', { class: 'quatre' }, [[st.vus, 'vus', 'ok'], [st.absents, 'absents', 'warn'], [st.reportes, 'reportés', 'warn'], [st.restants, 'restants', '']].map(([v, l, k]) => h('div', {}, h('strong', { class: k }, String(v)), h('small', { class: 'mut' }, l))))),
+      h('div', { class: 'carte t-resume' }, h('div', { class: 'elan-tete' }, h('strong', {}, 'Tournée du ' + dateFr(auj) + ' · ' + (st.prevus - st.restants) + '/' + st.prevus + ' traités'), h('span', { class: 'tag ' + (plan.termine ? 'ok' : 'warn') }, plan.termine ? 'Terminée' : 'En cours')),
+        h('div', { class: 'piste t-piste', role: 'img', 'aria-label': pc + ' % de la tournée traitée' }, h('div', { class: 'rempli' + (st.restants ? '' : ' ok'), style: 'width:' + pc + '%' })),
+        h('small', { class: 'mut' }, 'Vus ' + st.vus + ' · Absents ' + st.absents + ' · Reportés ' + st.reportes + ' · Restants ' + st.restants)),
+      h('div', { class: 't-liste' }, aFaire.length ? aFaire : h('p', { class: 'vide' }, 'Tous les garages sont traités. Bravo !')),
+      faits.length ? h('details', { class: 't-faits' }, h('summary', {}, 'Déjà traités (' + faits.length + ')'), faits) : null,
+      h('div', { class: 'actions t-actions' }, u && restants.length ? h('a', { class: 'btn', href: u, target: '_blank', rel: 'noopener' }, '🗺 Itinéraire (' + Math.min(10, restants.filter(posClient).length) + ' arrêts)') : null,
+        plan.termine ? null : h('button', { class: 'btn noir', type: 'button', onclick: async () => {
+          const nd = prochainOuvre();
+          for (const id of plan.ids) if (!r[id]) { const c = parId.get(id); if (c) { await marquerVisite(c, 'reporte', nd); r[id] = 'auto'; } }
+          plan.termine = true; await sauver(); const s2 = statsTournee(plan);
+          toast('Journée terminée : ' + s2.vus + ' vus, ' + s2.absents + ' absents, ' + s2.reportes + ' reportés au ' + dateFr(nd) + '.'); pageTournee();
+        } }, 'Terminer la journée')),
       alerteRep,
-      u && restants.length ? h('a', { class: 'btn gros', href: u, target: '_blank', rel: 'noopener' }, '🗺 Itinéraire des ' + Math.min(10, restants.filter(posClient).length) + ' restants') : null,
-      lignes.filter((x, i) => x && !r[plan.ids[i]]),
-      lignes.some((x, i) => x && r[plan.ids[i]]) ? [h('h2', {}, 'Déjà traités'), lignes.filter((x, i) => x && r[plan.ids[i]])] : null,
-      plan.termine ? null : h('div', { class: 'actions' }, h('button', { class: 'btn gros noir', onclick: async () => {
-        const nd = prochainOuvre();
-        for (const id of plan.ids) if (!r[id]) { const c = parId.get(id); if (c) { await marquerVisite(c, 'reporte', nd); r[id] = 'auto'; } }
-        plan.termine = true; await sauver(); const s2 = statsTournee(plan);
-        toast('Journée terminée : ' + s2.vus + ' vus, ' + s2.absents + ' absents, ' + s2.reportes + ' reportés au ' + dateFr(nd) + '.'); pageTournee();
-      } }, 'Terminer la journée')),
       st.restants === st.prevus ? h('div', { class: 'actions' }, h('button', { class: 'btn sec', onclick: async () => { delete T[auj]; await ecrireTournees(T); pageTournee(); } }, 'Refaire la sélection')) : null,
-      h('p', { class: 'mut' }, '« Terminer la journée » reporte au prochain jour ouvré les garages non traités. Un garage reporté disparaît de la liste jusqu’à sa date.'));
+      h('p', { class: 'mut' }, '« Terminer la journée » reporte les garages restants au prochain jour ouvré ; tu pourras les corriger ensuite.'), h('div', { style: 'height:84px' }));
     return;
   }
   const dues = cl.map(c => ({ c, e: echeance(c) })).filter(x => x.e && x.e.du).sort((a, b) => (b.e.rappel - a.e.rappel) || (b.e.pct - a.e.pct));

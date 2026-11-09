@@ -1,0 +1,35 @@
+/* ODICOLOR — FORMES ET TOURNÉE COMPACTE (v49). Fichier chargé en dernier.
+   Intention de marque (AGENTS.md) : société humaine, ouverte, accueillante → angles arrondis COHÉRENTS, centralisés ici. La Ville LEGO (classes vc-*, bureau/ville) n'est pas touchée. */
+:root{--r-champ:14px;--r-bouton:16px;--r-carte:20px;--r-hero:24px;--r-ligne:16px;--r-pastille:999px;--r-toast:16px}
+body .btn{border-radius:var(--r-bouton)}
+body input:not([type=checkbox]):not([type=radio]):not([type=range]),body select,body textarea{border-radius:var(--r-champ)}
+body .carte,body .kpi,body details.carte{border-radius:var(--r-carte)}
+body .carte.obj,body .carte.hero{border-radius:var(--r-hero)}
+body .toast{border-radius:var(--r-toast)}
+body .pastille,body .tag,body .puce,body .piste,body .rempli{border-radius:var(--r-pastille)}
+body .v38-catalogue input[type=search]{border-radius:var(--r-champ)}
+/* Tournée compacte : résumé court, une ligne par garage (≥ 48 px de haut), détails au toucher, terminés repliés. */
+.t-resume{padding:12px 14px;margin:6px 0 8px}
+.t-resume .elan-tete{margin:0 0 6px;gap:8px}
+.t-resume strong{font-size:15px;line-height:1.25}
+.t-piste{height:8px;margin:2px 0 6px}
+.t-liste{display:flex;flex-direction:column;gap:6px}
+.t-ligne{background:var(--card);border:1px solid var(--line,#27323C);border-radius:var(--r-ligne);padding:4px 6px 4px 12px}
+.t-rang{display:flex;align-items:center;gap:8px;min-height:56px}
+.t-nom{flex:1 1 auto;min-width:0;text-align:left;background:none;border:0;color:inherit;font:inherit;padding:6px 0;min-height:48px;display:flex;flex-direction:column;justify-content:center;gap:2px;cursor:pointer}
+.t-nom strong{font-size:15px;line-height:1.25;overflow-wrap:anywhere}
+.t-nom small{font-size:12.5px;line-height:1.2}
+.t-nom:focus-visible,.t-visite:focus-visible{outline:2px solid #FF2D3D;outline-offset:2px}
+.t-visite{flex:none;min-width:84px;min-height:48px;padding:0 14px}
+.t-rang .tag{flex:none;align-self:center}
+.t-detail{padding:4px 0 10px}
+.t-detail .trio .btn{min-height:48px}
+.t-faits{margin:10px 0;border-radius:var(--r-ligne)}
+.t-faits>summary{min-height:48px;display:flex;align-items:center;cursor:pointer;font-weight:700;padding:0 4px}
+.t-faits .t-ligne{opacity:.75;margin-bottom:6px}
+.t-actions{margin:10px 0 4px}.t-actions .btn{min-height:48px}
+/* Sous la liste, l'introduction de page ne mange plus la place des garages. */
+main:has(.t-liste) .v38-page-intro p{display:none}
+main:has(.t-liste) .v38-page-intro{padding-block:6px}
+main:has(.t-liste) .v38-page-intro small{display:none}
+body .v38-page-intro{border-radius:var(--r-carte)}

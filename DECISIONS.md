@@ -14,3 +14,5 @@
 | D11 | Mobile-first : le cockpit vit dans la PWA du téléphone (données IndexedDB, hors ligne) ; le Bureau et le coffre local restent des options, jamais requis | Orientation du propriétaire, pas de PC |
 | D12 | Sauvegardes : AES-256-GCM + PBKDF2-SHA256 600 000 itérations, phrase non conservée, relecture avant téléchargement, anciens formats importables | Demande du propriétaire (issue #6) |
 | D13 | CA = factures HT − avoirs saisis ; jamais déduit des commandes ; « non renseigné » sinon ; annulation motivée, jamais de suppression | Demande du propriétaire |
+| D14 | Formes : rayons centralisés dans `formes-v49.css` (champ 14, bouton 16, carte 20, carte principale 24, ligne 16, pastille ronde) ; la Ville LEGO (vc-*) n'est pas touchée | AGENTS.md (intention de marque : société humaine et ouverte) |
+| D15 | Tournée : résumé court + une ligne par garage (nom, commune, heure, bouton Visite), détails au toucher, terminés repliés, correction possible | AGENTS.md (pratique mesurable) |

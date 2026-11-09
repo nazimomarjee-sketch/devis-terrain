@@ -1,5 +1,5 @@
 {
-  "id": "49556a90ca1d855f8df08236517526299367e9020f3a1412755b5f21dba48187",
+  "id": "0190d2421a50e6d5e24be3f7555ebe1399d306a7c497a0da72537872d61ecc76",
   "assets": [
     {
       "path": "accueil-v23.css",
@@ -19,7 +19,7 @@
     },
     {
       "path": "app.js",
-      "sha256": "8a12c7d9c0094eba8a72d6be1d73e2a48225230c5f645a5c94f2d52405f50286"
+      "sha256": "fe35666441b79306659b62ee11bca28954077c56eca52ca97984deac0e992ff7"
     },
     {
       "path": "apparence-v26.css",
@@ -91,7 +91,7 @@
     },
     {
       "path": "commercial-v22.js",
-      "sha256": "7ea0c73683c773faad644d6aff13660b664fc6eb1bdca9d39c4ff52fbb5e6b92"
+      "sha256": "68f73bd5f170fba3db4755b5cd9e35654e00b24b8eaac8fc7ff4f27d13a7d5f7"
     },
     {
       "path": "communes-centres.js",
@@ -126,6 +126,10 @@
       "sha256": "6c2d6b1813c51f585ef48394238174d54a6b1c503e99926d0e2e75a1bf7c54d5"
     },
     {
+      "path": "formes-v49.css",
+      "sha256": "8701c6c481caed490eb38d632c000597bf32a33b11cac6256694c7598a4e9917"
+    },
+    {
       "path": "grand-ecran-v48.css",
       "sha256": "3666dbbfd44e1b32d52574dca960b6cdcc4dac1bc54ff948b380c717de96b0f5"
     },
@@ -155,7 +159,7 @@
     },
     {
       "path": "index.html",
-      "sha256": "0437fda6a7522fb90d0cc2701468c0756348bc9c11b8c4031d355179283e980a"
+      "sha256": "8330188fc7d01aca8a401a6fed3dafc64c2e12354c68fcc603eae4c97ce06196"
     },
     {
       "path": "logo-96.png",
@@ -199,7 +203,7 @@
     },
     {
       "path": "pwa-client.js",
-      "sha256": "dc3feb18ae9a94f984edd0a8eae7cfc0701257823b6de3a40fc2e73718164849"
+      "sha256": "285312013afe296cd9c6a16faca6223ff1c88756886e26d530dbe4dcb132603c"
     },
     {
       "path": "rappels-produits-v24.js",
