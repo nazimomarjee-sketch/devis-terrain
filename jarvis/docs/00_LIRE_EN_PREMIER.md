@@ -1,6 +1,13 @@
-# JARVIS v3 — État réel (lire en premier, 5 minutes)
+# JARVIS v4 — État réel (lire en premier, 5 minutes)
 
-Date : 9 novembre 2026. Preuves : `cd jarvis && npm test` → **256 tests verts, 0 ignoré** (`PREUVES_TESTS.txt`) ; mesures : `docs/BENCH_RESULTATS.json` (`node scripts/bench.js`).
+## Nouveautés v4 (essais de durée, démonstration, IA)
+- **Endurance mesurée (`14_ENDURANCE_ET_DEMO.md`)** : 60 min (890 missions) puis 30 min (423 missions) avec kill -9, gels, pannes d'intégration : **0 mission perdue, 0 doublon d'envoi ni de brouillon, journal intact** ; 5 missions interrompues en vol ont été reprises une fois. **24 h : NON TESTÉ.** Un défaut réel (faux positif de traçabilité au-delà de 300 missions) a été trouvé et corrigé.
+- **Service complet** : l'outbox (brouillons Gmail **synthétiques**) est maintenant traitée par le service avec attente progressive, rejeu administrateur et alertes.
+- **Démonstration bout en bout** (`scripts/demo.js`, captures `docs/captures/demo/`), étapes marquées RÉEL/SIMULÉ.
+- **IA (`13_IA_ET_INTEGRATIONS.md`)** : **aucun agent n'utilise de modèle IA** ; seul point d'extension : reformulation d'une demande non comprise, désactivé par défaut, testé uniquement contre un serveur simulé. Gmail, EBP, Airtable : **jamais testés avec le service réel**.
+- **Windows : toujours NON QUALIFIÉ** (jamais exécuté). Samsung réel : non testé.
+
+Date : 9 novembre 2026. Preuves : `cd jarvis && npm test` → **257 tests verts, 0 ignoré** (`PREUVES_TESTS.txt`) ; mesures : `docs/BENCH_RESULTATS.json` (`node scripts/bench.js`).
 
 > **Tous ces tests ont tourné sous Linux, sur des données fictives. Aucun n'est une validation Windows ni Samsung.** Les scripts Windows existent mais **n'ont jamais été exécutés** (pas de Windows, pas de PowerShell ici). Un test vert n'est jamais présenté comme une preuve sur le matériel réel.
 
