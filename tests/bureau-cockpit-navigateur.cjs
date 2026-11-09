@@ -163,6 +163,7 @@ test('Historique EBP 14 mois → Bureau → téléphone : page Opportunités (re
     assert.match(t, /Règle de détection \(hypothèse\) : Plus de 60 jours sans commande/);
     assert.doesNotMatch(t, /LAMBDA/, 'compte bloqué : aucun signal');
     await page.goto(origine + '/#/');
+    await page.getByText('Sources et autres montants', {exact:true}).click();
     await page.waitForSelector('text=montants EBP à consulter sur Mon travail');
     await page.waitForSelector('.v29-home-note small:has-text("Pour GARAGE FICTIF")');
     assert.deepEqual(erreurs, []);
