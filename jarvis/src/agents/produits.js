@@ -1,6 +1,7 @@
 // AGENT — Produits. Contrôle le catalogue (références, tarifs, marges, compatibilités) et produit des fiches. Lecture seule.
 import { norm, decimalVersEntier, joursEntre, bloque, regleActive, citerRegle, fautesGenerales } from './commun.js';
 
+export const MAX_ANOMALIES_LISTEES = 200;
 const margeBp = (prix, achat) => Math.trunc(((prix - achat) * 10000) / prix);
 
 export function creerAgentProduits({ defaut = null } = {}) {
@@ -65,10 +66,13 @@ export function creerAgentProduits({ defaut = null } = {}) {
         for (const r of tri.slice(1)) ajouter('DOUBLON_DESIGNATION', r, `identique à ${tri[0]}`);
       }
       anomalies.sort((a, b) => (a.code + a.ref).localeCompare(b.code + b.ref));
+      { const vu = new Set(); for (let i = anomalies.length - 1; i >= 0; i--) { const k = `${anomalies[i].code}|${anomalies[i].ref}`; if (vu.has(k)) anomalies.splice(i, 1); else vu.add(k); } }
       if (faute === 'anomalie_omise') anomalies.shift();
       if (faute === 'detail_aleatoire' && anomalies[0]) anomalies[0].detail += ` #${Math.random()}`; // champ libre : l'auditeur ne le voit pas
       if (faute === 'anomalie_inventee') anomalies.push({ code: 'PRIX_MANQUANT', ref: refs[0].ref, detail: 'anomalie inventée' });
-      return { statut: 'OK', resultat: { type: 'rapport_produits', mode: 'controle_catalogue', action_sensible: false, donnees_fictives: ctx.fictif, date: ctx.aujourdhui, regles_utilisees, nb_references: refs.length, anomalies } };
+      const parCode = {}; for (const a of anomalies) parCode[a.code] = (parCode[a.code] ?? 0) + 1;
+      return { statut: 'OK', resultat: { type: 'rapport_produits', mode: 'controle_catalogue', action_sensible: false, donnees_fictives: ctx.fictif, date: ctx.aujourdhui, regles_utilisees, nb_references: refs.length,
+        anomalies_total: anomalies.length, anomalies_par_code: parCode, anomalies_tronquees: anomalies.length > MAX_ANOMALIES_LISTEES, anomalies: anomalies.slice(0, MAX_ANOMALIES_LISTEES) } };
     },
   };
 }

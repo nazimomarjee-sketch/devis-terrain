@@ -26,10 +26,15 @@ export function auditerProduits({ mission, resultat: r, regles, aujourdhui, doss
   controlesGeneraux(C, { resultat: r, regles, datasets: ['catalogue'], dossierJeu, aujourdhui, typeAttendu: 'rapport_produits' });
   const e = [];
   if (r.mode === 'controle_catalogue') {
-    const att = attendusProduits(cat, regles, aujourdhui); const obt = new Set(r.anomalies.map((a) => `${a.code}|${a.ref}`));
-    for (const x of att) if (!obt.has(x)) e.push(`anomalie omise : ${x}`);
-    for (const x of obt) if (!att.has(x)) e.push(`anomalie inventée : ${x}`);
-    if (r.anomalies.length !== obt.size) e.push('anomalies en double'); if (r.nb_references !== cat.length) e.push('nombre de références faux');
+    const att = attendusProduits(cat, regles, aujourdhui); const MAX = 200;
+    const tri = [...att].map((k) => { const i = k.indexOf('|'); return { code: k.slice(0, i), ref: k.slice(i + 1) }; }).sort((a, b) => (a.code + a.ref).localeCompare(b.code + b.ref));
+    if (r.anomalies_total !== tri.length) e.push(`anomalies_total ${r.anomalies_total} ≠ ${tri.length}`);
+    const pc = {}; for (const a of tri) pc[a.code] = (pc[a.code] ?? 0) + 1;
+    if (JSON.stringify(Object.entries(r.anomalies_par_code).sort()) !== JSON.stringify(Object.entries(pc).sort())) e.push('décompte par code ≠ attendu');
+    if (r.anomalies_tronquees !== tri.length > MAX) e.push('indicateur de troncature faux');
+    const attendues = tri.slice(0, MAX).map((a) => `${a.code}|${a.ref}`); const obtenues = r.anomalies.map((a) => `${a.code}|${a.ref}`);
+    if (JSON.stringify(obtenues) !== JSON.stringify(attendues)) { const ob = new Set(obtenues); for (const x of attendues) if (!ob.has(x)) e.push(`anomalie omise : ${x}`); const at = new Set(attendues); for (const x of obtenues) if (!at.has(x)) e.push(`anomalie inventée : ${x}`); if (!e.length) e.push('liste des anomalies : ordre ou doublons incorrects'); }
+    if (r.nb_references !== cat.length) e.push('nombre de références faux');
   } else if (r.mode === 'fiche') {
     const ref = /\b([A-Za-z]{3}-[A-Za-z0-9]{3,6})\b/.exec(mission.demande)?.[1]; const c = cat.find((x) => x.ref.toLowerCase() === ref?.toLowerCase());
     if (!c) e.push('référence de la fiche inexistante'); else {

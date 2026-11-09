@@ -81,9 +81,9 @@ test('isolé : délai maximum — le processus agent est TUÉ (pas seulement ign
   } finally { e.nettoyer(); }
 });
 
-test('isolé : une sortie démesurée est coupée (processus tué, mission en échec contrôlé)', async () => {
+test('isolé : une sortie démesurée est coupée (processus tué) et la mission BLOQUÉE avec explication, sans 3 corrections inutiles', async () => {
   const e = environnement({ agent: 'prospection', defaut: { mode: 'sortie_geante', jusqua: 1 }, isolation: true });
-  try { const m = await traiter(e, 'priorise les prospects'); assert.match(erreurs(e, m.id)[0], /trop volumineuse/); assert.equal(m.corrections, 1); } finally { e.nettoyer(); }
+  try { const m = await traiter(e, 'priorise les prospects'); assert.match(erreurs(e, m.id)[0], /trop volumineuse/); assert.equal(m.statut, 'BLOQUE'); assert.equal(m.corrections, 0); assert.equal(m.executions, 1); assert.match(m.question, /Réduire le périmètre/); } finally { e.nettoyer(); }
 });
 
 test('LIMITE CONNUE (documentée, non masquée) : le modèle de permissions de Node NE filtre PAS le réseau', async () => {

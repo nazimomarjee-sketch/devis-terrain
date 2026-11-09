@@ -2,6 +2,8 @@
 // Les indicateurs sont SÉPARÉS et nommés : CA facturé, commandes, paiements reçus et encours ne se confondent jamais.
 import { decimalVersEntier, arrondi, bloque, regleActive, citerRegle, fautesGenerales, joursEntre } from './commun.js';
 
+export const MAX_ANOMALIES_LISTEES = 200; // plafond de la liste détaillée ; les TOTAUX et le décompte par code restent exacts
+
 export function creerAgentFinance({ defaut = null } = {}) {
   return {
     nom: 'finance',
@@ -50,6 +52,7 @@ export function creerAgentFinance({ defaut = null } = {}) {
       const cmdTotal = {};
       for (const c of commandes) cmdTotal[c.statut] = (cmdTotal[c.statut] ?? 0) + c.lignes.reduce((s, l) => s + l.qte * l.pu_ht_cents, 0);
       anomalies.sort((a, b) => (a.code + a.ref).localeCompare(b.code + b.ref));
+      { const vu = new Set(); for (let i = anomalies.length - 1; i >= 0; i--) { const k = `${anomalies[i].code}|${anomalies[i].ref}`; if (vu.has(k)) anomalies.splice(i, 1); else vu.add(k); } } // anomalies UNIQUES (code, référence)
       const recus = paiements.reduce((s, p) => s + p.montant_cents, 0);
       let out = anomalies;
       if (faute === 'anomalie_omise') out = anomalies.slice(1);
@@ -66,8 +69,9 @@ export function creerAgentFinance({ defaut = null } = {}) {
         marge_brute_bp: caLignes > 0 ? Math.trunc((marge * 10000) / caLignes) : null,
         factures_sans_lignes_exclues_de_la_marge: sansLignes,
       };
+      const parCode = {}; for (const a of out) parCode[a.code] = (parCode[a.code] ?? 0) + 1;
       return { statut: 'OK', resultat: { type: 'analyse_finance', action_sensible: false, donnees_fictives: ctx.fictif, date: ctx.aujourdhui, regles_utilisees: [...regleTva.values()],
-        nb_factures_uniques: uniques.length, indicateurs: indic, anomalies: out,
+        nb_factures_uniques: uniques.length, indicateurs: indic, anomalies_total: out.length, anomalies_par_code: parCode, anomalies_tronquees: out.length > MAX_ANOMALIES_LISTEES, anomalies: out.slice(0, MAX_ANOMALIES_LISTEES),
         definitions: { ca_ht_facture: 'somme HT des factures uniques', commandes: 'montants HT par statut de commande, distincts du CA', paiements_recus: 'somme des encaissements, y compris orphelins', encours: 'TTC facturé non réglé (factures uniques)', marge: 'sur les lignes dont le prix d’achat est connu' } } };
     },
   };

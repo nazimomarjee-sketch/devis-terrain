@@ -33,9 +33,14 @@ export function auditerFinance({ resultat: r, regles, aujourdhui, dossierJeu }) 
   if (I.marge_brute_bp !== (base > 0n ? Number((marge * 10000n) / base) : null)) e.push(`marge en pb ${I.marge_brute_bp} fausse`);
   if (I.factures_sans_lignes_exclues_de_la_marge !== sansL) e.push('factures sans lignes mal comptées');
   if (r.nb_factures_uniques !== uniq.length) e.push('nombre de factures uniques faux');
-  const ob = new Set(r.anomalies.map((a) => `${a.code}|${a.ref}`));
-  for (const x of att) if (!ob.has(x)) e.push(`anomalie omise : ${x}`);
-  for (const x of ob) if (!att.has(x)) e.push(`anomalie inventée : ${x}`);
+  // Liste détaillée plafonnée à 200 ; TOTAUX et décompte par code EXACTS et recalculés ; la liste = préfixe trié des anomalies attendues.
+  const MAX = 200; const tri = [...att].map((k) => { const i = k.indexOf('|'); return { code: k.slice(0, i), ref: k.slice(i + 1) }; }).sort((a, b) => (a.code + a.ref).localeCompare(b.code + b.ref));
+  if (r.anomalies_total !== tri.length) e.push(`anomalies_total ${r.anomalies_total} ≠ ${tri.length}`);
+  const pc = {}; for (const a of tri) pc[a.code] = (pc[a.code] ?? 0) + 1;
+  if (JSON.stringify(Object.entries(r.anomalies_par_code).sort()) !== JSON.stringify(Object.entries(pc).sort())) e.push('décompte des anomalies par code ≠ attendu');
+  if (r.anomalies_tronquees !== tri.length > MAX) e.push('indicateur de troncature faux');
+  const attendues = tri.slice(0, MAX).map((a) => `${a.code}|${a.ref}`); const obtenues = r.anomalies.map((a) => `${a.code}|${a.ref}`);
+  if (JSON.stringify(obtenues) !== JSON.stringify(attendues)) { const ob = new Set(obtenues); for (const x of attendues) if (!ob.has(x)) e.push(`anomalie omise : ${x}`); const at = new Set(attendues); for (const x of obtenues) if (!at.has(x)) e.push(`anomalie inventée : ${x}`); if (!e.length) e.push('liste des anomalies : ordre ou doublons incorrects'); }
   const DEFS = { ca_ht_facture: 'somme HT des factures uniques', commandes: 'montants HT par statut de commande, distincts du CA', paiements_recus: 'somme des encaissements, y compris orphelins', encours: 'TTC facturé non réglé (factures uniques)', marge: 'sur les lignes dont le prix d’achat est connu' };
   if (JSON.stringify(r.definitions) !== JSON.stringify(DEFS)) e.push('définitions des indicateurs ≠ attendues (risque de confusion entre CA, commandes, encaissements, encours)');
   ctrl(C, 'recalcul_finance', e);

@@ -42,11 +42,11 @@ os('les huit agents donnent les mêmes résultats confinés (compte distinct, r�
 os('sabotages sous confinement OS : kill, mémoire, disque, symlink, réseau — tous refusés par le SYSTÈME, mission en échec contrôlé', async () => {
   const cible = spawn('sleep', ['60'], { stdio: 'ignore' });
   try {
-    const cas = [['tuer_processus', { pid: cible.pid }, /kill refusé : EPERM/], ['memoire', {}, /mémoire refusée/], ['remplir_disque', {}, /(Quota disque|EFBIG|Sortie non conforme)/],
+    const cas = [['tuer_processus', { pid: cible.pid }, /kill refusé : EPERM/], ['memoire', {}, /mémoire refusée/], ['remplir_disque', {}, /(Quota disque|EFBIG|Sortie non conforme)/, 'BLOQUE'],
       ['symlink_sortie', { chemin: '/etc/hostname' }, /fs\.symlink API requires full fs\.read and fs\.write permissions/], ['reseau', { url: 'http://127.0.0.1:9/' }, /réseau : (ENETUNREACH|ECONNREFUSED|fetch failed)/]];
-    for (const [mode, extra, motif] of cas) {
+    for (const [mode, extra, motif, final] of cas) {
       const e = environnement({ agent: 'finance', defaut: { mode, jusqua: 99, ...extra }, isolation: true, confinement: CONF });
-      try { const m = await traiter(e, 'analyse financière'); assert.equal(m.statut, 'ECHEC', mode); const msgs = erreurs(e, m.id); assert.equal(msgs.length, 4, mode); assert.match(msgs[0], motif, `${mode} : ${msgs[0]}`); } finally { e.nettoyer(); }
+      try { const m = await traiter(e, 'analyse financière'); assert.equal(m.statut, final ?? 'ECHEC', mode); const msgs = erreurs(e, m.id); assert.equal(msgs.length, final ? 1 : 4, mode); assert.match(msgs[0], motif, `${mode} : ${msgs[0]}`); } finally { e.nettoyer(); }
     }
     process.kill(cible.pid, 0); // la cible est toujours vivante : l'agent n'a PAS pu la tuer
   } finally { cible.kill('SIGKILL'); }
@@ -89,14 +89,14 @@ test('défense en profondeur : Node REFUSE déjà la création d’un lien symbo
   try { const m = await traiter(e, 'contrôle du catalogue produits'); assert.equal(m.statut, 'ECHEC'); assert.match(erreurs(e, m.id)[0], /fs\.symlink API requires full fs\.read and fs\.write permissions/); assert.ok(!existsSync(join(e.dossierSorties, m.id, 'lien'))); } finally { e.nettoyer(); }
 });
 
-test('sortie propre à chaque tentative : les résidus d’une exécution échouée ne polluent pas la suivante', async () => {
-  const e = environnement({ agent: 'produits', defaut: { mode: 'remplir_disque', jusqua: 1 }, isolation: true });
-  try { const m = await traiter(e, 'contrôle du catalogue produits'); assert.equal(m.statut, 'VALIDE'); assert.equal(m.corrections, 1); assert.ok(verifierSortie(join(e.dossierSorties, m.id)).ok); } finally { e.nettoyer(); }
+test('sortie détruite après un échec : aucun résidu d’une exécution échouée ne subsiste', async () => {
+  const e = environnement({ agent: 'produits', defaut: { mode: 'remplir_disque', jusqua: 99 }, isolation: true });
+  try { const m = await traiter(e, 'contrôle du catalogue produits'); assert.equal(m.statut, 'BLOQUE'); assert.ok(!existsSync(join(e.dossierSorties, m.id)), 'dossier de sortie détruit'); } finally { e.nettoyer(); }
 });
 
-test('quota disque (mode « permission ») : un agent qui remplit son dossier de sortie est TUÉ', async () => {
+test('quota disque (mode « permission ») : un agent qui remplit son dossier de sortie est TUÉ et la mission BLOQUÉE (erreur déterministe)', async () => {
   const e = environnement({ agent: 'produits', defaut: { mode: 'remplir_disque', jusqua: 1 }, isolation: true });
-  try { const m = await traiter(e, 'contrôle du catalogue produits'); assert.match(erreurs(e, m.id)[0], /Quota disque|Sortie non conforme/); assert.equal(m.corrections, 1); } finally { e.nettoyer(); }
+  try { const m = await traiter(e, 'contrôle du catalogue produits'); assert.match(erreurs(e, m.id)[0], /Quota disque|Sortie non conforme/); assert.equal(m.statut, 'BLOQUE'); assert.equal(m.corrections, 0); } finally { e.nettoyer(); }
 });
 
 test('commande de lancement « linux-os » : aucun passage par un shell, limites présentes, compte inconnu refusé', () => {

@@ -58,7 +58,7 @@ export class Jarvis {
   }
 
   /** Attestation du confinement par sondes d'accès interdits ; le résultat conditionne le traitement de données réelles. */
-  async attester() { const att = await attester({ backend: this.confinement.backend, utilisateurAgent: this.confinement.utilisateurAgent }); enregistrerAttestation(this.db, att); return att; }
+  async attester() { const att = await attester({ backend: this.confinement.backend, utilisateurAgent: this.confinement.utilisateurAgent, lanceur: this.confinement.lanceur, dossierEchange: this.confinement.dossierEchange ? `${this.confinement.dossierEchange}-attestation` : null, dossierSortieAttestation: this.confinement.dossierSortieAttestation ?? null }); enregistrerAttestation(this.db, att); return att; }
 
   /** Auto-test de l'auditeur sur le jeu canari. Défaillance ⇒ échec fermé (plus de validation ni d'approbation). */
   async autotester() {
@@ -140,6 +140,12 @@ export class Jarvis {
     let sortie; let depenses;
     try { ({ sortie, depenses } = await this.#executerAgent(r.agent, mission, ctx, delai, ctx.dossierSortie)); } catch (e) {
       journaliser(db, { missionId: m.id, acteur: agent.nom, evenement: 'AGENT_ERREUR', detail: { message: e.message } });
+      // Erreur de TAILLE = déterministe : la rejouer ne change rien. Blocage immédiat avec explication (pas de 3 corrections inutiles).
+      if (/trop volumineuse|quota disque|quota dépassé|trop de fichiers/i.test(e.message)) { // couvre le contrôle périodique ET le contrôle final de la sortie
+        this.#finir(m, { statut: 'BLOQUE', raison: 'Résultat trop volumineux pour être traité en une fois.', question: 'Réduire le périmètre de la demande (période, client, famille) : le volume dépasse les limites de sécurité de l’exécution.' });
+        journaliser(db, { missionId: m.id, acteur: 'jarvis', evenement: 'RESULTAT_TROP_VOLUMINEUX', detail: {} });
+        return { action: 'bloque', id: m.id, code: 'RESULTAT_TROP_VOLUMINEUX' };
+      }
       return this.#echecOuCorrection(m, [`exécution : ${e.message}`]);
     }
     for (const c of depenses) enregistrerDepense(db, { missionId: m.id, fournisseur: agent.nom, cents: c });

@@ -12,6 +12,7 @@ import { diagnostic } from './sante.js';
 import { sauvegarder, derniereSauvegarde, exercerRestauration } from './sauvegarde.js';
 import { backendsDisponibles } from './confinement.js';
 import { Interpreteur } from './modeles.js';
+import { lanceurSchtasks } from './echange.js';
 import { fournisseurAnthropic } from './fournisseurs/anthropic.js';
 import { definirParam, param } from './db.js';
 import { horloge } from './horloge.js';
@@ -45,7 +46,9 @@ if (process.env.JARVIS_IA_CLE && process.env.JARVIS_IA_MODELE) {
   try { interpreteur = new Interpreteur({ fournisseurs: { en_ligne: fournisseurAnthropic({ cle: process.env.JARVIS_IA_CLE, modele: process.env.JARVIS_IA_MODELE, tarifEntreeCentsParMillion: Number(process.env.JARVIS_IA_TARIF_ENTREE), tarifSortieCentsParMillion: Number(process.env.JARVIS_IA_TARIF_SORTIE) }) } }); console.log('IA en ligne configurée (inactive tant que l’autorisation « ia_en_ligne » n’est pas accordée)'); }
   catch (e) { console.error(`IA en ligne NON activée : ${e.message}`); }
 }
-const jarvis = new Jarvis({ db, espace, isolation: process.env.JARVIS_ISOLATION !== 'non', racineCode, confinement: { backend, utilisateurAgent }, interpreteur });
+// Backend « échange » (Windows) : le lanceur démarre la tâche planifiée du compte agent de l'espace.
+const confinement = backend === 'echange' ? { backend, dossierEchange: join(espace.dossier, 'echange'), lanceur: lanceurSchtasks(id), dossierSortieAttestation: join(espace.dossierSorties, '_attestation') } : { backend, utilisateurAgent };
+const jarvis = new Jarvis({ db, espace, isolation: process.env.JARVIS_ISOLATION !== 'non', racineCode, confinement, interpreteur });
 if (param(db, 'double_execution') === null) definirParam(db, 'double_execution', process.env.JARVIS_DOUBLE_EXECUTION ?? 'sensibles'); // contrôle par défaut en service
 const serveur = creerServeur({
   jarvis, jeton: espace.jeton, jetonAdmin: espace.jetonAdmin, dossierPublic: join(racineCode, 'public'),

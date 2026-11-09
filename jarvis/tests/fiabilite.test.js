@@ -127,3 +127,13 @@ test('attestation : un refus par erreur ESRCH (cible déjà morte) n’est JAMAI
     assert.equal(r.debogueur_autre_processus.passe, true); assert.match(r.debogueur_autre_processus.detail, /INDETERMINE/);
   } finally { rmSync(dossier, { recursive: true, force: true }); }
 });
+
+test('attestation : un « refus » par fichier ABSENT (ENOENT) ou erreur anodine n’est JAMAIS compté comme un refus de sécurité (conservateur)', async () => {
+  const d = mkdtempSync(join(tmpdir(), 'enoent-'));
+  try {
+    const r = await lancerSondes({ secret: join(d, 'absent', 'secret.txt'), dossierSortie: join(d, 'inexistant'), pidKill: 999999, pidDebug: 999999, portTcp: 1, hoteTcp: '127.0.0.1', socketUnix: join(d, 'pas-de-socket'), dossierHors: join(d, 'absent'), environnementProcessus: join(d, 'pas-un-fichier') });
+    for (const [nom, v] of Object.entries(r)) if (['lire_secret_hors_perimetre', 'ecrire_hors_perimetre', 'symlink_vers_secret_puis_lecture', 'lien_dur_vers_secret', 'lire_environnement_processus', 'socket_unix'].includes(nom)) {
+      assert.equal(v.passe, true, `${nom} compté comme refusé alors que l’erreur n’est pas un refus de permission : ${v.detail}`); assert.match(v.detail, /INDETERMINE/, nom);
+    }
+  } finally { rmSync(d, { recursive: true, force: true }); }
+});

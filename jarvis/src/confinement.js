@@ -8,6 +8,7 @@
 import { spawn, execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, chmodSync, rmSync, readdirSync, lstatSync, existsSync } from 'node:fs';
 import { createServer } from 'node:net';
+import { networkInterfaces } from 'node:os';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -69,20 +70,25 @@ const PROBES_FICHIERS = ['lire_secret_hors_perimetre', 'ecrire_hors_perimetre', 
 const PROBES_OS = ['tuer_autre_processus', 'debogueur_autre_processus', 'connexion_tcp', 'envoi_udp', 'socket_unix', 'memoire_1_5_Go', 'fichier_20_Mo'];
 
 /** Retourne { niveau, backend, sondes, echecs, date }. Le niveau « os » exige que TOUTES les sondes soient refusées. */
-export async function attester({ backend = 'permission', utilisateurAgent = null, limites = LIMITES, plateforme = process.platform, lanceur = null, dossierEchange = null } = {}) {
+export async function attester({ backend = 'permission', utilisateurAgent = null, limites = LIMITES, plateforme = process.platform, lanceur = null, dossierEchange = null, dossierSortieAttestation = null } = {}) {
   const base = mkdtempSync(join(tmpdir(), 'jarvis-attest-'));
-  const serviceDir = join(base, 'service'); const sortie = join(base, 'sortie'); const hors = join(base, 'hors');
+  const serviceDir = join(base, 'service'); const sortie = dossierSortieAttestation ?? join(base, 'sortie'); const hors = join(base, 'hors'); // Windows (échange) : dossier de sortie sur lequel le compte agent a des droits
   for (const d of [serviceDir, sortie, hors]) mkdirSync(d, { recursive: true });
+  const marqueSortie = existsSync(sortie);
   const secret = join(serviceDir, 'secret.txt'); writeFileSync(secret, 'SECRET-DU-SERVICE'); chmodSync(secret, 0o600); chmodSync(serviceDir, 0o700); chmodSync(hors, 0o700);
-  const cible = spawn('sleep', ['120'], { stdio: 'ignore' }); // processus « service » (cible du kill) que l'agent ne doit pas pouvoir toucher
-  const cible2 = spawn('sleep', ['120'], { stdio: 'ignore' }); // second témoin, DISTINCT (cible du débogueur) : une sonde ne doit pas dépendre du résultat d'une autre
+  const temoin = () => spawn(process.execPath, ['-e', 'setTimeout(()=>{},120000)'], { stdio: 'ignore' }); // témoin PORTABLE (pas de « sleep » sous Windows)
+  const cible = temoin(); // processus « service » (cible du kill) que l'agent ne doit pas pouvoir toucher
+  const cible2 = temoin(); // second témoin, DISTINCT (cible du débogueur) : une sonde ne doit pas dépendre du résultat d'une autre
   let connexions = 0;
-  const ecouteur = createServer((s) => { connexions++; s.end(); }); await new Promise((ok) => ecouteur.listen(0, '127.0.0.1', ok));
+  // Canari TCP sur une interface NON loopback quand elle existe (le trafic loopback n'est pas filtré par le pare-feu Windows) ; sinon loopback.
+  const lan = Object.values(networkInterfaces()).flat().find((i) => i && i.family === 'IPv4' && !i.internal)?.address;
+  const hoteTcp = lan ?? '127.0.0.1';
+  const ecouteur = createServer((s) => { connexions++; s.end(); }); await new Promise((ok) => ecouteur.listen(0, hoteTcp, ok));
   const socketUnix = join(serviceDir, 'u.sock'); const unix = createServer((s) => { connexions++; s.end(); }); await new Promise((ok) => unix.listen(socketUnix, ok)); chmodSync(socketUnix, 0o600);
   try {
     const u = backend === 'linux-os' ? resoudreUtilisateur(utilisateurAgent) : null;
     if (u) { chmodSync(base, 0o755); chmodSync(sortie, 0o700); execFileSync('chown', ['-R', `${u.uid}:${u.gid}`, sortie]); }
-    const canaris = { secret, dossierSortie: sortie, pidKill: cible.pid, pidDebug: cible2.pid, portTcp: ecouteur.address().port, socketUnix, dossierHors: hors };
+    const canaris = { secret, dossierSortie: sortie, pidKill: cible.pid, pidDebug: cible2.pid, portTcp: ecouteur.address().port, hoteTcp, socketUnix, dossierHors: hors };
     let sorties;
     if (backend === 'echange') {
       // Même sondes, exécutées par le lanceur du compte agent (Windows : tâche planifiée). `preparer` donne au compte agent l'accès à son dossier de sortie.
