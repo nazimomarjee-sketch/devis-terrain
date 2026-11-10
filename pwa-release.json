@@ -1,5 +1,5 @@
 {
-  "id": "2bd67ec76e98ce53648ec31a9cbf6d255001197b53565f9015be1538fd1c04c2",
+  "id": "2342a33fccee5a05cc4b53dc369704a16ca5e3e5da28a27d446d7d748242a9eb",
   "assets": [
     {
       "path": "accueil-v23.css",
@@ -159,7 +159,7 @@
     },
     {
       "path": "index.html",
-      "sha256": "b525ec426b7d6ce111f6cb8e5abe325b43df2aedda63a76a376d21580db68e2e"
+      "sha256": "3bd64a6364bffe13f9fd4fb6586bf8d43f6bd0df917ec3db5f8777eac05d4d10"
     },
     {
       "path": "logo-96.png",
@@ -203,7 +203,7 @@
     },
     {
       "path": "pwa-client.js",
-      "sha256": "c45eda2277ef885fa6264af2e14ccbbe31e04e8bc52ef73f312f1e3d617f2e60"
+      "sha256": "7ba05b81e7d8d892302a3d09d0fda761ecd040534ab3480e71723744565525b8"
     },
     {
       "path": "rappels-produits-v24.js",

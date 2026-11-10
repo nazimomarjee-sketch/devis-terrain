@@ -60,3 +60,18 @@ test('première ouverture : aucun bandeau « mise à jour prête » (ce n’est 
   assert.equal(await page.locator('#v25-maj').count(),0,'bandeau affiché à tort à la première installation');
   await page.reload();await page.waitForTimeout(1200);assert.equal(await page.locator('#v25-maj').count(),0);await context.close();
 });
+
+test('Bureau sur Samsung : accessible après activation du cache téléphone, onglets et scripts chargés',async()=>{
+  const context=await browser.newContext({...devices['Galaxy S9+'],httpCredentials:{username:USER,password:PASS}});
+  const page=await context.newPage(),errs=[];page.on('pageerror',e=>errs.push(e.message));
+  await context.route(/^https:\/\//,r=>r.abort());
+  await page.goto(origin+'/#/reglages');await page.evaluate(()=>navigator.serviceWorker.ready);
+  await page.reload();await page.waitForFunction(()=>navigator.serviceWorker.controller!==null);
+  await page.goto(origin+'/bureau/#bureau');await page.locator('#onglets a[href="#bureau"]').waitFor();
+  assert.equal(await page.title(),'Ville ODICOLOR');
+  assert.equal(await page.evaluate(()=>typeof XLSX),'object');
+  await page.locator('#onglets a[href="#ville"]').click();
+  await page.waitForFunction(()=>location.hash==='#ville');
+  assert.equal(await page.locator('#onglets a[href="#ville"]').getAttribute('aria-current'),'page');
+  assert.deepEqual(errs,[]);await context.close();
+});

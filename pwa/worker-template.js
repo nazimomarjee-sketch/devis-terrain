@@ -49,6 +49,8 @@ async function immutable(request,event){
 self.addEventListener('fetch',event=>{
   const request=event.request,u=new URL(request.url);
   if(request.method!=='GET'||u.origin!==self.location.origin||!['http:','https:'].includes(u.protocol))return;
+  // Le Bureau est servi en ligne séparément du shell téléphone.
+  if(!u.searchParams.has('odicolor') && (u.pathname===new URL('bureau',self.registration.scope).pathname || u.pathname.startsWith(new URL('bureau/',self.registration.scope).pathname)))return;
   if(request.mode==='navigate'){
     const recovery=u.pathname.endsWith('/recuperation-v47.html');
     const entry=entries.find(x=>x.path===(recovery?'recuperation-v47.html':'index.html'));

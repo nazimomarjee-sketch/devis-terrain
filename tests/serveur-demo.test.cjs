@@ -39,3 +39,10 @@ test('terrain privé : accès protégé et mode de santé distinct',async()=>{
     assert.equal((await fetch(b+'/',{headers:auth(USER,PASS)})).status,200);
   } finally { s.close(); }
 });
+test('Bureau : page et ressources protégées, outils et documentation non publiés',async()=>{
+  assert.equal((await fetch(base+'/bureau/')).status,401);
+  for(const p of ['/bureau/','/bureau/index.html','/bureau/pipeline.js','/bureau/ville/dessin-iso.js']) {
+    const r=await fetch(base+p,{headers:auth(USER,PASS)});assert.equal(r.status,200,p);assert.equal(r.headers.get('cache-control'),'no-store');
+  }
+  for(const p of ['/bureau/LISEZ-MOI.md','/bureau/outils/generer-communes.cjs','/bureau/ville/demo-commune.html'])assert.equal((await fetch(base+p,{headers:auth(USER,PASS)})).status,404,p);
+});

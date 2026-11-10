@@ -8,6 +8,12 @@ const http = require('node:http'), fs = require('node:fs'), path = require('node
 const RACINE = path.resolve(__dirname, '..');
 const release = JSON.parse(fs.readFileSync(path.join(RACINE, 'pwa-release.json'), 'utf8'));
 const FICHIERS = new Set([...release.assets.map(a => a.path), 'index.html', 'sw.js', 'pwa-client.js', 'recuperation-v47.html', 'recuperation-v47.js']);
+// Liste fermée : uniquement les ressources référencées par la page Bureau.
+const BUREAU = new Set(['bureau/index.html']);
+for (const m of fs.readFileSync(path.join(RACINE, 'bureau/index.html'), 'utf8').matchAll(/<(?:script|link)\b[^>]*(?:src|href)="([^"]+)"/g)) {
+  if (/^(?:[a-z0-9-]+\/)*[a-z0-9.-]+\.(?:js|css)$/i.test(m[1])) BUREAU.add('bureau/' + m[1]);
+}
+for (const f of BUREAU) FICHIERS.add(f);
 const PUBLICS = new Set(['manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'logo-96.png']);
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json', '.json': 'application/json', '.svg': 'image/svg+xml' };
 const egal = (a, b) => { const x = crypto.createHash('sha256').update(String(a)).digest(), y = crypto.createHash('sha256').update(String(b)).digest(); return crypto.timingSafeEqual(x, y); };
@@ -24,7 +30,8 @@ function creer({ user, pass, mode = 'demo-prive', journal = () => {} }) {
     let chemin; try { chemin = decodeURIComponent(new URL(req.url, 'http://x').pathname); } catch (_) { res.writeHead(400, enTetes('text/plain')); return res.end('Requête invalide'); }
     if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405, enTetes('text/plain', { Allow: 'GET, HEAD' })); return res.end('Méthode non autorisée'); }
     if (chemin === '/sante') { res.writeHead(200, enTetes('application/json', { 'Cache-Control': 'no-store' })); return res.end(JSON.stringify({ ok: true, release: release.id.slice(0, 12), mode })); }
-    const nom = chemin === '/' ? 'index.html' : chemin.replace(/^\//, '');
+    const nom = chemin === '/' ? 'index.html' : /^\/bureau\/?$/.test(chemin) ? 'bureau/index.html' : chemin.replace(/^\//, '');
+    if (chemin === '/bureau') { res.writeHead(302, enTetes('text/plain', {Location:'/bureau/'})); return res.end(); }
     if (!PUBLICS.has(nom)) {
       if (bloque(ip)) { res.writeHead(429, enTetes('text/plain', { 'Retry-After': '60' })); return res.end('Trop d’essais. Réessaie dans une minute.'); }
       const h = req.headers.authorization || '', m = /^Basic (.+)$/.exec(h); let ok = false;
@@ -33,7 +40,7 @@ function creer({ user, pass, mode = 'demo-prive', journal = () => {} }) {
     }
     if (!FICHIERS.has(nom)) { res.writeHead(404, enTetes('text/plain')); return res.end('Introuvable'); }
     const f = path.join(RACINE, nom); let octets; try { octets = fs.readFileSync(f); } catch (_) { res.writeHead(404, enTetes('text/plain')); return res.end('Introuvable'); }
-    const html = nom === 'index.html' || nom === 'sw.js' || nom === 'pwa-client.js' || nom === 'recuperation-v47.html' || nom === 'manifest.webmanifest';
+    const html = BUREAU.has(nom) || nom === 'index.html' || nom === 'sw.js' || nom === 'pwa-client.js' || nom === 'recuperation-v47.html' || nom === 'manifest.webmanifest';
     res.writeHead(200, enTetes(TYPES[path.extname(nom)] || 'application/octet-stream', { 'Cache-Control': html ? 'no-store' : 'private, max-age=31536000, immutable', 'Content-Length': octets.length }));
     res.end(req.method === 'HEAD' ? undefined : octets); journal(nom);
   });
