@@ -2,6 +2,7 @@
 // Tout le texte dynamique passe par textContent (jamais innerHTML) : aucune injection HTML possible.
 const $ = (id) => document.getElementById(id);
 let jeton = '';
+let modeGmail = 'desactive';
 try { jeton = localStorage.getItem('jarvis_jeton') || ''; } catch { /* stockage indisponible */ }
 const el = (tag, props = {}, ...enfants) => {
   const n = document.createElement(tag);
@@ -28,8 +29,9 @@ async function ouvrirPdf(id) {
   window.open(URL.createObjectURL(await r.blob()), '_blank');
 }
 async function decider(id, decision) {
-  if (decision === 'approuver' && !confirm('Approuver ? (Aucun envoi réel n’existe : l’envoi est simulé.)')) return;
-  try { await api(`/api/missions/${id}/decision`, { method: 'POST', body: JSON.stringify({ decision }) }); } catch (e) { alert(e.message); }
+  const modeConfirme = modeGmail;
+  if (decision === 'approuver' && !confirm(modeConfirme === 'reel_test' ? 'Approuver ? Pour un devis, un brouillon de TEST sera créé dans Gmail avec le PDF. Aucun mail ne sera envoyé.' : 'Approuver ? Aucun mail ne sera envoyé. Le brouillon reste local.')) return;
+  try { await api(`/api/missions/${id}/decision`, { method: 'POST', body: JSON.stringify({ decision, mode_gmail: modeConfirme }) }); } catch (e) { alert(e.message); }
   rafraichir();
 }
 
@@ -64,6 +66,7 @@ function carteValidation(v, grande) {
 }
 
 function rendre(e) {
+  modeGmail = e.connecteur_gmail;
   $('connexion').hidden = true;
   $('espace').textContent = e.espace.libelle;
   const arret = e.alertes.some((a) => a.code === 'ARRET_URGENCE');
@@ -95,7 +98,22 @@ function rendre(e) {
   $('alertes').replaceChildren(...(lignes.length ? lignes : [el('li', {}, 'Aucune anomalie ni alerte.')]));
 
   const termines = e.missions.filter((m) => ['VALIDE', 'REFUSE', 'ECHEC', 'BLOQUE'].includes(m.statut)).slice(0, 8);
-  $('resultats').replaceChildren(...(termines.length ? termines.map((m) => { const li = el('li', {}, el('span', { class: `pastille s-${m.statut}` }, LIBELLES[m.statut]), `${m.agent ? `[${m.agent}] ` : ''}${m.demande.slice(0, 70)}`); if (m.question) li.append(el('div', { class: 'aide' }, `❓ ${m.question}`)); li.append(el('button', { class: 'petit', onclick: () => voirDetail(m.id) }, 'Détail')); return li; }) : [el('li', {}, 'Aucun résultat.')]));
+  $('resultats').replaceChildren(...(termines.length ? termines.map((m) => {
+    const li = el('li', {}, el('span', { class: `pastille s-${m.statut}` }, LIBELLES[m.statut]), `${m.agent ? `[${m.agent}] ` : ''}${m.demande.slice(0, 70)}`);
+    if (m.question) li.append(el('div', { class: 'aide' }, `❓ ${m.question}`));
+    const b = (e.brouillons || []).find((b) => b.mission_id === m.id);
+    if (b) {
+      const lib = {
+        A_FAIRE: 'Brouillon en attente', EN_COURS: 'Création du brouillon…',
+        FAIT: b.connecteur === 'gmail_reel' ? 'Brouillon créé dans Gmail — aucun envoi' : 'Brouillon local créé',
+        ECHEC: 'Brouillon à vérifier : ' + (b.derniere_erreur || 'échec'),
+      };
+      li.append(el('div', { class: 'aide' }, lib[b.etat]));
+      if (b.connecteur === 'gmail_reel') li.append(el('a', { href: 'https://mail.google.com/mail/#drafts', target: '_blank', rel: 'noopener noreferrer' }, 'Ouvrir Gmail'));
+    }
+    li.append(el('button', { class: 'petit', onclick: () => voirDetail(m.id) }, 'Détail'));
+    return li;
+  }) : [el('li', {}, 'Aucun résultat.')]));
 
   const m = e.metriques;
   const tuiles = [[e.agents.filter((a) => a.etat === 'actif').length, 'agents actifs'], [enCours.length, 'missions en cours'], [m.par_statut.VALIDE || 0, 'terminées et vérifiées'], [m.missions_bloquees, 'bloquées'], [e.a_valider.length, 'à valider'],
@@ -106,7 +124,7 @@ function rendre(e) {
     el('p', { class: 'aide' }, `Lit : ${a.droits.lire.join(', ')} · réseau : ${a.droits.reseau ? 'oui' : 'non'} · envoi : ${a.droits.envoyer ? 'oui' : 'non'}`), el('ul', { class: 'compact' }, ...a.criteres.map((x) => el('li', {}, x)))))));
 
   const aut = e.autorisations.filter((a) => !a.revoque_le).map((a) => el('li', {}, `✔ ${a.type} — ${a.portee}${a.expire_le ? ` (jusqu’au ${a.expire_le.slice(0, 10)})` : ''}`));
-  const integ = e.integrations.map((i) => el('li', { class: 'prevu' }, `${i.nom.toUpperCase()} : ${i.autorisee ? 'autorisée mais non développée' : 'désactivée'}`));
+  const integ = e.integrations.map((i) => el('li', { class: 'prevu' }, `${i.nom.toUpperCase()} : ${i.nom === 'gmail' ? (e.connecteur_gmail === 'reel_test' ? 'brouillons de test dans Gmail' : 'brouillons locaux / connexion réelle inactive') : (i.autorisee ? 'autorisée mais non développée' : 'désactivée')}`));
   $('autorisations').replaceChildren(el('li', {}, e.espace.donnees_reelles_autorisees ? 'Données réelles : AUTORISÉES' : 'Données réelles : désactivées'), ...aut, ...integ);
 }
 

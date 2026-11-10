@@ -1,3 +1,5 @@
+> **Mise à jour du 10 novembre 2026 :** adaptateur Gmail de test implémenté, mais aucun appel Google réel effectué. Lire [15_REPRISE_GMAIL.md](15_REPRISE_GMAIL.md) pour la configuration, les preuves et les limites. Les mentions « absent/non développé » ci-dessous décrivent l’état historique v4.
+
 # JARVIS v4 — État réel (lire en premier, 5 minutes)
 
 ## Nouveautés v4 (essais de durée, démonstration, IA)

@@ -97,6 +97,13 @@ CREATE TABLE IF NOT EXISTS outbox (
   maj_le TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS gmail_operations (
+  cle TEXT PRIMARY KEY,
+  empreinte TEXT NOT NULL,
+  compte_hash TEXT NOT NULL,
+  brouillon_id TEXT
+);
+
 CREATE TABLE IF NOT EXISTS sorties (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   ts TEXT NOT NULL,

@@ -1,0 +1,33 @@
+Reprise Gmail — 2026-11-10
+Base : 4061282 ; Linux, Node v24.22.1 (Claude : Node 22)
+
+Commande depuis jarvis/ : npm test
+266 tests : 257 réussis, 2 échecs, 7 ignorés, 0 annulé.
+Durée : 25,45 secondes.
+Ce résultat n'est PAS une suite entièrement verte.
+
+Échecs :
+1. fiabilite.test.js — sonde d'un socket Unix absent : EPERM dans le bac
+   d'exécution, alors que le test attend une erreur d'absence.
+   Échec reproduit sur la base 4061282 intacte.
+2. pwa.test.js — binaire Chromium Playwright attendu absent.
+   Tentative indépendante avec /usr/bin/chromium : lancement refusé par
+   socket() Operation not permitted. Aucun contournement effectué.
+
+7 tests ignorés : exigent Linux root/comptes distincts/confinement OS.
+Le test qui signale un scénario OS partiel conserve également cette limite.
+
+Tests ciblés :
+node --test tests/gmail-reel.test.js tests/connecteurs.test.js tests/securite.test.js
+32 réussis / 32, dont 9 nouveaux tests Gmail. Google : transport SIMULÉ.
+Le parcours HTTP demande → audit → consentement → PDF → brouillon est testé.
+Les actions utilisateur sont automatisées dans les essais.
+
+Deux corrections du banc :
+- horloge du parent restaurée après nettoyage d'un environnement imbriqué ;
+  le test Cockpit échouait sur la base intacte dès changement de date.
+- fermeture du serveur PWA même lorsque le navigateur refuse de démarrer.
+
+Non effectués : appel Google réel, connexion OAuth interactive initiale,
+recette Samsung, Windows, endurance 24 h, restauration pendant charge Gmail.
+Aucun déploiement, aucune fusion, aucune donnée client réelle, aucun envoi mail.

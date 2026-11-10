@@ -1,3 +1,5 @@
+> **Mise à jour du 10 novembre 2026 :** adaptateur Gmail de test implémenté, mais aucun appel Google réel effectué. Lire [15_REPRISE_GMAIL.md](15_REPRISE_GMAIL.md) pour la configuration, les preuves et les limites. Les mentions « absent/non développé » ci-dessous décrivent l’état historique v4.
+
 # 13 — Qui utilise réellement une IA ? Qu'est-ce qui est simulé ? (état factuel)
 
 Statuts : **RÉEL** = exécuté pour de vrai dans ce dépôt et couvert par des tests ; **SIMULÉ** = remplacé par un substitut local ; **ABSENT** = n'existe pas.

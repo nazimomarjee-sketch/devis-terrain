@@ -14,6 +14,7 @@ export const DEMANDE_TYPE = 'Jarvis, prépare un devis pour le garage Martin : 3
 
 /** Environnement isolé : espace temporaire, horloge figée au 2026-11-09, un agent éventuellement saboté volontairement. */
 export function environnement({ espace = 'odicolor', agent = null, defaut = null, isolation = false, memoire = false, dossierJeu = null, confinement = { backend: 'permission' } } = {}) {
+  const horlogeAvant = { gele: horloge.gele, decalageMs: horloge.decalageMs };
   horloge.reinitialiser();
   horloge.gele = Date.parse(`${AUJOURDHUI}T09:00:00Z`);
   const racine = mkdtempSync(join(tmpdir(), 'jarvis-test-'));
@@ -26,7 +27,7 @@ export function environnement({ espace = 'odicolor', agent = null, defaut = null
   const jarvis = new Jarvis({ db, espace: cfg, agents, isolation, racineCode: RACINE, confinement });
   return {
     racine, cfg, fichierDb: cfg.dbChemin, dossierSorties: cfg.dossierSorties, db, jarvis,
-    nettoyer() { try { db.close(); } catch { /* déjà fermée */ } rmSync(racine, { recursive: true, force: true }); horloge.reinitialiser(); },
+    nettoyer() { try { db.close(); } catch { /* déjà fermée */ } rmSync(racine, { recursive: true, force: true }); Object.assign(horloge, horlogeAvant); },
   };
 }
 

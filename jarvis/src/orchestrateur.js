@@ -232,7 +232,7 @@ export class Jarvis {
   }
 
   /** Décision humaine sur une action sensible : intégrité, nouvel audit, puis ENVOI SIMULÉ tracé. */
-  approuver(id, decision, par = 'utilisateur') {
+  approuver(id, decision, par = 'utilisateur', modeGmail = null) {
     const { db } = this;
     return transaction(db, () => {
       const m = db.prepare('SELECT * FROM missions WHERE id = ?').get(id);
@@ -250,6 +250,7 @@ export class Jarvis {
         throw new Error('Le résultat a été modifié depuis l’audit : approbation refusée.');
       }
       const resultat = JSON.parse(m.resultat);
+      if (resultat.type === 'devis' && (param(db, 'connecteur_gmail') === 'reel_test' || modeGmail === 'reel_test') && modeGmail !== param(db, 'connecteur_gmail')) throw new Error('Mode Gmail modifié ou non confirmé : rafraîchir puis approuver à nouveau');
       const rap = this.#auditer(m.agent, m, resultat);
       if (rap.verdict !== 'VALIDE') {
         journaliser(db, { missionId: id, acteur: 'auditeur', evenement: 'REAUDIT_ECHEC_AVANT_ENVOI', detail: { echecs: rap.echecs } });
@@ -262,9 +263,9 @@ export class Jarvis {
       db.prepare(`UPDATE missions SET statut='VALIDE', decide_par=?, maj_le=? WHERE id=?`).run(par, horloge.iso(), id);
       journaliser(db, { missionId: id, acteur: par, evenement: 'APPROUVE_ENVOI_SIMULE', detail: { type: resultat.type } });
       // Action externe : enfilée dans l'outbox DANS LA MÊME TRANSACTION que la décision (jamais d'appel externe direct).
-      if (resultat.type === 'devis' && param(db, 'connecteur_gmail', 'desactive') === 'synthetique') {
+      if (resultat.type === 'devis' && ['synthetique', 'reel_test'].includes(param(db, 'connecteur_gmail', 'desactive'))) {
         const eml = readFileSync(join(this.dossierSorties, resultat.fichiers.eml.chemin));
-        enfiler(db, { missionId: id, connecteur: 'gmail', action: 'CREER_BROUILLON', cle: `brouillon-${id}`, charge: { vers: resultat.client.email, eml_base64: eml.toString('base64') } });
+        enfiler(db, { missionId: id, connecteur: param(db, 'connecteur_gmail') === 'reel_test' ? 'gmail_reel' : 'gmail', action: 'CREER_BROUILLON', cle: `brouillon-${id}`, charge: { vers: resultat.client.email, eml_base64: eml.toString('base64') } });
       }
       return { statut: 'VALIDE', envoi: 'SIMULE' };
     });

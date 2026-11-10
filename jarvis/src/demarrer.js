@@ -15,6 +15,7 @@ import { Interpreteur } from './modeles.js';
 import { lanceurSchtasks } from './echange.js';
 import { fournisseurAnthropic } from './fournisseurs/anthropic.js';
 import { definirParam, param } from './db.js';
+import { connecteurGmailReel, jetonGmail } from './connecteurs/gmail-reel.js';
 import { connecteurGmail } from './connecteurs/gmail.js';
 import { connecteurAirtable } from './connecteurs/airtable.js';
 import { traiter as traiterOutbox } from './outbox.js';
@@ -56,7 +57,17 @@ const jarvis = new Jarvis({ db, espace, isolation: process.env.JARVIS_ISOLATION 
 if (param(db, 'double_execution') === null) definirParam(db, 'double_execution', process.env.JARVIS_DOUBLE_EXECUTION ?? 'sensibles'); // contrôle par défaut en service
 // Connecteurs SYNTHÉTIQUES (aucun accès réel) : exécutés par l'outbox, jamais en direct.
 const connecteurs = { gmail: connecteurGmail({ db, dossierBoite: join(espace.dossier, 'boite-synthetique') }), airtable: connecteurAirtable({ db, fichierBase: join(espace.dossier, 'airtable-synthetique.json') }) };
+// L'API réelle reste inactive sans configuration ET autorisation administrateur.
+let gmailReelConfigure = false;
+if (process.env.JARVIS_GMAIL_COMPTE) {
+  connecteurs.gmail_reel = connecteurGmailReel({ db, compte: process.env.JARVIS_GMAIL_COMPTE,
+    obtenirJeton: jetonGmail({ accessToken: process.env.JARVIS_GMAIL_ACCESS_TOKEN,
+      clientId: process.env.JARVIS_GMAIL_CLIENT_ID, clientSecret: process.env.JARVIS_GMAIL_CLIENT_SECRET,
+      refreshToken: process.env.JARVIS_GMAIL_REFRESH_TOKEN }) });
+  gmailReelConfigure = true;
+}
 const serveur = creerServeur({
+  gmailReelConfigure,
   jarvis, jeton: espace.jeton, jetonAdmin: espace.jetonAdmin, dossierPublic: join(racineCode, 'public'),
   dossierSauvegardes: espace.dossierSauvegardes, cleSauvegarde: espace.cleSauvegarde,
   hotesAutorises: (process.env.JARVIS_HOTES_AUTORISES ?? '').split(',').filter(Boolean),

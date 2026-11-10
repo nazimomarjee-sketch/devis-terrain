@@ -21,7 +21,7 @@ const EN_TETES = { 'Content-Security-Policy': "default-src 'self'; frame-ancesto
 const empreinte = (s) => createHash('sha256').update(s).digest();
 const ID = '(M-\\d{8}-[0-9a-f]{6})';
 
-export function creerServeur({ jarvis, jeton, jetonAdmin, dossierPublic, dossierSauvegardes = null, cleSauvegarde = null, hotesAutorises = [], liensEspaces = [] }) {
+export function creerServeur({ jarvis, jeton, jetonAdmin, dossierPublic, dossierSauvegardes = null, cleSauvegarde = null, hotesAutorises = [], liensEspaces = [], gmailReelConfigure = false }) {
   if (!jeton || jeton.length < 24) throw new Error('Jeton d’accès trop court (24 caractères minimum)');
   if (!jetonAdmin || jetonAdmin.length < 24 || jetonAdmin === jeton) throw new Error('Jeton administrateur absent, trop court ou identique au jeton utilisateur');
   const hU = empreinte(jeton); const hA = empreinte(jetonAdmin);
@@ -67,7 +67,8 @@ export function creerServeur({ jarvis, jeton, jetonAdmin, dossierPublic, dossier
     return {
       heure: horloge.iso(),
       espace: { id: espace.id, libelle: espace.libelle, description: espace.description, donnees_reelles_autorisees: autorise(db, 'donnees_reelles'), liens: liensEspaces },
-      outbox: etatOutbox(db), connecteur_gmail: param(db, 'connecteur_gmail', 'desactive'),
+      brouillons: db.prepare("SELECT mission_id, connecteur, etat, derniere_erreur FROM outbox WHERE action='CREER_BROUILLON' ORDER BY id DESC LIMIT 100").all(),
+      gmail_reel_configure: gmailReelConfigure, outbox: etatOutbox(db), connecteur_gmail: param(db, 'connecteur_gmail', 'desactive'),
       ia: jarvis.interpreteur ? jarvis.interpreteur.etat(db) : { fournisseurs: [], fonctions_locales: 'ok' },
       integrations: etatIntegrations(db), connecteur_cockpit_autorise: autorise(db, 'connecteur:cockpit'),
       mode: autorise(db, 'donnees_reelles') ? 'donnees-reelles-autorisees' : 'demo-donnees-fictives',
@@ -108,8 +109,9 @@ export function creerServeur({ jarvis, jeton, jetonAdmin, dossierPublic, dossier
         if (req.method === 'POST' && chemin === '/api/admin/regles') { const b = await corpsJson(req); definirRegle(db, b, 'administrateur'); return repondre(res, 200, { ok: true }); }
         if (req.method === 'POST' && chemin === '/api/admin/autorisations') { const b = await corpsJson(req); return repondre(res, 201, { id: accorder(db, b, 'administrateur') }); }
         if (req.method === 'POST' && chemin === '/api/admin/parametres') {
-          const b = await corpsJson(req); const OK = { connecteur_gmail: (v) => ['desactive', 'synthetique'].includes(v), double_execution: (v) => ['non', 'sensibles', 'toutes'].includes(v), budget_jour_cents: (v) => /^\d{1,6}$/.test(v) };
+          const b = await corpsJson(req); const OK = { connecteur_gmail: (v) => ['desactive', 'synthetique', 'reel_test'].includes(v), double_execution: (v) => ['non', 'sensibles', 'toutes'].includes(v), budget_jour_cents: (v) => /^\d{1,6}$/.test(v) };
           if (!OK[b.cle] || !OK[b.cle](String(b.valeur))) return repondre(res, 400, { erreur: 'Paramètre ou valeur non autorisés' });
+          if (b.cle === 'connecteur_gmail' && b.valeur === 'reel_test' && (!gmailReelConfigure || !autorise(db, 'integration:gmail'))) return repondre(res, 400, { erreur: 'Configurer Gmail et accorder integration:gmail avant activation' });
           definirParam(db, b.cle, String(b.valeur)); journaliser(db, { acteur: 'administrateur', evenement: 'PARAMETRE_MODIFIE', detail: { cle: b.cle, valeur: String(b.valeur) } }); return repondre(res, 200, { ok: true });
         }
         if (req.method === 'POST' && (m = /^\/api\/admin\/outbox\/(\d+)\/rejouer$/.exec(chemin))) { rejouer(db, Number(m[1])); return repondre(res, 200, { ok: true }); }
@@ -130,7 +132,7 @@ export function creerServeur({ jarvis, jeton, jetonAdmin, dossierPublic, dossier
         res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Disposition': 'inline; filename="devis-brouillon.pdf"', ...EN_TETES }); return createReadStream(f2).pipe(res);
       }
       if (req.method === 'POST' && chemin === '/api/missions') { const b = await corpsJson(req); return repondre(res, 201, jarvis.deposerParUtilisateur(String(b.demande ?? ''), { cle: b.cle ? String(b.cle).slice(0, 80) : null })); }
-      if (req.method === 'POST' && (m = new RegExp(`^/api/missions/${ID}/decision$`).exec(chemin))) { const b = await corpsJson(req); return repondre(res, 200, jarvis.approuver(m[1], String(b.decision), 'utilisateur')); }
+      if (req.method === 'POST' && (m = new RegExp(`^/api/missions/${ID}/decision$`).exec(chemin))) { const b = await corpsJson(req); return repondre(res, 200, jarvis.approuver(m[1], String(b.decision), 'utilisateur', b.mode_gmail)); }
       if (req.method === 'POST' && (m = new RegExp(`^/api/missions/${ID}/relancer$`).exec(chemin))) return repondre(res, 200, jarvis.relancer(m[1]));
       if (req.method === 'POST' && chemin === '/api/arret') { jarvis.arreterTout(); return repondre(res, 200, { arret: true }); }
       if (req.method === 'POST' && chemin === '/api/reprise') { jarvis.reprendre(); return repondre(res, 200, { arret: false }); }

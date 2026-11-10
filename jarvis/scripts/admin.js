@@ -9,5 +9,6 @@ if (!jeton) { console.error('JARVIS_ADMIN_TOKEN manquant'); process.exit(2); }
 const post = async (chemin, corps) => { const r = await fetch(url + chemin, { method: 'POST', headers: { Authorization: `Bearer ${jeton}`, 'Content-Type': 'application/json' }, body: JSON.stringify(corps) }); console.log(r.status, await r.text()); process.exit(r.ok ? 0 : 1); };
 if (cmd === 'regle') { const [type, cle, valeur, statut, justification, source] = a; await post('/api/admin/regles', { type, cle, valeur: JSON.parse(valeur), statut, justification, source }); }
 else if (cmd === 'autorise') { const [type, portee, jours] = a; await post('/api/admin/autorisations', { type, portee, jours: jours ? Number(jours) : null }); }
+else if (cmd === 'parametre') await post('/api/admin/parametres', { cle: a[0], valeur: a[1] });
 else if (cmd === 'revoque') await post(`/api/admin/autorisations/${a[0]}/revoquer`, {});
-else { console.error('Commandes : regle | autorise | revoque'); process.exit(2); }
+else { console.error('Commandes : regle | autorise | revoque | parametre'); process.exit(2); }

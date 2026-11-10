@@ -27,10 +27,11 @@ test('service worker : jamais d’API en cache (données confidentielles) — v�
 test('NAVIGATEUR RÉEL : service worker actif, coquille en cache, AUCUNE donnée en cache, hors ligne explicite, retour en ligne, XSS inopérant, cibles tactiles', { skip: chromium ? false : 'SAUTÉ : Playwright indisponible' }, async () => {
   const e = environnement(); const serveur = creerServeur({ jarvis: e.jarvis, jeton: U, jetonAdmin: A, dossierPublic: join(RACINE, 'public') });
   await new Promise((ok) => serveur.listen(0, '127.0.0.1', ok)); const port = serveur.address().port; const base = `http://127.0.0.1:${port}`;
-  const nav = await chromium.launch(); const ctx = await nav.newContext({ viewport: { width: 360, height: 780 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers: 'allow' });
-  await ctx.addInitScript((t) => { try { localStorage.setItem('jarvis_jeton', t); } catch { /* */ } }, U);
-  const p = await ctx.newPage(); const erreurs = []; const dialogues = []; p.on('pageerror', (x) => erreurs.push(x.message)); p.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource|net::ERR/.test(m.text())) erreurs.push(m.text()); }); p.on('dialog', (d) => { dialogues.push(d.message()); d.dismiss(); });
+  let nav;
   try {
+    nav = await chromium.launch(); const ctx = await nav.newContext({ viewport: { width: 360, height: 780 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers: 'allow' });
+    await ctx.addInitScript((t) => { try { localStorage.setItem('jarvis_jeton', t); } catch { /* */ } }, U);
+    const p = await ctx.newPage(); const erreurs = []; const dialogues = []; p.on('pageerror', (x) => erreurs.push(x.message)); p.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource|net::ERR/.test(m.text())) erreurs.push(m.text()); }); p.on('dialog', (d) => { dialogues.push(d.message()); d.dismiss(); });
     await traiter(e, DEMANDE_TYPE); // une validation en attente
     // XSS : une demande contenant du HTML doit s'afficher comme TEXTE
     e.jarvis.deposerParUtilisateur('<img src=x onerror="window.__xss=1"> <script>window.__xss=2</script> obscur'); await e.jarvis.executerJusquaVide();
@@ -54,7 +55,7 @@ test('NAVIGATEUR RÉEL : service worker actif, coquille en cache, AUCUNE donnée
     // Détail d'une décision : ouverture, fermeture clavier
     await p.click('#carte-prochaine button:has-text("Détail")'); await p.waitForSelector('#detail[open]'); await p.keyboard.press('Escape'); assert.equal(await p.locator('#detail[open]').count(), 0);
     assert.deepEqual(dialogues, [], `dialogues inattendus : ${dialogues}`); assert.deepEqual(erreurs, [], `erreurs console : ${erreurs}`);
-  } finally { await nav.close(); serveur.close(); e.nettoyer(); }
+  } finally { await nav?.close(); serveur.close(); e.nettoyer(); }
 });
 
 test('en-têtes : manifeste servi avec le bon type, jamais mis en cache HTTP par le serveur, icônes accessibles sans jeton', async () => {
