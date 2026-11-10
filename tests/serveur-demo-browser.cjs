@@ -71,7 +71,7 @@ test('Bureau sur Samsung : accessible après activation du cache téléphone, on
   assert.equal(await page.title(),'Ville ODICOLOR');
   assert.equal(await page.evaluate(()=>typeof XLSX),'object');
   await page.locator('#onglets a[href="#ville"]').click();
-  await page.waitForFunction(()=>location.hash==='#ville');
+  await page.locator('#onglets a[href="#ville"][aria-current="page"]').waitFor();
   assert.equal(await page.locator('#onglets a[href="#ville"]').getAttribute('aria-current'),'page');
   assert.deepEqual(errs,[]);await context.close();
 });
