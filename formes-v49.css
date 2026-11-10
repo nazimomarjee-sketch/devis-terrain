@@ -53,3 +53,12 @@ main:has(.v23-objectif) .v23-grid span{font-size:.875rem}
 @media(max-width:360px){.t-rang{flex-wrap:wrap}.t-nom{flex-basis:50%}}
 
 body.v38-home .v38-accueil-hero{height:auto;min-height:100px}
+
+/* Revue du 10/11/2026 : cibles tactiles ≥ 48 px sur les éléments repérés trop petits, sans changer la mise en page. */
+.ck-objectif{margin:2px 0 6px}.ck-lien{display:flex;margin-top:8px;min-height:48px}
+main details>summary{min-height:48px;display:flex;align-items:center;cursor:pointer}
+main details>summary::-webkit-details-marker{display:none}
+main details>summary::after{content:'▾';margin-left:auto;padding-left:8px;opacity:.7}
+main details[open]>summary::after{content:'▴'}
+main label:has(>input[type=checkbox]),main label:has(>input[type=radio]){min-height:48px;display:flex;align-items:center;gap:10px}
+main .btn{min-height:48px}

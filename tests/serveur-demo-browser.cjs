@@ -54,3 +54,9 @@ test('origine terrain : base vide, création persistante, démonstration inacces
   assert.equal(await page.evaluate(()=>document.body.hasAttribute('data-demo')),true);
   assert.deepEqual(errs,[]);await context.close();
 });
+test('première ouverture : aucun bandeau « mise à jour prête » (ce n’est pas une mise à jour) ; la page n’est pas recouverte',async()=>{
+  const context=await browser.newContext({...devices['Galaxy S9+'],httpCredentials:{username:USER,password:PASS}}),page=await context.newPage();
+  await page.goto(origin+'/#/');await page.evaluate(()=>navigator.serviceWorker.ready);await page.waitForTimeout(1500);
+  assert.equal(await page.locator('#v25-maj').count(),0,'bandeau affiché à tort à la première installation');
+  await page.reload();await page.waitForTimeout(1200);assert.equal(await page.locator('#v25-maj').count(),0);await context.close();
+});

@@ -17,5 +17,6 @@ Environnement : Node, Chromium/Playwright émulé (profil Galaxy S9+). **Simulat
 | Anomalie trouvée et corrigée (cycle 5) : `pwa-browser` test 5 intermittent (~50 %) depuis l'ajout des scripts de Ma Ville. Cause : le test passait hors ligne alors qu'un worker en attente n'avait pas encore pris le contrôle (l'application échoue alors de façon sûre : « Chargement incomplet »). Correction : `nextVersion` n'accepte la nouvelle version que si plus aucune mise à jour n'attend ; 8/8 exécutions stables. Aucun test désactivé. | corrigé |
 | Fin cycle 5 : 41 fichiers Node, 13 navigateur Bureau/local, 14 navigateur téléphone, build `--check` | tout OK en local (émulation) ; CI du dernier commit : voir synthèse |
 | Interface (tournée compacte, formes) : 4 tests navigateur sur 360×740, 412×915, 320×658 ; régressions : 16 navigateur téléphone, 42 Node, 13 Bureau/local, build `--check` | tout OK en local (émulation) |
+| Revue du 10/11 (émulation 360×740, serveur en mode terrain) : 26 écrans, 0 erreur JavaScript, 0 requête en échec, 0 « null/undefined/NaN », 0 défilement horizontal. Défaut corrigé : bandeau « mise à jour prête » affiché à tort à la première installation (test ajouté). | corrigé, non déployé |
 | Vrai Samsung | **NON TESTÉ** |
 | Données réelles | **NON TESTÉ** (interdit, B2) |

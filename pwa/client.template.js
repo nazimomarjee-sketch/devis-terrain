@@ -19,7 +19,8 @@
   window.ODICOLOR_PWA={release,ready,asset,integrity:name=>'sha256-'+btoa(String.fromCharCode(...new URL(asset(name),location.href).searchParams.get('odicolor').match(/../g).map(h=>parseInt(h,16))))};
   if('serviceWorker' in navigator)ready.then(async()=>{
     const reg=await navigator.serviceWorker.register('sw.js',{updateViaCache:'none'});
-    const waiting=()=>{if(reg.waiting)dispatchEvent(new Event('odicolor-update-ready'))};
+    // Une vraie mise à jour = un worker en attente ALORS QU'une version est déjà active. À la première installation, le worker passe brièvement par « waiting » : ce n'est pas une mise à jour.
+    const waiting=()=>{if(reg.waiting&&reg.active)dispatchEvent(new Event('odicolor-update-ready'))};
     waiting();reg.addEventListener('updatefound',()=>{const worker=reg.installing;if(worker)worker.addEventListener('statechange',waiting)});
   }).catch(error=>{console.warn('Copie hors ligne non prête',error.message)});
 })();
