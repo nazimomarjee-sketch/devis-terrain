@@ -354,7 +354,10 @@ function apparition() {
 }
 addEventListener('scroll', () => { const on = scrollY > 110; document.body.classList.toggle('defile', on); }, { passive: true });
 function nonTrouve() { montrer('Introuvable', h('p', { class: 'vide' }, 'Cette page n’existe pas. '), h('a', { class: 'btn', href: '#/' }, 'Retour')); }
-async function marquerDemo() { try { document.body.toggleAttribute('data-demo', !!(await get('meta', 'demo'))); document.body.toggleAttribute('data-test-env', /\.up\.railway\.app$/.test(location.hostname)); } catch (e) { /* sans effet */ } }
+// Origine dédiée au terrain : stockage navigateur distinct de la démonstration.
+const HOTE_TERRAIN = 'terrain-odicolor-production.up.railway.app';
+const espaceTerrain = () => location.hostname === HOTE_TERRAIN;
+async function marquerDemo() { try { document.body.toggleAttribute('data-demo', !!(await get('meta', 'demo'))); document.body.toggleAttribute('data-test-env', /\.up\.railway\.app$/.test(location.hostname) && !espaceTerrain()); } catch (e) { /* sans effet */ } }
 async function route() {
   marquerDemo();
   const p = (location.hash || '#/').slice(2).split('?')[0].split('/');
@@ -1195,7 +1198,7 @@ async function pageComparateur() {
 }
 function pagePlus() {
   const L = (href, t, d) => h('a', { class: 'ligne', href, style: 'color:inherit;text-decoration:none' }, h('span', { class: 'g' }, h('strong', {}, t), h('br'), h('small', {}, d)), h('span', {}, '›'));
-  montrer('Plus', L('#/autotest', 'Autotest du téléphone', 'Vérifie automatiquement stockage, chiffrement, hors ligne, vitesse : un seul rapport à copier'), L('#/demo', 'Démonstration (données fictives)', 'Charger un jeu 100 % fictif sur un téléphone vide, fichiers d’essai EBP'), L('#/agenda', 'Rendez-vous', 'Ton agenda avec heures ; intégré à la tournée du jour'), L('#/secteurs', 'Secteurs', 'CA, clients actifs/dormants, prospects et priorités par département et commune'), L('#/clients-ebp', 'Clients EBP', 'Relier les codes clients EBP à tes garages (tu valides chaque lien)'), L('#/ville', 'Ma Ville', 'Tes garages commune par commune, en vue LEGO tactile'), L('#/carte', 'Carte commerciale', 'Tous tes garages sur la carte, regroupés, hors ligne'), L('#/cockpit', 'Cockpit', 'Tes priorités du jour : CA, relances, devis, prospects, clients à voir'), L('#/ca', 'CA facturé HT', 'Tes factures et avoirs HT : le chiffre d’affaires, sans doublon'), L('#/travail', 'Mon travail', 'Tes 6 chiffres : visites, devis, commandes, factures, impayés'), L('#/point', 'Point du lundi', 'Le récap de la semaine écoulée : bilan, UN changement, engagements'), L('#/feuille', 'Feuille de route', 'Le plan de la semaine qui commence, jour par jour'), L('#/pc', 'Lien avec le PC', 'Envoyer ta sauvegarde au PC, recevoir le plan de la semaine'), L('#/evolution', 'Évolution', 'Tous les indicateurs, semaine par semaine, avec leur courbe'), L('#/signalements', 'Signalements', 'Problèmes remontés avec photo et leur suivi'), L('#/signaler', 'Signaler un problème', 'Photo + note envoyées à ton responsable'),
+  montrer('Plus', L('#/autotest', 'Autotest du téléphone', 'Vérifie automatiquement stockage, chiffrement, hors ligne, vitesse : un seul rapport à copier'), espaceTerrain() ? null : L('#/demo', 'Démonstration (données fictives)', 'Charger un jeu 100 % fictif sur un téléphone vide, fichiers d’essai EBP'), L('#/agenda', 'Rendez-vous', 'Ton agenda avec heures ; intégré à la tournée du jour'), L('#/secteurs', 'Secteurs', 'CA, clients actifs/dormants, prospects et priorités par département et commune'), L('#/clients-ebp', 'Clients EBP', 'Relier les codes clients EBP à tes garages (tu valides chaque lien)'), L('#/ville', 'Ma Ville', 'Tes garages commune par commune, en vue LEGO tactile'), L('#/carte', 'Carte commerciale', 'Tous tes garages sur la carte, regroupés, hors ligne'), L('#/cockpit', 'Cockpit', 'Tes priorités du jour : CA, relances, devis, prospects, clients à voir'), L('#/ca', 'CA facturé HT', 'Tes factures et avoirs HT : le chiffre d’affaires, sans doublon'), L('#/travail', 'Mon travail', 'Tes 6 chiffres : visites, devis, commandes, factures, impayés'), L('#/point', 'Point du lundi', 'Le récap de la semaine écoulée : bilan, UN changement, engagements'), L('#/feuille', 'Feuille de route', 'Le plan de la semaine qui commence, jour par jour'), L('#/pc', 'Lien avec le PC', 'Envoyer ta sauvegarde au PC, recevoir le plan de la semaine'), L('#/evolution', 'Évolution', 'Tous les indicateurs, semaine par semaine, avec leur courbe'), L('#/signalements', 'Signalements', 'Problèmes remontés avec photo et leur suivi'), L('#/signaler', 'Signaler un problème', 'Photo + note envoyées à ton responsable'),
     L('#/comparateur', 'Comparateur de coût', 'Coût réel au m² : produit actuel contre produit proposé'), L('#/reglages', 'Réglages', 'Objectifs, responsable, TVA, sauvegarde'));
 }
 
@@ -2361,6 +2364,7 @@ async function pageAgenda(clientPre) {
 
 // ---------- Démonstration : données 100 % fictives, uniquement sur une base vide ----------
 async function pageDemo() {
+  if (espaceTerrain()) return montrer('Mon espace de travail', h('section', {class:'carte'}, h('strong', {}, 'Cet espace est réservé à tes garages.'), h('p', {}, 'Les essais avec des données fictives restent dans la démonstration séparée.'), h('a', {class:'btn', href:'#/'}, 'Retour à l’accueil')));
   const [cl, dv, ar, demo] = [await getAll('clients'), await getAll('devis'), await getAll('articles'), await get('meta', 'demo')], auj = jourLocal(new Date());
   const vide = !cl.length && !dv.length && !ar.length, d = ODICOLOR_DEMO.generer(auj, ODICOLOR_COMMUNES_CENTRES);
   const telecharger2 = (nom, texte) => telecharger(nom, texte, 'text/csv');

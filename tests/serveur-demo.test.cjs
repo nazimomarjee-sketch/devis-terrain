@@ -29,3 +29,13 @@ test('force brute : au bout de 5 échecs, même le bon mot de passe est refusé 
   for(let i=0;i<5;i++)assert.equal((await fetch(b+'/',{headers:auth(USER,'x'+i)})).status,401);
   assert.equal((await fetch(b+'/',{headers:auth(USER,PASS)})).status,429);s2.close();
 });
+test('terrain privé : accès protégé et mode de santé distinct',async()=>{
+  assert.throws(()=>creer({user:USER,pass:PASS,mode:'public'}),/Mode/);
+  const s=creer({user:USER,pass:PASS,mode:'terrain-prive'});
+  await new Promise(r=>s.listen(0,'127.0.0.1',r));
+  try { const b=`http://127.0.0.1:${s.address().port}`;
+    const r=await fetch(b+'/');assert.equal(r.status,401);assert.match(r.headers.get('www-authenticate'),/espace de travail/);
+    assert.equal((await (await fetch(b+'/sante')).json()).mode,'terrain-prive');
+    assert.equal((await fetch(b+'/',{headers:auth(USER,PASS)})).status,200);
+  } finally { s.close(); }
+});

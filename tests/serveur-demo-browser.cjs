@@ -25,3 +25,32 @@ test('autotest embarqué : tous les contrôles automatiques réussissent (via le
   const rapport=await page.getByLabel('Rapport de l’autotest').inputValue();assert.match(rapport,/\[OK\]\s+Sauvegarde chiffrée/);assert.match(rapport,/À FAIRE À LA MAIN/);assert.doesNotMatch(rapport,/\b(null|undefined|NaN)\b/);
   assert.deepEqual(errs,[]);await context.close();
 });
+test('origine terrain : base vide, création persistante, démonstration inaccessible ; marqueur fictif jamais masqué',async()=>{
+  // Le routage teste l’origine HTTPS exacte avec le serveur local ; le hors-ligne est couvert ci-dessus.
+  const terrain='https://terrain-odicolor-production.up.railway.app';
+  const context=await browser.newContext({...devices['Galaxy S9+'],serviceWorkers:'block'}),errs=[];
+  await context.route(terrain+'/**',async route=>{
+    const u=new URL(route.request().url());
+    const response=await route.fetch({url:origin+u.pathname+u.search,headers:{Authorization:'Basic '+Buffer.from(USER+':'+PASS).toString('base64')}});
+    await route.fulfill({response});
+  });
+  let page=await context.newPage();page.on('pageerror',e=>errs.push(e.message));
+  await page.goto(terrain+'/#/nouveau-garage');await page.getByLabel('Nom du garage',{exact:true}).waitFor();
+  assert.equal(await page.evaluate(async()=>(await getAll('clients')).length),0);
+  assert.equal(await page.evaluate(()=>document.body.hasAttribute('data-test-env')),false);
+  await page.getByLabel('Nom du garage',{exact:true}).fill('Garage test isolé');
+  await page.getByLabel('Ville du garage',{exact:true}).fill('Palaiseau');
+  await page.getByRole('button',{name:'Créer et vérifier le prospect',exact:true}).click();
+  await page.waitForURL('**/#/dossier-prospect/*');await page.close();
+  page=await context.newPage();page.on('pageerror',e=>errs.push(e.message));
+  await page.goto(terrain+'/#/clients');await page.getByText('Garage test isolé',{exact:true}).first().waitFor();
+  assert.equal(await page.evaluate(async()=>(await getAll('clients')).length),1);
+  await page.goto(terrain+'/#/plus');await page.getByRole('link',{name:/Autotest du téléphone/}).waitFor();
+  assert.equal(await page.locator('a[href="#/demo"]').count(),0);
+  await page.goto(terrain+'/#/demo');await page.getByText('Cet espace est réservé à tes garages.').waitFor();
+  assert.equal(await page.getByRole('button',{name:'Charger la démonstration'}).count(),0);
+  assert.equal(await page.evaluate(async()=>(await getAll('clients')).length),1);
+  await page.evaluate(async()=>{await put('meta',true,'demo');await marquerDemo();});
+  assert.equal(await page.evaluate(()=>document.body.hasAttribute('data-demo')),true);
+  assert.deepEqual(errs,[]);await context.close();
+});

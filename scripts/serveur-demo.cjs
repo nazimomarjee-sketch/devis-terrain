@@ -12,7 +12,8 @@ const PUBLICS = new Set(['manifest.webmanifest', 'icon-192.png', 'icon-512.png',
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json', '.json': 'application/json', '.svg': 'image/svg+xml' };
 const egal = (a, b) => { const x = crypto.createHash('sha256').update(String(a)).digest(), y = crypto.createHash('sha256').update(String(b)).digest(); return crypto.timingSafeEqual(x, y); };
 
-function creer({ user, pass, journal = () => {} }) {
+function creer({ user, pass, mode = 'demo-prive', journal = () => {} }) {
+  if (!['demo-prive', 'terrain-prive'].includes(mode)) throw new Error('Mode de service inconnu.');
   if (!user || !pass || String(pass).length < 12) throw new Error('DEMO_USER et DEMO_PASS (12 caractères minimum) sont obligatoires : démarrage refusé.');
   const echecs = new Map();
   const bloque = ip => { const e = echecs.get(ip); return !!e && e.n >= 5 && Date.now() - e.t < 60000; };
@@ -22,13 +23,13 @@ function creer({ user, pass, journal = () => {} }) {
     const ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
     let chemin; try { chemin = decodeURIComponent(new URL(req.url, 'http://x').pathname); } catch (_) { res.writeHead(400, enTetes('text/plain')); return res.end('Requête invalide'); }
     if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405, enTetes('text/plain', { Allow: 'GET, HEAD' })); return res.end('Méthode non autorisée'); }
-    if (chemin === '/sante') { res.writeHead(200, enTetes('application/json', { 'Cache-Control': 'no-store' })); return res.end(JSON.stringify({ ok: true, release: release.id.slice(0, 12), mode: 'demo-prive' })); }
+    if (chemin === '/sante') { res.writeHead(200, enTetes('application/json', { 'Cache-Control': 'no-store' })); return res.end(JSON.stringify({ ok: true, release: release.id.slice(0, 12), mode })); }
     const nom = chemin === '/' ? 'index.html' : chemin.replace(/^\//, '');
     if (!PUBLICS.has(nom)) {
       if (bloque(ip)) { res.writeHead(429, enTetes('text/plain', { 'Retry-After': '60' })); return res.end('Trop d’essais. Réessaie dans une minute.'); }
       const h = req.headers.authorization || '', m = /^Basic (.+)$/.exec(h); let ok = false;
       if (m) { const [u, ...p] = Buffer.from(m[1], 'base64').toString('utf8').split(':'); ok = egal(u, user) & egal(p.join(':'), pass); }
-      if (!ok) { if (m) echec(ip); res.writeHead(401, enTetes('text/plain', { 'WWW-Authenticate': 'Basic realm="ODICOLOR démonstration privée", charset="UTF-8"', 'Cache-Control': 'no-store' })); return res.end('Authentification requise'); }
+      if (!ok) { if (m) echec(ip); res.writeHead(401, enTetes('text/plain', { 'WWW-Authenticate': 'Basic realm="' + (mode === 'terrain-prive' ? 'ODICOLOR espace de travail' : 'ODICOLOR démonstration privée') + '", charset="UTF-8"', 'Cache-Control': 'no-store' })); return res.end('Authentification requise'); }
     }
     if (!FICHIERS.has(nom)) { res.writeHead(404, enTetes('text/plain')); return res.end('Introuvable'); }
     const f = path.join(RACINE, nom); let octets; try { octets = fs.readFileSync(f); } catch (_) { res.writeHead(404, enTetes('text/plain')); return res.end('Introuvable'); }
@@ -40,6 +41,6 @@ function creer({ user, pass, journal = () => {} }) {
 module.exports = { creer, FICHIERS, PUBLICS };
 if (require.main === module) {
   const port = Number(process.env.PORT) || 8080;
-  let s; try { s = creer({ user: process.env.DEMO_USER, pass: process.env.DEMO_PASS }); } catch (e) { console.error(e.message); process.exit(1); }
-  s.listen(port, '0.0.0.0', () => console.log('Démonstration privée ODICOLOR prête sur le port ' + port + ' · version ' + release.id.slice(0, 12)));
+  let s; try { s = creer({ user: process.env.DEMO_USER, pass: process.env.DEMO_PASS, mode: process.env.ODICOLOR_MODE || 'demo-prive' }); } catch (e) { console.error(e.message); process.exit(1); }
+  s.listen(port, '0.0.0.0', () => console.log((process.env.ODICOLOR_MODE === 'terrain-prive' ? 'Espace de travail ODICOLOR prêt sur le port ' : 'Démonstration privée ODICOLOR prête sur le port ') + port + ' · version ' + release.id.slice(0, 12)));
 }

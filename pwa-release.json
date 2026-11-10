@@ -1,5 +1,5 @@
 {
-  "id": "773dd7c30a4df9e527e704022727ec310fd01f9cd61311a965b154f639df0537",
+  "id": "4d812d5b4c3721303cd98d0bf141b65b384b966eea5e2e877198b5ef0f7bcceb",
   "assets": [
     {
       "path": "accueil-v23.css",
@@ -19,7 +19,7 @@
     },
     {
       "path": "app.js",
-      "sha256": "6a8ba016506ef65d20a88b1b00f18b16ef36e75b74221938fba433581ed8aba2"
+      "sha256": "216e5b8cdeba2fff962a21d1363796341da4f73fcdc3e85bd5eeb00dd14da5a5"
     },
     {
       "path": "apparence-v26.css",
@@ -159,7 +159,7 @@
     },
     {
       "path": "index.html",
-      "sha256": "7bd2b1c373049b7c458518bcf08172389373632248846fd3a6528dc88d4a0afb"
+      "sha256": "2f0144a35470f82cca9d225cda81eabaedf8e27ee7196d1380434622deec86f8"
     },
     {
       "path": "logo-96.png",
@@ -203,7 +203,7 @@
     },
     {
       "path": "pwa-client.js",
-      "sha256": "8aa169a47d4f81da463c785263cb2d65f4b4cee2d57d06ba69fafa6f79fabcc6"
+      "sha256": "155e81ab838a53d516d7d91f04e5fe51486d9a41b8fb63e40a3cc4b1d192e645"
     },
     {
       "path": "rappels-produits-v24.js",
