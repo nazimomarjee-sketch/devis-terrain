@@ -52,11 +52,11 @@ main:has(.v23-objectif) .v23-grid span{font-size:.875rem}
 .t-visite{font-size:1rem;white-space:normal}
 @media(max-width:360px){.t-rang{flex-wrap:wrap}.t-nom{flex-basis:50%}}
 
-/* Accueil compact : bandeau sans photographie, CA résumé sur deux lignes.
+/* Accueil compact : photo en bandeau avec fondu noir, CA résumé sur deux lignes.
    Les détails restent accessibles et le texte peut revenir à la ligne au zoom. */
-body.v38-home .v38-accueil-hero{height:auto;min-height:0;padding:10px 14px;display:block;background-image:none;background-color:var(--card);box-shadow:none}
+body.v38-home .v38-accueil-hero{height:auto;min-height:112px;padding:12px 14px;display:flex;justify-content:flex-end;border:0;background-color:#06090E;background-position:center 44%;box-shadow:none}
 body.v38-home .v38-accueil-hero .v38-eyebrow{display:none}
-body.v38-home .v38-accueil-hero strong{font-size:1.25rem;margin:0;text-shadow:none}
+body.v38-home .v38-accueil-hero strong{font-size:1.25rem;margin:0;text-shadow:0 2px 8px #000}
 body.v38-home .v23-objectif{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:8px;padding:10px 12px!important}
 .v49-ca-details{min-width:0}
 .v49-ca-details>summary{gap:4px}

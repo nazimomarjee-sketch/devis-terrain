@@ -85,12 +85,13 @@ test('accueil compact : CA et action visibles sans défiler, vide ou avec une to
     const m=await page.evaluate(()=>{
       const box=s=>document.querySelector(s).getBoundingClientRect();
       return {bandeau:box('.v38-accueil-hero').height,ca:box('.v23-objectif').height,bouton:box('.v23-primary').bottom,nav:box('.onglets').top,
-        photo:getComputedStyle(document.querySelector('.v38-accueil-hero')).backgroundImage,
+        photo:getComputedStyle(document.querySelector('.v38-accueil-hero')).backgroundImage.includes('data:image/webp'),
+        fondu:getComputedStyle(document.querySelector('.v38-accueil-hero')).backgroundImage.includes('linear-gradient'),
         overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,
         petits:[...document.querySelectorAll('.v23-objectif summary,.v23-objectif a,.v23-prochaine summary,.v23-primary')].map(e=>e.getBoundingClientRect()).filter(b=>b.height>0&&(b.height<48||b.width<48)).length};
     });
-    assert.ok(m.bandeau<=60,'bandeau : '+m.bandeau);assert.ok(m.ca<=100,'CA compact : '+m.ca);assert.ok(m.bouton<=m.nav,'action cachée : '+JSON.stringify(m));
-    assert.equal(m.photo,'none');assert.equal(m.petits,0);assert.ok(m.overflow<=0);
+    assert.ok(m.bandeau<=120,'bandeau : '+m.bandeau);assert.ok(m.ca<=100,'CA compact : '+m.ca);assert.ok(m.bouton<=m.nav,'action cachée : '+JSON.stringify(m));
+    assert.equal(m.photo,true);assert.equal(m.fondu,true);assert.equal(m.petits,0);assert.ok(m.overflow<=0);
     assert.equal(await page.locator('.v49-ca-details').evaluate(e=>e.open),false);
     await page.getByLabel('Détails du CA facturé',{exact:true}).click();await page.getByText(/Source : factures et avoirs HT saisis/).waitFor();
     await page.getByLabel('Détails du CA facturé',{exact:true}).click();
