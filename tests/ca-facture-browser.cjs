@@ -30,7 +30,7 @@ test('saisie contrôlée : CA = factures − avoirs ; doublon et futur refusés 
   // une commande envoyée de 9 999 € : ne doit JAMAIS entrer dans le CA
   await page.evaluate(({AUJ})=>putMany('clients',[{id:1,nom:'GARAGE FICTIF CA',factures:[]}]).then(()=>putMany('devis',[{id:1,clientId:1,clientNom:'GARAGE FICTIF CA',creeLe:AUJ+'T08:00:00Z',statut:'envoye',commandeLe:AUJ,lignes:[{code:'X',des:'Produit fictif',q:100,pu:999900,r:0}]}])),{AUJ});
   await page.evaluate(()=>put('meta',{...S,objDepart:new Date().toISOString().slice(0,7),objectifs:[100000000,0,0]},'settings').then(()=>{S={...S,objDepart:new Date().toISOString().slice(0,7),objectifs:[100000000,0,0]};}));
-  await page.goto(origin+'/#/');await page.getByText('CA non renseigné').waitFor();
+  await page.goto(origin+'/#/');await page.locator('.v23-objectif').getByText('Non renseigné',{exact:true}).waitFor();
   await page.goto(origin+'/#/ca');await page.getByRole('heading',{name:'Ajouter une pièce'}).waitFor();
   await saisir(page,{num:'F-2026-001',montant:'1 000,00'});await page.getByText('Facture F-2026-001').waitFor();
   await saisir(page,{num:'F-2026-002',montant:'500'});await page.getByText('Facture F-2026-002').waitFor();

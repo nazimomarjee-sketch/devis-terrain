@@ -54,6 +54,7 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Tester la récupération avec IndexedDB réel et les modules complets
         run: |
+          ODICOLOR_CAPTURE_DIR="${{ runner.temp }}/captures-accueil" node tests/tournee-compacte-browser.cjs
           node tests/backup-browser.cjs
           node tests/pwa-browser.cjs
           node tests/null-ui-browser.cjs
@@ -68,7 +69,6 @@ jobs:
           node tests/agenda-browser.cjs
           node tests/demo-browser.cjs
           node tests/serveur-demo-browser.cjs
-          ODICOLOR_CAPTURE_DIR="${{ runner.temp }}/captures-accueil" node tests/tournee-compacte-browser.cjs
       - name: Tester le Bureau et l'application locale (navigateur, données fictives)
         run: |
           for f in tests/*navigateur.cjs; do echo "== $f"; node "$f" || exit 1; done
