@@ -68,7 +68,7 @@ jobs:
           node tests/agenda-browser.cjs
           node tests/demo-browser.cjs
           node tests/serveur-demo-browser.cjs
-          node tests/tournee-compacte-browser.cjs
+          ODICOLOR_CAPTURE_DIR="${{ runner.temp }}/captures-accueil" node tests/tournee-compacte-browser.cjs
       - name: Tester le Bureau et l'application locale (navigateur, données fictives)
         run: |
           for f in tests/*navigateur.cjs; do echo "== $f"; node "$f" || exit 1; done
@@ -97,5 +97,13 @@ jobs:
         with:
           name: odicolor-test-pr2-20261028-guide
           path: ${{ runner.temp }}/preview-samsung/guide/
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Conserver le rendu de l’accueil compact
+        uses: actions/upload-artifact@v4
+        with:
+          name: accueil-compact-samsung
+          path: ${{ runner.temp }}/captures-accueil/
           if-no-files-found: error
           retention-days: 7

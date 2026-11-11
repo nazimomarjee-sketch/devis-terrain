@@ -44,7 +44,7 @@ test('saisie contrôlée : CA = factures − avoirs ; doublon et futur refusés 
   assert.equal(r.entrees.length,3,'seules les trois pièces valides sont enregistrées');
   await page.getByText('1 300,00 €').first().waitFor();                      // 1000 + 500 − 200
   // accueil : CA facturé 1 300 €, commandes 9 999 € affichées séparément
-  await page.goto(origin+'/#/');await page.getByText('Sources et autres montants',{exact:true}).click();await page.locator('.v23-objectif').getByText(/commandes envoyées 9.999,00 € HT/).waitFor();
+  await page.goto(origin+'/#/');await page.getByLabel('Détails du CA facturé',{exact:true}).click();await page.locator('.v23-objectif').getByText(/commandes envoyées 9.999,00 € HT/).waitFor();
   const carte=page.locator('.v23-objectif'),texte=await carte.innerText();
   assert.match(texte,/OBJECTIF · CA FACTURÉ HT/);assert.match(texte,/Mois : 1[  ]300,00 €/);assert.doesNotMatch(texte.split('Source')[0],/9[  ]999/,'les commandes ne sont pas dans le chiffre d’objectif');
   assert.deepEqual(errs,[]);await context.close();

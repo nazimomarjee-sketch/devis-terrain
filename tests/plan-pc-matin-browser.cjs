@@ -65,7 +65,7 @@ for (const heure of ['08:30', '11:59', '14:00', '23:30']) test('export du jour a
     assert.match(await page.textContent('body'), /GARAGE FICTIF OMEGA[\s\S]*Aucune commande depuis 114 j/);
     // 2. Accueil : la ligne « montants EBP » et 3. le garage présélectionné pour la note terrain.
     await page.goto(origin + '/#/');
-    await page.getByText('Sources et autres montants', {exact:true}).click();
+    await page.getByLabel('Détails du CA facturé', {exact:true}).click();
     await page.waitForSelector('text=montants EBP à consulter sur Mon travail');
     await page.waitForSelector('.v29-home-note small:has-text("Pour GARAGE FICTIF OMEGA")');
     assert.deepEqual(erreurs, []);

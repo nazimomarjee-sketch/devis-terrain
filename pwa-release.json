@@ -1,5 +1,5 @@
 {
-  "id": "2342a33fccee5a05cc4b53dc369704a16ca5e3e5da28a27d446d7d748242a9eb",
+  "id": "846ab346614e0178d6450073cf40ae8cd93e42c302af5619593a5b3a0c9e4ae9",
   "assets": [
     {
       "path": "accueil-v23.css",
@@ -7,7 +7,7 @@
     },
     {
       "path": "accueil-v23.js",
-      "sha256": "97258f656773a54bc260ed582347b914623d4eb9f603eb33bc696441e846f037"
+      "sha256": "1780c201a05cddce9ee8ec9160bd99b68416f85d1d002e15e48a2863f762558d"
     },
     {
       "path": "agent-commercial-v35.css",
@@ -127,7 +127,7 @@
     },
     {
       "path": "formes-v49.css",
-      "sha256": "3cecafbe2f23ebb1a942dfafc08d21e9d50663d3968feaabc36bfbf492d853a8"
+      "sha256": "7b2705eafd61f2efea38099e010bad309aad81197e11028184a010c4ec7d0c81"
     },
     {
       "path": "grand-ecran-v48.css",
@@ -159,7 +159,7 @@
     },
     {
       "path": "index.html",
-      "sha256": "3bd64a6364bffe13f9fd4fb6586bf8d43f6bd0df917ec3db5f8777eac05d4d10"
+      "sha256": "b251e0127c47d76e3f763b199474fc39da87d5991f3986e741a72c9a32ba1a8f"
     },
     {
       "path": "logo-96.png",
@@ -203,7 +203,7 @@
     },
     {
       "path": "pwa-client.js",
-      "sha256": "7ba05b81e7d8d892302a3d09d0fda761ecd040534ab3480e71723744565525b8"
+      "sha256": "adb53b0d03bf0c7bfea3e5422a8825144a9df19e008dd24d29503632ec5a686b"
     },
     {
       "path": "rappels-produits-v24.js",

@@ -76,3 +76,26 @@ test('accueil : objectif puis action, tournée résumée ; grandes polices à 20
   }
   assert.deepEqual(errs,[]);await context.close();
 });
+
+test('accueil compact : CA et action visibles sans défiler, vide ou avec une tournée, 360×740 et 412×915',async()=>{
+  for(const [w,h] of [[360,740],[412,915]]) for(const vide of [true,false]) {
+    const {context,page,errs}=await ouvrir(w,h);
+    if(vide)await page.evaluate(async()=>{await new Promise((resolve,reject)=>{const tx=DB.db.transaction('clients','readwrite');tx.objectStore('clients').clear();tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});await ecrireTournees({})});
+    await page.goto(origin+'/#/');await page.locator('.v38-accueil-hero').waitFor();
+    const m=await page.evaluate(()=>{
+      const box=s=>document.querySelector(s).getBoundingClientRect();
+      return {ca:box('.v23-objectif').height,bouton:box('.v23-primary').bottom,nav:box('.onglets').top,
+        photo:getComputedStyle(document.querySelector('.v38-accueil-hero')).backgroundImage,
+        overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,
+        petits:[...document.querySelectorAll('.v23-objectif summary,.v23-objectif a,.v23-prochaine summary,.v23-primary')].map(e=>e.getBoundingClientRect()).filter(b=>b.height>0&&(b.height<48||b.width<48)).length};
+    });
+    assert.ok(m.ca<=100,'CA compact : '+m.ca);assert.ok(m.bouton<=m.nav,'action cachée : '+JSON.stringify(m));
+    assert.equal(m.photo,'none');assert.equal(m.petits,0);assert.ok(m.overflow<=0);
+    assert.equal(await page.locator('.v49-ca-details').evaluate(e=>e.open),false);
+    await page.getByLabel('Détails du CA facturé',{exact:true}).click();await page.getByText(/Source : factures et avoirs HT saisis/).waitFor();
+    await page.getByLabel('Détails du CA facturé',{exact:true}).click();
+    if(vide&&w===412&&process.env.ODICOLOR_CAPTURE_DIR){fs.mkdirSync(process.env.ODICOLOR_CAPTURE_DIR,{recursive:true});await page.screenshot({path:path.join(process.env.ODICOLOR_CAPTURE_DIR,'accueil-compact.png')});}
+    await page.getByRole('link',{name:'Saisir mon CA facturé',exact:true}).click();await page.waitForURL(/#\/ca$/);
+    assert.deepEqual(errs,[]);console.log({format:w+'×'+h,vide,...m});await context.close();
+  }
+});

@@ -25,14 +25,22 @@
     const cmdMois=dv.filter(d=>d.commandeLe&&String(d.commandeLe).slice(0,7)===mk).reduce((a,d)=>a+totaux(d).ht,0);
     const encMois=(cl||[]).reduce((a,c)=>a+(Array.isArray(c.factures)?c.factures:[]).filter(f=>f&&f.regleLe&&String(f.regleLe).slice(0,7)===mk).reduce((b,f)=>b+(f.montant||0),0),0);
     return h('section',{class:'carte v23-objectif'},
-      h('div',{class:'v23-between'},h('small',{class:'etiq'},'OBJECTIF · CA FACTURÉ HT'),h('small',{class:'mut'},'Cette semaine')),
-      h('div',{class:'v23-argent'},renseigne?[h('strong',{},montant(caSem)),h('span',{class:'mut'},objectif?' / '+montant(objectif):' · objectif à régler')]:h('strong',{},'CA non renseigné')),
-      objectif&&renseigne?h('div',{class:'piste',role:'progressbar','aria-valuenow':pct,'aria-valuemin':'0','aria-valuemax':'100','aria-label':'Avancement de l’objectif hebdomadaire en CA facturé'},
-        h('div',{class:'rempli',style:'width:'+pct+'%'})):null,
-      h('p',{class:'mut'},!renseigne?'Saisis tes factures et avoirs HT.':objectif?(pct+' % · reste '+montant(Math.max(0,objectif-caSem))+' à facturer'):'Définir un objectif pour suivre le CA de la semaine.'),
-      renseigne&&om?h('p',{class:'mut'},'Mois : '+montant(mois.totalCents)+' sur '+montant(om.cents)+' ('+Math.max(0,Math.min(100,Math.round(mois.totalCents/om.cents*100)))+' %)'):null,
-      h('details',{class:'v49-ca-details'},h('summary',{},'Sources et autres montants'),h('small',{class:'v23-source'},'Source : factures et avoirs HT saisis par toi · indicateurs séparés ce mois : commandes envoyées '+montant(cmdMois)+' HT · encaissé '+montant(encMois)+' · '+ligneEbp),h('div',{class:'actions'},lien('#/cockpit','Cockpit','sec'),!objectif?lien('#/reglages','Régler mon objectif'):null)),
-      h('div',{class:'actions'},lien('#/ca',renseigne?'Voir / saisir mon CA':'Saisir mon CA facturé','sec')));
+      h('details',{class:'v49-ca-details'},
+        h('summary',{'aria-label':'Détails du CA facturé'},
+          h('span',{class:'v49-ca-resume'},
+            h('small',{class:'etiq'},'OBJECTIF · CA FACTURÉ HT'),
+            h('span',{class:'v23-argent'},h('strong',{},renseigne?montant(caSem):'Non renseigné'),
+              h('span',{class:'mut'},objectif?' / '+montant(objectif):' · semaine')))),
+        h('div',{class:'v49-ca-contenu'},
+          h('small',{class:'mut'},'Cette semaine'),
+          objectif&&renseigne?h('div',{class:'piste',role:'progressbar','aria-valuenow':pct,'aria-valuemin':'0','aria-valuemax':'100','aria-label':'Avancement de l’objectif hebdomadaire en CA facturé'},
+            h('div',{class:'rempli',style:'width:'+pct+'%'})):null,
+          h('p',{class:'mut'},!renseigne?'Saisis tes factures et avoirs HT.':objectif?(pct+' % · reste '+montant(Math.max(0,objectif-caSem))+' à facturer'):'Définir un objectif pour suivre le CA de la semaine.'),
+          renseigne&&om?h('p',{class:'mut'},'Mois : '+montant(mois.totalCents)+' sur '+montant(om.cents)+' ('+Math.max(0,Math.min(100,Math.round(mois.totalCents/om.cents*100)))+' %)'):null,
+          h('small',{class:'v23-source'},'Source : factures et avoirs HT saisis par toi · indicateurs séparés ce mois : commandes envoyées '+montant(cmdMois)+' HT · encaissé '+montant(encMois)+' · '+ligneEbp),
+          h('div',{class:'actions'},lien('#/cockpit','Cockpit','sec'),!objectif?lien('#/reglages','Régler mon objectif'):null))),
+      h('a',{href:'#/ca',class:'btn sec v49-ca-saisir','aria-label':'Saisir mon CA facturé'},'Saisir'));
+
   }
 
   function candidats(dv,cl,pc,tours) {
