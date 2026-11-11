@@ -1,4 +1,19 @@
-# PROGRESS (état réel)
+# PROGRESS (état réel) — point d'entrée unique de reprise
+
+## Point de reprise au 11/11/2026
+Archive détaillée (privée, hors dépôt) : Google Drive du propriétaire, document « ODICOLOR — Archive de reprise 2026-11-11 » (identifiants d'hébergement, blocage exact, prochaine action). Ce dépôt public n'en reprend que l'état.
+
+| Sujet | Codé | Poussé | Testé (CI, émulation) | Déployé | Validé sur Samsung |
+|---|---|---|---|---|---|
+| Accueil terrain compact (commit `09289d4`, empreinte PWA `509abf9e18ec`) | oui | oui | oui (CI 43022486170 verte) | **NON** | **NON** |
+| Revue du 10/11 (faux bandeau de mise à jour, cockpit, cibles tactiles — `37524ae`) | oui | oui | oui | **NON** (inclus dans `09289d4`) | **NON** |
+| Espace terrain privé et démonstration séparée | oui | oui | oui | oui, sur une version ANTÉRIEURE (empreinte servie `2342a33fccee` d'après les journaux du 11/11) | **NON** |
+
+**Blocage** : la publication de `09289d4` sur l'espace terrain attend une approbation ; un changement de configuration est en attente côté hébergeur. Un statut « SUCCESS » ne suffit pas : la réussite = l'empreinte `509abf9e18ec` servie par `/sante`.
+**Une seule prochaine action** : sur accord explicite du propriétaire, appliquer le changement en attente par le circuit d'approbation, puis contrôler l'empreinte servie. Ne rien contourner.
+**Encore ouvert** : capture réelle du cockpit/Ville au format ordinateur 16 pouces ; recette sur le vrai Samsung (`docs/RECETTE_SAMSUNG_FINALE.md`).
+
+## Historique
 **Réel et testé** : lots A/B/C (comptes, vérifier les comptes, Mes garages en vue Commune) sur données fictives ; CA facturé HT (module Bureau) ; lecture sauvegarde téléphone ; sauvegarde/restauration/PWA hors ligne (Lot 1 intégré) ; recensement 45.20A (méthode, comptage officiel, convertisseur Marché) ; test d'intégration 1 500 garages.
 **Partiel** : objectif téléphone encore sur « commandes » ; cockpit/coffre supposent un PC (B1).
 **Absent** : validation vrai Samsung ; données réelles ; chiffrement de l'export (B4) ; carte >1 000 garages en vrai.
