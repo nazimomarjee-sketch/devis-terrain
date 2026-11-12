@@ -3,7 +3,7 @@
 # JARVIS v4 — État réel (lire en premier, 5 minutes)
 
 ## Nouveautés v4 (essais de durée, démonstration, IA)
-- **Endurance mesurée (`14_ENDURANCE_ET_DEMO.md`)** : 60 min (890 missions) puis 30 min (423 missions) avec kill -9, gels, pannes d'intégration : **0 mission perdue, 0 doublon d'envoi ni de brouillon, journal intact** ; 5 missions interrompues en vol ont été reprises une fois. **24 h : NON TESTÉ.** Un défaut réel (faux positif de traçabilité au-delà de 300 missions) a été trouvé et corrigé.
+- **Endurance mesurée (`14_ENDURANCE_ET_DEMO.md`)** : 60 min (890 missions), 30 min (423) puis 180 min (2 625 missions) avec kill -9, gels, pannes d'intégration : **0 mission perdue, 0 doublon d'envoi ni de brouillon, journal intact** ; 5 missions interrompues en vol ont été reprises une fois. **24 h : NON TESTÉ.** Un défaut réel (faux positif de traçabilité au-delà de 300 missions) a été trouvé et corrigé.
 - **Service complet** : l'outbox (brouillons Gmail **synthétiques**) est maintenant traitée par le service avec attente progressive, rejeu administrateur et alertes.
 - **Démonstration bout en bout** (`scripts/demo.js`, captures `docs/captures/demo/`), étapes marquées RÉEL/SIMULÉ.
 - **IA (`13_IA_ET_INTEGRATIONS.md`)** : **aucun agent n'utilise de modèle IA** ; seul point d'extension : reformulation d'une demande non comprise, désactivé par défaut, testé uniquement contre un serveur simulé. Gmail, EBP, Airtable : **jamais testés avec le service réel**.
