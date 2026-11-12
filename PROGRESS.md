@@ -11,6 +11,8 @@ Archive détaillée (privée, hors dépôt) : Google Drive du propriétaire, doc
 
 **Observation du 11/11, 18h22 UTC** : changement appliqué par le propriétaire ; déploiement SUCCESS ; le conteneur annonce l'empreinte `509abf9e18ec` (journaux ; `/sante` non interrogé directement). L'accueil compact est donc DÉPLOYÉ sur l'espace terrain ; toujours NON validé sur Samsung. Le blocage ci-dessous est levé.
 
+**Observation du 12/11, 09h39 UTC** : commit `76a3244` (imports EBP robustes, CI verte) appliqué par le propriétaire sur l'espace terrain ; le conteneur annonce l'empreinte `8e67a422d555`, égale à celle attendue. DÉPLOYÉ ; NON validé sur Samsung ; aucun vrai export EBP encore importé.
+
 **Blocage (historique)** : la publication de `09289d4` sur l'espace terrain attend une approbation ; un changement de configuration est en attente côté hébergeur. Un statut « SUCCESS » ne suffit pas : la réussite = l'empreinte `509abf9e18ec` servie par `/sante`.
 **Une seule prochaine action** : sur accord explicite du propriétaire, appliquer le changement en attente par le circuit d'approbation, puis contrôler l'empreinte servie. Ne rien contourner.
 **Encore ouvert** : capture réelle du cockpit/Ville au format ordinateur 16 pouces ; recette sur le vrai Samsung (`docs/RECETTE_SAMSUNG_FINALE.md`).
