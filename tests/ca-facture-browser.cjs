@@ -98,6 +98,8 @@ test('import EBP : fichier sans colonne HT refusé avec un message clair, rien �
   const {context,page,errs}=await ouvrir();
   await page.goto(origin+'/#/ca/import');await page.getByLabel('Export EBP des pièces').setInputFiles({name:'ttc.csv',mimeType:'text/csv',buffer:Buffer.from('Type;N° de pièce;Date;Client;Total TTC\r\nFacture;FA-1;01/11/2026;G;120')});
   await page.getByText(/Colonne\(s\) obligatoire\(s\) introuvable\(s\)/).waitFor();assert.equal(await page.evaluate(()=>get('meta','caFacture')),undefined);
+  // le choix manuel est proposé, mais la colonne TTC n'est jamais présélectionnée pour le HT
+  assert.equal(await page.getByLabel('Colonne pour Montant HT').inputValue(),'');
   assert.deepEqual(errs,[]);await context.close();
 });
 
@@ -120,5 +122,33 @@ test('rattachement explicite code EBP → garage, puis alerte « client à relan
   await page.goto(origin+'/#/cockpit');await page.getByText('Clients à relancer : plus de facture récente').waitFor();
   await page.getByText(/Dernière facture il y a 90 j/).waitFor();assert.equal(await page.getByText(/Dernière facture il y a 3 j/).count(),0);
   await page.getByText('Mes plus gros CA facturés ce mois').waitFor();
+  assert.deepEqual(errs,[]);await context.close();
+});
+
+test('import EBP réel-probable : en-têtes inconnus → choix manuel des colonnes, fichier sans type → déclaration explicite, lignes de total écartées',async()=>{
+  const {context,page,errs}=await ouvrir();page.on('dialog',d=>d.accept());
+  const d1=iso(new Date(auj.getTime()-2*864e5)).split('-').reverse().join('/');
+  const csv=Buffer.from(['Journal des ventes;;;','Référence interne;Jour;Qui;Somme hors taxe','2026-0001;'+d1+';GARAGE FICTIF A;1 000,00','2026-0002;'+d1+';GARAGE FICTIF B;-100,00','Total;;;900,00'].join('\r\n'),'latin1');
+  await page.goto(origin+'/#/ca/import');await page.getByLabel('Export EBP des pièces').setInputFiles({name:'inconnu.csv',mimeType:'text/csv',buffer:csv});
+  await page.getByText(/Import à compléter/).waitFor();
+  await page.getByLabel('Colonne pour N° de pièce').selectOption({label:'Référence interne'});await page.getByLabel('Colonne pour Date').selectOption({label:'Jour'});
+  await page.getByLabel('Colonne pour Client',{exact:true}).selectOption({label:'Qui'});await page.getByLabel('Colonne pour Montant HT').selectOption({label:'Somme hors taxe'});
+  await page.getByRole('button',{name:'Utiliser ces colonnes'}).click();
+  await page.getByText(/2 ligne\(s\) sans type de pièce reconnaissable/).waitFor();await page.getByText('0 pièce(s) à ajouter').waitFor();
+  await page.getByRole('button',{name:'Ce fichier ne contient que des factures et avoirs'}).click();
+  await page.getByText('2 pièce(s) à ajouter').waitFor();await page.getByText(/1 ligne\(s\) de total écartée/).waitFor();
+  await page.getByRole('button',{name:'Importer ces 2 pièces'}).click();await page.waitForURL(/#\/ca$/);
+  const m=await page.evaluate(()=>get('meta','caFacture'));assert.deepEqual(m.entrees.map(e=>[e.type,e.montantHt]).sort(),[['avoir',10000],['facture',100000]]);
+  assert.deepEqual(errs,[]);await context.close();
+});
+
+test('gros export EBP (pièces ligne par ligne, 90 000 lignes ≈ 5 Mo, au-delà de l’ancienne limite de 50 000) : lu, totalisé par pièce, rapide ; encodage Windows-1252',async()=>{
+  const {context,page,errs}=await ouvrir();const d1=iso(new Date(auj.getTime()-2*864e5)).split('-').reverse().join('/');
+  const l=['Type;N° de pièce;Date;Code client;Nom du client;Total HT'];for(let i=0;i<30000;i++)for(let k=0;k<3;k++)l.push('Facture;FA-'+i+';'+d1+';C'+(i%200)+';GARAGE FICTIF É'+(i%200)+';'+(10+k)+',00');
+  const buf=Buffer.from(l.join('\r\n'),'latin1');assert.ok(buf.length>2.5e6);
+  await page.goto(origin+'/#/ca/import');const t0=Date.now();await page.getByLabel('Export EBP des pièces').setInputFiles({name:'gros.csv',mimeType:'text/csv',buffer:buf});
+  await page.getByText('30000 pièce(s) à ajouter').waitFor({timeout:60000});const ms=Date.now()-t0;assert.ok(ms<30000,'lecture '+ms+' ms');
+  await page.getByText(/30000 pièce\(s\) totalisée\(s\) sur plusieurs lignes/).waitFor();     // chaque pièce a 3 lignes d'article : signalé
+  const eff=(await page.getByText(/Effet sur le CA/).innerText()).replace(/[\u00a0\u202f\s]/g,'');assert.match(eff,/990000,00€HT/,'total attendu 30 000 × 33 € = 990 000,00 € : '+eff);
   assert.deepEqual(errs,[]);await context.close();
 });

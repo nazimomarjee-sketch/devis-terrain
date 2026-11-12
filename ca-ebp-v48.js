@@ -9,14 +9,17 @@ const ODICOLOR_CA_EBP = (() => {
   const CA = (typeof module !== 'undefined' && module.exports) ? require('./ca-facture-v48.js') : ODICOLOR_CA;
   const norm = s => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
   const texte = (v, n = 120) => String(v == null ? '' : v).replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, n);
+  // Libellés rencontrés dans les exports EBP et tableurs (hypothèses larges) : la correspondance retenue est toujours affichée et corrigeable à la main.
   const COL = [
-    ['type', 'Type de pièce', /^(type|nature)|type de (piece|document)|^document$/, false],
-    ['no', 'N° de pièce', /^(n°|no|num(ero)?)( de)? ?(piece|document|facture)?$|^(n°|no|numero) (piece|document|facture)|^piece$/, true],
-    ['date', 'Date', /^date( de)?( la)? ?(piece|document|facture)?$/, true],
-    ['code', 'Code client', /code.*client|^code tiers$|^tiers$|^code$/, false],
-    ['client', 'Client', /(nom|raison sociale|libelle).*client|^client$|^raison sociale$|^nom$/, false],
-    ['ht', 'Montant HT', /(montant|total|net).*h\.?t|^h\.?t\.?$/, true]
+    ['type', 'Type de pièce', /^(type|nature)( de)?( la)?( piece| document)?$|type de (piece|document)|^document$|^type doc/, false],
+    ['no', 'N° de pièce', /^(n°|n|no|num|numero|num\.)( de| du)?( la)? ?(piece|document|facture|doc)?$|^(n°|no|numero|num\.?) ?(de |du )?(piece|document|facture|doc)|^piece$|^reference (piece|document)$|^code (piece|document)$/, true],
+    ['date', 'Date', /^date( de| du)?( la)? ?(piece|document|facture|doc)?$|^date$|^date d.emission$|^date facture$/, true],
+    ['code', 'Code client', /code.*(client|tiers)|^tiers$|^code$|^(n°|no|numero) (client|tiers)$|^compte (client|tiers)$/, false],
+    ['client', 'Client', /(nom|raison sociale|libelle|intitule).*(client|tiers)|^client$|^raison sociale$|^nom$|^tiers \(nom\)$|^societe$/, false],
+    ['ht', 'Montant HT', /(montant|total|net|prix|base).*h\.?t\.?|h\.?t\.?.*(net|total|montant)|^h\.?t\.?$|^net a payer ht$|^total net$/, true]
   ];
+  const TTC = /t\.?t\.?c/;
+  const TOTAL = /^(total|sous[- ]?total|totaux|somme|cumul)\b/;
   const pad = n => String(n).padStart(2, '0');
   function lireDate(v) {
     let y, m, d;
@@ -38,38 +41,57 @@ const ODICOLOR_CA_EBP = (() => {
   }
   function lireType(t, no) {
     const s = norm(t);
-    if (/avoir/.test(s)) return 'avoir'; if (/devis|proposition/.test(s)) return 'devis'; if (/commande/.test(s)) return 'commande'; if (/livraison|^bl\b/.test(s)) return 'bl'; if (/facture/.test(s)) return 'facture';
+    if (/avoir|note de credit|credit note/.test(s)) return 'avoir'; if (/devis|proposition/.test(s)) return 'devis'; if (/commande/.test(s)) return 'commande'; if (/livraison|^bl\b/.test(s)) return 'bl'; if (/facture/.test(s)) return 'facture';
     const n = String(no || '').toUpperCase();
     if (/^(AV|AF)/.test(n)) return 'avoir'; if (/^(DE|DV|DEV)/.test(n)) return 'devis'; if (/^(CC|CO|CDE|BC)/.test(n)) return 'commande'; if (/^(BL|LI)/.test(n)) return 'bl'; if (/^(FA|FC|FAC)/.test(n)) return 'facture';
     return '';
   }
-  // Trouve la ligne d'en-têtes (parmi les 15 premières) et la correspondance des colonnes.
-  function associer(rows) {
+  const deviner = (ent) => { const hn = ent.map(norm), pris = new Set(), carte = {};
+    for (const [k, , re] of COL) { const j = hn.findIndex((x, q) => !pris.has(q) && re.test(x) && !(k === 'ht' && TTC.test(x))); if (j >= 0) { carte[k] = j; pris.add(j); } }
+    return carte; };
+  const manquantes = carte => COL.filter(([k, , , ob]) => ob && carte[k] == null).map(([, l]) => l);
+  // Analyse TOUJOURS disponible (même si la détection est incomplète) : sert au choix manuel des colonnes. Ne contient que des TITRES, aucune donnée.
+  function analyser(rows) {
     if (!Array.isArray(rows) || rows.length < 2) return { ok: false, erreur: 'Fichier vide : aucune ligne après les en-têtes.' };
     let meilleur = null;
     for (let i = 0; i < Math.min(rows.length - 1, 15); i++) {
       const ent = (rows[i] || []).map(c => texte(c, 80)); if (ent.filter(Boolean).length < 2) continue;
-      const hn = ent.map(norm), pris = new Set(), carte = {};
-      for (const [k, , re] of COL) { const j = hn.findIndex((x, q) => !pris.has(q) && re.test(x)); if (j >= 0) { carte[k] = j; pris.add(j); } }
-      const manque = COL.filter(([k, , , ob]) => ob && carte[k] == null).map(([, l]) => l);
-      if (!meilleur || manque.length < meilleur.manque.length) meilleur = { debut: i, ent, carte, manque };
+      const carte = deviner(ent), manque = manquantes(carte);
+      if (!meilleur || manque.length < meilleur.manque.length) meilleur = { debut: i, entetes: ent, carte, manque };
       if (!manque.length) break;
     }
     if (!meilleur) return { ok: false, erreur: 'Aucune ligne d’en-têtes reconnaissable.' };
-    if (meilleur.manque.length) return { ok: false, erreur: 'Colonne(s) obligatoire(s) introuvable(s) : ' + meilleur.manque.join(', ') + '. Colonnes lues : ' + meilleur.ent.filter(Boolean).join(' | ') + '. (Seul le montant HT est accepté : jamais le TTC.)' };
-    return { ok: true, debut: meilleur.debut, carte: meilleur.carte, correspondance: COL.filter(([k]) => meilleur.carte[k] != null).map(([k, l]) => ({ cle: k, libelle: l, colonne: meilleur.ent[meilleur.carte[k]] })) };
+    return { ok: true, ...meilleur, champs: COL.map(([cle, libelle, , obligatoire]) => ({ cle, libelle, obligatoire })) };
+  }
+  // Correspondance des colonnes. `force` = { debut, carte } choisi à la main par l'utilisateur (prioritaire sur la détection).
+  function associer(rows, force) {
+    const an = analyser(rows); if (!an.ok) return an;
+    let carte = an.carte, debut = an.debut, ent = an.entetes;
+    if (force && force.carte) {
+      debut = Number.isInteger(force.debut) ? force.debut : an.debut; ent = (rows[debut] || []).map(c => texte(c, 80)); carte = {};
+      for (const [k] of COL) { const v = force.carte[k]; if (Number.isInteger(v) && v >= 0 && v < ent.length) carte[k] = v; }
+      const vals = Object.values(carte); if (new Set(vals).size !== vals.length) return { ok: false, erreur: 'Deux champs utilisent la même colonne.', analyse: an };
+    }
+    const manque = manquantes(carte);
+    if (manque.length) return { ok: false, analyse: an, erreur: 'Colonne(s) obligatoire(s) introuvable(s) : ' + manque.join(', ') + '. Colonnes lues : ' + ent.filter(Boolean).join(' | ') + '. (Seul le montant HT est accepté : jamais le TTC.) Choisis les colonnes à la main ci-dessous.' };
+    return { ok: true, debut, carte, analyse: an, correspondance: COL.filter(([k]) => carte[k] != null).map(([k, l]) => ({ cle: k, libelle: l, colonne: ent[carte[k]] })) };
   }
   /* APERÇU : aucune écriture. ctx = { auj, existantes (entrées du magasin) }. Retourne { ok, correspondance, nouvelles[], identiques[], conflits[], ignorees[], horsCa{}, totaux }. */
   function apercu(rows, ctx) {
-    const a = associer(rows); if (!a.ok) return a;
-    const { carte } = a, nouvelles = [], identiques = [], conflits = [], ignorees = [], horsCa = {}, pieces = new Map();
+    const a = associer(rows, ctx.colonnes); if (!a.ok) return a;
+    const { carte } = a, nouvelles = [], identiques = [], conflits = [], ignorees = [], horsCa = {}, pieces = new Map(); let totaux = 0, sansType = 0;
     const existantes = (ctx.existantes || []).filter(e => !e.annule), parCle = new Map(existantes.map(e => [e.type + '|' + CA.numeroNorm(e.numero), e]));
     for (let i = a.debut + 1; i < rows.length; i++) {
       const r = rows[i] || []; if (!r.some(c => texte(c) !== '')) continue;
       const ligne = i + 1, g = k => (carte[k] == null ? '' : r[carte[k]]);
-      const no = texte(g('no'), 40), type = lireType(g('type'), no);
+      const no = texte(g('no'), 40);
+      // Ligne de total ou de sous-total d'un export : jamais une pièce.
+      if (r.some(c => TOTAL.test(norm(c))) && (!no || TOTAL.test(norm(no)))) { totaux++; continue; }
       if (!no) { ignorees.push({ ligne, motif: 'N° de pièce absent' }); continue; }
-      if (!type) { ignorees.push({ ligne, motif: 'Type de pièce non reconnu (' + no + ')' }); continue; }
+      let type = lireType(g('type'), no);
+      // Fichier déclaré « factures et avoirs seulement » par l'utilisateur : une pièce sans type lisible est une facture (un avoir si son montant est négatif).
+      if (!type && ctx.typeDefaut === 'facture') { const m0 = lireMontant(g('ht')); type = m0 != null && m0 < 0 ? 'avoir' : 'facture'; }
+      if (!type) { sansType++; ignorees.push({ ligne, motif: 'Type de pièce non reconnu (' + no + ')' }); continue; }
       if (type !== 'facture' && type !== 'avoir') { horsCa[type] = (horsCa[type] || 0) + 1; continue; }
       const date = lireDate(g('date')), ht = lireMontant(g('ht'));
       if (!date) { ignorees.push({ ligne, motif: 'Date illisible pour ' + no }); continue; }
@@ -90,7 +112,7 @@ const ODICOLOR_CA_EBP = (() => {
     }
     const multi = [...pieces.values()].filter(p => p.lignes > 1).map(p => p.numero);
     const somme = l => l.reduce((s, e) => s + (e.type === 'avoir' ? -e.montantHt : e.montantHt), 0);
-    return { ok: true, correspondance: a.correspondance, multiLignes: multi, nouvelles, identiques, conflits, ignorees, horsCa, totaux: { nouvellesCents: somme(nouvelles), nNouvelles: nouvelles.length } };
+    return { ok: true, correspondance: a.correspondance, analyse: a.analyse, carte: a.carte, debut: a.debut, lignesTotal: totaux, sansType, multiLignes: multi, nouvelles, identiques, conflits, ignorees, horsCa, totaux: { nouvellesCents: somme(nouvelles), nNouvelles: nouvelles.length } };
   }
   /* APPLICATION : n'écrit que les NOUVELLES pièces ; les conflits restent à traiter à la main. Ajoute un événement d'import à l'historique. ctx = { idImport, nouvelId(), maintenant, fichier, auj } */
   function appliquer(magasin, ap, ctx) {
@@ -111,6 +133,6 @@ const ODICOLOR_CA_EBP = (() => {
     const entrees = magasin.entrees.map(e => e.import && e.import.id === idImport && !e.annule ? { ...e, annule: { le: ctx.maintenant, motif: 'Import annulé : ' + String(motif).trim().slice(0, 160) } } : e);
     return { version: 1, entrees, imports: magasin.imports.map(x => x.id === idImport ? { ...x, annule: { le: ctx.maintenant, motif: String(motif).trim().slice(0, 160) } } : x) };
   }
-  return { associer, apercu, appliquer, annulerImport, lireDate, lireMontant, lireType };
+  return { analyser, associer, apercu, appliquer, annulerImport, lireDate, lireMontant, lireType };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = ODICOLOR_CA_EBP;

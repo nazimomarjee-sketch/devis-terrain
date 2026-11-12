@@ -165,6 +165,8 @@ function chercher(q, max = 15) {
 
 // ---------- lecture de fichiers (xlsx / csv) ----------
 const MAX_OCTETS = 10 * 1024 * 1024, MAX_LIGNES = 50000;
+// Exports EBP (pièces ligne par ligne d'article) : bien plus gros qu'un tarif ; lus en mémoire sur le téléphone, d'où une borne explicite.
+const LIMITES_EBP = { octets: 40 * 1024 * 1024, lignes: 300000 };
 function chargerXlsx() {
   if (window.XLSX) return Promise.resolve();
   return new Promise((res, rej) => { const s = h('script', { src: window.ODICOLOR_PWA.asset('xlsx.mini.min.js'), integrity:window.ODICOLOR_PWA.integrity('xlsx.mini.min.js'), crossorigin:'anonymous' }); s.onload = res; s.onerror = () => rej(new Error('Lecteur Excel introuvable')); document.head.append(s); });
@@ -184,8 +186,9 @@ function parseCSV(text) {
   if (f !== '' || row.length) { row.push(f); rows.push(row); }
   return rows;
 }
-async function lireFichier(file) {
-  if (file.size > MAX_OCTETS) throw new Error('Fichier trop gros (10 Mo maximum).');
+async function lireFichier(file, limites = {}) {
+  const maxOctets = limites.octets || MAX_OCTETS, maxLignes = limites.lignes || MAX_LIGNES;
+  if (file.size > maxOctets) throw new Error('Fichier trop gros (' + Math.round(maxOctets / 1048576) + ' Mo maximum). Exporte une période plus courte.');
   const buf = await file.arrayBuffer();
   const nom = file.name.toLowerCase();
   let feuilles; // [{nom, rows: tableau de tableaux, la ligne i = ligne Excel i+1}]
@@ -198,7 +201,7 @@ async function lireFichier(file) {
     try { txt = new TextDecoder('utf-8', { fatal: true }).decode(buf); } catch (e) { txt = new TextDecoder('windows-1252').decode(buf); }
     feuilles = [{ nom: 'CSV', rows: parseCSV(txt.replace(/^﻿/, '')) }];
   }
-  feuilles.forEach(f => { if (f.rows.length > MAX_LIGNES + 1) throw new Error('Plus de ' + MAX_LIGNES + ' lignes : découpe le fichier.'); });
+  feuilles.forEach(f => { if (f.rows.length > maxLignes + 1) throw new Error('Plus de ' + maxLignes + ' lignes : exporte une période plus courte.'); });
   return feuilles;
 }
 function ligneEntete(rows) {
@@ -2044,6 +2047,19 @@ async function pageCockpit() {
     h('p', { class: 'mut' }, 'Chaque ligne vient de ce que tu as saisi (visites, rappels, devis, factures). Rien n’est deviné.'));
 }
 
+// ---------- Imports EBP : choix manuel des colonnes (les titres seulement, jamais les données) ----------
+function colonnesEbpUI(an, carte, appliquer, ouvert) {
+  if (!an || !an.ok) return null;
+  const sels = {}, ent = an.entetes;
+  const champs = an.champs.map(c => { sels[c.cle] = h('select', { 'aria-label': 'Colonne pour ' + c.libelle }, h('option', { value: '' }, c.obligatoire ? 'Choisir…' : '— aucune —'), ent.map((e, i) => e ? h('option', { value: i, selected: carte && carte[c.cle] === i }, e) : null));
+    return h('label', {}, c.libelle + (c.obligatoire ? ' *' : ''), sels[c.cle]); });
+  const titres = 'Titres de colonnes (ligne ' + (an.debut + 1) + ') : ' + ent.filter(Boolean).join(' | ');
+  return h('details', { class: 'carte', open: !!ouvert }, h('summary', {}, 'Colonnes du fichier (à corriger si besoin)'),
+    h('p', { class: 'mut' }, 'Vérifie que chaque information vient de la bonne colonne. Le montant doit être le HT, jamais le TTC.'), champs,
+    h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onclick: () => { const c = {}; for (const k of Object.keys(sels)) if (sels[k].value !== '') c[k] = Number(sels[k].value); appliquer({ debut: an.debut, carte: c }); } }, 'Utiliser ces colonnes'),
+      h('button', { class: 'btn sec', type: 'button', onclick: async () => { try { await navigator.clipboard.writeText(titres); toast('Titres copiés (aucune donnée de client).'); } catch (e) { toast(titres, true); } } }, 'Copier les titres de colonnes')),
+    h('p', { class: 'mut' }, 'En cas de doute, copie les titres et envoie-les : ils ne contiennent aucune donnée de client.'));
+}
 // ---------- Import EBP du CA facturé : aperçu obligatoire avant écriture ----------
 async function pageCAImport() {
   const file = h('input', { type: 'file', accept: '.xlsx,.xlsm,.csv,.txt', 'aria-label': 'Export EBP des pièces' }), zone = h('div');
@@ -2054,17 +2070,23 @@ async function pageCAImport() {
   file.addEventListener('change', async () => {
     const f = file.files[0]; if (!f) return;
     try {
-      const feuilles = await lireFichier(f), magasin = await get('meta', 'caFacture'), auj = jourLocal(new Date());
+      const feuilles = await lireFichier(f, LIMITES_EBP), magasin = await get('meta', 'caFacture'), auj = jourLocal(new Date());
       let fe = feuilles.find(x => ODICOLOR_CA_EBP.associer(x.rows).ok) || feuilles[0];
-      const ap = ODICOLOR_CA_EBP.apercu(fe.rows, { auj, existantes: magasin ? magasin.entrees : [] });
-      if (!ap.ok) { zone.replaceChildren(h('div', { class: 'carte erreur', role: 'alert' }, 'Import impossible : ' + ap.erreur)); return; }
+      let colonnes = null, typeDefaut = '';
+      const afficher = async () => {
+      const ap = ODICOLOR_CA_EBP.apercu(fe.rows, { auj, existantes: magasin ? magasin.entrees : [], colonnes, typeDefaut });
+      const an = ap.analyse || ODICOLOR_CA_EBP.analyser(fe.rows), panneau = colonnesEbpUI(an, ap.carte || (colonnes && colonnes.carte) || (an.ok ? an.carte : null), c => { colonnes = c; afficher(); }, !ap.ok);
+      if (!ap.ok) { zone.replaceChildren(h('div', { class: 'carte erreur', role: 'alert' }, 'Import à compléter : ' + ap.erreur), panneau); return; }
+      const sansTypeBloc = ap.sansType && !typeDefaut ? h('div', { class: 'carte alerte', role: 'alert' }, h('strong', {}, ap.sansType + ' ligne(s) sans type de pièce reconnaissable. '), 'Si ce fichier ne contient QUE des factures et des avoirs, tu peux les compter (un montant négatif = avoir).',
+        h('div', { class: 'actions' }, h('button', { class: 'btn sec', type: 'button', onclick: () => { if (confirm('Confirmes-tu que ce fichier ne contient que des factures et des avoirs (aucun devis, commande ou bon de livraison) ?')) { typeDefaut = 'facture'; afficher(); } } }, 'Ce fichier ne contient que des factures et avoirs'))) : null;
       const liste = (titre, arr, f2) => arr.length ? h('details', { class: 'carte' }, h('summary', {}, titre + ' · ' + arr.length), arr.slice(0, 30).map(x => h('p', { class: 'mut' }, f2(x))), arr.length > 30 ? h('p', { class: 'mut' }, '+ ' + (arr.length - 30) + ' autre(s)') : null) : null;
       const hc = Object.entries(ap.horsCa).map(([k, n]) => n + ' ' + k).join(', ');
       zone.replaceChildren(
         h('div', { class: 'carte' }, h('strong', {}, f.name), h('p', { class: 'mut' }, 'Colonnes retenues : ' + ap.correspondance.map(c => c.libelle + ' ← « ' + c.colonne + ' »').join(' · ')),
           h('div', { class: 'gros-chiffre' }, ap.nouvelles.length + ' pièce(s) à ajouter'), h('p', {}, 'Effet sur le CA : ' + (ap.totaux.nouvellesCents < 0 ? '− ' : '') + eur(Math.abs(ap.totaux.nouvellesCents)) + ' HT (factures − avoirs)'),
-          h('p', { class: 'mut' }, ap.identiques.length + ' déjà présente(s) · ' + ap.conflits.length + ' conflit(s) non importé(s) · ' + ap.ignorees.length + ' ligne(s) ignorée(s)' + (hc ? ' · hors CA : ' + hc : ''))),
+          h('p', { class: 'mut' }, ap.identiques.length + ' déjà présente(s) · ' + ap.conflits.length + ' conflit(s) non importé(s) · ' + ap.ignorees.length + ' ligne(s) ignorée(s)' + (hc ? ' · hors CA : ' + hc : '') + (ap.lignesTotal ? ' · ' + ap.lignesTotal + ' ligne(s) de total écartée(s)' : ''))),
         ap.multiLignes.length ? h('div', { class: 'carte alerte', role: 'alert' }, h('strong', {}, ap.multiLignes.length + ' pièce(s) totalisée(s) sur plusieurs lignes : '), 'vérifie que l’export n’est pas dupliqué (' + ap.multiLignes.slice(0, 8).join(', ') + (ap.multiLignes.length > 8 ? '…' : '') + ').') : null,
+        sansTypeBloc, panneau,
         liste('Conflits (même numéro, montant ou date différents : à vérifier à la main, rien n’est écrasé)', ap.conflits, x => x.numero + ' : export ' + eur(x.montantHt) + ' le ' + x.date + ' ≠ enregistré ' + eur(x.existant.montantHt) + ' le ' + x.existant.date),
         liste('Lignes ignorées', ap.ignorees, x => 'Ligne ' + x.ligne + ' : ' + x.motif),
         liste('Pièces à ajouter', ap.nouvelles, x => (x.type === 'avoir' ? 'Avoir ' : 'Facture ') + x.numero + ' · ' + x.date + ' · ' + eur(x.montantHt) + (x.clientNom ? ' · ' + x.clientNom : '')),
@@ -2073,6 +2095,8 @@ async function pageCAImport() {
           try { const maintenant = new Date().toISOString(), m2 = ODICOLOR_CA_EBP.appliquer(await get('meta', 'caFacture'), ap, { idImport: nouvelUid(), nouvelId: nouvelUid, maintenant, fichier: f.name, auj }); await put('meta', m2, 'caFacture'); toast(ap.nouvelles.length + ' pièce(s) importée(s).'); location.hash = '#/ca'; }
           catch (e) { toast('Import annulé : ' + e.message, true); ev.currentTarget.disabled = false; }
         } }, ap.nouvelles.length ? 'Importer ces ' + ap.nouvelles.length + ' pièces' : 'Rien à importer'), h('a', { class: 'btn sec', href: '#/ca' }, 'Annuler')));
+      };
+      await afficher();
     } catch (e) { zone.replaceChildren(h('div', { class: 'carte erreur', role: 'alert' }, 'Import impossible : ' + e.message)); }
   });
 }
@@ -2270,9 +2294,11 @@ async function pageClientsEbp() {
   file.addEventListener('change', async () => {
     const f = file.files[0]; if (!f) return;
     try {
-      const feuilles = await lireFichier(f), fe = feuilles.find(x => E.associer(x.rows).ok) || feuilles[0], lu = E.lire(fe.rows);
-      if (!lu.ok) { zone.replaceChildren(h('div', { class: 'carte erreur', role: 'alert' }, 'Import impossible : ' + lu.erreur)); return; }
+      const feuilles = await lireFichier(f, LIMITES_EBP), fe = feuilles.find(x => E.associer(x.rows).ok) || feuilles[0]; let colonnes = null, lu = E.lire(fe.rows);
       const dessiner = async () => {
+        lu = E.lire(fe.rows, colonnes);
+        const an = lu.analyse || E.analyser(fe.rows), panneau = colonnesEbpUI(an, lu.carte || (colonnes && colonnes.carte) || (an.ok ? an.carte : null), c => { colonnes = c; dessiner(); }, !lu.ok);
+        if (!lu.ok) { zone.replaceChildren(h('div', { class: 'carte erreur', role: 'alert' }, 'Import à compléter : ' + lu.erreur), panneau); return; }
         const garages = await getAll('clients'), r = E.rapprocher(lu.clients, garages), parCode = new Map(lu.clients.map(c => [c.code, c])), parId = new Map(garages.map(g => [g.id, g])), auj = jourLocal(new Date());
         const ctx = { auj, fichier: f.name, auteur: S.vendeur || 'Moi' };
         const lier = async (decisions) => {
@@ -2287,6 +2313,7 @@ async function pageClientsEbp() {
           h('div', { class: 'carte' }, h('strong', {}, f.name), h('p', { class: 'mut' }, 'Colonnes retenues : ' + lu.correspondance.map(c => c.libelle + ' ← « ' + c.colonne + ' »').join(' · ')),
             h('p', {}, lu.clients.length + ' client(s) EBP · ' + r.liees.length + ' déjà lié(s) · ' + r.fortes.length + ' proposition(s) forte(s) · ' + r.aVerifier.length + ' à vérifier · ' + r.sansGarage.length + ' sans garage' + (bloquesNb ? ' · ' + bloquesNb + ' compte(s) bloqué(s) dans EBP' : '')),
             lu.ignorees.length || lu.conflitsCode.length ? h('p', { class: 'mut' }, lu.ignorees.length + ' ligne(s) ignorée(s)' + (lu.conflitsCode.length ? ' · ' + lu.conflitsCode.length + ' code(s) répété(s) avec un autre nom : ' + lu.conflitsCode.slice(0, 5).map(c => c.code).join(', ') : '') + '.') : null),
+          panneau,
           r.fortes.length ? h('details', { class: 'carte', open: true }, h('summary', {}, 'Propositions fortes · ' + r.fortes.length),
             h('p', { class: 'mut' }, 'Même nom et même code postal (ou ville), unique des deux côtés. Relis, coche, valide.'),
             r.fortes.slice(0, 200).map(x => h('label', { class: 'ligne', style: 'display:flex;gap:10px;align-items:center;min-height:52px' }, coches.get(x.code), h('span', { style: 'flex:1' }, h('strong', {}, x.code + ' → ' + nomG(x.id)), h('br'), h('small', { class: 'mut' }, (parCode.get(x.code) || {}).nom + ' · ' + x.raison)))),

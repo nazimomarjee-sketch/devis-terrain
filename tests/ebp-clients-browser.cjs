@@ -45,5 +45,7 @@ test('import clients EBP : propositions, aucun lien sans validation, liaison coc
 test('import clients EBP : colonne « Code client » absente → refus clair, rien écrit',async()=>{
   const {context,page,errs}=await ouvrir();
   await page.goto(origin+'/#/clients-ebp');await page.getByLabel('Export EBP des clients').setInputFiles({name:'mauvais.csv',mimeType:'text/csv',buffer:Buffer.from('Nom;Ville\r\nX;Y')});
-  await page.getByText(/Colonne\(s\) obligatoire\(s\) introuvable\(s\)/).waitFor();assert.equal(await page.evaluate(()=>get('meta','ebpClients')),undefined);assert.deepEqual(errs,[]);await context.close();
+  await page.getByText(/Colonne\(s\) obligatoire\(s\) introuvable\(s\)/).waitFor();assert.equal(await page.evaluate(()=>get('meta','ebpClients')),undefined);
+  // choix manuel : la colonne « Nom » sert de code faute de mieux → la lecture aboutit, sans rien enregistrer
+  await page.getByLabel('Colonne pour Ville').selectOption({value:''});await page.getByLabel('Colonne pour Code client').selectOption({label:'Ville'});await page.getByRole('button',{name:'Utiliser ces colonnes'}).click();await page.getByText(/1 client\(s\) EBP/).waitFor();assert.equal(await page.evaluate(()=>get('meta','ebpClients')),undefined);assert.deepEqual(errs,[]);await context.close();
 });

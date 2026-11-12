@@ -1,5 +1,5 @@
 {
-  "id": "4468cdee7b1006a38c813f3a6ab14e6ebe94d92a7fbf4d4b13d396615dd7481d",
+  "id": "8e67a422d555019c3d06f47e5a9254cee21be49238f0575d4965992a5e05e456",
   "assets": [
     {
       "path": "accueil-v23.css",
@@ -19,7 +19,7 @@
     },
     {
       "path": "app.js",
-      "sha256": "21ef643211349b73dab924c81addb2596a4168941f724914d53dbc36e42345fa"
+      "sha256": "b8b0a3b71bdb9fbd6175cbd3f88c0090e31c6824482c6dd3b6678eac80f13e5f"
     },
     {
       "path": "apparence-v26.css",
@@ -67,7 +67,7 @@
     },
     {
       "path": "ca-ebp-v48.js",
-      "sha256": "4d76866d385a023f3dd0cec0504bd2152a74f5904b3b5502f9ed5819056384bf"
+      "sha256": "8d5b0a48137e6a1c0f1cde41becb2919f7f9af0255d6380c686ce8a214b64f4c"
     },
     {
       "path": "ca-facture-v48.js",
@@ -119,7 +119,7 @@
     },
     {
       "path": "ebp-clients-v48.js",
-      "sha256": "ab426ca79b3534a0788c0ecf9a49089524ce2f49029e7ee363551b7954fd4e67"
+      "sha256": "c804f3e0d2384b43abf5d0b0a5f788cf4cb5899c661e00ebe3ded5bae3da46b0"
     },
     {
       "path": "fiche-client-v36.css",
@@ -159,7 +159,7 @@
     },
     {
       "path": "index.html",
-      "sha256": "6a2df94a47f8ad0c72a1b8685f2b6d0ee335b0ed093b5729bbdabcf4d8c44641"
+      "sha256": "b28861029434e6871bfacb2969c3d678b25917b8333627826008d65d5ee6f125"
     },
     {
       "path": "logo-96.png",
@@ -203,7 +203,7 @@
     },
     {
       "path": "pwa-client.js",
-      "sha256": "b4887fd03bb7900efc87dddd89a339e011084fdd37547d3db859225f31fa6deb"
+      "sha256": "3447c26315f9dcc2e5b59cb604a80d6e1c412fda5b84f3c990b34bd4d7a1f70b"
     },
     {
       "path": "rappels-produits-v24.js",

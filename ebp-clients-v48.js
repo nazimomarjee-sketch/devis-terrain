@@ -10,8 +10,8 @@ const ODICOLOR_EBP_CLIENTS = (() => {
   const norm = s => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
   const texte = (v, n = 120) => String(v == null ? '' : v).replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, n);
   const COL = [
-    ['code', 'Code client', /^code$|code.*(client|tiers)|^(n°|no|numero) client$|^tiers$/, true],
-    ['nom', 'Nom / raison sociale', /raison sociale|^nom|^client$|^intitule$|^societe$/, true],
+    ['code', 'Code client', /^code$|code.*(client|tiers)|^(n°|no|numero) (client|tiers)$|^tiers$|^compte (client|tiers)$|^reference client$/, true],
+    ['nom', 'Nom / raison sociale', /raison sociale|^nom|^client$|^intitule|^societe$|^denomination|^libelle$/, true],
     ['ville', 'Ville', /ville|commune/, false],
     ['cp', 'Code postal', /code postal|^cp$/, false],
     ['statut', 'Statut du compte', /statut|bloque|sommeil|^etat|^actif$/, false],
@@ -24,23 +24,36 @@ const ODICOLOR_EBP_CLIENTS = (() => {
   const villeNorm = s => norm(s).replace(/[^a-z0-9]+/g, ' ').replace(/\bsaint\b/g, 'st').replace(/\bsainte\b/g, 'ste').trim();
   const jaccard = (a, b) => { const A = new Set(a.split(' ').filter(Boolean)), B = new Set(b.split(' ').filter(Boolean)); if (!A.size || !B.size) return 0; let i = 0; for (const x of A) if (B.has(x)) i++; return i / (A.size + B.size - i); };
 
-  function associer(rows) {
+  const deviner = ent => { const hn = ent.map(norm), pris = new Set(), carte = {};
+    for (const [k, , re] of COL) { const j = hn.findIndex((x, q) => !pris.has(q) && re.test(x) && !(k === 'code' && /postal/.test(x))); if (j >= 0) { carte[k] = j; pris.add(j); } }
+    return carte; };
+  const manquantes = carte => COL.filter(([k, , , ob]) => ob && carte[k] == null).map(([, l]) => l);
+  function analyser(rows) {
     if (!Array.isArray(rows) || rows.length < 2) return { ok: false, erreur: 'Fichier vide : aucune ligne après les en-têtes.' };
     let meilleur = null;
     for (let i = 0; i < Math.min(rows.length - 1, 15); i++) {
       const ent = (rows[i] || []).map(c => texte(c, 80)); if (ent.filter(Boolean).length < 2) continue;
-      const hn = ent.map(norm), pris = new Set(), carte = {};
-      for (const [k, , re] of COL) { const j = hn.findIndex((x, q) => !pris.has(q) && re.test(x)); if (j >= 0) { carte[k] = j; pris.add(j); } }
-      const manque = COL.filter(([k, , , ob]) => ob && carte[k] == null).map(([, l]) => l);
-      if (!meilleur || manque.length < meilleur.manque.length) meilleur = { debut: i, ent, carte, manque };
+      const carte = deviner(ent), manque = manquantes(carte);
+      if (!meilleur || manque.length < meilleur.manque.length) meilleur = { debut: i, entetes: ent, carte, manque };
       if (!manque.length) break;
     }
     if (!meilleur) return { ok: false, erreur: 'Aucune ligne d’en-têtes reconnaissable.' };
-    if (meilleur.manque.length) return { ok: false, erreur: 'Colonne(s) obligatoire(s) introuvable(s) : ' + meilleur.manque.join(', ') + '. Colonnes lues : ' + meilleur.ent.filter(Boolean).join(' | ') + '.' };
-    return { ok: true, debut: meilleur.debut, carte: meilleur.carte, correspondance: COL.filter(([k]) => meilleur.carte[k] != null).map(([k, l]) => ({ cle: k, libelle: l, colonne: meilleur.ent[meilleur.carte[k]] })) };
+    return { ok: true, ...meilleur, champs: COL.map(([cle, libelle, , obligatoire]) => ({ cle, libelle, obligatoire })) };
   }
-  function lire(rows) {
-    const a = associer(rows); if (!a.ok) return a;
+  function associer(rows, force) {
+    const an = analyser(rows); if (!an.ok) return an;
+    let carte = an.carte, debut = an.debut, ent = an.entetes;
+    if (force && force.carte) {
+      debut = Number.isInteger(force.debut) ? force.debut : an.debut; ent = (rows[debut] || []).map(c => texte(c, 80)); carte = {};
+      for (const [k] of COL) { const v = force.carte[k]; if (Number.isInteger(v) && v >= 0 && v < ent.length) carte[k] = v; }
+      const vals = Object.values(carte); if (new Set(vals).size !== vals.length) return { ok: false, erreur: 'Deux champs utilisent la même colonne.', analyse: an };
+    }
+    const manque = manquantes(carte);
+    if (manque.length) return { ok: false, analyse: an, erreur: 'Colonne(s) obligatoire(s) introuvable(s) : ' + manque.join(', ') + '. Colonnes lues : ' + ent.filter(Boolean).join(' | ') + '. Choisis les colonnes à la main ci-dessous.' };
+    return { ok: true, debut, carte, analyse: an, correspondance: COL.filter(([k]) => carte[k] != null).map(([k, l]) => ({ cle: k, libelle: l, colonne: ent[carte[k]] })) };
+  }
+  function lire(rows, colonnes) {
+    const a = associer(rows, colonnes); if (!a.ok) return a;
     const clients = [], ignorees = [], conflitsCode = [], vus = new Map();
     for (let i = a.debut + 1; i < rows.length; i++) {
       const r = rows[i] || []; if (!r.some(c => texte(c) !== '')) continue;
@@ -53,7 +66,7 @@ const ODICOLOR_EBP_CLIENTS = (() => {
       if (vus.has(code)) { const p = vus.get(code); if (nomNorm(p.nom) !== nomNorm(c.nom)) conflitsCode.push({ code, noms: [p.nom, c.nom], ligne }); continue; }
       vus.set(code, c); clients.push(c);
     }
-    return { ok: true, correspondance: a.correspondance, clients, ignorees, conflitsCode, lues: rows.length - a.debut - 1 };
+    return { ok: true, correspondance: a.correspondance, analyse: a.analyse, carte: a.carte, debut: a.debut, clients, ignorees, conflitsCode, lues: rows.length - a.debut - 1 };
   }
   /* garages : fiches du téléphone (id, nom, ville, cp, codeEbp?). Retourne les propositions, sans rien modifier. */
   function rapprocher(ebp, garages) {
@@ -104,6 +117,6 @@ const ODICOLOR_EBP_CLIENTS = (() => {
       liaisonEbp: { code: c.code, par: ctx.auteur || 'Moi', le: ctx.auj, source: 'création depuis import clients EBP · ' + texte(ctx.fichier, 80), methode: 'creation' },
       ebp: { code: c.code, nom: c.nom, bloque: c.bloque, famille: c.famille, commercial: c.commercial, statut: c.statut, importeLe: ctx.auj, fichier: texte(ctx.fichier, 80) } };
   }
-  return { associer, lire, rapprocher, appliquer, nouveauGarage, nomNorm };
+  return { analyser, associer, lire, rapprocher, appliquer, nouveauGarage, nomNorm };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = ODICOLOR_EBP_CLIENTS;
