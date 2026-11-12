@@ -152,110 +152,119 @@ ok 151 - EXERCICE DE RESTAURATION : réussi → tracé ; non réalisé depuis 8 
 ok 152 - attestation : un refus par erreur ESRCH (cible déjà morte) n’est JAMAIS compté comme un refus de permission
 ok 153 - attestation : un « refus » par fichier ABSENT (ENOENT) ou erreur anodine n’est JAMAIS compté comme un refus de sécurité (conservateur)
 ok 154 - RÉGRESSION (révélée par l’essai d’endurance) : la traçabilité ne prend pas pour orphelins les envois de missions plus anciennes que la fenêtre examinée
-ok 155 - adaptateur : requête minimale et correcte, coût calculé depuis la consommation réelle, clé jamais exposée
-ok 156 - adaptateur : configuration refusée sans tarifs, sans modèle, sans clé, hôte hors liste, http, 
-ok 157 - adaptateur : réponses défectueuses refusées (statut, JSON, texte, schéma, jetons absents, démesure, redirection) ; la clé n’apparaît dans AUCUNE erreur
-ok 158 - adaptateur : délai dépassé → erreur franche (le serveur ne répond jamais)
-ok 159 - IA en ligne soumise à AUTORISATION : sans elle, aucun appel ; avec elle, proposition (à confirmer) ; coût réel tracé au budget
-ok 160 - PANNE INTERNET : les fonctions locales essentielles continuent, le disjoncteur évite d’attendre à chaque mission, reprise automatique au retour du réseau
-ok 161 - hybride local puis en ligne : le modèle LOCAL passe en premier ; l’en ligne n’est appelé que s’il échoue ET s’il est autorisé
-ok 162 - indépendance : aucun fichier de src/auditeurs/ n’importe un fichier de src/agents/ (ni l’inverse)
-ok 163 - moindre privilège : les agents n’importent ni la base, ni le moteur, ni les règles/autorisations, ni l’orchestrateur, ni le serveur
-ok 164 - droits déclarés : lecture limitée à des jeux connus, jamais de réseau ni d’envoi, 8 agents avec critères mesurables
-ok 165 - un agent ne peut se donner aucun droit : l’orchestrateur n’importe AUCUNE fonction d’octroi de droit ou de modification de règle
-ok 166 - isolé : un devis complet (calculs, PDF, mail) donne le même résultat que le mode direct
-ok 167 - isolé : un agent ne peut lire AUCUN fichier hors du code (base de données, secrets, autres espaces)
-ok 168 - isolé : écriture hors du dossier de sortie, lancement de processus : refusés
-ok 169 - isolé : l’environnement de l’agent est VIDE — aucun jeton, aucune clé du service ne lui est transmis
-ok 170 - droits de lecture : chaque agent ne reçoit QUE les jeux de données qu’il déclare
-ok 171 - isolé : délai maximum — le processus agent est TUÉ (pas seulement ignoré)
-ok 172 - isolé : une sortie démesurée est coupée (processus tué) et la mission BLOQUÉE avec explication, sans 3 corrections inutiles
-ok 173 - LIMITE CONNUE (documentée, non masquée) : le modèle de permissions de Node NE filtre PAS le réseau
-ok 174 - isolé : les huit agents donnent les mêmes statuts qu’en mode direct
-ok 175 - isolé : l’exécutable des agents peut être une COPIE dédiée de node (pour un pare-feu par programme sous Windows)
-ok 176 - hybride : le modèle PROPOSE une reformulation, l’humain décide ; rien n’est exécuté et le coût est tracé
-ok 177 - hybride : repli automatique local → en ligne ; et si TOUS les fournisseurs sont en panne, JARVIS fonctionne quand même (déterministe)
-ok 178 - hybride : sortie malveillante ou invalide du modèle REFUSÉE (agent inconnu, droits, injection, secret, longueur)
-ok 179 - hybride : le modèle ne reçoit QUE le texte de la demande, sans e-mail ni téléphone, et jamais les données
-ok 180 - hybride : budget IA atteint → aucun appel au modèle (le travail continue sans lui)
-ok 181 - hybride : la proposition ne peut viser qu’un agent ACTIF de l’espace (cloisonnement respecté)
-ok 182 - [devis] mutation champ par champ : aucun champ non vérifié hors texte libre déclaré
-ok 183 - [produits] mutation champ par champ : aucun champ non vérifié hors texte libre déclaré
-ok 184 - [prospection] mutation champ par champ : aucun champ non vérifié hors texte libre déclaré
-ok 185 - [clients] mutation champ par champ : aucun champ non vérifié hors texte libre déclaré
-ok 186 - [relances] mutation champ par champ : aucun champ non vérifié hors texte libre déclaré
-ok 187 - [commandes] mutation champ par champ : aucun champ non vérifié hors texte libre déclaré
-ok 188 - [finance] mutation champ par champ : aucun champ non vérifié hors texte libre déclaré
-ok 189 - [planification] mutation champ par champ : aucun champ non vérifié hors texte libre déclaré
-ok 190 - [planification/charge_atelier] mutation champ par champ sur le connecteur cockpit autorisé
-ok 191 - résultats BLOQUÉS : un blocage inventé (code inconnu, candidat inexistant, question absente) est refusé
-ok 192 - manifeste et icônes : champs d’installabilité présents, PNG réels aux bonnes dimensions
-ok 193 - service worker : jamais d’API en cache (données confidentielles) — vérifié sur le code
-ok 194 - NAVIGATEUR RÉEL : service worker actif, coquille en cache, AUCUNE donnée en cache, hors ligne explicite, retour en ligne, XSS inopérant, cibles tactiles
-ok 195 - en-têtes : manifeste servi avec le bon type, jamais mis en cache HTTP par le serveur, icônes accessibles sans jeton
-ok 196 - reprise après crash : ouvrier mort + redémarrage complet du processus, la mission aboutit
-ok 197 - plafond de reprises : 4 interruptions consécutives → ECHEC et alerte critique
-ok 198 - aucun doublon d’exécution entre plusieurs PROCESSUS qui se disputent la file
-ok 199 - idempotence : le même dépôt envoyé deux fois ne crée qu’une mission
-ok 200 - FIFO déterministe : deux missions créées dans la même milliseconde sont traitées dans l’ordre de dépôt
-ok 201 - un ouvrier qui a perdu son bail ne peut pas écraser le résultat
-ok 202 - [devis] panne volontaire (exception) : récupérée puis escalade si persistante
-ok 203 - [devis] délai maximum : agent trop lent interrompu puis mission relancée
-ok 204 - [finance] panne volontaire (exception) : récupérée puis escalade si persistante
-ok 205 - [finance] délai maximum : agent trop lent interrompu puis mission relancée
-ok 206 - [planification] panne volontaire (exception) : récupérée puis escalade si persistante
-ok 207 - [planification] délai maximum : agent trop lent interrompu puis mission relancée
-ok 208 - [relances] panne volontaire (exception) : récupérée puis escalade si persistante
-ok 209 - [relances] délai maximum : agent trop lent interrompu puis mission relancée
-ok 210 - arrêt d’urgence : par paramètre OU par fichier ARRET, aucune mission traitée
-ok 211 - budget : une mission qui dépasse le budget du jour bloque les suivantes AVANT tout travail
-ok 212 - porte humaine : approbation impossible si le résultat ou un fichier a été modifié après l’audit
-ok 213 - métriques calculées sur l’état réel (réussite, erreurs détectées, corrections, interventions)
-ok 214 - un mail, un PDF ou un site ne peut PAS donner d’ordre : seule la source authentifiée est acceptée (échec fermé)
-ok 215 - note client piégée (injection) : jamais recopiée dans le PDF, le mail ni le résultat
-ok 216 - injection dans les DONNÉES (notes de clients et de prospects) : exclue et signalée par chaque agent concerné
-ok 217 - détection d’injection et de secrets : vrais positifs, pas de faux positif sur les textes normaux
-ok 218 - journaux : e-mails, téléphones, IBAN et jetons masqués avant écriture
-ok 219 - journaux de TOUTES les missions des 8 agents : aucune donnée personnelle (e-mails de clients) dans le journal
-ok 220 - journal d’audit : toute modification a posteriori est détectée et alertée
-ok 221 - aucun secret ni donnée réelle dans le code, les données de démonstration et la documentation
-ok 222 - API : refuse sans jeton / mauvais jeton, accepte le bon ; en-têtes de sécurité ; page publique sans données
-ok 223 - API : DNS rebinding, verrouillage après 5 échecs, corps géant, traversée de chemin
-ok 224 - API : parcours complet — dépôt, exécution, détail de la décision, PDF, approbation, prochaine action
-ok 225 - API : anomalies métier remontées (finance, produits, suivi des commandes) dans l’état
-ok 226 - API : règles et autorisations — administration réservée au jeton administrateur, lecture au jeton utilisateur
-ok 227 - API : jeton trop court ou jeton administrateur identique/absent → serveur refusé
-ok 228 - sauvegarde chiffrée : aller-retour, mauvaise clé et fichier altéré rejetés, aucune donnée en clair, reprise après restauration
-ok 229 - sauvegarde trop ancienne → alerte
-ok 230 - politique : service sain → aucune action ; un raté isolé ne déclenche PAS de redémarrage (confirmation)
-ok 231 - politique : service MORT (2 sondes ratées) → redémarrage automatique + alerte
-ok 232 - politique : service vivant mais SILENCIEUX (orchestrateur bloqué) → redémarrage
-ok 233 - politique : alertes critiques sur service vivant → ALERTE seulement (un redémarrage ne règle ni un journal altéré ni un échec métier)
-ok 234 - protection contre la BOUCLE DE CRASH : 3 redémarrages puis ESCALADE, supervision suspendue ; reprise manuelle seulement
-ok 235 - fenêtre glissante : des redémarrages anciens (> fenêtre) ne comptent plus — pas d’escalade à tort
-ok 236 - redémarrage différé si la condition de sûreté n’est pas remplie ; échec du redémarrage signalé
-ok 237 - la sonde qui plante ou dépasse son délai est traitée comme un service MORT
-ok 238 - RÉEL : service kill -9 en pleine activité → le superviseur le redémarre, TOUTES les missions aboutissent UNE fois, aucun double envoi, journal intact
-ok 239 - service silencieux : pas de battement → alerte critique ; après un tour de boucle → sain ; 3 minutes de silence → critique
-ok 240 - incohérences détectées par le superviseur : résultat modifié en base, validation sans trace
-ok 241 - sonde de santé en ligne de commande : code de sortie 1 si service silencieux, 0 après un tour de boucle
-ok 242 - auto-test de l’auditeur : sain sur les 8 agents (canari) ; falsificateur générique fonctionnel
-ok 243 - auditeur « tampon encreur » (valide tout) DÉTECTÉ par l’auto-test ; l’orchestrateur passe en échec fermé puis se rétablit
-ok 244 - auditeur trop strict (refuse tout) ou qui plante : détecté comme faux positif
-ok 245 - auto-test jamais exécuté / ancien : signalé
-ok 246 - double exécution de contrôle : une dérive que l’AUDITEUR ne voit pas (champ libre aléatoire) est détectée
-ok 247 - double exécution : mode « sensibles » ne double que les actions sensibles ; résultats identiques = aucun faux positif sur les 8 agents
-ok 248 - AUCUN double envoi : deux processus approuvent la même mission en même temps → UN seul envoi (et index unique en garde-fou)
-ok 249 - accès refusés : agrégés dans le journal, alerte à partir de 10 ; pas d’inondation du journal
-ok 250 - escalade de privilège (jeton utilisateur sur route admin et inverse) : tracée, limitée en débit, alerte critique
-ok 251 - sonde de vie /api/sante : sans jeton, MINIMALE (aucune donnée) ; reflète le battement et les alertes critiques
-ok 252 - erreurs répétées, mission en erreur répétée et file bloquée (orchestrateur silencieux) : alertes
-ok 253 - tous les scripts Windows portent l’avertissement « NON EXÉCUTÉ » et aucun motif dangereux (iex, ExecutionPolicy Bypass, mot de passe en clair, téléchargement distant)
-ok 254 - installer.ps1 : garde-fous attendus (admin, simulation, entropie cryptographique, héritage coupé, pare-feu par compte, droits de connexion, BitLocker, version de Node)
-ok 255 - verifier-isolation.ps1 : toutes les sondes d’accès interdits prévues, rapport JSON, code de sortie 1 sur échec, risque loopback mesuré
-ok 256 - exercice-reprise.ps1 et desinstaller.ps1 : jeton obligatoire, délai borné, suppression des données seulement sur demande explicite
-ok 257 - hygiène syntaxique grossière : accolades, parenthèses et guillemets équilibrés dans chaque script (ne remplace PAS un interpréteur PowerShell)
-# tests 257
-# pass 257
+ok 155 - Gmail API : seul POST drafts, MIME base64url, aucun envoi et rejeu sans doublon après réouverture SQLite
+ok 156 - Gmail : refus avant réseau sans autorisation, après révocation, arrêt et pour action ou destinataire non permis
+ok 157 - Gmail : coupure après création distante, reprise et rejeu admin ne répètent jamais le POST
+ok 158 - Gmail : approbation → PDF dans brouillon → FAIT ; arrêt empêche la file ; mode synthétique conservé dans la file
+ok 159 - Gmail : deux connexions concurrentes réservent un seul POST
+ok 160 - OAuth : renouvellement, cache, erreurs sans secrets ; aucun secret enregistré en base
+ok 161 - Gmail : autorisation révoquée pendant OAuth → aucun POST
+ok 162 - API téléphone : activation protégée, consentement explicite et statut du brouillon
+ok 163 - Gmail : réponses HTTP d’échec et JSON invalide deviennent incertaines, sans répétition
+ok 164 - adaptateur : requête minimale et correcte, coût calculé depuis la consommation réelle, clé jamais exposée
+ok 165 - adaptateur : configuration refusée sans tarifs, sans modèle, sans clé, hôte hors liste, http, 
+ok 166 - adaptateur : réponses défectueuses refusées (statut, JSON, texte, schéma, jetons absents, démesure, redirection) ; la clé n’apparaît dans AUCUNE erreur
+ok 167 - adaptateur : délai dépassé → erreur franche (le serveur ne répond jamais)
+ok 168 - IA en ligne soumise à AUTORISATION : sans elle, aucun appel ; avec elle, proposition (à confirmer) ; coût réel tracé au budget
+ok 169 - PANNE INTERNET : les fonctions locales essentielles continuent, le disjoncteur évite d’attendre à chaque mission, reprise automatique au retour du réseau
+ok 170 - hybride local puis en ligne : le modèle LOCAL passe en premier ; l’en ligne n’est appelé que s’il échoue ET s’il est autorisé
+ok 171 - indépendance : aucun fichier de src/auditeurs/ n’importe un fichier de src/agents/ (ni l’inverse)
+ok 172 - moindre privilège : les agents n’importent ni la base, ni le moteur, ni les règles/autorisations, ni l’orchestrateur, ni le serveur
+ok 173 - droits déclarés : lecture limitée à des jeux connus, jamais de réseau ni d’envoi, 8 agents avec critères mesurables
+ok 174 - un agent ne peut se donner aucun droit : l’orchestrateur n’importe AUCUNE fonction d’octroi de droit ou de modification de règle
+ok 175 - isolé : un devis complet (calculs, PDF, mail) donne le même résultat que le mode direct
+ok 176 - isolé : un agent ne peut lire AUCUN fichier hors du code (base de données, secrets, autres espaces)
+ok 177 - isolé : écriture hors du dossier de sortie, lancement de processus : refusés
+ok 178 - isolé : l’environnement de l’agent est VIDE — aucun jeton, aucune clé du service ne lui est transmis
+ok 179 - droits de lecture : chaque agent ne reçoit QUE les jeux de données qu’il déclare
+ok 180 - isolé : délai maximum — le processus agent est TUÉ (pas seulement ignoré)
+ok 181 - isolé : une sortie démesurée est coupée (processus tué) et la mission BLOQUÉE avec explication, sans 3 corrections inutiles
+ok 182 - LIMITE CONNUE (documentée, non masquée) : le modèle de permissions de Node NE filtre PAS le réseau
+ok 183 - isolé : les huit agents donnent les mêmes statuts qu’en mode direct
+ok 184 - isolé : l’exécutable des agents peut être une COPIE dédiée de node (pour un pare-feu par programme sous Windows)
+ok 185 - hybride : le modèle PROPOSE une reformulation, l’humain décide ; rien n’est exécuté et le coût est tracé
+ok 186 - hybride : repli automatique local → en ligne ; et si TOUS les fournisseurs sont en panne, JARVIS fonctionne quand même (déterministe)
+ok 187 - hybride : sortie malveillante ou invalide du modèle REFUSÉE (agent inconnu, droits, injection, secret, longueur)
+ok 188 - hybride : le modèle ne reçoit QUE le texte de la demande, sans e-mail ni téléphone, et jamais les données
+ok 189 - hybride : budget IA atteint → aucun appel au modèle (le travail continue sans lui)
+ok 190 - hybride : la proposition ne peut viser qu’un agent ACTIF de l’espace (cloisonnement respecté)
+ok 191 - [devis] mutation champ par champ : aucun champ non vérifié hors texte libre déclaré
+ok 192 - [produits] mutation champ par champ : aucun champ non vérifié hors texte libre déclaré
+ok 193 - [prospection] mutation champ par champ : aucun champ non vérifié hors texte libre déclaré
+ok 194 - [clients] mutation champ par champ : aucun champ non vérifié hors texte libre déclaré
+ok 195 - [relances] mutation champ par champ : aucun champ non vérifié hors texte libre déclaré
+ok 196 - [commandes] mutation champ par champ : aucun champ non vérifié hors texte libre déclaré
+ok 197 - [finance] mutation champ par champ : aucun champ non vérifié hors texte libre déclaré
+ok 198 - [planification] mutation champ par champ : aucun champ non vérifié hors texte libre déclaré
+ok 199 - [planification/charge_atelier] mutation champ par champ sur le connecteur cockpit autorisé
+ok 200 - résultats BLOQUÉS : un blocage inventé (code inconnu, candidat inexistant, question absente) est refusé
+ok 201 - manifeste et icônes : champs d’installabilité présents, PNG réels aux bonnes dimensions
+ok 202 - service worker : jamais d’API en cache (données confidentielles) — vérifié sur le code
+ok 203 - NAVIGATEUR RÉEL : service worker actif, coquille en cache, AUCUNE donnée en cache, hors ligne explicite, retour en ligne, XSS inopérant, cibles tactiles
+ok 204 - en-têtes : manifeste servi avec le bon type, jamais mis en cache HTTP par le serveur, icônes accessibles sans jeton
+ok 205 - reprise après crash : ouvrier mort + redémarrage complet du processus, la mission aboutit
+ok 206 - plafond de reprises : 4 interruptions consécutives → ECHEC et alerte critique
+ok 207 - aucun doublon d’exécution entre plusieurs PROCESSUS qui se disputent la file
+ok 208 - idempotence : le même dépôt envoyé deux fois ne crée qu’une mission
+ok 209 - FIFO déterministe : deux missions créées dans la même milliseconde sont traitées dans l’ordre de dépôt
+ok 210 - un ouvrier qui a perdu son bail ne peut pas écraser le résultat
+ok 211 - [devis] panne volontaire (exception) : récupérée puis escalade si persistante
+ok 212 - [devis] délai maximum : agent trop lent interrompu puis mission relancée
+ok 213 - [finance] panne volontaire (exception) : récupérée puis escalade si persistante
+ok 214 - [finance] délai maximum : agent trop lent interrompu puis mission relancée
+ok 215 - [planification] panne volontaire (exception) : récupérée puis escalade si persistante
+ok 216 - [planification] délai maximum : agent trop lent interrompu puis mission relancée
+ok 217 - [relances] panne volontaire (exception) : récupérée puis escalade si persistante
+ok 218 - [relances] délai maximum : agent trop lent interrompu puis mission relancée
+ok 219 - arrêt d’urgence : par paramètre OU par fichier ARRET, aucune mission traitée
+ok 220 - budget : une mission qui dépasse le budget du jour bloque les suivantes AVANT tout travail
+ok 221 - porte humaine : approbation impossible si le résultat ou un fichier a été modifié après l’audit
+ok 222 - métriques calculées sur l’état réel (réussite, erreurs détectées, corrections, interventions)
+ok 223 - un mail, un PDF ou un site ne peut PAS donner d’ordre : seule la source authentifiée est acceptée (échec fermé)
+ok 224 - note client piégée (injection) : jamais recopiée dans le PDF, le mail ni le résultat
+ok 225 - injection dans les DONNÉES (notes de clients et de prospects) : exclue et signalée par chaque agent concerné
+ok 226 - détection d’injection et de secrets : vrais positifs, pas de faux positif sur les textes normaux
+ok 227 - journaux : e-mails, téléphones, IBAN et jetons masqués avant écriture
+ok 228 - journaux de TOUTES les missions des 8 agents : aucune donnée personnelle (e-mails de clients) dans le journal
+ok 229 - journal d’audit : toute modification a posteriori est détectée et alertée
+ok 230 - aucun secret ni donnée réelle dans le code, les données de démonstration et la documentation
+ok 231 - API : refuse sans jeton / mauvais jeton, accepte le bon ; en-têtes de sécurité ; page publique sans données
+ok 232 - API : DNS rebinding, verrouillage après 5 échecs, corps géant, traversée de chemin
+ok 233 - API : parcours complet — dépôt, exécution, détail de la décision, PDF, approbation, prochaine action
+ok 234 - API : anomalies métier remontées (finance, produits, suivi des commandes) dans l’état
+ok 235 - API : règles et autorisations — administration réservée au jeton administrateur, lecture au jeton utilisateur
+ok 236 - API : jeton trop court ou jeton administrateur identique/absent → serveur refusé
+ok 237 - sauvegarde chiffrée : aller-retour, mauvaise clé et fichier altéré rejetés, aucune donnée en clair, reprise après restauration
+ok 238 - sauvegarde trop ancienne → alerte
+ok 239 - politique : service sain → aucune action ; un raté isolé ne déclenche PAS de redémarrage (confirmation)
+ok 240 - politique : service MORT (2 sondes ratées) → redémarrage automatique + alerte
+ok 241 - politique : service vivant mais SILENCIEUX (orchestrateur bloqué) → redémarrage
+ok 242 - politique : alertes critiques sur service vivant → ALERTE seulement (un redémarrage ne règle ni un journal altéré ni un échec métier)
+ok 243 - protection contre la BOUCLE DE CRASH : 3 redémarrages puis ESCALADE, supervision suspendue ; reprise manuelle seulement
+ok 244 - fenêtre glissante : des redémarrages anciens (> fenêtre) ne comptent plus — pas d’escalade à tort
+ok 245 - redémarrage différé si la condition de sûreté n’est pas remplie ; échec du redémarrage signalé
+ok 246 - la sonde qui plante ou dépasse son délai est traitée comme un service MORT
+ok 247 - RÉEL : service kill -9 en pleine activité → le superviseur le redémarre, TOUTES les missions aboutissent UNE fois, aucun double envoi, journal intact
+ok 248 - service silencieux : pas de battement → alerte critique ; après un tour de boucle → sain ; 3 minutes de silence → critique
+ok 249 - incohérences détectées par le superviseur : résultat modifié en base, validation sans trace
+ok 250 - sonde de santé en ligne de commande : code de sortie 1 si service silencieux, 0 après un tour de boucle
+ok 251 - auto-test de l’auditeur : sain sur les 8 agents (canari) ; falsificateur générique fonctionnel
+ok 252 - auditeur « tampon encreur » (valide tout) DÉTECTÉ par l’auto-test ; l’orchestrateur passe en échec fermé puis se rétablit
+ok 253 - auditeur trop strict (refuse tout) ou qui plante : détecté comme faux positif
+ok 254 - auto-test jamais exécuté / ancien : signalé
+ok 255 - double exécution de contrôle : une dérive que l’AUDITEUR ne voit pas (champ libre aléatoire) est détectée
+ok 256 - double exécution : mode « sensibles » ne double que les actions sensibles ; résultats identiques = aucun faux positif sur les 8 agents
+ok 257 - AUCUN double envoi : deux processus approuvent la même mission en même temps → UN seul envoi (et index unique en garde-fou)
+ok 258 - accès refusés : agrégés dans le journal, alerte à partir de 10 ; pas d’inondation du journal
+ok 259 - escalade de privilège (jeton utilisateur sur route admin et inverse) : tracée, limitée en débit, alerte critique
+ok 260 - sonde de vie /api/sante : sans jeton, MINIMALE (aucune donnée) ; reflète le battement et les alertes critiques
+ok 261 - erreurs répétées, mission en erreur répétée et file bloquée (orchestrateur silencieux) : alertes
+ok 262 - tous les scripts Windows portent l’avertissement « NON EXÉCUTÉ » et aucun motif dangereux (iex, ExecutionPolicy Bypass, mot de passe en clair, téléchargement distant)
+ok 263 - installer.ps1 : garde-fous attendus (admin, simulation, entropie cryptographique, héritage coupé, pare-feu par compte, droits de connexion, BitLocker, version de Node)
+ok 264 - verifier-isolation.ps1 : toutes les sondes d’accès interdits prévues, rapport JSON, code de sortie 1 sur échec, risque loopback mesuré
+ok 265 - exercice-reprise.ps1 et desinstaller.ps1 : jeton obligatoire, délai borné, suppression des données seulement sur demande explicite
+ok 266 - hygiène syntaxique grossière : accolades, parenthèses et guillemets équilibrés dans chaque script (ne remplace PAS un interpréteur PowerShell)
+# tests 266
+# pass 266
 # fail 0
 # skipped 0
