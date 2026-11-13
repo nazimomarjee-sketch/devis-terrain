@@ -348,6 +348,8 @@ select.recherche{appearance:auto}
 <script src="annuaire.js"></script>
 <script src="ca-facture.js"></script>
 <script src="encaissements.js"></script>
+<script src="../communes-centres.js"></script>
+<script src="tournee.js"></script>
 <script src="decisions-comptes.js"></script>
 <script src="verifier-comptes.js"></script>
 <script src="ville/modele-commune.js"></script>
@@ -790,12 +792,18 @@ function panneauTournee(){
   if (!etat.tournee.length) return null;
   const g = etat.tournee.map(id => etat.garages.find(x=>x.id===id) || Object.values(etat.marche).flatMap(m=>m.etablissements).find(x=>x.id===id)).filter(Boolean);
   const msg = h('p',{class:'info', style:'margin:8px 0 0', 'aria-live':'polite'});
-  return h('section',{class:'bloc tournee'}, h('div',{class:'titre-bloc'}, `Visites à planifier · ${g.length}`),
-    h('ol',{}, g.map(x => h('li',{}, x.nom, h('span',{class:'info'}, ' · ' + (x.commune || 'commune ?') + (x.dep ? ' (' + x.dep + ')' : ''))))),
+  // Lot 2 : ordre proposé (départ et retour Massy–Palaiseau), distance ESTIMÉE entre centres de communes ; garages sans position à part.
+  let t = null; try { t = Tournee.ordonner({ centres: typeof ODICOLOR_COMMUNES_CENTRES !== 'undefined' ? ODICOLOR_COMMUNES_CENTRES : [],
+    etapes: g.map(x => ({ id: x.id, nom: x.nom, insee: x.insee || (x.classement && x.classement.insee) || '', cp: x.cp || (x.classement && x.classement.cp) || '', commune: x.commune || (x.classement && x.classement.commune) || '' })) }); } catch (e) { t = null; }
+  const parId = new Map(g.map(x => [x.id, x])), ordonnes = t ? t.ordre.map(o => parId.get(o.id)).concat(t.inconnues.map(o => parId.get(o.id))).filter(Boolean) : g;
+  return h('section',{class:'bloc tournee', id:'tournee'}, h('div',{class:'titre-bloc'}, `Visites à planifier · ${g.length}`),
+    t ? h('p',{class:'info', 'data-tournee':'resume'}, 'Ordre proposé depuis ' + t.depart + (t.retour ? ', retour compris' : '') + ' · environ ' + t.kmEstimes + ' km (estimation) · ' + t.hypothese) : null,
+    h('ol',{}, ordonnes.map(x => { const inc = t && t.inconnues.find(o => o.id === x.id);
+      return h('li',{'data-tournee':'etape'}, x.nom, h('span',{class:'info'}, ' · ' + (x.commune || 'commune ?') + (x.dep ? ' (' + x.dep + ')' : '') + (inc ? ' · ' + inc.motif + ' : à placer toi-même' : ''))); })),
     h('div',{style:'display:flex;gap:8px;margin-top:10px;flex-wrap:wrap'},
-      h('button',{class:'btn', onclick:async()=>{ const ok = await copier(g.map((x,i)=>`${i+1}. ${x.nom} — ${x.commune||''} ${x.classement.cp||''}`).join('\n')); msg.textContent = ok ? 'Liste copiée.' : 'Copie refusée par le navigateur.'; }}, icone('copier'), 'Copier la liste'),
+      h('button',{class:'btn', onclick:async()=>{ const ok = await copier(ordonnes.map((x,i)=>`${i+1}. ${x.nom} — ${x.commune||''} ${(x.classement && x.classement.cp)||''}`).join('\n')); msg.textContent = ok ? 'Liste copiée.' : 'Copie refusée par le navigateur.'; }}, icone('copier'), 'Copier la liste'),
       h('button',{class:'btn discret', onclick:()=>{ etat.tournee=[]; rendre(); }}, 'Vider')),
-    msg, h('p',{class:'regle'}, 'Brouillon de cette page seulement : rien n’est envoyé au téléphone ni enregistré. L’ordre de tournée arrive au Lot 2.'));
+    msg, h('p',{class:'regle'}, 'Brouillon de cette page seulement : rien n’est envoyé au téléphone ni enregistré. L’envoi de la tournée vers le téléphone reste à faire (lot 2, étape suivante).'));
 }
 function vueAClasser(){
   const g = L0.aClasser(etat.garages);
