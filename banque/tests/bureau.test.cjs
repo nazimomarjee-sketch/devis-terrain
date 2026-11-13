@@ -17,7 +17,15 @@ test.after(() => fs.rmSync(DOSSIER, { recursive: true, force: true }));
 const RELEVE = 'Date;Libellé;Montant\n02/10/2026;VIR SEPA SALAIRE OCT;2 100,00\n05/10/2026;PRLV SEPA NETFLIX.COM;-13,49\n20/10/2026;CB GARAGE DUPONT;-450,00\n';
 fs.writeFileSync(path.join(B.F.entree, 'octobre.csv'), RELEVE);
 fs.writeFileSync(path.join(DOSSIER, 'secret.csv'), RELEVE);
-const autoriser = oui => fs.writeFileSync(B.F.config, JSON.stringify({ detailPourAssistant: oui }));
+const autoriser = oui => fs.writeFileSync(B.F.config, JSON.stringify({ assistant: oui === true ? 'detail' : oui === false ? 'totaux' : oui }));
+
+test('par défaut, aucun assistant n\'a accès à rien : toutes les actions sont refusées', () => {
+  for (const nom of Object.keys(B.ACTIONS))
+    assert.throws(() => B.executer(nom, { fichier: 'octobre.csv', id: 'x', categorie: 'Transport', motCle: 'abc' }, 'test'), /Aucun assistant n'est autorisé/, nom);
+  assert.equal(B.lire().ops.length, 0);
+  assert.match(fs.readFileSync(B.F.journal, 'utf8'), /REFUS : assistant non autorisé/);
+  autoriser('totaux');
+});
 
 test('import : aperçu sans écriture, puis enregistrement, puis réimport sans doublon', () => {
   const a = B.executer('importer', { fichier: 'octobre.csv' }, 'test');
@@ -40,9 +48,16 @@ test('sans autorisation : totaux visibles, libellés et écritures de catégorie
   autoriser(false);
   const s = B.executer('synthese', {}, 'test');
   assert.deepEqual([s.mois, s.entrees, s.sorties, s.solde], ['2026-10', 2100, -463.49, 1636.51]);
-  const visible = JSON.stringify([s, B.executer('etat', {}, 'test'), B.executer('resume', {}, 'test'), B.executer('recurrentes', {}, 'test')]);
-  for (const mot of ['NETFLIX', 'GARAGE', 'DUPONT', 'SALAIRE']) assert.equal(visible.includes(mot), false, mot);
-  for (const [nom, args] of [['operations', {}], ['regles', {}], ['classer', { id: 'x', categorie: 'Transport' }], ['ajouter_regle', { motCle: 'garage', categorie: 'Transport' }], ['supprimer_regle', { motCle: 'garage' }]])
+  const d0 = B.lire();
+  d0.comptes = [{ nom: 'Compte courant', soldeRef: 50000, dateRef: '2026-10-25' }];
+  d0.echeances = [{ id: 'e1', libelle: 'Garage Dupont entretien', montant: -45000, jour: 1, cat: 'Transport', type: 'charge' }];
+  B.ecrire(d0);
+  const prev = B.executer('prevision', {}, 'test');
+  assert.equal(prev.disponible, 500);
+  assert.equal(prev.echeancesRestantes.length, 1);
+  const visible = JSON.stringify([s, prev, B.executer('echeances', {}, 'test'), B.executer('etat', {}, 'test'), B.executer('resume', {}, 'test'), B.executer('recurrentes', {}, 'test')]);
+  for (const mot of ['NETFLIX', 'GARAGE', 'DUPONT', 'SALAIRE', 'Garage', 'Dupont', 'Compte courant']) assert.equal(visible.includes(mot), false, mot);
+  for (const [nom, args] of [['operations', {}], ['regles', {}], ['pistes_economies', {}], ['classer', { id: 'x', categorie: 'Transport' }], ['ajouter_regle', { motCle: 'garage', categorie: 'Transport' }], ['supprimer_regle', { motCle: 'garage' }]])
     assert.throws(() => B.executer(nom, args, 'test'), /libellés désactivé/, nom);
 });
 
@@ -93,8 +108,10 @@ test('connecteur MCP : initialisation, liste des outils, appel, refus propre', a
     const outils = (await appeler(2, 'tools/list')).result.tools;
     assert.deepEqual(outils.map(o => o.name).sort(), Object.keys(B.ACTIONS).sort());
     assert.equal(outils.find(o => o.name === 'importer').inputSchema.required[0], 'fichier');
+    autoriser('totaux');
     const s = await appeler(3, 'tools/call', { name: 'synthese', arguments: { mois: '2026-10' } });
     assert.equal(JSON.parse(s.result.content[0].text).solde, 1636.51);
+    autoriser('totaux');
     const refus = await appeler(4, 'tools/call', { name: 'operations', arguments: {} });
     assert.equal(refus.result.isError, true);
     assert.equal((await appeler(5, 'inconnue')).error.code, -32601);
@@ -125,6 +142,9 @@ test('serveur local : jeton obligatoire, hôte vérifié, écoute sur 127.0.0.1 
     assert.equal((await req('GET', '/api/donnees', { Authorization: 'Bearer ' + jeton, Host: 'site-malveillant.example' })).code, 403);
     const d = JSON.parse((await req('GET', '/api/donnees', { Authorization: 'Bearer ' + jeton })).texte);
     assert.equal(d.ops.length, 3);
+    autoriser('aucun');
+    assert.equal((await req('POST', '/api/action/synthese', { Authorization: 'Bearer ' + jeton, 'Content-Type': 'application/json' }, '{}')).code, 400);
+    autoriser('totaux');
     const a = await req('POST', '/api/action/synthese', { Authorization: 'Bearer ' + jeton, 'Content-Type': 'application/json' }, '{}');
     assert.equal(JSON.parse(a.texte).resultat.solde, 1636.51);
     const invalide = await req('POST', '/api/ops', { Authorization: 'Bearer ' + jeton, 'Content-Type': 'application/json' }, JSON.stringify({ ops: [{ id: 'x', montant: 1.5 }] }));

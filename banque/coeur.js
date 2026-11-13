@@ -84,6 +84,7 @@
     const mots = normaliser(libelle)
       .replace(/\b(PAIEMENT|ACHAT|PAR|CARTE|CB|PRLV|PRELEVEMENT|SEPA|VIR|VIREMENT|INST|RECU|EMIS|DE|DU|FACTURE|REF|ECH|ECHEANCE)\b/g, ' ')
       .replace(/\b[A-Z]*\d[A-Z0-9]*\b/g, ' ')
+      .replace(/\b(JANVIER|JANV?|FEVRIER|FEVR?|MARS|AVRIL|AVR|MAI|JUIN|JUILLET|JUIL?|AOUT|SEPTEMBRE|SEPT?|OCTOBRE|OCT|NOVEMBRE|NOV|DECEMBRE|DEC)\b/g, ' ')
       .split(/\s+/).filter(Boolean);
     return mots.slice(0, 3).join(' ');
   }
@@ -238,25 +239,28 @@
     return t.length % 2 ? t[m] : Math.round((t[m - 1] + t[m]) / 2);
   }
 
-  /** Dépenses qui reviennent au moins 3 mois distincts pour un montant proche (± 25 %), encore actives. */
-  function recurrentes(ops, regles) {
+  /** Mouvements qui reviennent au moins 3 mois distincts pour un montant proche (± 25 %), encore actifs.
+   *  signe = -1 : dépenses (défaut) ; signe = 1 : revenus. Les montants renvoyés sont positifs. */
+  function recurrentes(ops, regles, signe) {
+    signe = signe === 1 ? 1 : -1;
     const tous = listeMois(ops);
     if (!tous.length) return [];
     const recents = new Set(tous.slice(-2)), groupes = new Map();
     for (const o of ops) {
-      if (o.montant >= 0) continue;
+      if (Math.sign(o.montant) !== signe) continue;
       const cat = categorie(o, regles), cle = marchand(o.libelle);
       if (cat === NEUTRE || !cle) continue;
-      if (!groupes.has(cle)) groupes.set(cle, { marchand: cle, cat, parMois: new Map() });
+      if (!groupes.has(cle)) groupes.set(cle, { marchand: cle, cat, parMois: new Map(), jours: [] });
       const g = groupes.get(cle);
-      g.parMois.set(moisDe(o), (g.parMois.get(moisDe(o)) || 0) - o.montant);
+      g.parMois.set(moisDe(o), (g.parMois.get(moisDe(o)) || 0) + Math.abs(o.montant));
+      g.jours.push(Number(o.date.slice(8, 10)));
     }
     const res = [];
     for (const g of groupes.values()) {
       const med = mediane(g.parMois.values());
       const proches = [...g.parMois].filter(([, v]) => Math.abs(v - med) <= med * 0.25).map(([m]) => m);
       if (proches.length >= 3 && proches.some(m => recents.has(m)))
-        res.push({ marchand: g.marchand, cat: g.cat, montant: med, nbMois: proches.length });
+        res.push({ marchand: g.marchand, cat: g.cat, montant: med, nbMois: proches.length, jour: mediane(g.jours) });
     }
     return res.sort((a, b) => b.montant - a.montant);
   }
@@ -298,10 +302,228 @@
     return L.join('\n');
   }
 
+  /* ---------- Comptes et argent disponible ---------- */
+  /** Solde d'un compte = solde relevé par le propriétaire à une date + opérations postérieures à cette date. */
+  function soldes(comptes, ops) {
+    const noms = [...new Set([...(comptes || []).map(c => c.nom), ...ops.map(o => o.compte)])];
+    const res = { parCompte: [], disponible: 0, epargne: 0, connus: 0, inconnus: [] };
+    for (const nom of noms) {
+      const c = (comptes || []).find(x => x.nom === nom) || { nom };
+      const connu = Number.isInteger(c.soldeRef) && !!c.dateRef;
+      const depuis = connu ? ops.filter(o => o.compte === nom && o.date > c.dateRef) : [];
+      const solde = connu ? c.soldeRef + depuis.reduce((a, o) => a + o.montant, 0) : null;
+      res.parCompte.push({ nom, epargne: !!c.epargne, solde, dateRef: c.dateRef || null, opsDepuis: depuis.length });
+      if (!connu) res.inconnus.push(nom);
+      else { res.connus++; if (c.epargne) res.epargne += solde; else res.disponible += solde; }
+    }
+    return res;
+  }
+
+  /* ---------- Échéances : charges fixes, crédits, revenus réguliers ---------- */
+  const TYPES_ECHEANCE = ['charge', 'credit', 'revenu'];
+  const joursDansMois = mois => new Date(Date.UTC(+mois.slice(0, 4), +mois.slice(5, 7), 0)).getUTCDate();
+  const ecartJours = (a, b) => Math.round((Date.parse(a) - Date.parse(b)) / 864e5);
+  function moisSuivant(mois, n) {
+    const d = new Date(Date.UTC(+mois.slice(0, 4), +mois.slice(5, 7) - 1 + (n || 1), 1));
+    return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0');
+  }
+  function echeanceDue(e, mois) {
+    if (e.fin && mois > e.fin) return false;
+    return !e.mois || !e.mois.length || e.mois.includes(+mois.slice(5, 7));
+  }
+  const dateEcheance = (e, mois) => mois + '-' + String(Math.min(e.jour, joursDansMois(mois))).padStart(2, '0');
+
+  /** Pour un mois : chaque échéance due, sa date, et l'opération du relevé qui la règle si on la retrouve.
+   *  Avec mot-clé : libellé contenant le mot-clé, montant à ± 50 %. Sans : montant à ± 5 % et date à 7 jours près. */
+  function etatEcheances(echeances, ops, mois) {
+    const duMois = ops.filter(o => moisDe(o) === mois), prises = new Set();
+    return (echeances || []).filter(e => echeanceDue(e, mois)).map(e => {
+      const date = dateEcheance(e, mois), abs = Math.abs(e.montant);
+      const op = duMois.find(o => {
+        if (prises.has(o.id) || Math.sign(o.montant) !== Math.sign(e.montant)) return false;
+        const ecart = Math.abs(Math.abs(o.montant) - abs);
+        if (e.motif) return (' ' + normaliser(o.libelle) + ' ').includes(' ' + e.motif + ' ') && ecart <= abs * 0.5;
+        return ecart <= abs * 0.05 && Math.abs(ecartJours(o.date, date)) <= 7;
+      });
+      if (op) prises.add(op.id);
+      return { echeance: e, date, reglee: !!op, op: op || null };
+    }).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  }
+
+  /** Charge mensuelle lissée : une échéance annuelle compte pour 1/12. */
+  function totalMensuel(echeances, type) {
+    return Math.round((echeances || []).filter(e => !type || e.type === type)
+      .reduce((a, e) => a + e.montant * ((e.mois && e.mois.length) || 12) / 12, 0));
+  }
+
+  /** Récurrences repérées dans les relevés et pas encore déclarées : propositions à valider d'un geste. */
+  function suggestionsEcheances(ops, regles, echeances) {
+    const fixes = ['Logement', 'Énergie et télécoms', 'Assurances', 'Abonnements', 'Santé', 'Impôts', 'Frais bancaires', A_CLASSER];
+    const connue = r => (echeances || []).some(e => e.motif && (e.motif === r.marchand || r.marchand.includes(e.motif) || e.motif.includes(r.marchand)));
+    const charges = recurrentes(ops, regles, -1).filter(r => fixes.includes(r.cat) && !connue(r))
+      .map(r => ({ libelle: r.marchand, montant: -r.montant, jour: r.jour, cat: r.cat, type: 'charge', motif: r.marchand, nbMois: r.nbMois }));
+    const revenus = recurrentes(ops, regles, 1).filter(r => !connue(r))
+      .map(r => ({ libelle: r.marchand, montant: r.montant, jour: r.jour, cat: r.cat, type: 'revenu', motif: r.marchand, nbMois: r.nbMois }));
+    return [...revenus, ...charges];
+  }
+
+  /* ---------- Prévision de fin de mois ---------- */
+  /** Dépenses courantes par jour (hors échéances déclarées, hors épargne), estimées sur les 3 derniers mois complets. */
+  function rythmeVariable(d, aujourdhui) {
+    const mois = aujourdhui.slice(0, 7);
+    const horsCharges = m => {
+      const s = syntheseMois(d.ops, d.regles, m);
+      const fixes = (d.echeances || []).filter(e => e.montant < 0 && echeanceDue(e, m)).reduce((a, e) => a - e.montant, 0);
+      return Math.max(0, -s.sorties - fixes);
+    };
+    const complets = listeMois(d.ops).filter(m => m < mois).slice(-3);
+    if (complets.length) {
+      const jours = complets.reduce((a, m) => a + joursDansMois(m), 0);
+      return { parJour: complets.reduce((a, m) => a + horsCharges(m), 0) / jours, base: complets.length + ' mois complet' + (complets.length > 1 ? 's' : '') };
+    }
+    const s = syntheseMois(d.ops, d.regles, mois);
+    if (!s.nb) return { parJour: 0, base: 'aucune donnée' };
+    const reglees = etatEcheances(d.echeances, d.ops, mois).filter(x => x.reglee && x.echeance.montant < 0).reduce((a, x) => a - x.op.montant, 0);
+    return { parJour: Math.max(0, -s.sorties - reglees) / +aujourdhui.slice(8, 10), base: 'le mois en cours seulement' };
+  }
+
+  /** Solde prévu à la fin du mois en cours et point le plus bas d'ici là. Tout est une estimation. */
+  function prevision(d, aujourdhui) {
+    const mois = aujourdhui.slice(0, 7), nbJours = joursDansMois(mois), jourAuj = +aujourdhui.slice(8, 10);
+    const s = soldes(d.comptes, d.ops);
+    if (!s.parCompte.some(c => c.solde !== null && !c.epargne)) return { inconnu: true, mois };
+    const restantes = etatEcheances(d.echeances, d.ops, mois).filter(x => !x.reglee)
+      .map(x => ({ libelle: x.echeance.libelle, type: x.echeance.type, cat: x.echeance.cat, montant: x.echeance.montant, date: x.date, enRetard: x.date < aujourdhui }));
+    const r = rythmeVariable(d, aujourdhui);
+    let solde = s.disponible, bas = { montant: s.disponible, date: aujourdhui };
+    for (let j = jourAuj; j <= nbJours; j++) {
+      const date = mois + '-' + String(j).padStart(2, '0');
+      for (const e of restantes) if (e.date === date || (j === jourAuj && e.enRetard)) solde += e.montant;
+      if (j > jourAuj) solde -= r.parJour;
+      if (solde < bas.montant) bas = { montant: Math.round(solde), date };
+    }
+    const revenusAttendus = restantes.filter(e => e.montant > 0).reduce((a, e) => a + e.montant, 0);
+    const chargesAVenir = restantes.filter(e => e.montant < 0).reduce((a, e) => a + e.montant, 0);
+    const variablesRestantes = -Math.round(r.parJour * (nbJours - jourAuj));
+    return { mois, disponible: s.disponible, revenusAttendus, chargesAVenir, variablesRestantes,
+      soldeFin: s.disponible + revenusAttendus + chargesAVenir + variablesRestantes,
+      pointBas: bas, base: r.base, parJour: Math.round(r.parJour), joursRestants: nbJours - jourAuj, echeancesRestantes: restantes };
+  }
+
+  /* ---------- Alertes et pistes d'économies ---------- */
+  const jourFr = d => d.slice(8, 10) + '/' + d.slice(5, 7);
+
+  function alertes(d, aujourdhui) {
+    const res = [], p = prevision(d, aujourdhui), seuil = Number.isInteger(d.seuil) ? d.seuil : 0, mois = aujourdhui.slice(0, 7);
+    if (!p.inconnu) {
+      if (p.pointBas.montant < 0) res.push({ niveau: 'rouge', texte: 'Découvert possible le ' + jourFr(p.pointBas.date) + ' : ' + euros(p.pointBas.montant) + ' €.' });
+      if (p.soldeFin < seuil && !(p.pointBas.montant < 0 && p.pointBas.date.slice(8) === String(joursDansMois(mois))))
+        res.push({ niveau: 'rouge', texte: 'Solde prévu en fin de mois : ' + euros(p.soldeFin) + ' €' + (seuil ? ', sous votre seuil de ' + euros(seuil) + ' €.' : '.') });
+      for (const e of p.echeancesRestantes.filter(e => e.enRetard && e.montant < 0))
+        res.push({ niveau: 'orange', texte: '« ' + e.libelle + ' » (' + euros(-e.montant) + ' €) était prévue le ' + jourFr(e.date) + ' et n\'apparaît pas dans vos opérations.' });
+      for (const e of p.echeancesRestantes.filter(e => e.enRetard && e.montant > 0))
+        res.push({ niveau: 'orange', texte: 'Revenu « ' + e.libelle + ' » attendu le ' + jourFr(e.date) + ', pas encore vu.' });
+    }
+    const s = syntheseMois(d.ops, d.regles, mois);
+    for (const [cat, budget] of Object.entries(d.budgets || {})) {
+      const depense = -(s.parCat[cat] || 0);
+      if (depense > budget) res.push({ niveau: 'orange', texte: 'Budget « ' + cat + ' » dépassé : ' + euros(depense) + ' € pour ' + euros(budget) + ' € prévus.' });
+    }
+    for (const c of soldes(d.comptes, d.ops).parCompte)
+      if (c.dateRef && !c.opsDepuis && ecartJours(aujourdhui, c.dateRef) > 14)
+        res.push({ niveau: 'info', texte: 'Solde de « ' + c.nom + ' » non mis à jour depuis ' + ecartJours(aujourdhui, c.dateRef) + ' jours.' });
+    return res;
+  }
+
+  /** Constats chiffrés sur les relevés. Ce sont des faits ; juger une dépense « inutile » reste votre décision. */
+  function pistes(d, aujourdhui) {
+    const res = [], mois = aujourdhui.slice(0, 7);
+    const complets = listeMois(d.ops).filter(m => m < mois);
+    const abos = recurrentes(d.ops, d.regles, -1).filter(r => r.cat === 'Abonnements');
+    if (abos.length) {
+      const t = abos.reduce((a, r) => a + r.montant, 0);
+      res.push({ titre: abos.length + ' abonnement' + (abos.length > 1 ? 's' : '') + ' : ' + euros(t) + ' € par mois, soit ' + euros(t * 12) + ' € par an',
+        detail: abos.map(r => r.marchand + ' ' + euros(r.montant) + ' €').join(' · '), gainMensuel: t });
+    }
+    const trois = complets.slice(-3);
+    if (trois.length) {
+      const frais = trois.reduce((a, m) => a - (syntheseMois(d.ops, d.regles, m).parCat['Frais bancaires'] || 0), 0);
+      if (frais > 0) res.push({ titre: 'Frais bancaires : ' + euros(frais) + ' € sur ' + trois.length + ' mois',
+        detail: 'Souvent négociables ou évitables (cotisation de carte, commissions, agios).', gainMensuel: Math.round(frais / trois.length) });
+    }
+    if (complets.length >= 2) {
+      const dernier = complets[complets.length - 1], avant = complets.slice(-4, -1);
+      const sd = syntheseMois(d.ops, d.regles, dernier), sa = avant.map(m => syntheseMois(d.ops, d.regles, m));
+      for (const [cat, v] of Object.entries(sd.parCat)) {
+        if (v >= 0 || cat === A_CLASSER) continue;
+        const moy = sa.reduce((a, x) => a - (x.parCat[cat] || 0), 0) / sa.length, hausse = -v - moy;
+        if (moy > 0 && hausse > 3000 && hausse > moy * 0.2)
+          res.push({ titre: cat + ' en hausse en ' + dernier + ' : +' + euros(Math.round(hausse)) + ' €',
+            detail: euros(-v) + ' € contre ' + euros(Math.round(moy)) + ' € en moyenne sur les ' + sa.length + ' mois précédents.', gainMensuel: Math.round(hausse) });
+      }
+      const petits = new Map();
+      for (const o of d.ops) {
+        if (moisDe(o) !== dernier || o.montant >= 0 || o.montant < -1500 || categorie(o, d.regles) === NEUTRE) continue;
+        const cle = marchand(o.libelle); if (!cle) continue;
+        const g = petits.get(cle) || { n: 0, total: 0 }; g.n++; g.total -= o.montant; petits.set(cle, g);
+      }
+      for (const [cle, g] of petits) if (g.n >= 8)
+        res.push({ titre: g.n + ' petits achats chez ' + cle + ' en ' + dernier + ' : ' + euros(g.total) + ' €', detail: 'Moins de 15 € à chaque fois, mais ' + euros(g.total * 12) + ' € par an à ce rythme.', gainMensuel: g.total });
+    }
+    return res.sort((a, b) => b.gainMensuel - a.gainMensuel);
+  }
+
+  /** Budgets proposés : moyenne des 3 derniers mois complets, arrondie à 10 € au-dessus. Ne remplace pas un budget existant. */
+  function budgetsProposes(d, aujourdhui) {
+    const complets = listeMois(d.ops).filter(m => m < aujourdhui.slice(0, 7)).slice(-3), res = {};
+    if (!complets.length) return res;
+    const hors = ['Revenus', 'Entrées diverses', NEUTRE, A_CLASSER];
+    for (const cat of CATEGORIES) {
+      if (hors.includes(cat) || (d.budgets && d.budgets[cat])) continue;
+      const moy = complets.reduce((a, m) => a - (syntheseMois(d.ops, d.regles, m).parCat[cat] || 0), 0) / complets.length;
+      if (moy >= 1000) res[cat] = Math.ceil(moy / 1000) * 1000;
+    }
+    return res;
+  }
+
+  /* ---------- Saisies manuelles et rapprochement avec un relevé ---------- */
+  const estManuelle = o => o.id.startsWith('M|');
+  /** Une saisie manuelle retrouvée dans un relevé (même compte, même montant, 4 jours d'écart au plus) est remplacée. */
+  function rapprocher(ops, ajouts) {
+    const prises = new Set(), paires = [];
+    for (const a of ajouts) {
+      const m = ops.find(o => estManuelle(o) && !prises.has(o.id) && o.compte === a.compte && o.montant === a.montant && Math.abs(ecartJours(o.date, a.date)) <= 4);
+      if (m) { prises.add(m.id); paires.push({ manuelle: m, importee: a }); }
+    }
+    return paires;
+  }
+
+  /** Résumé pour Claude, complété par la situation du moment (toujours sans libellé ni nom de compte). */
+  function resumeComplet(d, nbMois, aujourdhui) {
+    const base = resumePourClaude(d.ops, d.regles, nbMois);
+    if (!base) return '';
+    const L = [], p = prevision(d, aujourdhui);
+    L.push('Situation au ' + aujourdhui + ' :');
+    if (p.inconnu) L.push('- Solde des comptes non renseigné.');
+    else {
+      L.push('- Argent disponible (hors épargne) : ' + euros(p.disponible));
+      L.push('- Prévision fin de mois : ' + euros(p.soldeFin) + ' (revenus attendus ' + euros(p.revenusAttendus) + ', charges à venir ' + euros(p.chargesAVenir) + ', dépenses courantes estimées ' + euros(p.variablesRestantes) + ' d\'après ' + p.base + ')');
+      L.push('- Point le plus bas prévu : ' + euros(p.pointBas.montant) + ' le ' + p.pointBas.date);
+    }
+    if ((d.echeances || []).length) {
+      L.push('- Charges fixes déclarées : ' + euros(-totalMensuel(d.echeances, 'charge')) + ' / mois ; crédits : ' + euros(-totalMensuel(d.echeances, 'credit')) + ' / mois ; revenus réguliers : ' + euros(totalMensuel(d.echeances, 'revenu')) + ' / mois (montants lissés).');
+      for (const e of d.echeances.filter(x => x.type === 'credit' && x.fin)) L.push('- Un crédit de ' + euros(-e.montant) + ' / mois se termine en ' + e.fin + '.');
+    }
+    const budgets = Object.entries(d.budgets || {});
+    if (budgets.length) L.push('- Budgets mensuels fixés : ' + budgets.map(([c, v]) => c + ' ' + euros(v)).join(', ') + '.');
+    return base.replace('\n\nCe que j\'attends de toi', '\n\n' + L.join('\n') + '\n\nCe que j\'attends de toi');
+  }
+
   /* ---------- Sauvegarde ---------- */
   function validerSauvegarde(d) {
     if (!d || d.format !== 'banque-locale' || !Array.isArray(d.ops)) throw new Error('Ce fichier n\'est pas une sauvegarde Banque locale.');
     const ids = new Set();
+    const texte = (v, max) => typeof v === 'string' && v.length > 0 && v.length <= max;
     const ops = d.ops.map((o, i) => {
       const ok = o && typeof o.id === 'string' && o.id && !ids.has(o.id) && typeof o.libelle === 'string'
         && typeof o.compte === 'string' && Number.isInteger(o.montant) && o.montant !== 0
@@ -315,9 +537,38 @@
     const regles = (Array.isArray(d.regles) ? d.regles : [])
       .filter(r => r && typeof r.motif === 'string' && r.motif && CATEGORIES.includes(r.cat))
       .map(r => ({ motif: normaliser(r.motif), cat: r.cat }));
-    return { ops, regles };
+    const nomsVus = new Set();
+    const comptes = (Array.isArray(d.comptes) ? d.comptes : []).map((c, i) => {
+      const soldeOk = c && (c.soldeRef === undefined || (Number.isInteger(c.soldeRef) && typeof c.dateRef === 'string' && parseDate(c.dateRef) === c.dateRef));
+      if (!c || !texte(c.nom, 40) || nomsVus.has(c.nom) || !soldeOk) throw new Error('Sauvegarde refusée : compte n° ' + (i + 1) + ' invalide.');
+      nomsVus.add(c.nom);
+      const p = { nom: c.nom, epargne: c.epargne === true };
+      if (c.soldeRef !== undefined) { p.soldeRef = c.soldeRef; p.dateRef = c.dateRef; }
+      return p;
+    });
+    const idsE = new Set();
+    const echeances = (Array.isArray(d.echeances) ? d.echeances : []).map((e, i) => {
+      const ok = e && texte(e.id, 60) && !idsE.has(e.id) && texte(e.libelle, 60) && Number.isInteger(e.montant) && e.montant !== 0
+        && Number.isInteger(e.jour) && e.jour >= 1 && e.jour <= 31 && CATEGORIES.includes(e.cat) && TYPES_ECHEANCE.includes(e.type)
+        && (e.type === 'revenu') === (e.montant > 0)
+        && (e.mois === undefined || (Array.isArray(e.mois) && e.mois.length <= 12 && e.mois.every(m => Number.isInteger(m) && m >= 1 && m <= 12)))
+        && (e.fin === undefined || /^\d{4}-(0[1-9]|1[0-2])$/.test(e.fin)) && (e.motif === undefined || texte(e.motif, 60));
+      if (!ok) throw new Error('Sauvegarde refusée : échéance n° ' + (i + 1) + ' invalide.');
+      idsE.add(e.id);
+      const p = { id: e.id, libelle: e.libelle, montant: e.montant, jour: e.jour, cat: e.cat, type: e.type };
+      if (e.mois && e.mois.length) p.mois = [...new Set(e.mois)].sort((a, b) => a - b);
+      if (e.fin) p.fin = e.fin;
+      if (e.motif && normaliser(e.motif)) p.motif = normaliser(e.motif);
+      return p;
+    });
+    const budgets = {};
+    for (const [cat, v] of Object.entries(d.budgets && typeof d.budgets === 'object' && !Array.isArray(d.budgets) ? d.budgets : {}))
+      if (CATEGORIES.includes(cat) && Number.isInteger(v) && v > 0) budgets[cat] = v;
+    return { ops, regles, comptes, echeances, budgets, seuil: Number.isInteger(d.seuil) ? d.seuil : 0 };
   }
 
   return { CATEGORIES, A_CLASSER, NEUTRE, parseMontant, parseDate, normaliser, marchand, lireReleve, identifier,
-    fusionner, categorie, listeMois, syntheseMois, recurrentes, resumePourClaude, euros, validerSauvegarde };
+    fusionner, categorie, listeMois, syntheseMois, recurrentes, resumePourClaude, euros, validerSauvegarde,
+    TYPES_ECHEANCE, soldes, echeanceDue, dateEcheance, etatEcheances, totalMensuel, suggestionsEcheances, moisSuivant,
+    rythmeVariable, prevision, alertes, pistes, budgetsProposes, estManuelle, rapprocher, resumeComplet };
 });

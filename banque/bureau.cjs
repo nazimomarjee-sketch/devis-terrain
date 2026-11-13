@@ -8,8 +8,10 @@
  *   node bureau.cjs actions         liste les actions disponibles
  *
  * Les données vivent dans un fichier du PC (par défaut ~/BanqueLocale/donnees.json), jamais dans le dépôt.
- * L'assistant ne passe que par la liste ACTIONS ci-dessous : il ne peut ni effacer ni restaurer,
- * il ne lit que les fichiers du dossier « a-importer », et il ne voit les libellés que si vous l'autorisez.
+ * Par défaut, aucun assistant n'a accès à rien : le propriétaire choisit le niveau dans l'appli (Plus > Assistant) :
+ *   aucun (défaut) | totaux (montants par catégorie, sans libellé) | detail (libellés + classement).
+ * Même autorisé, l'assistant ne passe que par la liste ACTIONS : il ne peut ni effacer ni restaurer,
+ * et il ne lit que les fichiers du dossier « a-importer ».
  */
 const fs = require('node:fs');
 const os = require('node:os');
@@ -41,14 +43,14 @@ function ecrireAtomique(fichier, texte) {
 function lire() {
   let brut;
   try { brut = fs.readFileSync(F.donnees, 'utf8'); }
-  catch (e) { if (e.code === 'ENOENT') return { ops: [], regles: [], rev: 0 }; throw e; }
+  catch (e) { if (e.code === 'ENOENT') return { ops: [], regles: [], comptes: [], echeances: [], budgets: {}, seuil: 0, rev: 0 }; throw e; }
   let d;
   try { d = JSON.parse(brut); } catch (e) { throw new Error('donnees.json est illisible. Restaurez une copie du dossier « sauvegardes ».'); }
   const v = C.validerSauvegarde(d);
-  return { ops: v.ops, regles: v.regles, rev: Number.isInteger(d.rev) ? d.rev : 0 };
+  return { ...v, rev: Number.isInteger(d.rev) ? d.rev : 0 };
 }
 function ecrire(d) {
-  const v = C.validerSauvegarde({ format: 'banque-locale', ops: d.ops, regles: d.regles });
+  const v = C.validerSauvegarde({ format: 'banque-locale', ops: d.ops, regles: d.regles, comptes: d.comptes, echeances: d.echeances, budgets: d.budgets, seuil: d.seuil });
   const copie = path.join(F.copies, 'donnees-' + new Date().toISOString().slice(0, 10) + '.json');
   if (fs.existsSync(F.donnees) && !fs.existsSync(copie)) {
     fs.copyFileSync(F.donnees, copie);
@@ -56,12 +58,13 @@ function ecrire(d) {
     for (const n of anciennes.slice(0, -30)) fs.unlinkSync(path.join(F.copies, n));
   }
   d.rev = (d.rev || 0) + 1;
-  ecrireAtomique(F.donnees, JSON.stringify({ format: 'banque-locale', version: 1, rev: d.rev, ops: v.ops, regles: v.regles }));
+  ecrireAtomique(F.donnees, JSON.stringify({ format: 'banque-locale', version: 2, rev: d.rev, ...v }));
   return d.rev;
 }
+const NIVEAUX = ['aucun', 'totaux', 'detail'];
 function lireConfig() {
-  try { return { detailPourAssistant: JSON.parse(fs.readFileSync(F.config, 'utf8')).detailPourAssistant === true }; }
-  catch (e) { return { detailPourAssistant: false }; }
+  try { const c = JSON.parse(fs.readFileSync(F.config, 'utf8')); return { assistant: NIVEAUX.includes(c.assistant) ? c.assistant : 'aucun' }; }
+  catch (e) { return { assistant: 'aucun' }; }
 }
 function journaliser(source, action, note) {
   const ligne = new Date().toISOString() + '\t' + source + '\t' + action + '\t' + String(note || '').replace(/\s+/g, ' ').slice(0, 200) + '\n';
@@ -80,8 +83,12 @@ function lireTexte(fichier) {
 const eur = c => c / 100;
 const erreur = m => { const e = new Error(m); e.attendue = true; return e; };
 function exigerDetail() {
-  if (!lireConfig().detailPourAssistant)
-    throw erreur('Accès aux libellés désactivé. Le propriétaire peut l\'activer dans l\'appli : Réglages > Assistant.');
+  if (lireConfig().assistant !== 'detail')
+    throw erreur('Accès aux libellés désactivé. Le propriétaire peut l\'activer dans l\'appli : Plus > Assistant.');
+}
+function aujourdhui() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 function exigerCategorie(c) {
   if (!C.CATEGORIES.includes(c)) throw erreur('Catégorie inconnue. Valeurs possibles : ' + C.CATEGORIES.join(', '));
@@ -99,12 +106,13 @@ const ACTIONS = {
     description: 'État général : nombre d\'opérations, comptes, mois disponibles, date de la dernière opération, opérations à classer, et si l\'accès aux libellés est autorisé.',
     params: {},
     run() {
-      const d = lire();
+      const d = lire(), detail = lireConfig().assistant === 'detail';
+      const noms = [...new Set([...d.comptes.map(c => c.nom), ...d.ops.map(o => o.compte)])];
       return {
-        operations: d.ops.length, comptes: [...new Set(d.ops.map(o => o.compte))], mois: C.listeMois(d.ops),
+        operations: d.ops.length, nombreDeComptes: noms.length, ...(detail ? { comptes: noms } : {}), mois: C.listeMois(d.ops),
         derniereOperation: d.ops.reduce((a, o) => (o.date > a ? o.date : a), '') || null,
         aClasser: d.ops.filter(o => C.categorie(o, d.regles) === C.A_CLASSER).length,
-        reglesPersonnelles: d.regles.length, libellesAutorises: lireConfig().detailPourAssistant,
+        reglesPersonnelles: d.regles.length, libellesAutorises: detail,
         categories: C.CATEGORIES, dossierImport: F.entree
       };
     }
@@ -128,17 +136,49 @@ const ACTIONS = {
     params: { nbMois: { ...nombre, description: 'Nombre de mois, 1 à 24. Défaut : 6.' } },
     run(a) {
       const d = lire(), n = Math.min(24, Math.max(1, Number.isInteger(a.nbMois) ? a.nbMois : 6));
-      return { texte: C.resumePourClaude(d.ops, d.regles, n) || 'Aucune opération importée.' };
+      return { texte: C.resumeComplet(d, n, aujourdhui()) || 'Aucune opération importée.' };
     }
   },
   recurrentes: {
     description: 'Charges qui reviennent chaque mois (au moins 3 mois, montant proche). Le nom du commerçant n\'est donné que si l\'accès aux libellés est autorisé.',
     params: {},
     run() {
-      const d = lire(), detail = lireConfig().detailPourAssistant;
+      const d = lire(), detail = lireConfig().assistant === 'detail';
       const liste = C.recurrentes(d.ops, d.regles).map(r => ({ ...(detail ? { commercant: r.marchand } : {}), categorie: r.cat, montantMensuel: eur(r.montant), mois: r.nbMois }));
       return { totalMensuel: eur(C.recurrentes(d.ops, d.regles).reduce((s, r) => s + r.montant, 0)), charges: liste };
     }
+  },
+  prevision: {
+    description: 'Argent disponible aujourd\'hui, solde prévu à la fin du mois, point le plus bas d\'ici là et alertes. Ce sont des estimations. Les noms d\'échéances ne sont donnés que si l\'accès aux libellés est autorisé.',
+    params: {},
+    run() {
+      const d = lire(), jour = aujourdhui(), p = C.prevision(d, jour), detail = lireConfig().assistant === 'detail';
+      if (p.inconnu) return { inconnu: true, message: 'Le propriétaire n\'a pas encore indiqué le solde de ses comptes.' };
+      const s = C.soldes(d.comptes, d.ops);
+      return {
+        date: jour, disponible: eur(p.disponible), epargne: eur(s.epargne), revenusAttendus: eur(p.revenusAttendus), chargesAVenir: eur(p.chargesAVenir),
+        depensesCourantesEstimees: eur(p.variablesRestantes), baseEstimation: p.base, soldeFinDeMois: eur(p.soldeFin),
+        pointBas: { montant: eur(p.pointBas.montant), date: p.pointBas.date },
+        echeancesRestantes: p.echeancesRestantes.map(e => ({ ...(detail ? { libelle: e.libelle } : {}), type: e.type, categorie: e.cat, montant: eur(e.montant), date: e.date, enRetard: e.enRetard })),
+        alertes: detail ? C.alertes(d, jour) : C.alertes(d, jour).filter(a => !/«/.test(a.texte) || /Budget/.test(a.texte))
+      };
+    }
+  },
+  echeances: {
+    description: 'Charges fixes, crédits et revenus réguliers déclarés par le propriétaire, avec leur total mensuel lissé. Les libellés ne sont donnés que si l\'accès aux libellés est autorisé.',
+    params: {},
+    run() {
+      const d = lire(), detail = lireConfig().assistant === 'detail';
+      return {
+        totalMensuel: { charges: eur(C.totalMensuel(d.echeances, 'charge')), credits: eur(C.totalMensuel(d.echeances, 'credit')), revenus: eur(C.totalMensuel(d.echeances, 'revenu')) },
+        echeances: d.echeances.map(e => ({ ...(detail ? { libelle: e.libelle } : {}), type: e.type, categorie: e.cat, montant: eur(e.montant), jour: e.jour, mois: e.mois || 'tous', fin: e.fin || null }))
+      };
+    }
+  },
+  pistes_economies: {
+    description: 'Constats chiffrés : abonnements, frais bancaires, catégories en hausse, petits achats répétés (libellés autorisés uniquement, car ils nomment des commerçants).',
+    params: {},
+    run() { exigerDetail(); return { pistes: C.pistes(lire(), aujourdhui()).map(p => ({ titre: p.titre, detail: p.detail, gainMensuelPossible: eur(p.gainMensuel) })) }; }
   },
   fichiers_a_importer: {
     description: 'Liste les relevés (CSV, OFX) déposés par le propriétaire dans le dossier d\'import. C\'est le seul dossier lisible.',
@@ -170,7 +210,10 @@ const ACTIONS = {
         totalSorties: eur(f.ajouts.filter(o => o.montant < 0).reduce((s, o) => s + o.montant, 0))
       };
       if (a.confirmer !== true) return { enregistre: false, apercu, suite: 'Faites vérifier ces totaux au propriétaire, puis rappelez avec confirmer=true.' };
-      if (f.ajouts.length) { d.ops.push(...f.ajouts); ecrire(d); }
+      if (f.ajouts.length) {
+        for (const p of C.rapprocher(d.ops, f.ajouts)) { if (p.manuelle.catManuelle) p.importee.catManuelle = p.manuelle.catManuelle; d.ops = d.ops.filter(o => o !== p.manuelle); }
+        d.ops.push(...f.ajouts); ecrire(d);
+      }
       return { enregistre: true, apercu };
     },
     note: a => path.basename(String(a.fichier || '')) + (a.confirmer === true ? ' (enregistré)' : ' (aperçu)')
@@ -240,6 +283,10 @@ const ACTIONS = {
 function executer(nom, args, source) {
   const action = Object.prototype.hasOwnProperty.call(ACTIONS, nom) ? ACTIONS[nom] : null;
   if (!action) throw erreur('Action inconnue : ' + nom + '. Disponibles : ' + Object.keys(ACTIONS).join(', '));
+  if (lireConfig().assistant === 'aucun') {
+    journaliser(source, nom, 'REFUS : assistant non autorisé');
+    throw erreur('Aucun assistant n\'est autorisé à accéder à ces données. Le propriétaire peut l\'autoriser dans l\'appli : Plus > Assistant.');
+  }
   args = args && typeof args === 'object' && !Array.isArray(args) ? args : {};
   for (const r of action.requis || []) if (args[r] == null || args[r] === '') throw erreur('Paramètre manquant : ' + r);
   try {
@@ -263,7 +310,7 @@ function demarrerMCP() {
     if (method === 'initialize') return envoyer({ jsonrpc: '2.0', id, result: {
       protocolVersion: (params && params.protocolVersion) || '2024-11-05', capabilities: { tools: {} },
       serverInfo: { name: 'banque-locale', version: '1.0.0' },
-      instructions: 'Comptes bancaires du propriétaire, stockés sur son PC. Pour analyser, utilisez « resume » ou « synthese » (aucun libellé). N\'inventez aucun montant. Avant d\'enregistrer un import, montrez l\'aperçu au propriétaire.'
+      instructions: 'Finances personnelles du propriétaire, stockées sur son PC. Pour analyser, utilisez « prevision », « resume » ou « synthese » (aucun libellé). N\'inventez aucun montant. Avant d\'enregistrer un import, montrez l\'aperçu au propriétaire.'
     } });
     if (method === 'ping') return envoyer({ jsonrpc: '2.0', id, result: {} });
     if (method === 'tools/list') return envoyer({ jsonrpc: '2.0', id, result: { tools: outils } });
@@ -337,7 +384,7 @@ function demarrerServeur() {
       if (route === 'GET /api/rev') return json(rep, 200, { rev: lire().rev });
       if (route === 'GET /api/donnees') {
         const d = lire();
-        return json(rep, 200, { ops: d.ops, regles: d.regles, rev: d.rev, config: lireConfig(), dossier: DOSSIER, dossierImport: F.entree, journal: finJournal(25) });
+        return json(rep, 200, { ...d, config: lireConfig(), dossier: DOSSIER, dossierImport: F.entree, journal: finJournal(25) });
       }
       if (req.method !== 'POST') return json(rep, 404, { erreur: 'Introuvable.' });
       const corps = await corpsJSON(req);
@@ -346,15 +393,24 @@ function demarrerServeur() {
       /* Routes réservées à l'écran de l'appli (le propriétaire). */
       if (route === 'POST /api/ops') {
         const d = lire(), parId = new Map(d.ops.map(o => [o.id, o]));
+        for (const id of Array.isArray(corps.supprimer) ? corps.supprimer : []) parId.delete(id);
         for (const o of Array.isArray(corps.ops) ? corps.ops : []) parId.set(o && o.id, o);
         d.ops = [...parId.values()];
         return json(rep, 200, { rev: ecrire(d) });
       }
-      if (route === 'POST /api/regles') { const d = lire(); d.regles = corps.regles; return json(rep, 200, { rev: ecrire(d) }); }
-      if (route === 'POST /api/remplacer') { const d = lire(); d.ops = corps.ops; d.regles = corps.regles; journaliser('ecran', 'remplacer', d.ops.length + ' opérations'); return json(rep, 200, { rev: ecrire(d) }); }
+      if (route === 'POST /api/divers') {
+        const d = lire();
+        for (const cle of ['regles', 'comptes', 'echeances', 'budgets', 'seuil']) if (corps[cle] !== undefined) d[cle] = corps[cle];
+        return json(rep, 200, { rev: ecrire(d) });
+      }
+      if (route === 'POST /api/remplacer') {
+        const d = { ...C.validerSauvegarde({ format: 'banque-locale', ...corps }), rev: lire().rev };
+        journaliser('ecran', 'remplacer', d.ops.length + ' opérations');
+        return json(rep, 200, { rev: ecrire(d) });
+      }
       if (route === 'POST /api/config') {
-        const c = { detailPourAssistant: corps.detailPourAssistant === true };
-        ecrireAtomique(F.config, JSON.stringify(c)); journaliser('ecran', 'config', 'libellés ' + (c.detailPourAssistant ? 'autorisés' : 'masqués'));
+        const c = { assistant: NIVEAUX.includes(corps.assistant) ? corps.assistant : 'aucun' };
+        ecrireAtomique(F.config, JSON.stringify(c)); journaliser('ecran', 'config', 'assistant : ' + c.assistant);
         return json(rep, 200, { config: c });
       }
       return json(rep, 404, { erreur: 'Introuvable.' });
