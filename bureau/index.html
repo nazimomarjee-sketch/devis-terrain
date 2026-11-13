@@ -347,6 +347,7 @@ select.recherche{appearance:auto}
 <script src="lecture-sauvegarde.js"></script>
 <script src="annuaire.js"></script>
 <script src="ca-facture.js"></script>
+<script src="encaissements.js"></script>
 <script src="decisions-comptes.js"></script>
 <script src="verifier-comptes.js"></script>
 <script src="ville/modele-commune.js"></script>
@@ -1101,7 +1102,24 @@ function monterRecherche(){
 // ================= Bureau : exports EBP → pipeline → 3 actions → plan du matin pour le téléphone =================
 // Logique : ebp-import.js et pipeline.js (testés). Tout reste en mémoire : rien n'est envoyé ni enregistré.
 const jourIso = (d = new Date()) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-etat.ebp = { pieces:null, reglements:null, clients:null, arrete: jourIso(), erreur:{} };
+etat.ebp = { pieces:null, reglements:null, clients:null, arrete: jourIso(), arreteConfirmee:false, erreur:{} };
+// Lot 1 (13/11/2026) : la date de l'export n'est plus « aujourd'hui » par défaut dès qu'un fichier est chargé. Elle est proposée
+// d'après la date du fichier le plus ANCIEN chargé (le plus prudent), jamais dans le futur, et reste « non confirmée » tant que
+// l'utilisateur ne l'a pas saisie lui-même. Chaque import garde sa provenance (nom, taille, date du fichier, empreinte SHA-256).
+async function empreinteFichier(f){ try { const b = await f.arrayBuffer(); const h = await crypto.subtle.digest('SHA-256', b); return [...new Uint8Array(h)].map(x => x.toString(16).padStart(2,'0')).join(''); } catch (e) { return null; } }
+function proposerArrete(){
+  const E = etat.ebp; if (E.arreteConfirmee) return;
+  const dates = ['pieces','reglements','clients'].map(t => E[t] && E[t].provenance && E[t].provenance.dateFichier).filter(Boolean).sort();
+  if (dates.length) E.arrete = dates[0] < jourIso() ? dates[0] : jourIso();
+}
+function controlesArrete(){
+  const E = etat.ebp, m = [];
+  const dates = E.pieces ? E.pieces.pieces.map(p => p.date).filter(Boolean).sort() : [];
+  const derniere = dates[dates.length - 1];
+  if (derniere && E.arrete && derniere > E.arrete) m.push('Une pièce est datée du ' + frDate(derniere) + ', après la date d’export : la date d’export est fausse.');
+  if (!E.arreteConfirmee && (E.pieces || E.reglements || E.clients)) m.push('Date d’export proposée d’après la date du fichier : à confirmer.');
+  return m;
+}
 const EXPORTS = [['pieces','Pièces (devis, commandes, BL, factures)','lirePieces'],['reglements','Échéancier des règlements','lireReglements'],['clients','Fichier clients','lireClientsEbp']];
 async function lireTableau(f){
   const buf = await f.arrayBuffer();
@@ -1117,7 +1135,11 @@ async function importerEbp(type, f){
   try {
     if (f.size > 50*1024*1024) throw new Error('Fichier trop gros (50 Mo maximum).');
     const fn = EXPORTS.find(x => x[0] === type)[2];
-    etat.ebp[type] = Object.assign(EbpImport[fn](await lireTableau(f)), {fichier: f.name});
+    const r = EbpImport[fn](await lireTableau(f));
+    const dateFichier = f.lastModified ? jourIso(new Date(f.lastModified)) : null;
+    etat.ebp[type] = Object.assign(r, {fichier: f.name, provenance: { fichier: f.name, nature: type, taille: f.size, dateFichier, importeLe: new Date().toISOString(),
+      empreinte: await empreinteFichier(f), lues: r.lues, ecartees: r.ignorees.length }});
+    proposerArrete();
   } catch (e) { etat.ebp.erreur[type] = e.message + (etat.ebp[type] ? ' Le fichier chargé avant (' + etat.ebp[type].fichier + ') reste utilisé.' : ''); } // un fichier refusé ne fait jamais perdre le précédent
   connecterVille(); rendre(); signalerChangement();
 }
@@ -1166,17 +1188,20 @@ function vueBureau(){
       E.erreur[type] ? h('div',{class:'message erreur'}, 'Refusé : ' + E.erreur[type]) : null,
       r ? h('details',{class:'info'}, h('summary',{}, `${r.fichier} : ${r.lues} ligne(s) lue(s), ${r.ignorees.length} écartée(s)`),
         h('p',{}, 'Colonnes retenues : ' + r.correspondance.map(c => c.libelle + ' ← « ' + c.colonne + ' »').join(' · ')),
+        r.provenance ? h('p',{class:'provenance'}, 'Provenance : ' + r.provenance.fichier + ' · ' + Math.round(r.provenance.taille / 1024) + ' Ko · fichier du ' + frDate(r.provenance.dateFichier) + ' · importé le ' + new Date(r.provenance.importeLe).toLocaleString('fr-FR') + (r.provenance.empreinte ? ' · empreinte ' + r.provenance.empreinte.slice(0, 12) : '')) : null,
+        r.anomalies && r.anomalies.length ? h('ul',{}, r.anomalies.slice(0, 50).map(x => h('li',{}, 'Ligne ' + x.ligne + ' : ' + x.motif))) : null,
         r.ignorees.length ? h('ul',{}, r.ignorees.slice(0, 50).map(x => h('li',{}, 'Ligne ' + x.ligne + ' : ' + x.motif))) : null,
         type === 'pieces' && !r.liens ? h('div',{class:'message erreur'}, 'Colonne « pièce d’origine » absente : impossible de relier devis, commandes, livraisons et factures. Les retards ne sont pas fiables.') : null,
         r.avoirs && r.avoirs.length ? h('p',{}, r.avoirs.length + ' avoir(s) lu(s), non déduit(s) du CA (règle à valider) : ' + r.avoirs.map(x => x.no).join(', ')) : null) : null); };
   const imports = h('section',{class:'bloc'}, h('div',{class:'titre-bloc'},'Exports EBP'),
     h('p',{class:'info'}, 'Charge tes exports EBP (CSV ou Excel). Lecture seule : rien n’est modifié ni envoyé. ',
       etat.telephone ? h('b',{}, (etat.telephone.devis || []).length + ' devis du téléphone pris en compte.') : 'Charge aussi ta sauvegarde téléphone (bouton Démo / Mes garages) pour relier tes devis.'),
-    h('label',{class:'info', for:'ebp-arrete'}, 'Date de l’export EBP '), h('input',{type:'date', id:'ebp-arrete', class:'recherche', value:E.arrete, max:jourIso(), onchange:ev => { E.arrete = ev.target.value; connecterVille(); rendre(); signalerChangement(); }}),
+    h('label',{class:'info', for:'ebp-arrete'}, 'Date de l’export EBP '), h('input',{type:'date', id:'ebp-arrete', class:'recherche', value:E.arrete, max:jourIso(), onchange:ev => { E.arrete = ev.target.value; E.arreteConfirmee = !!ev.target.value; connecterVille(); rendre(); signalerChangement(); }}),
+    controlesArrete().map(t => h('div',{class:'message ' + (/fausse/.test(t) ? 'erreur' : 'info'), role:'status'}, t)),
     h('div',{class:'deps'}, EXPORTS.map(champ)));
   let plan = null, erreur = '';
   try { plan = planBureau(); } catch (e) { erreur = e.message; }
-  if (!plan) return h('div',{class:'ecran'}, h('div',{class:'panneau'}, blocCA(caAccueil()), blocComptes(), imports, panneauReveil(null), erreur ? h('div',{class:'message erreur'}, erreur) :
+  if (!plan) return h('div',{class:'ecran'}, h('div',{class:'panneau'}, blocCA(caAccueil()), blocEncaissements(), blocComptes(), imports, panneauReveil(null), erreur ? h('div',{class:'message erreur'}, erreur) :
     h('section',{class:'bloc'}, h('h2',{},'Ta journée'), h('p',{class:'sous'},'Charge au moins l’export des pièces EBP pour voir tes 3 actions et ton CA réel.'))));
   const k = plan.kpi, top = plan.actions.filter(a => a.prio === 1), suite = plan.actions.filter(a => a.prio > 1);
   const action = (a, i) => h('div',{class:'action'}, h('div',{class:'n'}, (i + 1) + ' · ' + a.tag + ' · ' + a.responsable),
@@ -1191,7 +1216,7 @@ function vueBureau(){
       plan.changement ? h('section',{class:'bloc'}, h('div',{class:'titre-bloc'},'Un seul changement cette semaine'), h('p',{}, plan.changement.texte), h('small',{class:'info'}, plan.changement.mesure)) : null,
       panneauReveil(plan)),
     h('div',{class:'panneau'},
-      blocCA(caAccueil()), blocComptes(),
+      blocCA(caAccueil()), blocEncaissements(), blocComptes(),
       h('section',{class:'bloc'}, h('div',{class:'titre-bloc'},'Où j’en suis'), h('div',{class:'chiffres'},
         chiffre('CA commandé cette semaine', e2(k.semaine.cmdHt), ebpB, k.semaine.cmdN + ' commande(s)'),
         chiffre('CA commandé ce mois', e2(k.mois.cmdHt), ebpB, k.mois.cmdN + ' commande(s)'),
@@ -1232,6 +1257,20 @@ function caAccueil(){ // Accueil : exports EBP réels s'ils sont chargés ; sino
   return etat.mode === 'demo' ? caMV() : CaFacture.calculer({ aujourdhui:jourIso() });
 }
 const titreCA = r => 'CA facturé HT · ' + r.libelleMois;
+// Lot 1 : encaissements constatés et créances (TTC, échéancier EBP). Jamais additionnés au CA HT ; « Non renseigné » si absent.
+function blocEncaissements(){
+  const E = etat.ebp; if (!E.reglements && !E.clients) return null;
+  const r = Encaissements.calculer({ reglements: E.reglements ? E.reglements.reglements : null, clientsEbp: E.clients ? E.clients.clients : null, pieces: E.pieces ? E.pieces.pieces : [], arrete: E.arrete, aujourdhui: jourIso() });
+  const eu = c => c == null ? 'Non renseigné' : CaFacture.euros(c).replace(' HT', ' TTC');
+  const ligne = (lib, x, cle) => h('div',{class:'ca-ligne'}, h('span',{}, lib), h('b',{'data-enc':cle}, eu(x.cents) + (x.statut === 'douteux' ? ' · à vérifier' : '')));
+  const motifs = [r.encaisseMois, r.creances].map(x => x.motif).filter(Boolean);
+  return h('section',{class:'ca-bloc', id:'bloc-encaissements'},
+    h('div',{class:'ca-titre'}, 'Encaissements et créances (TTC, échéancier EBP)'),
+    ligne('Encaissé constaté ce mois', r.encaisseMois, 'encaisse'), ligne('Créances (reste à payer connu)', r.creances, 'creances'), ligne('Dont échu', r.echu, 'echu'),
+    h('div',{class:'ca-ligne'}, h('span',{}, 'Comptes bloqués'), h('b',{'data-enc':'bloques'}, r.bloques.statut === 'absent' ? 'Non renseigné' : String(r.bloques.nb))),
+    motifs.map(m => h('p',{class:'ca-alerte'}, m)),
+    h('p',{class:'ca-detail'}, 'Montants TTC : ne pas comparer au CA facturé HT. ' + CaFacture.fraicheur({ arrete: E.arrete })));
+}
 function blocCA(r){
   const eu = CaFacture.euros, obj = etat.objectifCents, v = r.totalCents;
   const pct = obj && v != null ? Math.max(0, Math.round(v / obj * 100)) : null;
@@ -1539,7 +1578,7 @@ window.OdicolorBureau = Object.freeze({
     const s = etat.sauvegardeTelephone || null, E = etat.ebp;
     etat.journalExporte = etat.decisions; // celui qui part dans le coffre : confirmé seulement si l'enregistrement réussit
     return { version:2, telephone: s && s.telephone, garagesTelephone: s && s.garages, rapport: s && s.rapport,
-      ebp: { pieces:E.pieces, reglements:E.reglements, clients:E.clients, arrete:E.arrete }, decisionsComptes: etat.decisions };
+      ebp: { pieces:E.pieces, reglements:E.reglements, clients:E.clients, arrete:E.arrete, arreteConfirmee:!!E.arreteConfirmee }, decisionsComptes: etat.decisions };
   },
   // Décisions (sans écran au lot A ; l'écran « Vérifier les comptes » du lot B utilisera ces mêmes fonctions).
   decisions: Object.freeze({
@@ -1561,6 +1600,7 @@ window.OdicolorBureau = Object.freeze({
     const E = d.ebp || {};
     for (const k of ['pieces','reglements','clients']) etat.ebp[k] = E[k] || null;
     if (/^\d{4}-\d{2}-\d{2}$/.test(E.arrete || '')) etat.ebp.arrete = E.arrete;
+    etat.ebp.arreteConfirmee = !!E.arreteConfirmee;
     etat.message = {erreur: !!etat.decisionsAlerte, texte:'Données retrouvées dans le coffre ODICOLOR' + (enregistreLe ? ' (dernier enregistrement : ' + new Date(enregistreLe).toLocaleString('fr-FR') + ')' : '') + '.'
       + ' ' + (etat.decisions && Array.isArray(etat.decisions.decisions) ? etat.decisions.decisions.length : '?') + ' décision(s) de compte retrouvée(s).' + (etat.decisionsAlerte ? ' ' + etat.decisionsAlerte : '')};
     connecterVille(); rendre(); return true;
