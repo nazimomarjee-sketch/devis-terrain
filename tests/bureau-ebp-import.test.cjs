@@ -91,12 +91,15 @@ test('pièces : même numéro avec des informations contradictoires = écarté, 
   assert.match(r.ignorees[0].motif, /en double avec des informations différentes/);
 });
 
-test('règlements : reste lu dans l’échéancier ; sans colonne « reste », déduit de la date de règlement', () => {
+test('règlements : reste lu dans l’échéancier ; sans colonne « reste », un règlement daté sans montant n’est JAMAIS déclaré soldé (lot 1)', () => {
   const r = E.lireReglements(table('ebp-reglements.csv'));
   assert.deepEqual(r.reglements.map(x => [x.facture, x.echeance, x.reglement, x.montantCents, x.resteCents]), [
     ['FA-4001', '2026-11-16', '', 216000, 216000], ['FA-4002', '2026-10-31', '', 360000, 360000], ['FA-4003', '2026-12-03', '2026-11-05', 84000, 0]]);
   const s = E.lireReglements([['N° facture', 'Échéance', 'Date de règlement', 'Montant TTC'], ['F1', '01/11/2026', '', '120,00'], ['F2', '01/11/2026', '02/11/2026', '60,00']]);
-  assert.deepEqual(s.reglements.map(x => x.resteCents), [12000, 0]);
+  // Règle modifiée le 13/11/2026 (mandat ODICOLOR 2.0, lot 1) : avant, F2 était lu « 0 € restant » alors qu'un règlement partiel est possible.
+  assert.deepEqual(s.reglements.map(x => x.resteCents), [12000, null]);
+  assert.deepEqual(s.reglements.map(x => x.origineReste), ['sans_reglement', 'inconnu']);
+  assert.match(s.reglements[1].motifReste, /non vérifiable/);
   assert.equal(s.reglements[0].resteDeclare, false);
 });
 
@@ -129,4 +132,41 @@ test('fichier clients : colonnes « Bloqué » / « En sommeil » en Oui / Non c
   const b = E.lireClientsEbp([['Code', 'Nom', 'Bloqué'], ['C1', 'A', 'Oui'], ['C2', 'B', 'Non'], ['C3', 'C', '']]).clients;
   assert.deepEqual(b.map(x => x.bloque), [true, false, false]);
   assert.equal(E.lireClientsEbp([['Code', 'Nom', 'En sommeil'], ['C1', 'A', 'Oui']]).clients[0].statut, 'En sommeil');
+});
+
+// ---------- Lot 1 « Socle fiable » (13/11/2026) : données fictives uniquement ----------
+test('lot 1 — montants ambigus : « 1.234 » et « 1,234 » ne sont plus devinés ; les formats sûrs restent lus', () => {
+  for (const v of ['1.234', '1,234', '-1.234', '999,999']) assert.equal(E.lireMontant(v), null, v);
+  assert.deepEqual(['1.234,56', '1 234', '1 234,5', '12.5', '12,50', '0,99', '1234', 1234.5].map(E.lireMontant), [123456, 123400, 123450, 1250, 1250, 99, 123400, 123450]);
+  const p = E.lirePieces([['Type', 'N° pièce', 'Date', 'Client', 'Montant HT'], ['Facture', 'FA1', '05/11/2026', 'G', '1.234']]);
+  assert.equal(p.pieces.length, 0); assert.match(p.ignorees[0].motif, /ambigu/);
+});
+
+test('lot 1 — règlements : montant réglé ⇒ reste calculé (partiel visible) ; réglé > dû refusé ; échéance en double écartée', () => {
+  const r = E.lireReglements([['N° facture', 'Échéance', 'Date de règlement', 'Montant réglé', 'Montant TTC'],
+    ['F1', '01/11/2026', '05/11/2026', '400,00', '1 200,00'], ['F2', '01/11/2026', '05/11/2026', '1 300,00', '1 200,00'],
+    ['F3', '01/12/2026', '', '', '600,00'], ['F3', '01/12/2026', '', '', '600,00']]);
+  assert.deepEqual(r.correspondance.find(c => c.cle === 'montant').colonne, 'Montant TTC', '« Montant réglé » jamais pris pour le dû');
+  assert.deepEqual(r.reglements.map(x => [x.facture, x.resteCents, x.origineReste]), [['F1', 80000, 'calcule'], ['F3', 60000, 'sans_reglement']]);
+  assert.deepEqual(r.ignorees.map(x => x.motif.replace(/ pour .*/, '')), ['Montant réglé supérieur au montant de l’échéance', 'Échéance en double (même facture, dates et montants)']);
+});
+
+test('lot 1 — SIRET : clé de Luhn vérifiée, invalide signalé et ignoré (jamais utilisé pour rapprocher)', () => {
+  assert.equal(E.siretValide('999 999 999 00017'), '99999999900017');
+  assert.equal(E.siretValide('99999999900018'), null);
+  assert.equal(E.siretValide('1234'), null);
+  const c = E.lireClientsEbp([['Code client', 'Nom', 'SIRET', 'Code postal'], ['C1', 'A', '99999999900017', '91300'], ['C2', 'B', '99999999900018', '91120']]);
+  assert.deepEqual(c.clients.map(x => x.siret), ['99999999900017', '']);
+  assert.equal(c.anomalies.length, 1); assert.match(c.anomalies[0].motif, /SIRET invalide/);
+  assert.equal(c.correspondance.find(x => x.cle === 'cp').colonne, 'Code postal');
+});
+
+test('lot 1 — pièce totalisée sur des lignes STRICTEMENT identiques : signalée (export dupliqué ?), jamais silencieuse', () => {
+  const p = E.lirePieces([['Type', 'N° pièce', 'Date', 'Code client', 'Client', 'Montant HT'],
+    ['Facture', 'FA9', '05/11/2026', 'C1', 'G', '100,00'], ['Facture', 'FA9', '05/11/2026', 'C1', 'G', '100,00'], ['Facture', 'FA8', '05/11/2026', 'C1', 'G', '50,00'], ['Facture', 'FA8', '05/11/2026', 'C1', 'G', '70,00']]);
+  assert.deepEqual(p.pieces.map(x => [x.no, x.htCents, x.lignesIdentiques || 0]), [['FA9', 20000, 1], ['FA8', 12000, 0]]);
+  assert.ok(!JSON.stringify(p.pieces).includes('_sig'), 'aucune donnée interne exportée');
+  const CA = require('../bureau/ca-facture.js');
+  const r = CA.calculer({ pieces: p.pieces, avoirs: [], arrete: '2026-11-10', aujourdhui: '2026-11-10' });
+  assert.ok(r.incomplets.some(m => /strictement identiques.*FA9/.test(m)));
 });

@@ -109,9 +109,11 @@
       if (a.facture) {
         const rs = a.factures.flatMap(f => regl.get(f.no) || []);
         a.depuis = a.facture.date;
-        if (!echeancier || !rs.length) {
+        const resteInconnu = rs.find(r => r.resteCents == null); // lot 1 : règlement daté sans montant → jamais déclaré soldé
+        if (!echeancier || !rs.length || resteInconnu) {
           a.etape = 'facture'; a.resteCents = null; a.niveau = 'ok'; a.retard = false; a.age = ecart(a.facture.date, aujourdhui);
           a.aVerifier = echeancier; // échéancier chargé mais facture absente : à vérifier, jamais déclarée impayée
+          if (resteInconnu) { a.aVerifier = true; a.motifReste = resteInconnu.motifReste || 'Solde non vérifiable'; }
         } else {
           a.resteCents = rs.reduce((s, r) => s + r.resteCents, 0);
           a.echeance = rs.map(r => r.echeance).sort()[0];

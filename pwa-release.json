@@ -1,5 +1,5 @@
 {
-  "id": "8e67a422d555019c3d06f47e5a9254cee21be49238f0575d4965992a5e05e456",
+  "id": "47e3a025df851e510bd4bf65c10450e6fdb8f628aaf757efca25a143b862605f",
   "assets": [
     {
       "path": "accueil-v23.css",
@@ -47,7 +47,7 @@
     },
     {
       "path": "bureau/ma-ville.js",
-      "sha256": "aa3cadec9b02bfbfaf9e80f38e6b181d87940b7eb827d36f24cbafc8821d4430"
+      "sha256": "b2987e3689879e1cfc05b47deb1e4682a3566a84515e417822e798768dbf2d78"
     },
     {
       "path": "bureau/ville/dessin-iso.js",
@@ -159,7 +159,7 @@
     },
     {
       "path": "index.html",
-      "sha256": "b28861029434e6871bfacb2969c3d678b25917b8333627826008d65d5ee6f125"
+      "sha256": "f94c8c608a8e82cfa710f2b94542ae93fc28672b360c5c7f86f08da2faf93361"
     },
     {
       "path": "logo-96.png",
@@ -203,7 +203,7 @@
     },
     {
       "path": "pwa-client.js",
-      "sha256": "3447c26315f9dcc2e5b59cb604a80d6e1c412fda5b84f3c990b34bd4d7a1f70b"
+      "sha256": "7ad8b6d69c69ac5e2acedd01e8b89fc4bdc1e7c59e6a30aebdcac6c3aec306ab"
     },
     {
       "path": "rappels-produits-v24.js",

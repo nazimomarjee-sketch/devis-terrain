@@ -65,6 +65,11 @@
     }
     // 2. EBP : fichier clients (famille, statut), relié au terrain par code, sinon nom unique (+ commune si connue).
     for (const c of clientsEbp) {
+      // Lot 1 : SIRET et code EBP qui désignent deux fiches différentes, ou fiche déjà liée à un autre code : jamais de fusion automatique.
+      const parS = c.siret ? parSiret.get(c.siret) : null, parC = c.code ? parCode.get(c.code) : null;
+      if (parS && parC && parS !== parC) { aRapprocher.push({ source: 'ebp', nom: c.nom, code: c.code, siret: c.siret, motif: 'Le SIRET et le code client EBP désignent deux fiches différentes' }); continue; }
+      if (parS && parS.codeEbp && parS.codeEbp !== c.code) { aRapprocher.push({ source: 'ebp', nom: c.nom, code: c.code, siret: c.siret, motif: 'Ce SIRET est déjà lié au code EBP ' + parS.codeEbp }); continue; }
+      if (parC && c.siret && parC.siret && parC.siret !== c.siret) { aRapprocher.push({ source: 'ebp', nom: c.nom, code: c.code, siret: c.siret, motif: 'SIRET EBP différent du SIRET connu (' + parC.siret + ')' }); continue; }
       let e = trouver(c.siret, c.code);
       if (!e) {
         const memesNoms = etab.filter(x => norm(x.nom) === norm(c.nom) && !x.codeEbp && (!c.ville || !x.commune || norm(x.commune) === norm(L0.classer({ commune: c.ville, cp: c.cp }).commune)));
@@ -73,7 +78,7 @@
       }
       if (!e) e = nouveau(c.nom, { cp: c.cp, commune: c.ville }, 'ebp');
       if (!e.sources.includes('ebp')) e.sources.push('ebp');
-      e.codeEbp = c.code; e.client = true; e.compteBloque = !!c.bloque;
+      e.codeEbp = c.code; e.client = true; e.compteBloque = !!c.bloque; if (c.siret && !e.siret) e.siret = c.siret;
       if (/inactif|sommeil|ferme/.test(norm(c.statut))) e.inactif = true;
       const a = activiteDepuisTexte(c.famille, 'ebp'); if (a) e.activite = a;
       indexer(e);

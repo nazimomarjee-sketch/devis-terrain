@@ -26,7 +26,9 @@
       ['facture', 'N° de facture', /facture|^(n°|no|numero)( de)? ?piece$/, true],
       ['echeance', 'Date d’échéance', /echeance/, true],
       ['reglement', 'Date de règlement', /reglement|paiement|encaisse/, false],
-      ['montant', 'Montant TTC', /montant|total|ttc/, true],
+      // « Montant réglé » est lu AVANT « Montant TTC » et exclu de celui-ci : sinon la colonne du réglé pouvait être prise pour le dû.
+      ['regle', 'Montant réglé', /(montant|total) (deja )?(regle|paye|encaisse)|^(deja )?regle$|^paye$/, false],
+      ['montant', 'Montant TTC', /^(?!.*(regle|paye|encaiss|reste)).*(montant|total|ttc)/, true],
       ['reste', 'Reste à payer', /reste|solde|impaye|du$/, false]
     ],
     clients: [
@@ -34,6 +36,7 @@
       ['nom', 'Nom', /nom|raison sociale|^client$/, true],
       ['ville', 'Ville', /ville|commune/, false],
       ['cp', 'Code postal', /code postal|^cp$/, false],
+      ['siret', 'SIRET', /siret/, false], // lot 1 : rapprochement EBP ↔ SIRET (vérifié par la clé de Luhn)
       ['statut', 'Statut du compte', /statut|bloque|sommeil|^etat|^actif$/, false], // jamais « Compte comptable »
       ['famille', 'Famille / activité (carrosserie, mécanique)', /famille|categorie|activite|type de client|secteur/, false],
       // Portefeuille : sert seulement à distinguer le CA personnel du CA de l'agence. Jamais « Nom commercial » (enseigne).
@@ -94,9 +97,18 @@
     return x.getUTCFullYear() === y && x.getUTCMonth() === m - 1 && x.getUTCDate() === d ? iso : '';
   }
 
+  // Montant ambigu : « 1.234 » ou « 1,234 » (un seul séparateur suivi de 3 chiffres) peut être 1 234 € ou 1,234 €.
+  // Constaté le 13/11/2026 : « 1.234 » était lu 1,23 €. Une telle valeur n'est plus devinée : la ligne est écartée avec ce motif.
+  function montantAmbigu(v) {
+    if (typeof v === 'number') return false;
+    const s = String(v == null ? '' : v).replace(/[\s  €]/g, '').replace(/^[-(]|\)$/g, '');
+    return /^\d{1,3}[.,]\d{3}$/.test(s);
+  }
+
   // Montant → centimes entiers, ou null si illisible. « 1 234,56 », « 1.234,56 », « 1234.56 », « 1 234,56 € », nombre Excel.
   function lireMontant(v) {
     if (typeof v === 'number') return Number.isFinite(v) ? Math.round(v * 100) : null;
+    if (montantAmbigu(v)) return null;
     let s = String(v == null ? '' : v).replace(/[\s  €]/g, '');
     if (!s) return null;
     const neg = /^-|^\(.*\)$/.test(s); s = s.replace(/^[-(]|\)$/g, '');
@@ -145,40 +157,70 @@
       // Avoir : pièce normale, gardée à part, jamais « écartée ». Déduit du CA facturé à SA date (règle validée le 07/11/2026, bureau/ca-facture.js).
       if (type === 'avoir') return avoirs.push({ ligne: n, no, date, client, htCents: ht, origine: texte(g('origine'), 40), code: texte(g('code'), 40) });
       if (!date) return ignorees.push({ ligne: n, motif: 'Date illisible pour ' + no });
-      if (ht == null) return ignorees.push({ ligne: n, motif: 'Montant HT illisible pour ' + no });
+      if (ht == null) return ignorees.push({ ligne: n, motif: (montantAmbigu(g('ht')) ? 'Montant HT ambigu (« ' + texte(g('ht'), 20) + ' » : séparateur de milliers ou décimal ?)' : 'Montant HT illisible') + ' pour ' + no });
       if (!client) return ignorees.push({ ligne: n, motif: 'Client absent pour ' + no });
       const cle = type + '|' + no;
       if (vus.has(cle)) {
         const p = vus.get(cle);
         if (p.date !== date || p.client !== client) return ignorees.push({ ligne: n, motif: 'N° ' + no + ' en double avec des informations différentes' });
-        p.htCents += ht; p.lignesSource++; return; // export ligne par ligne d'article : on totalise la pièce
+        p.htCents += ht; p.lignesSource++; // export ligne par ligne d'article : on totalise la pièce
+        const sig = r.map(x => texte(x, 200)).join('\u0001'); // ligne strictement identique à une autre de la même pièce : signalée (export dupliqué ?)
+        if (p._sig.has(sig)) p.lignesIdentiques = (p.lignesIdentiques || 0) + 1; else p._sig.add(sig);
+        return;
       }
       const p = { type, no, date, code: texte(g('code'), 40), client, htCents: ht, origine: texte(g('origine'), 40), ref: texte(g('ref'), 160), source: 'ebp', lignesSource: 1 };
+      Object.defineProperty(p, '_sig', { value: new Set([r.map(x => texte(x, 200)).join('\u0001')]), enumerable: false });
       vus.set(cle, p); pieces.push(p);
     });
     // liens = l'export indique la pièce d'origine (indispensable pour suivre devis → commande → BL → facture).
     return { pieces, ignorees, avoirs, liens: T.carte.origine != null, correspondance: T.correspondance, lues: T.corps.length };
   }
 
-  // Échéancier des règlements. Sans colonne « reste » : réglé si date de règlement, sinon montant entier dû.
+  // Échéancier des règlements. Reste à payer, par ordre de fiabilité :
+  //  1. colonne « Reste à payer » (demandée par le guide d'extraction) ;
+  //  2. sinon « Montant TTC − Montant réglé » si la colonne du réglé existe ;
+  //  3. sinon : sans date de règlement → montant entier dû ; AVEC une date mais sans montant réglé → reste INCONNU (null).
+  //     Avant le lot 1, ce cas était lu « soldé » : un règlement partiel devenait invisible (constaté le 13/11/2026).
   function lireReglements(lignes) {
-    const T = verifierTable('reglements', lignes), reglements = [], ignorees = [];
+    const T = verifierTable('reglements', lignes), reglements = [], ignorees = [], vus = new Set();
     T.corps.forEach((r, i) => {
       const n = i + 2, g = k => cellule(r, T.carte, k);
       const facture = texte(g('facture'), 40), echeance = lireDate(g('echeance')), reglement = lireDate(g('reglement')), montant = lireMontant(g('montant'));
       if (!facture) return ignorees.push({ ligne: n, motif: 'N° de facture absent' });
       if (!echeance) return ignorees.push({ ligne: n, motif: 'Échéance illisible pour ' + facture });
       if (montant == null) return ignorees.push({ ligne: n, motif: 'Montant illisible pour ' + facture });
-      let reste = T.carte.reste == null ? (reglement ? 0 : montant) : lireMontant(g('reste'));
-      if (reste == null) return ignorees.push({ ligne: n, motif: 'Reste à payer illisible pour ' + facture });
-      reglements.push({ facture, echeance, reglement, montantCents: montant, resteCents: reste, resteDeclare: T.carte.reste != null });
+      const sig = [facture, echeance, reglement, montant, texte(g('reste'), 30), texte(g('regle'), 30)].join('|');
+      if (vus.has(sig)) return ignorees.push({ ligne: n, motif: 'Échéance en double (même facture, dates et montants) pour ' + facture });
+      vus.add(sig);
+      let reste, origineReste;
+      if (T.carte.reste != null) {
+        reste = lireMontant(g('reste')); origineReste = 'declare';
+        if (reste == null) return ignorees.push({ ligne: n, motif: 'Reste à payer illisible pour ' + facture });
+      } else if (T.carte.regle != null && texte(g('regle'))) {
+        const regle = lireMontant(g('regle'));
+        if (regle == null) return ignorees.push({ ligne: n, motif: 'Montant réglé illisible pour ' + facture });
+        if (Math.abs(regle) > Math.abs(montant)) return ignorees.push({ ligne: n, motif: 'Montant réglé supérieur au montant de l’échéance pour ' + facture });
+        reste = montant - regle; origineReste = 'calcule';
+      } else if (reglement) { reste = null; origineReste = 'inconnu'; }
+      else { reste = montant; origineReste = 'sans_reglement'; }
+      reglements.push({ facture, echeance, reglement, montantCents: montant, resteCents: reste, resteDeclare: T.carte.reste != null, origineReste,
+        motifReste: reste == null ? 'Règlement daté du ' + reglement + ' sans montant réglé ni reste : solde non vérifiable (partiel possible)' : null });
     });
     return { reglements, ignorees, correspondance: T.correspondance, lues: T.corps.length };
   }
 
+  // SIRET : 14 chiffres et clé de Luhn (exception officielle de La Poste, SIREN 356 000 000 : somme des chiffres multiple de 5).
+  function siretValide(v) {
+    const s = String(v == null ? '' : v).replace(/[\s.\-]/g, '');
+    if (!/^\d{14}$/.test(s)) return null;
+    if (s.startsWith('356000000')) return [...s].reduce((t, c) => t + +c, 0) % 5 === 0 ? s : null;
+    let t = 0; for (let i = 0; i < 14; i++) { let d = +s[13 - i]; if (i % 2) { d *= 2; if (d > 9) d -= 9; } t += d; }
+    return t % 10 === 0 ? s : null;
+  }
+
   // Fichier clients EBP. Statut « bloqué » repéré dans le texte du statut.
   function lireClientsEbp(lignes) {
-    const T = verifierTable('clients', lignes), clients = [], ignorees = [], codes = new Set();
+    const T = verifierTable('clients', lignes), clients = [], ignorees = [], anomalies = [], codes = new Set();
     T.corps.forEach((r, i) => {
       const n = i + 2, g = k => cellule(r, T.carte, k);
       const code = texte(g('code'), 40), nom = texte(g('nom'), 120);
@@ -190,12 +232,14 @@
       const statut = /^(bloque|sommeil|en sommeil)/.test(titre) && /^(oui|vrai|1|x)$/.test(norm(brut)) ? (/bloque/.test(titre) ? 'Bloqué' : 'En sommeil')
         : /^(bloque|sommeil|en sommeil)/.test(titre) && /^(non|faux|0)?$/.test(norm(brut)) ? 'Actif'
         : titre === 'actif' && /^(non|faux|0)$/.test(norm(brut)) ? 'Inactif' : titre === 'actif' && /^(oui|vrai|1|x)$/.test(norm(brut)) ? 'Actif' : brut;
-      clients.push({ code, nom, ville: texte(g('ville'), 80), cp: texte(g('cp'), 10), statut, famille: texte(g('famille'), 60), commercial: texte(g('commercial'), 40), bloque: /bloqu|suspendu|interdit|contentieux/.test(norm(statut)) });
+      const siretBrut = texte(g('siret'), 30), siret = siretValide(siretBrut);
+      if (siretBrut && !siret) anomalies.push({ ligne: n, code, motif: 'SIRET invalide (' + siretBrut + ') : ignoré pour le rapprochement' });
+      clients.push({ code, nom, siret: siret || '', ville: texte(g('ville'), 80), cp: texte(g('cp'), 10), statut, famille: texte(g('famille'), 60), commercial: texte(g('commercial'), 40), bloque: /bloqu|suspendu|interdit|contentieux/.test(norm(statut)) });
     });
-    return { clients, ignorees, correspondance: T.correspondance, lues: T.corps.length };
+    return { clients, ignorees, anomalies, correspondance: T.correspondance, lues: T.corps.length };
   }
 
-  const api = { COLONNES, decoderTexte, lireCsv, associerColonnes, lireDate, lireMontant, lireType, lirePieces, lireReglements, lireClientsEbp };
+  const api = { COLONNES, decoderTexte, lireCsv, associerColonnes, lireDate, lireMontant, montantAmbigu, siretValide, lireType, lirePieces, lireReglements, lireClientsEbp };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else racine.EbpImport = api;
 })(typeof self !== 'undefined' ? self : this);

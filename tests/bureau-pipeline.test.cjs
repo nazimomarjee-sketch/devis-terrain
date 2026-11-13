@@ -212,3 +212,12 @@ test('téléphone (code réel) : statut « fait » d’une action conservé au p
   const recu = await importer(fichier(demain));
   assert.equal(recu.actions.find(a => a.id === id).statut, 'fait');
 });
+
+test('lot 1 — règlement daté sans montant (reste inconnu) : facture JAMAIS déclarée soldée ni impayée, à vérifier avec motif', () => {
+  const pieces = [{ type: 'facture', no: 'FA-L1', date: '2026-10-01', code: 'C1', client: 'GARAGE FICTIF L1', htCents: 100000, source: 'ebp' }];
+  const reglements = [{ facture: 'FA-L1', echeance: '2026-10-31', reglement: '2026-11-02', montantCents: 120000, resteCents: null, origineReste: 'inconnu', motifReste: 'Règlement daté du 2026-11-02 sans montant réglé ni reste : solde non vérifiable (partiel possible)' }];
+  const a = P.construireAffaires(pieces, reglements, [], AUJ).find(x => x.id === 'FA-L1');
+  assert.equal(a.etape, 'facture'); assert.equal(a.resteCents, null); assert.equal(a.aVerifier, true); assert.match(a.motifReste, /non vérifiable/);
+  const solde = P.construireAffaires(pieces, [{ ...reglements[0], resteCents: 0, origineReste: 'declare', motifReste: null }], [], AUJ).find(x => x.id === 'FA-L1');
+  assert.equal(solde.etape, 'solde', 'avec un reste déclaré à 0, la facture reste soldée comme avant');
+});

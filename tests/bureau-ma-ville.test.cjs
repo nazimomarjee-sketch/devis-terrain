@@ -91,3 +91,14 @@ test('cockpit : conquête par département (taux de clients parmi les établisse
   assert.equal(c.departements.find(x => x.dep === '75').tauxClients, null, 'aucun établissement connu : pas de taux');
   assert.deepEqual([c.aQualifier, c.probables, c.aRapprocher], [4, 2, 2], 'ZETA ×2, SANS FICHE, SARL FICTIVE à qualifier ; ALPHA et BETA rapprochés par le nom');
 });
+
+test('lot 1 — SIRET EBP : relie la fiche terrain de même SIRET malgré un nom différent ; un SIRET déjà lié à un autre code va « à rapprocher »', () => {
+  const t = B.lireClients([{ id: 1, nom: 'CARROSSERIE FICTIVE OMEGA', ville: 'Massy', cp: '91300', statutCrm: 'prospect' }], AUJ).garages.map(g => ({ ...g, siret: '99999999900017' }));
+  const c = E.lireClientsEbp([['Code client', 'Raison sociale', 'SIRET', 'Ville', 'Code postal'],
+    ['C701', 'SARL OMEGA FICTIVE', '99999999900017', 'Massy', '91300'], ['C702', 'OMEGA BIS FICTIVE', '999 999 999 00017', 'Massy', '91300']]).clients;
+  const r = MV.construire({ terrain: t, clientsEbp: c, piecesEbp: [], annuaire: [], arrete: AUJ });
+  const omega = r.etablissements.filter(e => e.siret === '99999999900017');
+  assert.equal(omega.length, 1, 'un seul établissement pour un SIRET'); assert.equal(omega[0].codeEbp, 'C701'); assert.ok(omega[0].sources.includes('terrain'));
+  assert.ok(r.aRapprocher.some(x => x.code === 'C702' && /déjà lié au code EBP C701/.test(x.motif)), 'jamais de fusion automatique');
+  assert.ok(!r.etablissements.some(e => e.codeEbp === 'C702'));
+});

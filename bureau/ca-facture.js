@@ -47,6 +47,8 @@
     if (ign) incomplets.push(ign + ' ligne(s) de l’export des pièces écartée(s) à l’import : le CA peut être sous-estimé');
     if (doublons.length) incomplets.push(doublons.length + ' pièce(s) en double (même numéro) comptée(s) une seule fois : ' + doublons.map(d => d.no).join(', '));
     const multi = e.pieces.filter(p => p && p.type === 'facture' && dans(p.date) && p.lignesSource > 1).length;
+    const identiques = e.pieces.filter(p => p && p.type === 'facture' && dans(p.date) && p.lignesIdentiques > 0);
+    if (identiques.length) incomplets.push(identiques.length + ' facture(s) contenant des lignes strictement identiques (export dupliqué ?) : ' + identiques.map(p => p.no).join(', ') + ' — montant à vérifier dans EBP');
     if (multi) incomplets.push(multi + ' facture(s) totalisée(s) sur plusieurs lignes d’article (export ligne par ligne) : vérifier que l’export n’est pas dupliqué');
 
     // Rattachement : uniquement par le code client EBP.
