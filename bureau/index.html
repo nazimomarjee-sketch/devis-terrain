@@ -1107,6 +1107,19 @@ etat.ebp = { pieces:null, reglements:null, clients:null, arrete: jourIso(), arre
 // d'après la date du fichier le plus ANCIEN chargé (le plus prudent), jamais dans le futur, et reste « non confirmée » tant que
 // l'utilisateur ne l'a pas saisie lui-même. Chaque import garde sa provenance (nom, taille, date du fichier, empreinte SHA-256).
 async function empreinteFichier(f){ try { const b = await f.arrayBuffer(); const h = await crypto.subtle.digest('SHA-256', b); return [...new Uint8Array(h)].map(x => x.toString(16).padStart(2,'0')).join(''); } catch (e) { return null; } }
+// Lot 1 : journal des anomalies d'un import, exportable (CSV « ; », UTF-8 avec BOM pour Excel). Rien n'est envoyé : téléchargement local.
+function journalAnomalies(type){
+  const r = etat.ebp[type]; if (!r) return '';
+  const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"', pv = r.provenance || {};
+  const lignes = [['Fichier','Empreinte SHA-256','Importé le','Nature','Ligne','Gravité','Motif'].map(q).join(';')];
+  for (const x of r.ignorees) lignes.push([pv.fichier || r.fichier, pv.empreinte, pv.importeLe, type, x.ligne, 'Ligne écartée', x.motif].map(q).join(';'));
+  for (const x of (r.anomalies || [])) lignes.push([pv.fichier || r.fichier, pv.empreinte, pv.importeLe, type, x.ligne, 'Anomalie', x.motif].map(q).join(';'));
+  return '\ufeff' + lignes.join('\r\n') + '\r\n';
+}
+function exporterAnomalies(type){
+  const a = h('a',{href:URL.createObjectURL(new Blob([journalAnomalies(type)],{type:'text/csv;charset=utf-8'})), download:'anomalies-' + type + '-' + jourIso() + '.csv'});
+  document.body.appendChild(a); a.click(); a.remove();
+}
 function proposerArrete(){
   const E = etat.ebp; if (E.arreteConfirmee) return;
   const dates = ['pieces','reglements','clients'].map(t => E[t] && E[t].provenance && E[t].provenance.dateFichier).filter(Boolean).sort();
@@ -1190,6 +1203,7 @@ function vueBureau(){
         h('p',{}, 'Colonnes retenues : ' + r.correspondance.map(c => c.libelle + ' ← « ' + c.colonne + ' »').join(' · ')),
         r.provenance ? h('p',{class:'provenance'}, 'Provenance : ' + r.provenance.fichier + ' · ' + Math.round(r.provenance.taille / 1024) + ' Ko · fichier du ' + frDate(r.provenance.dateFichier) + ' · importé le ' + new Date(r.provenance.importeLe).toLocaleString('fr-FR') + (r.provenance.empreinte ? ' · empreinte ' + r.provenance.empreinte.slice(0, 12) : '')) : null,
         r.anomalies && r.anomalies.length ? h('ul',{}, r.anomalies.slice(0, 50).map(x => h('li',{}, 'Ligne ' + x.ligne + ' : ' + x.motif))) : null,
+        (r.ignorees.length || (r.anomalies && r.anomalies.length)) ? h('button',{type:'button', class:'btn', 'data-anomalies':type, onclick:() => exporterAnomalies(type)}, 'Exporter le journal des anomalies (CSV)') : null,
         r.ignorees.length ? h('ul',{}, r.ignorees.slice(0, 50).map(x => h('li',{}, 'Ligne ' + x.ligne + ' : ' + x.motif))) : null,
         type === 'pieces' && !r.liens ? h('div',{class:'message erreur'}, 'Colonne « pièce d’origine » absente : impossible de relier devis, commandes, livraisons et factures. Les retards ne sont pas fiables.') : null,
         r.avoirs && r.avoirs.length ? h('p',{}, r.avoirs.length + ' avoir(s) lu(s), non déduit(s) du CA (règle à valider) : ' + r.avoirs.map(x => x.no).join(', ')) : null) : null); };

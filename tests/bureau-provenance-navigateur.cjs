@@ -70,3 +70,21 @@ test('encaissements : bloc TTC affiché depuis l’échéancier, distinct du CA 
     assert.deepEqual(erreurs, []);
   } finally { await ctx.close(); }
 });
+
+test('journal des anomalies : export CSV local des lignes écartées, avec fichier et empreinte', async () => {
+  const ctx = await nav.newContext({ viewport: { width: 1440, height: 900 }, acceptDownloads: true });
+  await ctx.route(/^https?:/, r => r.abort());
+  const p = await ctx.newPage(), erreurs = []; p.on('pageerror', e => erreurs.push(e.message));
+  try {
+    await p.clock.setFixedTime(new Date('2026-11-06T10:00:00'));
+    await p.goto(PAGE + '#bureau'); await p.waitForSelector('#ebp-arrete', { state: 'attached' });
+    await charger(p, CSV + 'Facture;FA-P2;15/10/2026;C1;GARAGE FICTIF P;1.234\n', '2026-10-20T08:00:00');
+    await p.evaluate(() => { document.querySelector('[data-anomalies="pieces"]').closest('details').open = true; }); // détail de l'import ouvert, comme au toucher
+    const [dl] = await Promise.all([p.waitForEvent('download'), p.click('[data-anomalies="pieces"]')]);
+    const contenu = require('node:fs').readFileSync(await dl.path(), 'utf8');
+    assert.match(dl.suggestedFilename(), /^anomalies-pieces-2026-11-06\.csv$/);
+    assert.match(contenu, /^﻿"Fichier";"Empreinte SHA-256"/);
+    assert.match(contenu, /"pieces-fictives\.csv";"[0-9a-f]{64}";"[^"]+";"pieces";"3";"Ligne écartée";"Montant HT ambigu/);
+    assert.deepEqual(erreurs, []);
+  } finally { await ctx.close(); }
+});

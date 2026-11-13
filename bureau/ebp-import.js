@@ -14,10 +14,12 @@
   const COLONNES = {
     pieces: [
       ['type', 'Type de pièce', /^(type|nature)|type de (piece|document)|^document$/, false],
-      ['no', 'N° de pièce', /^(n°|no|num(ero)?)( de)? ?(piece|document)?$|^(n°|no|numero) (piece|document)|^piece$/, true],
-      ['date', 'Date', /^date( de)?( la)? ?(piece|document)?$/, true],
-      ['code', 'Code client', /code.*client|^code tiers$|^tiers$|^code$/, false],
-      ['client', 'Nom du client', /(nom|raison sociale|libelle).*client|^client$|^raison sociale$|^nom$/, true],
+      // Lot 1 : variantes alignées sur l'import du téléphone (ca-ebp-v48.js) — « Numéro du document », « N° de facture »,
+      // « Date du document », « Nom du tiers », « Intitulé du client », « N° client », « Compte client » (HYPOTHÈSE : identifiant client).
+      ['no', 'N° de pièce', /^(n°|no|num(ero)?)( (de|du))?( la)? ?(piece|document|facture)?$|^(n°|no|numero) (piece|document|facture)|^piece$/, true],
+      ['date', 'Date', /^date( (de|du))?( la)? ?(piece|document|facture)?$/, true],
+      ['code', 'Code client', /code.*client|^code tiers$|^tiers$|^code$|^(n°|no|numero) (client|tiers)$|^compte (client|tiers)$/, false],
+      ['client', 'Nom du client', /(nom|raison sociale|libelle|intitule).*(client|tiers)|^client$|^raison sociale$|^nom$/, true],
       ['ht', 'Montant HT', /(montant|total|net).*h\.?t|^h\.?t\.?$/, true],
       ['origine', 'N° de pièce d’origine', /origine|piece (precedente|liee|source)|precedent/, false],
       ['ref', 'Référence / commentaire', /reference|commentaire|objet/, false]

@@ -170,3 +170,17 @@ test('lot 1 — pièce totalisée sur des lignes STRICTEMENT identiques : signal
   const r = CA.calculer({ pieces: p.pieces, avoirs: [], arrete: '2026-11-10', aujourdhui: '2026-11-10' });
   assert.ok(r.incomplets.some(m => /strictement identiques.*FA9/.test(m)));
 });
+
+test('lot 1 — mêmes en-têtes que l’import du téléphone : le Bureau lit le même HT (jamais le TTC), au lieu de refuser', () => {
+  const T = require('../ca-ebp-v48.js');
+  for (const e of [['Type de document', 'Numéro du document', 'Date du document', 'Code tiers', 'Nom du tiers', 'Total TTC', 'Total HT net'],
+    ['Nature', 'N° pièce', 'Date pièce', 'Code client', 'Raison sociale', 'Montant TTC', 'Montant HT'],
+    ['Type', 'Numéro', 'Date', 'Compte client', 'Intitulé du client', 'Net HT', 'TTC'],
+    ['Document', 'N° de facture', 'Date de facture', 'N° client', 'Client', 'Total H.T.', 'Total T.T.C.']]) {
+    const ttcEnPremier = /ttc/i.test(e[5]), ligne = ['Facture', 'FA1', '05/11/2026', 'C1', 'G', ttcEnPremier ? '120' : '100', ttcEnPremier ? '100' : '120'];
+    const b = E.lirePieces([e, ligne]);
+    assert.deepEqual(b.pieces.map(p => [p.no, p.date, p.code, p.htCents]), [['FA1', '2026-11-05', 'C1', 10000]], e.join(' | '));
+    const t = T.apercu([e, ligne], { auj: '2026-11-12', existantes: [] });
+    assert.equal(t.nouvelles[0].montantHt, b.pieces[0].htCents, 'même HT que le téléphone : ' + e.join(' | '));
+  }
+});
