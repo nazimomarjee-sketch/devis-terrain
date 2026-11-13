@@ -303,14 +303,16 @@
   }
 
   /* ---------- Comptes et argent disponible ---------- */
-  /** Solde d'un compte = solde relevé par le propriétaire à une date + opérations postérieures à cette date. */
+  /** Solde d'un compte = solde relevé par le propriétaire à une date + opérations postérieures à cette date.
+   *  Le jour même du relevé, seules comptent les opérations saisies à la main après lui (la banque ne les connaît pas encore). */
   function soldes(comptes, ops) {
     const noms = [...new Set([...(comptes || []).map(c => c.nom), ...ops.map(o => o.compte)])];
     const res = { parCompte: [], disponible: 0, epargne: 0, connus: 0, inconnus: [] };
     for (const nom of noms) {
       const c = (comptes || []).find(x => x.nom === nom) || { nom };
       const connu = Number.isInteger(c.soldeRef) && !!c.dateRef;
-      const depuis = connu ? ops.filter(o => o.compte === nom && o.date > c.dateRef) : [];
+      const depuis = connu ? ops.filter(o => o.compte === nom && (o.date > c.dateRef
+        || (o.date === c.dateRef && Number.isInteger(o.saisieLe) && Number.isInteger(c.refLe) && o.saisieLe > c.refLe))) : [];
       const solde = connu ? c.soldeRef + depuis.reduce((a, o) => a + o.montant, 0) : null;
       res.parCompte.push({ nom, epargne: !!c.epargne, solde, dateRef: c.dateRef || null, opsDepuis: depuis.length });
       if (!connu) res.inconnus.push(nom);
@@ -488,12 +490,18 @@
 
   /* ---------- Saisies manuelles et rapprochement avec un relevé ---------- */
   const estManuelle = o => o.id.startsWith('M|');
-  /** Une saisie manuelle retrouvée dans un relevé (même compte, même montant, 4 jours d'écart au plus) est remplacée. */
+  /** Une saisie manuelle retrouvée dans un relevé (même compte, même montant, 4 jours d'écart au plus) est remplacée.
+   *  L'opération importée reprend sa catégorie et son rang par rapport au solde relevé. */
   function rapprocher(ops, ajouts) {
     const prises = new Set(), paires = [];
     for (const a of ajouts) {
       const m = ops.find(o => estManuelle(o) && !prises.has(o.id) && o.compte === a.compte && o.montant === a.montant && Math.abs(ecartJours(o.date, a.date)) <= 4);
-      if (m) { prises.add(m.id); paires.push({ manuelle: m, importee: a }); }
+      if (m) {
+        prises.add(m.id);
+        if (m.catManuelle) a.catManuelle = m.catManuelle;
+        if (m.saisieLe) a.saisieLe = m.saisieLe;
+        paires.push({ manuelle: m, importee: a });
+      }
     }
     return paires;
   }
@@ -532,6 +540,7 @@
       ids.add(o.id);
       const p = { id: o.id, date: o.date, libelle: o.libelle, montant: o.montant, compte: o.compte };
       if (CATEGORIES.includes(o.catManuelle)) p.catManuelle = o.catManuelle;
+      if (Number.isInteger(o.saisieLe) && o.saisieLe > 0) p.saisieLe = o.saisieLe;
       return p;
     });
     const regles = (Array.isArray(d.regles) ? d.regles : [])
@@ -543,7 +552,7 @@
       if (!c || !texte(c.nom, 40) || nomsVus.has(c.nom) || !soldeOk) throw new Error('Sauvegarde refusée : compte n° ' + (i + 1) + ' invalide.');
       nomsVus.add(c.nom);
       const p = { nom: c.nom, epargne: c.epargne === true };
-      if (c.soldeRef !== undefined) { p.soldeRef = c.soldeRef; p.dateRef = c.dateRef; }
+      if (c.soldeRef !== undefined) { p.soldeRef = c.soldeRef; p.dateRef = c.dateRef; if (Number.isInteger(c.refLe) && c.refLe > 0) p.refLe = c.refLe; }
       return p;
     });
     const idsE = new Set();

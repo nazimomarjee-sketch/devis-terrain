@@ -211,7 +211,7 @@ const ACTIONS = {
       };
       if (a.confirmer !== true) return { enregistre: false, apercu, suite: 'Faites vérifier ces totaux au propriétaire, puis rappelez avec confirmer=true.' };
       if (f.ajouts.length) {
-        for (const p of C.rapprocher(d.ops, f.ajouts)) { if (p.manuelle.catManuelle) p.importee.catManuelle = p.manuelle.catManuelle; d.ops = d.ops.filter(o => o !== p.manuelle); }
+        for (const p of C.rapprocher(d.ops, f.ajouts)) d.ops = d.ops.filter(o => o !== p.manuelle);
         d.ops.push(...f.ajouts); ecrire(d);
       }
       return { enregistre: true, apercu };

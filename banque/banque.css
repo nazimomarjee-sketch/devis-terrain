@@ -63,3 +63,19 @@ ul{padding-left:20px;margin:8px 0}
 .case input{width:auto;margin-top:4px}
 details{margin-top:10px}
 summary{cursor:pointer}
+.grand{font-size:2rem;font-weight:700;font-variant-numeric:tabular-nums;margin:2px 0 10px;overflow-wrap:anywhere}
+.droite{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.bouton.petit{padding:6px 10px;font-size:.88rem}
+.fait{color:var(--doux)}
+.alerte.rouge{background:#fde3e0;color:#7a1410}
+.alerte.info{background:var(--carte);color:var(--doux);border:1px solid var(--trait)}
+.jauge i.depasse{background:var(--moins)}
+.ecart.moins{color:var(--moins)}
+.fenetre{border:1px solid var(--trait);border-radius:14px;background:var(--carte);color:var(--texte);padding:18px;width:min(460px,calc(100vw - 24px));max-height:calc(100vh - 24px);overflow:auto}
+.fenetre::backdrop{background:rgba(0,0,0,.5)}
+.fenetre h2{margin-top:0}
+@media (prefers-color-scheme:dark){.alerte.rouge{background:#4a1b17;color:#ffc9c2}}
+@media (max-width:560px){
+  .onglets{gap:4px;padding:8px 10px;overflow-x:visible}
+  .onglets button{flex:1 1 0;min-width:0;padding:9px 2px;font-size:.8rem;white-space:nowrap}
+}

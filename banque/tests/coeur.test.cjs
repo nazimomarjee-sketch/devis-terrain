@@ -276,3 +276,19 @@ test('sauvegarde version 2 : comptes, échéances, budgets validés ; ancienne v
   assert.throws(mauvais({ ...d.echeances[0], montant: 70000 }), /échéance n° 1 invalide/);
   assert.throws(() => C.validerSauvegarde({ format: 'banque-locale', ops: [], comptes: [{ nom: 'A', soldeRef: 1.5, dateRef: '2026-01-01' }] }), /compte n° 1 invalide/);
 });
+
+test('solde : une dépense saisie le jour même, après le relevé du solde, est bien déduite', () => {
+  const compte = { nom: 'Courant', soldeRef: 120000, dateRef: '2026-11-13', refLe: 1000 };
+  const apres = { id: 'M|a', date: '2026-11-13', libelle: 'Courses', montant: -4590, compte: 'Courant', saisieLe: 2000 };
+  const avant = { id: 'M|b', date: '2026-11-13', libelle: 'Café', montant: -200, compte: 'Courant', saisieLe: 500 };
+  const importee = { id: 'x', date: '2026-11-13', libelle: 'CARTE', montant: -900, compte: 'Courant' };
+  const veille = { id: 'M|c', date: '2026-11-12', libelle: 'Hier', montant: -700, compte: 'Courant', saisieLe: 3000 };
+  assert.equal(C.soldes([compte], [apres, avant, importee, veille]).disponible, 120000 - 4590);
+  // Retrouvée ensuite dans un relevé : l'opération importée la remplace sans faire remonter le solde.
+  const ajouts = C.identifier([{ date: '2026-11-13', libelle: 'CARTE CARREFOUR', montant: -4590 }], 'Courant');
+  const paires = C.rapprocher([apres], ajouts);
+  assert.equal(paires.length, 1);
+  assert.equal(C.soldes([compte], ajouts).disponible, 120000 - 4590);
+  const v = C.validerSauvegarde({ format: 'banque-locale', ops: [apres], comptes: [compte] });
+  assert.deepEqual([v.ops[0].saisieLe, v.comptes[0].refLe], [2000, 1000]);
+});

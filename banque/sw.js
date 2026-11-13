@@ -1,7 +1,7 @@
 'use strict';
 /* Banque locale — cache hors ligne du code uniquement. Ne touche jamais aux données (IndexedDB)
  * ni au cache de l'appli ODICOLOR (préfixe « terrain- »). Réseau d'abord, cache en secours. */
-const CACHE = 'banque-v1';
+const CACHE = 'banque-v2';
 const FICHIERS = ['./', 'index.html', 'banque.css', 'coeur.js', 'app.js', 'manifest.webmanifest', 'icone.svg'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FICHIERS)).then(() => self.skipWaiting()));
