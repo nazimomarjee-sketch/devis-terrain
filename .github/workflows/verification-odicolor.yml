@@ -34,3 +34,7 @@ jobs:
           NODE
       - name: Tester validation, sauvegarde et restauration atomique
         run: node --test tests/*.test.cjs
+      - name: Tester l'outil Banque locale (dossier banque, indépendant de l'appli ODICOLOR)
+        run: |
+          for f in banque/coeur.js banque/app.js banque/sw.js banque/bureau.cjs; do node --check "$f"; done
+          node --test banque/tests/*.test.cjs

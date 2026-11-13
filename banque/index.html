@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- connect-src 'none' : le navigateur interdit à cette page tout envoi de données vers un serveur. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'none'; img-src 'self' data:; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#0f766e">
+<title>Banque locale</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icone.svg" type="image/svg+xml">
+<link rel="stylesheet" href="banque.css">
+</head>
+<body>
+<header class="barre">
+  <strong>Banque locale</strong>
+  <small id="etat">Données stockées sur cet appareil uniquement</small>
+</header>
+<nav class="onglets" aria-label="Navigation">
+  <button type="button" data-vue="synthese">Synthèse</button>
+  <button type="button" data-vue="operations">Opérations</button>
+  <button type="button" data-vue="importer">Importer</button>
+  <button type="button" data-vue="claude">Claude</button>
+  <button type="button" data-vue="reglages">Réglages</button>
+</nav>
+<main id="app"></main>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script src="coeur.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

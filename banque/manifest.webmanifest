@@ -1,0 +1,12 @@
+{
+  "name": "Banque locale",
+  "short_name": "Banque",
+  "description": "Suivi de comptes à partir de relevés importés. Les données restent sur l'appareil.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "lang": "fr",
+  "background_color": "#0f1418",
+  "theme_color": "#0f766e",
+  "icons": [{ "src": "icone.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
