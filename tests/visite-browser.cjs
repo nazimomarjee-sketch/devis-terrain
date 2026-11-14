@@ -59,6 +59,8 @@ test('hors ligne : la visite s’enregistre et survit au rechargement',async()=>
   const {context,page,errs}=await ouvrir();
   await page.goto(origin+'/#/visite/1');await page.getByRole('button',{name:/^Vu/}).click();await page.getByRole('button',{name:/Parle du prix/}).click();await page.getByRole('button',{name:'Programmer une relance'}).click();
   await page.locator('#titre',{hasText:'Visite enregistrée'}).waitFor();await page.reload();
+  // Après rechargement, attendre que la base locale soit rouverte (course constatée le 14/11/2026 : « db » encore nul).
+  await page.waitForFunction(async()=>{try{return !!(await get('clients',1));}catch(e){return false;}});
   const c=await page.evaluate(()=>get('clients',1));assert.equal(c.visites.length,1);assert.equal(c.infosTerrain[0].type,'prix');assert.deepEqual(errs,[]);await context.close();
 });
 test('tournée proposée depuis le cockpit : garages proches et prioritaires, cochés, validés → tournée du jour ; sans position : jamais proposé',async()=>{
