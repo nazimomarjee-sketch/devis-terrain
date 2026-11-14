@@ -278,16 +278,17 @@
   function lirePieces(lignes, options = {}) {
     const T = verifierTable('pieces', lignes, options), pieces = [], ignorees = [], avoirs = [], vus = new Map();
     T.corps.forEach((r, i) => {
-      const n = i + 2 + T.decalage, g = k => cellule(r, T.carte, k);
+      const n = r.lignePhysique || i + 2 + T.decalage, g = k => cellule(r, T.carte, k);
+      if (r.length !== T.entetes.length) return ignorees.push({ ligne:n, motif:'Ligne tronquée : ' + r.length + ' colonne(s) au lieu de ' + T.entetes.length });
       const no = texte(g('no'), 40), date = lireDate(g('date')), type = lireType(g('type'), no), ht = lireMontant(g('ht'));
       const client = texte(g('client'), 120) || texte(g('code'), 40);
       if (!no) return ignorees.push({ ligne: n, motif: 'N° de pièce absent' });
       if (!type) return ignorees.push({ ligne: n, motif: 'Type de pièce non reconnu (' + texte(g('type'), 30) + ' / ' + no + ')' });
-      // Avoir : pièce normale, gardée à part, jamais « écartée ». Déduit du CA facturé à SA date (règle validée le 07/11/2026, bureau/ca-facture.js).
-      if (type === 'avoir') return avoirs.push({ ligne: n, no, date, client, htCents: ht, origine: texte(g('origine'), 40), code: texte(g('code'), 40) });
       if (!date) return ignorees.push({ ligne: n, motif: 'Date illisible pour ' + no });
       if (ht == null) return ignorees.push({ ligne: n, motif: (montantAmbigu(g('ht')) ? 'Montant HT ambigu (« ' + texte(g('ht'), 20) + ' » : séparateur de milliers ou décimal ?)' : 'Montant HT illisible') + ' pour ' + no });
       if (!client) return ignorees.push({ ligne: n, motif: 'Client absent pour ' + no });
+      // Un avoir incomplet n'est jamais utilisé pour corriger le chiffre d'affaires.
+      if (type === 'avoir') return avoirs.push({ ligne: n, no, date, client, htCents: ht, origine: texte(g('origine'), 40), code: texte(g('code'), 40) });
       const cle = type + '|' + no;
       if (vus.has(cle)) {
         const p = vus.get(cle);
@@ -302,7 +303,8 @@
       vus.set(cle, p); pieces.push(p);
     });
     // liens = l'export indique la pièce d'origine (indispensable pour suivre devis → commande → BL → facture).
-    return { pieces, ignorees, avoirs, liens: T.carte.origine != null, correspondance: T.correspondance, lues: T.corps.length };
+    terminerLecture(T, ignorees);
+    return { type:'pieces', pieces, ignorees, avoirs, liens:T.carte.origine != null, correspondance:T.correspondance, lues:T.corps.length, acceptees:T.corps.length-ignorees.length, rejetees:ignorees.length };
   }
 
   // Échéancier des règlements. Reste à payer, par ordre de fiabilité :
@@ -313,7 +315,8 @@
   function lireReglements(lignes, options = {}) {
     const T = verifierTable('reglements', lignes, options), reglements = [], ignorees = [], vus = new Set();
     T.corps.forEach((r, i) => {
-      const n = i + 2 + T.decalage, g = k => cellule(r, T.carte, k);
+      const n = r.lignePhysique || i + 2 + T.decalage, g = k => cellule(r, T.carte, k);
+      if (r.length !== T.entetes.length) return ignorees.push({ ligne:n, motif:'Ligne tronquée : ' + r.length + ' colonne(s) au lieu de ' + T.entetes.length });
       const facture = texte(g('facture'), 40), echeance = lireDate(g('echeance')), reglement = lireDate(g('reglement')), montant = lireMontant(g('montant'));
       if (!facture) return ignorees.push({ ligne: n, motif: 'N° de facture absent' });
       if (!echeance) return ignorees.push({ ligne: n, motif: 'Échéance illisible pour ' + facture });
@@ -335,7 +338,8 @@
       reglements.push({ facture, echeance, reglement, montantCents: montant, resteCents: reste, resteDeclare: T.carte.reste != null, origineReste,
         motifReste: reste == null ? 'Règlement daté du ' + reglement + ' sans montant réglé ni reste : solde non vérifiable (partiel possible)' : null });
     });
-    return { reglements, ignorees, correspondance: T.correspondance, lues: T.corps.length };
+    terminerLecture(T, ignorees);
+    return { type:'reglements', reglements, ignorees, correspondance:T.correspondance, lues:T.corps.length, acceptees:reglements.length, rejetees:ignorees.length };
   }
 
   // SIRET : 14 chiffres et clé de Luhn (exception officielle de La Poste, SIREN 356 000 000 : somme des chiffres multiple de 5).
@@ -351,7 +355,8 @@
   function lireClientsEbp(lignes, options = {}) {
     const T = verifierTable('clients', lignes, options), clients = [], ignorees = [], anomalies = [], codes = new Set();
     T.corps.forEach((r, i) => {
-      const n = i + 2 + T.decalage, g = k => cellule(r, T.carte, k);
+      const n = r.lignePhysique || i + 2 + T.decalage, g = k => cellule(r, T.carte, k);
+      if (r.length !== T.entetes.length) return ignorees.push({ ligne:n, motif:'Ligne tronquée : ' + r.length + ' colonne(s) au lieu de ' + T.entetes.length });
       const code = texte(g('code'), 40), nom = texte(g('nom'), 120);
       if (!code || !nom) return ignorees.push({ ligne: n, motif: 'Code ou nom absent' });
       if (codes.has(code)) return ignorees.push({ ligne: n, motif: 'Code client ' + code + ' en double' });
@@ -365,7 +370,8 @@
       if (siretBrut && !siret) anomalies.push({ ligne: n, code, motif: 'SIRET invalide (' + siretBrut + ') : ignoré pour le rapprochement' });
       clients.push({ code, nom, siret: siret || '', ville: texte(g('ville'), 80), cp: texte(g('cp'), 10), statut, famille: texte(g('famille'), 60), commercial: texte(g('commercial'), 40), bloque: /bloqu|suspendu|interdit|contentieux/.test(norm(statut)) });
     });
-    return { clients, ignorees, anomalies, correspondance: T.correspondance, lues: T.corps.length };
+    terminerLecture(T, ignorees);
+    return { type:'clients', clients, ignorees, anomalies, correspondance:T.correspondance, lues:T.corps.length, acceptees:clients.length, rejetees:ignorees.length };
   }
 
   const api = { COLONNES, decoderTexte, lireCsv, associerColonnes, trouverEntete, analyser, estFec, appliquerCarteMemorisee, rapportAnomalies, signature, lireDate, lireMontant, montantAmbigu, siretValide, lireType, lirePieces, lireReglements, lireClientsEbp };
