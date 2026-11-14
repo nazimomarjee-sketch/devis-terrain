@@ -32,7 +32,8 @@ const COOKIE = 'odicolor_session';
 function fichierAutorise(chemin) {
   if (chemin === '/' || chemin === '/ouvrir.html') return path.join(PUBLIC, 'ouvrir.html');
   if (chemin === '/ouvrir.js' || chemin === '/ouvrir.css') return path.join(PUBLIC, chemin.slice(1));
-  if (chemin === '/xlsx.mini.min.js' || chemin === '/odicolor-logo-officiel.png') return path.join(RACINE, chemin.slice(1));
+  // communes-centres.js : centres des communes (données publiques, Licence Ouverte), utilisés par l'ordre de tournée du Bureau (lot 2).
+  if (chemin === '/xlsx.mini.min.js' || chemin === '/odicolor-logo-officiel.png' || chemin === '/communes-centres.js') return path.join(RACINE, chemin.slice(1));
   if (chemin.startsWith('/bureau/')) {
     const f = path.resolve(RACINE, '.' + chemin), dossier = path.join(RACINE, 'bureau') + path.sep;
     if (f.startsWith(dossier) && !path.basename(f).startsWith('.') && !f.slice(dossier.length).includes(path.sep + 'outils' + path.sep) && !f.slice(dossier.length).startsWith('outils' + path.sep)) return f;
