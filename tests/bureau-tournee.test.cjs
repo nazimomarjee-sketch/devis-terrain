@@ -39,7 +39,7 @@ test('rendez-vous : jamais déplacés, toujours dans l’ordre de leurs heures',
 });
 
 test('position inconnue ou heure illisible : jamais placés au hasard, listés à part avec motif', () => {
-  const r = T.ordonner({ centres, etapes: [G('A', code('Massy')), { id: 'P', nom: 'GARAGE FICTIF PARIS', insee: '75111' }, G('H', code('Orsay'), '25h')] });
+  const r = T.ordonner({ centres, etapes: [G('A', code('Massy')), { id: 'P', nom: 'GARAGE FICTIF HORS IDF', insee: '60057' }, G('H', code('Orsay'), '25h')] });
   assert.deepEqual(r.ordre.map(x => x.id), ['A']);
   assert.deepEqual(r.inconnues.map(x => [x.id, /Position inconnue|illisible/.test(x.motif)]), [['P', true], ['H', true]]);
 });
@@ -47,4 +47,11 @@ test('position inconnue ou heure illisible : jamais placés au hasard, listés �
 test('rattachement par code postal + commune quand le code INSEE manque', () => {
   const r = T.ordonner({ centres, etapes: [{ id: 'C', nom: 'GARAGE FICTIF C', cp: '91300', commune: 'MASSY' }] });
   assert.equal(r.ordre[0].commune, 'Massy');
+});
+
+test('Île-de-France complète : Paris (code postal d’arrondissement), Yvelines et Hauts-de-Seine ont désormais une position', () => {
+  const deps = new Set(centres.map(c => c[0].slice(0, 2)));
+  assert.deepEqual([...deps].sort(), ['75', '77', '78', '91', '92', '93', '94', '95']);
+  const r = T.ordonner({ centres, etapes: [{ id: 'P', nom: 'GARAGE FICTIF PARIS', cp: '75011', commune: 'Paris' }, G('V', code('Versailles')), G('N', code('Nanterre'))] });
+  assert.deepEqual(r.inconnues, []); assert.equal(r.ordre.length, 3);
 });

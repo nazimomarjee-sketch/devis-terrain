@@ -3,8 +3,9 @@ const {test,before}=require('node:test'),assert=require('node:assert/strict');
 const K=require('../carte-v48.js'),CENTRES=require('../communes-centres.js');
 before(()=>K.charger(CENTRES));
 const INSEE=new Map(CENTRES.map(r=>[r[0],r]));
-test('référentiel : 971 communes (970 + alias 93059) des cinq départements, centres plausibles (Île-de-France), codes uniques',()=>{
-  assert.equal(CENTRES.length,971);assert.equal(new Set(CENTRES.map(r=>r[0])).size,971);
+test('référentiel : 1 267 communes (1 266 + alias 93059) des HUIT départements d’Île-de-France, centres plausibles, codes uniques',()=>{
+  assert.equal(CENTRES.length,1267);assert.equal(new Set(CENTRES.map(r=>r[0])).size,1267);
+  assert.deepEqual([...new Set(CENTRES.map(r=>r[0].slice(0,2)))].sort(),['75','77','78','91','92','93','94','95']);
   for(const [c,n,lat,lng] of CENTRES){assert.ok(lat>48.0&&lat<49.3&&lng>1.4&&lng<3.6,c+' '+n+' '+lat+','+lng);}
   assert.equal(INSEE.get('91174')[1],'Corbeil-Essonnes');assert.ok(INSEE.has('93059'));
 });
@@ -43,4 +44,8 @@ test('zoom centré sur le doigt : le point sous le doigt ne bouge pas ; plafonds
   const v={cx:100,cy:-5000,kmParPx:0.1,largeur:400,hauteur:800},z=K.zoomer(v,2,300,200);
   const avant=[(300-200)*v.kmParPx+v.cx,(200-400)*v.kmParPx+v.cy],apres=[(300-200)*z.kmParPx+z.cx,(200-400)*z.kmParPx+z.cy];
   assert.ok(Math.abs(avant[0]-apres[0])<1e-9&&Math.abs(avant[1]-apres[1])<1e-9);assert.equal(K.zoomer(v,1e9,0,0).kmParPx,0.01);assert.equal(K.zoomer(v,1e-9,0,0).kmParPx,2);
+});
+
+test('commune fusionnée : un garage de Pierrefitte-sur-Seine est compté dans Saint-Denis (93066), comme dans le Bureau',()=>{
+  const p=K.placer({ville:'Pierrefitte-sur-Seine',cp:'93380'});assert.deepEqual([p.precision,p.insee,p.commune],['commune','93066','Saint-Denis']);
 });

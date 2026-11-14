@@ -16,7 +16,13 @@ const ODICOLOR_CARTE = (() => {
     CENTRES = { parInsee, parCp, parNom }; return CENTRES;
   }
   // Place un garage : GPS connu > commune (nom + code postal) > code postal à commune unique > non placé (avec motif).
-  function placer(c) {
+  // Communes fusionnées : Pierrefitte-sur-Seine (93059) fait partie de Saint-Denis (93066) depuis le 01/01/2025.
+  // Le centre de Pierrefitte reste utilisé pour la position (plus précis), mais le garage est compté dans Saint-Denis,
+  // comme le fait le Bureau (référentiel officiel) : Carte, Secteurs et Ma Ville comptent ainsi de la même façon.
+  const FUSIONS = { '93059': { insee: '93066', commune: 'Saint-Denis' } };
+  const fusion = r => (r && r.insee && FUSIONS[r.insee] ? Object.assign(r, FUSIONS[r.insee]) : r);
+  function placer(c) { return fusion(placerBrut(c)); }
+  function placerBrut(c) {
     if (c.ent && Number.isFinite(c.ent.lat) && Number.isFinite(c.ent.lng) && Math.abs(c.ent.lat) <= 90 && Math.abs(c.ent.lng) <= 180) return { lat: c.ent.lat, lng: c.ent.lng, precision: 'gps' };
     if (!CENTRES) return { precision: null, motif: 'Référentiel des communes non chargé' };
     const cp = String(c.cp || '').replace(/\D/g, '').slice(0, 5), noms = [c.ville, c.villeProspection].map(norm).filter(Boolean);
