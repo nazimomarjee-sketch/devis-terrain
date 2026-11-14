@@ -2,9 +2,9 @@ name: Vérification ODICOLOR
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, odicolor-2-0-lot1-socle]
   push:
-    branches: [main, fix/lot1-f01-f03-recuperation, ccr-b491dc52-ckgq60]
+    branches: [main, fix/lot1-f01-f03-recuperation, ccr-b491dc52-ckgq60, odicolor-2-0-lot10-ebp-fiabilise]
 
 concurrency:
   group: odicolor-${{ github.event.pull_request.head.ref || github.ref_name }}
