@@ -89,6 +89,11 @@ test('création du coffre, imports, ARRÊT BRUTAL, redémarrage : cockpit, garag
     return p.$$eval('.perso', l => l.map(x => x.getAttribute('aria-label')).sort()); };
   const villeAvant = await personnages();
   assert.ok(villeAvant.some(x => x.startsWith('GARAGE FICTIF ALPHA,')));
+  // Lot 7 : objectif et seuils réglés dans le Pilotage, enregistrés dans le coffre (et non seulement dans ce navigateur).
+  await p.evaluate(() => { location.hash = 'pilotage'; }); await p.waitForSelector('[data-pilotage="objectif-saisie"]');
+  g = await generation(p); await p.fill('[data-pilotage="objectif-saisie"]', '20000'); await p.dispatchEvent('[data-pilotage="objectif-saisie"]', 'change'); await attendreEnregistrement(p, g);
+  await p.click('[data-pilotage="reglages"] summary'); await p.fill('[data-seuil="devisSansCommandeJours"]', '14');
+  g = await generation(p); await p.click('[data-pilotage="enregistrer-reglages"]'); await attendreEnregistrement(p, g);
   await ctx.close();
   // 3. Coupure brutale du programme local (comme une panne de courant), puis relance.
   await tuer(prog);
@@ -108,6 +113,11 @@ test('création du coffre, imports, ARRÊT BRUTAL, redémarrage : cockpit, garag
   assert.equal(await p.textContent('.reveil .sous'), voyants);
   assert.match(await p.textContent('.reveil [data-id="ville"]'), /3 garages/);
   assert.equal(await p.textContent('#mode'), 'Mes garages');
+  // Lot 7 : réglages retrouvés depuis le coffre (nouveau navigateur : rien dans son stockage local).
+  await p.evaluate(() => { location.hash = 'pilotage'; }); await p.waitForSelector('[data-pilotage="objectif"]');
+  assert.match((await p.textContent('[data-pilotage="objectif"]')).replace(/\s+/g, ' '), /20 000,00 € HT/);
+  await p.click('[data-pilotage="reglages"] summary'); assert.equal(await p.inputValue('[data-seuil="devisSansCommandeJours"]'), '14');
+  await p.evaluate(() => { location.hash = 'bureau'; }); await p.waitForSelector('.reveil');
   await capture(p, 'local-3-cockpit-retrouve');
   assert.deepEqual(await personnages(), villeAvant, 'Ville LEGO : mêmes personnages (nom, segment, alerte) qu’avant la coupure');
   assert.equal(await p.$eval('.agent', x => getComputedStyle(x).animationName), 'balance', 'animations intactes');

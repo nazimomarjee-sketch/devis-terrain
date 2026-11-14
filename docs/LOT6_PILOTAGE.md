@@ -10,7 +10,7 @@ est écrit **« Non renseigné »** avec la raison : jamais de zéro inventé.
 | Objectif mensuel | Celui que tu saisis (ex. 20 000 € HT). Absent = « Non renseigné » |
 | Reste à réaliser / Avancement | Objectif − facturé ; facturé ÷ objectif |
 | Projection fin de mois | **Estimation** : rythme des jours ouvrés écoulés × jours ouvrés du mois (fériés exclus). Pas avant 3 jours ouvrés |
-| Mois précédent | Seulement si les exports couvrent **tout** le mois précédent |
+| Mois précédent | Seulement si une **période d'export déclarée** couvre tout le mois précédent (lot 7) |
 
 Commandes, factures et encaissements restent séparés : l'encaissé (TTC, échéancier) est dans l'onglet Commerce.
 
@@ -24,7 +24,7 @@ Bouton « Repartir du dernier export seul » si tu veux tout recommencer.
 
 ## Catégories de clientèle (règles du 14/11/2026)
 - **Existant** : facturé ce mois et déjà facturé dans les 12 mois précédents.
-- **Nouveau** : facturé ce mois, jamais facturé avant — il faut un historique EBP couvrant les 12 mois précédents.
+- **Nouveau** : facturé ce mois, jamais facturé avant — il faut une période d'export déclarée couvrant les 12 mois précédents.
 - **Réactivé** : facturé ce mois, facturé avant mais pas dans les 12 mois précédents — même exigence d'historique.
 - **Non déterminé** : historique trop court pour trancher. On ne devine pas.
 - **Prospects non convertis** : garages du téléphone sans compte EBP.
@@ -45,5 +45,4 @@ calculées et la raison est affichée.
 
 ## Limites
 - Données fictives dans les tests ; aucun export réel lu (accord de Faizal requis, sur le PC ODICOLOR).
-- L'objectif est mémorisé dans ce navigateur (pas encore dans le coffre).
 - Pas testé sur le PC Windows ni sur le vrai Samsung.

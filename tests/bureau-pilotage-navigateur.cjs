@@ -37,7 +37,7 @@ test('Pilotage : import répété sans double comptage, avoir déduit, paiement 
     assert.match(await p.textContent('[data-pilotage="donnees"]'), /2 export\(s\) consolidé\(s\)/);
     assert.match(await t('[data-categorie="non_determine"]'), /2 client\(s\)/, 'historique de quelques jours : non déterminé, jamais deviné');
     assert.match((await p.textContent('[data-pilotage="recommandations"]')).replace(/\s+/g, ' '), /FA-1 échue depuis 9 jours, reste 2 000,00 € TTC/);
-    assert.match(await p.textContent('[data-pilotage="manques"]'), /12 mois/);
+    assert.match(await p.textContent('[data-pilotage="manques"]'), /12 derniers mois/);
     await p.fill('[data-pilotage="objectif-saisie"]', '20000'); await p.dispatchEvent('[data-pilotage="objectif-saisie"]', 'change');
     await p.waitForFunction(() => /20\s000,00\s€\sHT/.test(document.querySelector('[data-pilotage="objectif"]').textContent));
     assert.match(await t('[data-pilotage="reste"]'), /13 000,00 € HT/); assert.match(await t('[data-pilotage="pct"]'), /^35 %/);

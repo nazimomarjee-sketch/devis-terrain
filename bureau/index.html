@@ -321,6 +321,7 @@ select.recherche{appearance:auto}
 /* Hors du bloc verrouillé de la Ville (test d'invariance) : barre d'onglets du Bureau (lots 4 à 6). Au format téléphone,
    les onglets passent sur plusieurs rangées : jamais de défilement horizontal de la page. */
 @media (max-width:720px){.onglets{flex-wrap:wrap;row-gap:6px}.onglet{flex:1 1 30%;min-width:0;min-height:44px}}
+.assistant .carte-bilan{background:#16181C;border-radius:16px;padding:12px;margin:10px 0}.assistant ul{padding-left:18px}
 </style>
 <header class="entete">
   <div class="entete-l1 gouttiere">
@@ -366,6 +367,7 @@ select.recherche{appearance:auto}
 <script src="studio.js"></script>
 <script src="commerce.js"></script>
 <script src="performance.js"></script>
+<script src="assistant-import.js"></script>
 <script src="decisions-comptes.js"></script>
 <script src="verifier-comptes.js"></script>
 <script src="ville/modele-commune.js"></script>
@@ -1128,6 +1130,11 @@ function monterRecherche(){
 const jourIso = (d = new Date()) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 etat.ebp = { pieces:null, reglements:null, clients:null, arrete: jourIso(), arreteConfirmee:false, erreur:{}, lotsPieces:[] };
 etat.perfDecisions = []; // Lot 6 : décisions du responsable sur les recommandations (enregistrées dans le coffre)
+// Lot 7 : réglages du pilotage (objectif mensuel, seuils) enregistrés dans le coffre ; l'objectif reste aussi mémorisé dans ce navigateur.
+etat.reglagesPilotage = null;
+function reglagesPilotage(){ if (!etat.reglagesPilotage) etat.reglagesPilotage = Performance.reglages({ objectifCents: etat.objectifCents }); return etat.reglagesPilotage; }
+function changerReglages(m){ const r = Performance.reglages(Object.assign({}, reglagesPilotage(), m, { seuils: Object.assign({}, reglagesPilotage().seuils, m.seuils || {}), modifieLe: new Date().toISOString() }));
+  etat.reglagesPilotage = r; etat.objectifCents = r.objectifCents; ecrireLocal('odicolor-objectif-mensuel-ht', r.objectifCents ? String(r.objectifCents) : ''); signalerChangement(); return r; }
 // Lot 1 (13/11/2026) : la date de l'export n'est plus « aujourd'hui » par défaut dès qu'un fichier est chargé. Elle est proposée
 // d'après la date du fichier le plus ANCIEN chargé (le plus prudent), jamais dans le futur, et reste « non confirmée » tant que
 // l'utilisateur ne l'a pas saisie lui-même. Chaque import garde sa provenance (nom, taille, date du fichier, empreinte SHA-256).
@@ -1167,7 +1174,7 @@ async function lireTableau(f){
   }
   return EbpImport.lireCsv(EbpImport.decoderTexte(buf).texte);
 }
-async function importerEbp(type, f){
+async function importerEbp(type, f, options = {}){
   if (!f) return;
   delete etat.ebp.erreur[type];
   try {
@@ -1175,13 +1182,14 @@ async function importerEbp(type, f){
     const fn = EXPORTS.find(x => x[0] === type)[2];
     const r = EbpImport[fn](await lireTableau(f));
     const dateFichier = f.lastModified ? jourIso(new Date(f.lastModified)) : null;
-    const prov = { fichier: f.name, nature: type, taille: f.size, dateFichier, importeLe: new Date().toISOString(), empreinte: await empreinteFichier(f), lues: r.lues, ecartees: r.ignorees.length };
+    const prov = { fichier: f.name, nature: type, taille: f.size, dateFichier, importeLe: new Date().toISOString(), empreinte: await empreinteFichier(f), lues: r.lues, ecartees: r.ignorees.length,
+      periode: Performance.periodeValide(options.periode) ? { du: options.periode.du, au: options.periode.au, declareeLe: new Date().toISOString() } : null }; // lot 7 : période déclarée
     if (type === 'pieces') {
       // Lot 6 : les exports de pièces successifs s'ajoutent (historique), sans double comptage (performance.js, consolider).
       if (!etat.ebp.lotsPieces.length && etat.ebp.pieces) etat.ebp.lotsPieces.push(etat.ebp.pieces); // pièces retrouvées dans le coffre
       etat.ebp.lotsPieces.push(Object.assign(r, { fichier: f.name, provenance: prov }));
       const C = Performance.consolider(etat.ebp.lotsPieces);
-      etat.ebp.pieces = Object.assign({}, r, { pieces: C.pieces, avoirs: C.avoirs, ignorees: C.ignorees, liens: C.liens, consolidation: { imports: C.imports, modifiees: C.modifiees, doublonsFichier: C.doublonsFichier, couverture: C.couverture, dernierImport: C.dernierImport } });
+      etat.ebp.pieces = Object.assign({}, r, { pieces: C.pieces, avoirs: C.avoirs, ignorees: C.ignorees, liens: C.liens, consolidation: { imports: C.imports, modifiees: C.modifiees, doublonsFichier: C.doublonsFichier, couverture: C.couverture, dernierImport: C.dernierImport, periodes: C.periodes, nonDeclares: C.nonDeclares, horsPeriode: C.horsPeriode } });
     } else etat.ebp[type] = Object.assign(r, {fichier: f.name, provenance: prov});
     proposerArrete();
   } catch (e) { etat.ebp.erreur[type] = e.message + (etat.ebp[type] ? ' Le fichier chargé avant (' + etat.ebp[type].fichier + ') reste utilisé.' : ''); } // un fichier refusé ne fait jamais perdre le précédent
@@ -1241,6 +1249,7 @@ function vueBureau(){
   const imports = h('section',{class:'bloc'}, h('div',{class:'titre-bloc'},'Exports EBP'),
     h('p',{class:'info'}, 'Charge tes exports EBP (CSV ou Excel). Lecture seule : rien n’est modifié ni envoyé. ',
       etat.telephone ? h('b',{}, (etat.telephone.devis || []).length + ' devis du téléphone pris en compte.') : 'Charge aussi ta sauvegarde téléphone (bouton Démo / Mes garages) pour relier tes devis.'),
+    h('a',{class:'btn principal', href:'#import-ebp', 'data-assistant':'ouvrir'}, 'Assistant d’import pas à pas'), ' ',
     h('label',{class:'info', for:'ebp-arrete'}, 'Date de l’export EBP '), h('input',{type:'date', id:'ebp-arrete', class:'recherche', value:E.arrete, max:jourIso(), onchange:ev => { E.arrete = ev.target.value; E.arreteConfirmee = !!ev.target.value; connecterVille(); rendre(); signalerChangement(); }}),
     controlesArrete().map(t => h('div',{class:'message ' + (/fausse/.test(t) ? 'erreur' : 'info'), role:'status'}, t)),
     h('div',{class:'deps'}, EXPORTS.map(champ)));
@@ -1336,7 +1345,7 @@ function blocCA(r){
     ...(r.incomplets || []).map(t => h('p',{class:'ca-alerte'}, '⚠ ' + t)),
     h('p',{class:'ca-detail', style:'margin-top:8px'}, CaFacture.fraicheur(r)),
     h('div',{}, saisie('Objectif mensuel HT (€)', 'objectif', obj ? String(obj / 100) : '', t => { const n = Math.round(Number(t.replace(/\s/g,'').replace(',','.')) * 100);
-        etat.objectifCents = n > 0 ? n : null; ecrireLocal('odicolor-objectif-mensuel-ht', etat.objectifCents ? String(etat.objectifCents) : ''); rendre(); }, 'à saisir'),
+        changerReglages({ objectifCents: n > 0 ? n : null }); rendre(); }, 'à saisir'),
       saisie('Mon code représentant EBP', 'commercial', etat.monCommercial, t => { etat.monCommercial = t.slice(0, 40); ecrireLocal('odicolor-mon-code-representant', etat.monCommercial); rendre(); }, 'non renseigné')));
 }
 etat.mvCompte = 'tous'; etat.mvChoix = null;
@@ -1532,6 +1541,7 @@ function route(){
   if (hs === '#studio') return {ecran:'studio'};
   if (hs === '#commerce') return {ecran:'commerce'};
   if (hs === '#pilotage') return {ecran:'pilotage'};
+  if (hs === '#import-ebp') return {ecran:'import-ebp'};
   if (hs === '#a-classer') return {ecran:'a-classer'};
   if (hs === '#verifier-comptes') return {ecran:'verifier-comptes'};
   const mv = /^#commune-(\d{5})$/.exec(hs); if (mv) return {ecran:'commune', insee:mv[1]};
@@ -1549,6 +1559,42 @@ const telechargerFichier = (contenu, nom, type) => { const a = h('a',{href:URL.c
 // Demandes du téléphone reliées aux pièces EBP par identifiant seulement (bureau/commerce.js). Lecture seule, rien n'est envoyé.
 // ================= Lot 6 : Pilotage de la performance (14/11/2026) =================
 // Règles écrites dans bureau/performance.js (pas d'IA). Chaque chiffre : source EBP ou « Non renseigné » avec la cause.
+// ================= Lot 7 : assistant d'import EBP, pas à pas (14/11/2026) =================
+etat.assistant = { etape: 0, periode: null };
+function vueAssistantImport(){
+  const A = AssistantImport, E = etat.ebp, S = etat.assistant, et = A.ETAPES[S.etape], gros = 'min-height:56px';
+  if (!S.periode) { const a = E.arrete || jourIso(); S.periode = { du: (Number(a.slice(0,4)) - 1) + a.slice(4,7) + '-01', au: a }; }
+  const aller = n => { S.etape = Math.max(0, Math.min(A.ETAPES.length - 1, n)); rendre(); };
+  const NIV = { ok:['Prêt','b-confirme'], attention:['À vérifier','b-alerte'], erreur:['Problème','b-alerte'] };
+  const carteBilan = (type) => { const b = A.bilanFichier(type, E[type], type === 'pieces' && E.pieces ? E.pieces.consolidation : null);
+    if (E.erreur[type]) return h('div',{class:'message erreur', 'data-assistant':'erreur-' + type}, 'Fichier refusé : ' + E.erreur[type]);
+    if (!b.charge) return h('p',{class:'info', 'data-assistant':'bilan-' + type}, 'Pas encore chargé.');
+    return h('div',{class:'carte-bilan', 'data-assistant':'bilan-' + type}, h('p',{}, h('span',{class:'badge ' + NIV[b.niveau][1]}, NIV[b.niveau][0]), ' ', b.fichier + ' : ' + b.lues + ' ligne(s) lue(s), ' + b.retenues + ' retenue(s), ' + b.ecartees + ' écartée(s)'),
+      b.motifs.length ? h('ul',{}, b.motifs.slice(0, 6).map(m => h('li',{}, m.n + ' × ' + m.motif))) : null,
+      b.absentes.length ? h('div',{}, h('b',{}, 'Colonnes absentes et conséquences :'), h('ul',{}, b.absentes.map(x => h('li',{}, x.libelle + ' — ' + x.consequence)))) : null,
+      b.corrections.length ? h('div',{}, h('b',{}, 'Corrections détectées :'), h('ul',{}, b.corrections.map(x => h('li',{}, x)))) : null); };
+  const fichier = (type, opts) => h('label',{class:'btn principal', style:gros}, 'Choisir le fichier', h('input',{type:'file', accept:'.csv,.txt,.xlsx,.xls', hidden:true, 'data-assistant':'fichier-' + type,
+    onchange:async ev => { const f = ev.target.files[0]; ev.target.value = ''; if (f) await importerEbp(type, f, opts ? opts() : {}); }}));
+  let corps;
+  if (et.id === 'arrete') corps = [h('label',{class:'studio-champ'}, h('span',{}, 'Date des exports'), h('input',{type:'date', class:'recherche', value:E.arrete, max:jourIso(), 'data-assistant':'arrete',
+    onchange:ev => { E.arrete = ev.target.value; E.arreteConfirmee = !!ev.target.value; S.periode = null; connecterVille(); signalerChangement(); rendre(); }})),
+    h('p',{class:'info'}, E.arreteConfirmee ? 'Date confirmée.' : 'À confirmer : saisis la date à laquelle tu as fait les exports.')];
+  else if (et.id === 'pieces') { const du = h('input',{type:'date', class:'recherche', value:S.periode.du, 'data-assistant':'periode-du', onchange:ev => { S.periode.du = ev.target.value; }}),
+      au = h('input',{type:'date', class:'recherche', value:S.periode.au, 'data-assistant':'periode-au', onchange:ev => { S.periode.au = ev.target.value; }});
+    corps = [h('p',{class:'info'}, 'Indique la période choisie dans EBP pour cet export. Elle seule prouve qu’un mois est complet (un mois sans pièce peut être un mois non exporté).'),
+      h('div',{class:'studio-grille'}, h('label',{class:'studio-champ'}, h('span',{}, 'Exporté du'), du), h('label',{class:'studio-champ'}, h('span',{}, 'au'), au)),
+      fichier('pieces', () => ({ periode: { du: S.periode.du, au: S.periode.au } })), carteBilan('pieces')]; }
+  else if (et.id === 'bilan') { const manque = A.donneesAbsentes(E);
+    corps = [h('div',{'data-assistant':'bilan-final'}, ['clients','pieces','reglements'].map(t => h('div',{}, h('h3',{}, A.ETAPES.find(x => x.id === t).titre), carteBilan(t))),
+      h('h3',{}, 'Données absentes'), manque.length ? h('ul',{'data-assistant':'absentes'}, manque.map(m => h('li',{}, m))) : h('p',{class:'info', 'data-assistant':'absentes'}, 'Rien ne manque pour le pilotage.')),
+      h('div',{class:'actions'}, h('a',{class:'btn principal', href:'#pilotage', style:gros}, 'Voir le pilotage'), h('a',{class:'btn', href:'#commerce', style:gros}, 'Voir le commerce'))]; }
+  else corps = [fichier(et.id), carteBilan(et.id)];
+  return h('div',{class:'ecran'}, h('div',{class:'panneau'}, h('section',{class:'bloc assistant', 'data-assistant':'etape-' + et.id},
+    h('div',{class:'titre-bloc'}, 'Import EBP · étape ' + (S.etape + 1) + ' sur ' + A.ETAPES.length + ' · ' + et.titre), h('p',{class:'sous'}, et.aide), corps,
+    h('div',{class:'actions'}, S.etape > 0 ? h('button',{class:'btn discret', style:gros, 'data-assistant':'precedent', onclick:() => aller(S.etape - 1)}, 'Précédent') : null,
+      S.etape < A.ETAPES.length - 1 ? h('button',{class:'btn', style:gros, 'data-assistant':'suivant', onclick:() => aller(S.etape + 1)}, 'Suivant') : null),
+    h('p',{class:'regle'}, 'Lecture seule : rien n’est modifié dans EBP ni envoyé. Fichiers réels : seulement sur le PC ODICOLOR, avec l’accord de la direction.'))));
+}
 function vuePilotage(){
   const E = etat.ebp, P = Performance, eu = c => c == null ? 'Non renseigné' : CaFacture.euros(c), aujourdhui = jourIso();
   const pieces = E.pieces ? E.pieces.pieces : [], avoirs = E.pieces ? E.pieces.avoirs : [], cons = E.pieces && E.pieces.consolidation;
@@ -1556,10 +1602,11 @@ function vuePilotage(){
   let ca = null; try { ca = caAccueil(); } catch (e) { ca = null; }
   if (ca && ca.fictif) ca = { statut:'non_renseigne', motif:'Démo : chiffres fictifs. Charge tes exports EBP.' };
   let caPrec = null; if (E.pieces && E.arrete) { try { caPrec = CaFacture.calculer({ pieces, avoirs, ignorees:E.pieces.ignorees, arrete:E.arrete, aujourdhui:P.utils.moisPrec(aujourdhui) }); } catch (e) { caPrec = null; } }
-  const O = P.objectif({ ca, caPrec, objectifCents: etat.objectifCents || null, aujourdhui, joursOuvres: Pipeline.joursOuvres, couverture });
+  const periodes = cons && cons.periodes ? cons.periodes : [], RG = reglagesPilotage();
+  const O = P.objectif({ ca, caPrec, objectifCents: etat.objectifCents || null, aujourdhui, joursOuvres: Pipeline.joursOuvres, periodes });
   const tuile = (lib, val, cle, note, badge) => h('div',{class:'kpi', 'data-pilotage':cle}, h('b',{}, val), h('span',{}, lib, badge ? h('em',{class:'badge b-alerte', style:'margin-left:6px'}, badge) : null), note ? h('small',{class:'info'}, note) : null);
   const objectifSaisie = h('input',{class:'recherche', inputmode:'numeric', placeholder:'Objectif € HT / mois (ex. 20000)', 'data-pilotage':'objectif-saisie', value: etat.objectifCents ? String(etat.objectifCents / 100) : '',
-    onchange:ev => { const n = Math.round(Number(String(ev.target.value).replace(/\s/g,'').replace(',','.')) * 100); etat.objectifCents = n > 0 ? n : null; ecrireLocal('odicolor-objectif-mensuel-ht', etat.objectifCents ? String(etat.objectifCents) : ''); rendre(); }});
+    onchange:ev => { const n = Math.round(Number(String(ev.target.value).replace(/\s/g,'').replace(',','.')) * 100); changerReglages({ objectifCents: n > 0 ? n : null }); rendre(); }});
   const synthese = h('section',{class:'bloc', 'data-pilotage':'synthese'}, h('div',{class:'titre-bloc'}, 'Pilotage · ' + (ca && ca.libelleMois ? ca.libelleMois : 'mois en cours')),
     h('div',{class:'kpis-commerce'},
       tuile('Facturé HT ce mois (factures − avoirs, EBP)', eu(O.faitCents), 'fait', O.faitCents == null ? (ca && ca.motif) : null),
@@ -1572,12 +1619,15 @@ function vuePilotage(){
     O.motifs.length ? h('ul',{class:'info'}, O.motifs.map(m => h('li',{}, m))) : null);
   const donnees = h('details',{class:'bloc', 'data-pilotage':'donnees'}, h('summary',{class:'titre-bloc'}, 'Données utilisées'),
     h('p',{class:'info'}, E.pieces ? 'Dernier import des pièces : ' + ((cons && cons.dernierImport && cons.dernierImport.fichier) || E.pieces.fichier || '?') + ((cons && cons.dernierImport && cons.dernierImport.le) ? ' le ' + new Date(cons.dernierImport.le).toLocaleString('fr-FR') : '') + ' · ' + (cons ? cons.imports : 1) + ' export(s) consolidé(s)' : 'Aucun export de pièces EBP chargé.'),
-    h('p',{class:'info', 'data-pilotage':'couverture'}, couverture ? 'Couverture des pièces : du ' + frDate(couverture.debut) + ' au ' + frDate(couverture.fin) + ' · date d’export ' + frDate(E.arrete) + (E.arreteConfirmee ? '' : ' (à confirmer)') : 'Couverture : aucune pièce.'),
+    h('p',{class:'info', 'data-pilotage':'couverture'}, (periodes.length ? 'Périodes d’export déclarées : ' + periodes.map(x => 'du ' + frDate(x.du) + ' au ' + frDate(x.au)).join(' · ') : 'Aucune période d’export déclarée : comparaisons et catégories bloquées.') + (couverture ? ' · pièces du ' + frDate(couverture.debut) + ' au ' + frDate(couverture.fin) : '') + ' · date d’export ' + frDate(E.arrete) + (E.arreteConfirmee ? '' : ' (à confirmer)')),
+    cons && cons.nonDeclares ? h('p',{class:'ca-alerte'}, cons.nonDeclares + ' export(s) de pièces sans période déclarée : passe par l’assistant d’import pour la déclarer.') : null,
+    cons && cons.horsPeriode && cons.horsPeriode.length ? h('p',{class:'ca-alerte'}, cons.horsPeriode.length + ' pièce(s) hors de la période déclarée : ' + cons.horsPeriode.slice(0, 6).map(x => x.no).join(', ')) : null,
+    h('a',{class:'btn', href:'#import-ebp', 'data-pilotage':'assistant'}, 'Assistant d’import EBP (pas à pas)'),
     cons && cons.doublonsFichier.length ? h('p',{class:'info'}, 'Fichier(s) déjà importé(s), ignoré(s) : ' + cons.doublonsFichier.join(', ')) : null,
     cons && cons.modifiees.length ? h('p',{class:'ca-alerte'}, cons.modifiees.length + ' pièce(s) modifiée(s) entre deux exports (la plus récente fait foi) : ' + cons.modifiees.map(m => m.no).join(', ')) : null,
     E.pieces && !E.pieces.liens ? h('p',{class:'ca-alerte'}, 'Liens entre pièces absents (colonne « pièce d’origine ») : devis → commande → facture non reliables.') : null,
     E.lotsPieces.length > 1 ? h('button',{class:'btn discret', onclick:() => { const d = E.lotsPieces[E.lotsPieces.length - 1]; E.lotsPieces = [d]; E.pieces = Object.assign({}, d); connecterVille(); rendre(); signalerChangement(); }}, 'Repartir du dernier export seul') : null);
-  const K = P.categories({ pieces, avoirs, couverture, aujourdhui, garages: etat.mode === 'reel' && etat.garagesTelephone ? etat.garagesTelephone : [] });
+  const K = P.categories({ pieces, avoirs, periodes, aujourdhui, garages: etat.mode === 'reel' && etat.garagesTelephone ? etat.garagesTelephone : [] });
   const LIBC = { existant:'Clients existants', nouveau:'Nouveaux clients', reactive:'Anciens clients réactivés', non_determine:'Non déterminé' };
   const categories = h('section',{class:'bloc', 'data-pilotage':'categories'}, h('div',{class:'titre-bloc'}, 'Facturé par catégorie de clientèle'),
     h('div',{class:'liste', style:'max-height:none'}, Object.entries(LIBC).map(([k,l]) => h('div',{class:'ligne', 'data-categorie':k}, h('span',{}, l, h('small',{}, K.lignes[k].nb + ' client(s)' + (K.lignes[k].clients[0] ? ' · ex. ' + K.lignes[k].clients.slice(0,3).map(c => c.client).join(', ') : ''))), h('b',{}, eu(K.lignes[k].htCents)))),
@@ -1585,8 +1635,8 @@ function vuePilotage(){
     K.sansCode ? h('p',{class:'info'}, K.sansCode + ' facture(s) sans code client (' + eu(K.sansCodeCents) + ') : non classées.') : null,
     K.avoirsSansFactureCents ? h('p',{class:'info'}, 'Avoirs de clients non facturés ce mois : ' + eu(K.avoirsSansFactureCents) + ' (non classés).') : null,
     h('details',{class:'info'}, h('summary',{}, 'Règles de classement (datées du ' + frDate(K.regles.date) + ')'), Object.entries(LIBC).concat([['prospect','Prospects']]).map(([k,l]) => h('p',{}, h('b',{}, l + ' : '), K.regles[k])),
-      h('p',{}, K.historiqueSuffisant ? 'Historique suffisant (depuis ' + frDate(couverture.debut) + ').' : 'Historique EBP insuffisant (il faut des pièces depuis le ' + frDate(K.fenetreDebut) + ') : classement « Non déterminé ».')));
-  const R = P.recommandations({ pieces, reglements: E.reglements ? E.reglements.reglements : null, clientsEbp: E.clients ? E.clients.clients : [], demandes: (etat.telephone && etat.telephone.demandes) || [], liens: !!(E.pieces && E.pieces.liens), arrete: E.arrete || aujourdhui, couverture });
+      h('p',{}, K.historiqueSuffisant ? 'Historique suffisant : période d’export déclarée depuis le ' + frDate(K.fenetreDebut) + ' au moins.' : 'Historique insuffisant : il faut une période d’export DÉCLARÉE couvrant depuis le ' + frDate(K.fenetreDebut) + ' (assistant d’import) : classement « Non déterminé ».')));
+  const R = P.recommandations({ pieces, reglements: E.reglements ? E.reglements.reglements : null, clientsEbp: E.clients ? E.clients.clients : [], demandes: (etat.telephone && etat.telephone.demandes) || [], liens: !!(E.pieces && E.pieces.liens), arrete: E.arrete || aujourdhui, periodes, seuils: RG.seuils });
   const LIBR = { garage_a_visiter:'À visiter', devis_a_relancer:'Devis à relancer', dormant_a_reactiver:'Dormant à réactiver', commande_bloquee:'Commande bloquée', facture_a_surveiller:'Facture à surveiller' };
   const decider = (id, decision) => { try { etat.perfDecisions = P.decider(etat.perfDecisions, { id, decision, le:new Date().toISOString() }); signalerChangement(); rendre(); } catch (e) { alert(e.message); } };
   const reco = h('section',{class:'bloc', 'data-pilotage':'recommandations'}, h('div',{class:'titre-bloc'}, 'Priorités · ' + R.liste.length),
@@ -1596,14 +1646,22 @@ function vuePilotage(){
         d ? h('span',{class:'badge ' + (d.decision === 'valide' ? 'b-confirme' : 'b-vide')}, d.decision === 'valide' ? 'Validée' : 'Écartée') :
           h('span',{class:'actions'}, h('button',{class:'btn', 'data-decision':'valide', onclick:() => decider(x.id, 'valide')}, 'Valider'), h('button',{class:'btn discret', 'data-decision':'ecarte', onclick:() => decider(x.id, 'ecarte')}, 'Écarter'))); })) : h('p',{class:'info'}, 'Aucune priorité détectée avec les données chargées.'),
     R.manques.length ? h('ul',{class:'info', 'data-pilotage':'manques'}, R.manques.map(m => h('li',{}, m))) : null);
-  return h('div',{class:'ecran'}, h('div',{class:'panneau'}, synthese, reco, categories, donnees));
+  const champsSeuils = Object.entries({ devisSansCommandeJours:'Devis EBP sans commande, relance après (jours)', demandeRelanceJours:'Devis envoyé sans réponse, relance après (jours)', commandeSansFactureJours:'Commande non facturée, alerte après (jours)', dormantMinJours:'Dormant : sans facture depuis au moins (jours)', dormantMaxJours:'Dormant : au plus (jours)' })
+    .map(([k,l]) => h('label',{class:'studio-champ'}, h('span',{}, l + ' · ' + P.BORNES[k][0] + ' à ' + P.BORNES[k][1]), h('input',{class:'recherche', type:'number', inputmode:'numeric', value:RG.seuils[k], 'data-seuil':k})));
+  const msgR = h('p',{class:'info', 'data-pilotage':'reglages-message', 'aria-live':'polite'}, RG.erreurs.length ? RG.erreurs.join(' · ') : RG.modifieLe ? 'Réglages enregistrés le ' + new Date(RG.modifieLe).toLocaleString('fr-FR') : 'Réglages par défaut.');
+  const reglagesBloc = h('details',{class:'bloc', 'data-pilotage':'reglages'}, h('summary',{class:'titre-bloc'}, 'Réglages des priorités'), champsSeuils,
+    h('div',{class:'actions'}, h('button',{class:'btn', 'data-pilotage':'enregistrer-reglages', onclick:() => { const seuils = {}; document.querySelectorAll('[data-seuil]').forEach(i => { seuils[i.dataset.seuil] = i.value; });
+      const r = changerReglages({ seuils }); rendre(); setTimeout(() => { const m = document.querySelector('[data-pilotage="reglages-message"]'); if (m && r.erreurs.length) m.textContent = 'Corrigé : ' + r.erreurs.join(' · '); }); }}, 'Enregistrer les réglages'),
+      h('button',{class:'btn discret', onclick:() => { changerReglages({ seuils: Object.assign({}, P.SEUILS) }); rendre(); }}, 'Valeurs par défaut')),
+    msgR, h('p',{class:'regle'}, 'Objectif et réglages sont enregistrés dans le coffre de l’application locale et restaurés avec lui.'));
+  return h('div',{class:'ecran'}, h('div',{class:'panneau'}, synthese, reco, categories, donnees, reglagesBloc));
 }
 function vueCommerce(){
   const E = etat.ebp, demandes = (etat.telephone && Array.isArray(etat.telephone.demandes)) ? etat.telephone.demandes : [];
   const suivi = Commerce.suivre({ demandes, pieces: E.pieces ? E.pieces.pieces : null, avoirs: E.pieces ? E.pieces.avoirs : [], reglements: E.reglements ? E.reglements.reglements : null, clientsEbp: E.clients ? E.clients.clients : [], liens: !!(E.pieces && E.pieces.liens) });
   let ca = null; try { ca = caAccueil(); } catch (e) { ca = null; }
   if (ca && ca.fictif) ca = { statut:'non_renseigne', motif:'Démo : chiffres fictifs, jamais affichés comme ton CA. Charge tes exports EBP.' };
-  const T = Commerce.tableau({ suivi, demandes, ca, objectifCents: etat.objectifCents || null, liens: !!(E.pieces && E.pieces.liens), aujourdhui: jourIso() });
+  const T = Commerce.tableau({ suivi, demandes, ca, objectifCents: etat.objectifCents || null, liens: !!(E.pieces && E.pieces.liens), aujourdhui: jourIso(), relanceJours: reglagesPilotage().seuils.demandeRelanceJours });
   const eu = c => c == null ? 'Non renseigné' : CaFacture.euros(c), ttc = c => c == null ? 'Non renseigné' : CaFacture.euros(c).replace(' HT', ' TTC');
   const tuile = (lib, val, cle, note) => h('div',{class:'kpi', 'data-commerce':cle}, h('b',{}, val), h('span',{}, lib), note ? h('small',{class:'info'}, note) : null);
   const ETQ = { demande:'Demandé (téléphone)', devis_ebp:'Devis EBP', commande:'Commande confirmée (EBP)', facture:'Facturé (EBP)', encaisse:'Encaissé' };
@@ -1702,9 +1760,9 @@ function rendre(){
   if (r.porte) etat.choix = r.porte.id;
   if (r.ecran !== 'carte' && carte) { carte.remove(); carte = null; }
   rendreEntete(); rendreKpis(); rendreFiltres();
-  $('#kpis').hidden = ['simulation','bureau','studio','commerce','pilotage','commune','communes','verifier-comptes'].includes(r.ecran);
+  $('#kpis').hidden = ['simulation','bureau','studio','commerce','pilotage','import-ebp','commune','communes','verifier-comptes'].includes(r.ecran);
   $('#vue').replaceChildren(r.ecran === 'verifier-comptes' ? vueVerifierComptes() : ['commune','communes'].includes(r.ecran) ? (sansSourceMV() || (r.ecran === 'commune' ? vueCommuneMV(r.insee) : vueCommunesMV(r.dep)))
-    : r.ecran==='carte' ? vueCarte(r.D, r.porte) : r.ecran==='simulation' ? vueSimulation() : r.ecran==='bureau' ? vueBureau() : r.ecran==='studio' ? vueStudio() : r.ecran==='commerce' ? vueCommerce() : r.ecran==='pilotage' ? vuePilotage() : r.ecran==='a-classer' ? vueAClasser() : vueVille());
+    : r.ecran==='carte' ? vueCarte(r.D, r.porte) : r.ecran==='simulation' ? vueSimulation() : r.ecran==='bureau' ? vueBureau() : r.ecran==='studio' ? vueStudio() : r.ecran==='commerce' ? vueCommerce() : r.ecran==='pilotage' ? vuePilotage() : r.ecran==='import-ebp' ? vueAssistantImport() : r.ecran==='a-classer' ? vueAClasser() : vueVille());
   rendreFil();
   const sc = document.getElementById('scene'); if (sc && sc.scrollWidth > sc.clientWidth) { const t = TERRITOIRES.find(x=>x.id===etat.choix), [px] = iso(...pos(t)); sc.scrollLeft = (px + 495) / 990 * sc.scrollWidth - sc.clientWidth/2; }
 }
@@ -1783,7 +1841,7 @@ window.OdicolorBureau = Object.freeze({
     const s = etat.sauvegardeTelephone || null, E = etat.ebp;
     etat.journalExporte = etat.decisions; // celui qui part dans le coffre : confirmé seulement si l'enregistrement réussit
     return { version:2, telephone: s && s.telephone, garagesTelephone: s && s.garages, rapport: s && s.rapport,
-      ebp: { pieces:E.pieces, reglements:E.reglements, clients:E.clients, arrete:E.arrete, arreteConfirmee:!!E.arreteConfirmee }, decisionsComptes: etat.decisions, studio: { biblio: etat.studio.biblio }, perfDecisions: etat.perfDecisions };
+      ebp: { pieces:E.pieces, reglements:E.reglements, clients:E.clients, arrete:E.arrete, arreteConfirmee:!!E.arreteConfirmee }, decisionsComptes: etat.decisions, studio: { biblio: etat.studio.biblio }, perfDecisions: etat.perfDecisions, reglagesPilotage: reglagesPilotage() };
   },
   // Décisions (sans écran au lot A ; l'écran « Vérifier les comptes » du lot B utilisera ces mêmes fonctions).
   decisions: Object.freeze({
@@ -1796,6 +1854,7 @@ window.OdicolorBureau = Object.freeze({
     // Version 1 (avant le lot A) : aucun journal → journal vide. Version 2 : journal relu et contrôlé, rien n'est jeté.
     if (d.studio && Array.isArray(d.studio.biblio)) etat.studio.biblio = d.studio.biblio; // Lot 4 : bibliothèque du studio
     if (Array.isArray(d.perfDecisions)) etat.perfDecisions = d.perfDecisions; // Lot 6
+    if (d.reglagesPilotage) { etat.reglagesPilotage = Performance.reglages(d.reglagesPilotage); if (etat.reglagesPilotage.objectifCents) etat.objectifCents = etat.reglagesPilotage.objectifCents; } // Lot 7 : le coffre fait foi
     const lu = DecisionsComptes.lire(d.version === 2 ? d.decisionsComptes : null);
     etat.decisions = lu.journal || d.decisionsComptes; etat.decisionsConfirmees = etat.decisions; etat.decisionsAlerte = lu.erreur ? lu.erreur + ' : conservé tel quel, nouvelles décisions bloquées.'
       : lu.illisibles.length ? lu.illisibles.length + ' décision(s) illisible(s) dans le coffre : conservées telles quelles, nouvelles décisions bloquées.' : null;
