@@ -71,7 +71,7 @@ test('encaissements : bloc TTC affiché depuis l’échéancier, distinct du CA 
   } finally { await ctx.close(); }
 });
 
-test('journal des anomalies : export CSV local des lignes écartées, avec fichier et empreinte', async () => {
+test('journal des anomalies : CSV et JSON locaux, sans données identifiantes', async () => {
   const ctx = await nav.newContext({ viewport: { width: 1440, height: 900 }, acceptDownloads: true });
   await ctx.route(/^https?:/, r => r.abort());
   const p = await ctx.newPage(), erreurs = []; p.on('pageerror', e => erreurs.push(e.message));
@@ -83,8 +83,15 @@ test('journal des anomalies : export CSV local des lignes écartées, avec fichi
     const [dl] = await Promise.all([p.waitForEvent('download'), p.click('[data-anomalies="pieces"]')]);
     const contenu = require('node:fs').readFileSync(await dl.path(), 'utf8');
     assert.match(dl.suggestedFilename(), /^anomalies-pieces-2026-11-06\.csv$/);
-    assert.match(contenu, /^﻿"Fichier";"Empreinte SHA-256"/);
-    assert.match(contenu, /"pieces-fictives\.csv";"[0-9a-f]{64}";"[^"]+";"pieces";"3";"Ligne écartée";"Montant HT ambigu/);
+    assert.match(contenu, /^﻿"Type";"Ligne";"Gravité";"Motif"/);
+    assert.match(contenu, /"pieces";"3";"rejet";"Montant illisible ou incohérent"/);
+    for (const secret of ['FA-P2', 'GARAGE FICTIF', '1.234', 'pieces-fictives.csv']) assert.ok(!contenu.includes(secret));
+    const [dlJson] = await Promise.all([p.waitForEvent('download'), p.click('[data-anomalies-json="pieces"]')]);
+    const rapport = JSON.parse(require('node:fs').readFileSync(await dlJson.path(), 'utf8'));
+    assert.equal(rapport.type, 'pieces');
+    assert.equal(rapport.rejetees, 1);
+    assert.equal(rapport.anomalies[0].ligne, 3);
+    assert.ok(!JSON.stringify(rapport).includes('FA-P2'));
     assert.deepEqual(erreurs, []);
   } finally { await ctx.close(); }
 });
