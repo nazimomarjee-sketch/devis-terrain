@@ -1143,14 +1143,20 @@ async function empreinteFichier(f){ try { const b = await f.arrayBuffer(); const
 // Lot 1 : journal des anomalies d'un import, exportable (CSV « ; », UTF-8 avec BOM pour Excel). Rien n'est envoyé : téléchargement local.
 function journalAnomalies(type){
   const r = etat.ebp[type]; if (!r) return '';
-  const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"', pv = r.provenance || {};
-  const lignes = [['Fichier','Empreinte SHA-256','Importé le','Nature','Ligne','Gravité','Motif'].map(q).join(';')];
-  for (const x of r.ignorees) lignes.push([pv.fichier || r.fichier, pv.empreinte, pv.importeLe, type, x.ligne, 'Ligne écartée', x.motif].map(q).join(';'));
-  for (const x of (r.anomalies || [])) lignes.push([pv.fichier || r.fichier, pv.empreinte, pv.importeLe, type, x.ligne, 'Anomalie', x.motif].map(q).join(';'));
+  const rapport = EbpImport.rapportAnomalies(r), q = v => '"' + String(v == null ? '' : v).replace(/"/g,'""') + '"';
+  const lignes = [['Type','Ligne','Gravité','Motif'].map(q).join(';')];
+  for (const x of rapport.anomalies) lignes.push([rapport.type,x.ligne,x.gravite,x.motif].map(q).join(';'));
   return '\ufeff' + lignes.join('\r\n') + '\r\n';
 }
 function exporterAnomalies(type){
-  const a = h('a',{href:URL.createObjectURL(new Blob([journalAnomalies(type)],{type:'text/csv;charset=utf-8'})), download:'anomalies-' + type + '-' + jourIso() + '.csv'});
+  const url = URL.createObjectURL(new Blob([journalAnomalies(type)],{type:'text/csv;charset=utf-8'}));
+  const a = h('a',{href:url, download:'anomalies-' + type + '-' + jourIso() + '.csv'});
+  document.body.appendChild(a); a.click(); a.remove();
+}
+function exporterAnomaliesJson(type){
+  const rapport = EbpImport.rapportAnomalies(etat.ebp[type]);
+  const url = URL.createObjectURL(new Blob([JSON.stringify(rapport,null,2)],{type:'application/json'}));
+  const a = h('a',{href:url, download:'rapport-anomalies-' + type + '-' + jourIso() + '.json'});
   document.body.appendChild(a); a.click(); a.remove();
 }
 function proposerArrete(){
@@ -1186,10 +1192,13 @@ async function analyserFichierEbp(type, f, options = {}){
   const lignes = options.lignes || await lireTableau(f);
   let carte = options.carte || null;
   const brut = EbpImport.analyser(type, lignes);
-  const memo = !carte ? AssistantImport.correspondancePour(correspondances(), brut.signature) : null; if (memo) carte = memo.carte;
-  const analyse = EbpImport.analyser(type, lignes, { carte: carte || {} });
+  let memo = !carte ? AssistantImport.correspondancePour(correspondances(), brut.signature) : null;
+  if (memo) { try { carte = EbpImport.appliquerCarteMemorisee(type, brut.entetes, memo.carte).carte; }
+    catch (e) { memo = null; carte = null; } }
+  const optionsLecture = { carte: carte || {}, mode: options.mode || 'tolere' };
+  const analyse = EbpImport.analyser(type, lignes, optionsLecture);
   const fn = EXPORTS.find(x => x[0] === type)[2];
-  const r = analyse.manquantes.length ? null : EbpImport[fn](lignes, { carte: carte || {} });
+  const r = analyse.manquantes.length ? null : EbpImport[fn](lignes, optionsLecture);
   const empreinte = options.empreinte || await empreinteFichier(f), dateFichier = f.lastModified ? jourIso(new Date(f.lastModified)) : null;
   const prov = r ? { fichier: f.name, nature: type, taille: f.size, dateFichier, importeLe: new Date().toISOString(), empreinte, lues: r.lues, ecartees: r.ignorees.length,
     periode: Performance.periodeValide(options.periode) ? { du: options.periode.du, au: options.periode.au, declareeLe: new Date().toISOString() } : null } : null; // lot 7 : période déclarée
@@ -1265,7 +1274,8 @@ function vueBureau(){
         h('p',{}, 'Colonnes retenues : ' + r.correspondance.map(c => c.libelle + ' ← « ' + c.colonne + ' »').join(' · ')),
         r.provenance ? h('p',{class:'provenance'}, 'Provenance : ' + r.provenance.fichier + ' · ' + Math.round(r.provenance.taille / 1024) + ' Ko · fichier du ' + frDate(r.provenance.dateFichier) + ' · importé le ' + new Date(r.provenance.importeLe).toLocaleString('fr-FR') + (r.provenance.empreinte ? ' · empreinte ' + r.provenance.empreinte.slice(0, 12) : '')) : null,
         r.anomalies && r.anomalies.length ? h('ul',{}, r.anomalies.slice(0, 50).map(x => h('li',{}, 'Ligne ' + x.ligne + ' : ' + x.motif))) : null,
-        (r.ignorees.length || (r.anomalies && r.anomalies.length)) ? h('button',{type:'button', class:'btn', 'data-anomalies':type, onclick:() => exporterAnomalies(type)}, 'Exporter le journal des anomalies (CSV)') : null,
+        (r.ignorees.length || (r.anomalies && r.anomalies.length)) ? [h('button',{type:'button',class:'btn','data-anomalies':type,onclick:()=>exporterAnomalies(type)},'Exporter le journal anonymisé (CSV)'),
+         h('button',{type:'button',class:'btn','data-anomalies-json':type,onclick:()=>exporterAnomaliesJson(type)},'Rapport anonymisé (JSON)')] : null,
         r.ignorees.length ? h('ul',{}, r.ignorees.slice(0, 50).map(x => h('li',{}, 'Ligne ' + x.ligne + ' : ' + x.motif))) : null,
         type === 'pieces' && !r.liens ? h('div',{class:'message erreur'}, 'Colonne « pièce d’origine » absente : impossible de relier devis, commandes, livraisons et factures. Les retards ne sont pas fiables.') : null,
         r.avoirs && r.avoirs.length ? h('p',{}, r.avoirs.length + ' avoir(s) lu(s), non déduit(s) du CA (règle à valider) : ' + r.avoirs.map(x => x.no).join(', ')) : null) : null); };
