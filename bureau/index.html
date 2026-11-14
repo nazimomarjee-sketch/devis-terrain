@@ -1837,7 +1837,13 @@ function vueStudio(){
   setTimeout(majApercu);
   return h('div',{class:'ecran'}, h('div',{class:'panneau studio'}, form, h('section',{class:'bloc'}, h('div',{class:'titre-bloc'}, 'Aperçu'), apercu, telechargements), biblio, propositions));
 }
+// Un changement de champ peut provoquer un blur pendant replaceChildren : éviter
+// qu'un second rendu retire à nouveau les mêmes nœuds (observé en CI Chromium).
+let renduEnCours = false, renduDiffere = false;
 function rendre(){
+  if (renduEnCours) { renduDiffere = true; return; }
+  renduEnCours = true;
+  try {
   const r = route();
   if (r.porte) etat.choix = r.porte.id;
   if (r.ecran !== 'carte' && carte) { carte.remove(); carte = null; }
@@ -1847,6 +1853,10 @@ function rendre(){
     : r.ecran==='carte' ? vueCarte(r.D, r.porte) : r.ecran==='simulation' ? vueSimulation() : r.ecran==='bureau' ? vueBureau() : r.ecran==='studio' ? vueStudio() : r.ecran==='commerce' ? vueCommerce() : r.ecran==='pilotage' ? vuePilotage() : r.ecran==='import-ebp' ? vueAssistantImport() : r.ecran==='controle' ? vueControle() : r.ecran==='a-classer' ? vueAClasser() : vueVille());
   rendreFil();
   const sc = document.getElementById('scene'); if (sc && sc.scrollWidth > sc.clientWidth) { const t = TERRITOIRES.find(x=>x.id===etat.choix), [px] = iso(...pos(t)); sc.scrollLeft = (px + 495) / 990 * sc.scrollWidth - sc.clientWidth/2; }
+  } finally {
+    renduEnCours = false;
+    if (renduDiffere) { renduDiffere = false; queueMicrotask(rendre); }
+  }
 }
 
 // ================= Import (lecture seule) =================
