@@ -43,6 +43,27 @@
       ['famille', 'Famille / activité (carrosserie, mécanique)', /famille|categorie|activite|type de client|secteur/, false],
       // Portefeuille : sert seulement à distinguer le CA personnel du CA de l'agence. Jamais « Nom commercial » (enseigne).
       ['commercial', 'Représentant / commercial', /^(code )?(representant|commercial|vendeur)$|representant|^portefeuille|^vendeur|^commercial (attitre|affecte)/, false]
+    ],
+    // FEC : en-têtes comptables reconnus, sans alimentation des chiffres commerciaux.
+    fec: [
+      ['journalCode','Code journal',/^journal ?code$/,true],
+      ['journalLib','Libellé journal',/^journal ?lib$/,false],
+      ['ecritureNum','N° écriture',/^ecriture ?num$/,false],
+      ['ecritureDate','Date écriture',/^ecriture ?date$/,true],
+      ['compteNum','N° compte',/^compte ?num$/,true],
+      ['compteLib','Libellé compte',/^compte ?lib$/,false],
+      ['compAuxNum','Compte auxiliaire',/^comp ?aux ?num$/,false],
+      ['compAuxLib','Libellé auxiliaire',/^comp ?aux ?lib$/,false],
+      ['pieceRef','Référence pièce',/^piece ?ref$/,false],
+      ['pieceDate','Date pièce',/^piece ?date$/,false],
+      ['ecritureLib','Libellé écriture',/^ecriture ?lib$/,false],
+      ['debit','Débit',/^debit$/,true],
+      ['credit','Crédit',/^credit$/,true],
+      ['ecritureLet','Lettrage',/^ecriture ?let$/,false],
+      ['dateLet','Date lettrage',/^date ?let$/,false],
+      ['validDate','Date validation',/^valid ?date$/,false],
+      ['montantdevise','Montant devise',/^montant ?devise$/,false],
+      ['idevise','Identifiant devise',/^idevise$/,false]
     ]
   };
 
@@ -60,17 +81,26 @@
   function lireCsv(t) {
     t = String(t).replace(/^﻿/, '');
     const premiere = t.split(/\r?\n/, 1)[0];
-    const sep = [';', '\t', ','].map(d => [d, premiere.split(d).length]).sort((a, b) => b[1] - a[1])[0][0];
-    const lignes = []; let ligne = [], cur = '', q = false;
+    const sep = [';', '\t', ',', '|'].map(d => [d, premiere.split(d).length]).sort((a, b) => b[1] - a[1])[0][0];
+    const lignes = []; let ligne = [], cur = '', q = false, physique = 1, debut = 1;
+    const ajouter = () => {
+      ligne.push(cur);
+      if (ligne.some(x => x !== '')) {
+        Object.defineProperty(ligne, 'lignePhysique', { value: debut, enumerable: false });
+        lignes.push(ligne);
+      }
+      ligne = []; cur = '';
+    };
     for (let i = 0; i < t.length; i++) {
       const c = t[i];
-      if (q) { if (c === '"' && t[i + 1] === '"') { cur += '"'; i++; } else if (c === '"') q = false; else cur += c; }
+      if (q) { if (c === '"' && t[i + 1] === '"') { cur += '"'; i++; } else if (c === '"') q = false;
+        else { cur += c; if (c === '\n' || (c === '\r' && t[i + 1] !== '\n')) physique++; } }
       else if (c === '"') q = true;
       else if (c === sep) { ligne.push(cur); cur = ''; }
-      else if (c === '\n' || c === '\r') { if (c === '\r' && t[i + 1] === '\n') i++; ligne.push(cur); cur = ''; if (ligne.some(x => x !== '')) lignes.push(ligne); ligne = []; }
+      else if (c === '\n' || c === '\r') { if (c === '\r' && t[i + 1] === '\n') i++; ajouter(); physique++; debut = physique; }
       else cur += c;
     }
-    ligne.push(cur); if (ligne.some(x => x !== '')) lignes.push(ligne);
+    ajouter();
     return lignes;
   }
 
@@ -151,11 +181,67 @@
     }
     return meilleur;
   }
+  // Le FEC est reconnu par une combinaison de cinq champs, jamais par « débit » seul.
+  function estFec(entetes) {
+    const h = new Set((entetes || []).map(x => norm(x).replace(/[^a-z0-9]/g,'')));
+    return ['journalcode','ecrituredate','comptenum','debit','credit'].every(k => h.has(k));
+  }
+  function appliquerCarteMemorisee(type, entetes, memorisee = {}) {
+    if (!COLONNES[type]) throw new Error('Type d’export inconnu : ' + type);
+    const carte = {}, utilises = new Set();
+    for (const [cle, colonne] of Object.entries(memorisee || {})) {
+      if (!COLONNES[type].some(c => c[0] === cle)) throw new Error('Champ mémorisé inconnu.');
+      if (colonne === '' || colonne == null) continue;
+      if (!entetes.includes(colonne)) throw new Error('Colonne mémorisée absente du fichier.');
+      if (utilises.has(colonne)) throw new Error('Une colonne ne peut servir à deux champs.');
+      utilises.add(colonne); carte[cle] = colonne;
+    }
+    return { carte };
+  }
+  const modeImport = options => {
+    const mode = options.mode || 'tolere';
+    if (!['strict', 'tolere'].includes(mode)) throw new Error('Mode d’import inconnu.');
+    return mode;
+  };
+  function terminerLecture(T, ignorees) {
+    if (T.mode === 'strict' && ignorees.length) throw new Error(
+      'Import strict refusé : ' + ignorees.length + ' ligne(s) rejetée(s) (lignes ' +
+      ignorees.slice(0,15).map(x => x.ligne).join(', ') + '). Aucune donnée importée.');
+  }
+  // Aucune valeur brute, référence, nom, montant ni nom de fichier dans le rapport partageable.
+  function motifPublic(motif) {
+    const m = norm(motif);
+    if (/tronqu|colonne/.test(m)) return 'Nombre de colonnes incorrect';
+    if (/montant|reste|regle|ht/.test(m)) return 'Montant illisible ou incohérent';
+    if (/date|echeance/.test(m)) return 'Date illisible ou absente';
+    if (/double|doublon/.test(m)) return 'Doublon';
+    if (/siret/.test(m)) return 'SIRET invalide';
+    if (/type/.test(m)) return 'Type de pièce non reconnu';
+    if (/client|code|nom/.test(m)) return 'Information client manquante';
+    return 'Ligne à vérifier (détail masqué)';
+  }
+  function rapportAnomalies(resultat) {
+    const r = resultat || {}, ignorees = r.ignorees || [], anomalies = r.anomalies || [];
+    return {
+      type: ['pieces','reglements','clients','fec'].includes(r.type) ? r.type : 'inconnu',
+      lues: r.lues || 0,
+      acceptees: r.acceptees == null ? r.lues - ignorees.length : r.acceptees,
+      rejetees: ignorees.length,
+      anomalies: ignorees.map(x => ({ ligne:x.ligne, motif:motifPublic(x.motif), gravite:'rejet' }))
+        .concat(anomalies.map(x => ({ ligne:x.ligne, motif:motifPublic(x.motif), gravite:'attention' }))),
+      colonnes: (r.correspondance || []).map(c => ({ cle:c.cle, libelle:c.libelle, colonne:'[nom d’en-tête masqué]' }))
+    };
+  }
   // Signature d'un format d'export : type + en-têtes normalisés (pour retrouver une correspondance validée).
   const signature = (type, entetes) => type + '|' + entetes.map(norm).join('|');
   // options : { ligneEntete, carte (clé → NOM de colonne choisi à la main) }. Une association manuelle prime sur la détection.
   function analyser(type, lignes, options = {}) {
     if (!Array.isArray(lignes) || !lignes.length) throw new Error('Export ' + type + ' vide.');
+    if (!COLONNES[type]) throw new Error('Type d’export inconnu : ' + type);
+    const fec = lignes.slice(0,15).some(estFec);
+    if (fec && type !== 'fec') throw new Error('FEC comptable détecté : impossible de l’importer comme export commercial. Utilise les exports de ventes, règlements ou clients EBP.');
+    if (type === 'fec' && !fec) throw new Error('Colonnes caractéristiques d’un FEC absentes.');
+    const mode = modeImport(options);
     const i = options.ligneEntete != null ? options.ligneEntete : trouverEntete(type, lignes);
     const entetes = (lignes[i] || []).map(x => texte(x, 80)), a = associerColonnes(type, entetes), carte = Object.assign({}, a.carte), def = COLONNES[type];
     for (const [k, nom] of Object.entries(options.carte || {})) {
@@ -166,7 +252,16 @@
       carte[k] = j;
     }
     const manquantes = def.filter(([k, , , ob]) => ob && carte[k] == null).map(([, lib]) => lib);
-    return { type, ligneEntete: i, entetes, carte, manquantes, signature: signature(type, entetes), manuel: !!(options.carte && Object.keys(options.carte).length),
+    const utilises = new Set(Object.values(carte));
+    const ambiguites = entetes.flatMap((nom, index) => {
+      const compatibles = def.filter(([, , re]) => re.test(norm(nom))).map(([cle, libelle]) => ({ cle, libelle }));
+      if (compatibles.length > 1 || (!utilises.has(index) && /montant|total|solde/.test(norm(nom)))) {
+        const possibles = compatibles.length > 1 ? compatibles : def.filter(([cle]) => /^(ht|montant|regle|reste|debit|credit)$/.test(cle)).map(([cle, libelle]) => ({ cle, libelle }));
+        return [{ colonne: nom, possibles }];
+      }
+      return [];
+    });
+    return { type, ligneEntete: i, entetes, carte, manquantes, mode, ambiguites, signature: signature(type, entetes), manuel: !!(options.carte && Object.keys(options.carte).length),
       correspondance: def.filter(([k]) => carte[k] != null).map(([k, lib]) => ({ cle: k, libelle: lib, colonne: entetes[carte[k]] })),
       champs: def.map(([k, lib, , ob]) => ({ cle: k, libelle: lib, obligatoire: ob, colonne: carte[k] != null ? entetes[carte[k]] : '' })), lignesTitre: i };
   }
@@ -175,7 +270,7 @@
     const A = analyser(type, lignes, options);
     if (A.manquantes.length) throw new Error('Export ' + type + ' : colonne(s) obligatoire(s) introuvable(s) : ' + A.manquantes.join(', ') + '. Colonnes lues : ' + A.entetes.join(' | ') + '.');
     if (lignes.length < A.ligneEntete + 2) throw new Error('Export ' + type + ' vide : aucune ligne après les en-têtes.');
-    return { entetes: A.entetes, carte: A.carte, manquantes: [], correspondance: A.correspondance, corps: lignes.slice(A.ligneEntete + 1), decalage: A.ligneEntete };
+    return { entetes: A.entetes, carte: A.carte, mode: A.mode, manquantes: [], correspondance: A.correspondance, corps: lignes.slice(A.ligneEntete + 1), decalage: A.ligneEntete };
   }
   const cellule = (r, carte, k) => (carte[k] == null ? '' : r[carte[k]]);
 
@@ -273,7 +368,7 @@
     return { clients, ignorees, anomalies, correspondance: T.correspondance, lues: T.corps.length };
   }
 
-  const api = { COLONNES, decoderTexte, lireCsv, associerColonnes, trouverEntete, analyser, signature, lireDate, lireMontant, montantAmbigu, siretValide, lireType, lirePieces, lireReglements, lireClientsEbp };
+  const api = { COLONNES, decoderTexte, lireCsv, associerColonnes, trouverEntete, analyser, estFec, appliquerCarteMemorisee, rapportAnomalies, signature, lireDate, lireMontant, montantAmbigu, siretValide, lireType, lirePieces, lireReglements, lireClientsEbp };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else racine.EbpImport = api;
 })(typeof self !== 'undefined' ? self : this);
