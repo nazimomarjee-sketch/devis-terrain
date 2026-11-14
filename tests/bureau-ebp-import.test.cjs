@@ -243,12 +243,12 @@ test('lot 10 — doublon inter-import bloqué par consolidation existante, corre
 
 test('lot 10 — rapport JSON anonymisé : zéro numéro, client, montant ou valeur brute', () => {
   const r = E.lirePieces([['Type','N° pièce','Date','Client','Montant HT'],
-    ['Inconnu','FA-SECRET-987','01/11/2026','GARAGE SECRET','123456,78']]);
+    ['Inconnu','XX-SECRET-987','01/11/2026','GARAGE SECRET','123456,78']]);
   const j = E.rapportAnomalies(r), texte = JSON.stringify(j);
   assert.equal(j.rejetees, 1);
   assert.equal(j.lues, 1);
   assert.equal(j.anomalies[0].ligne, 2);
-  for (const secret of ['FA-SECRET-987','GARAGE SECRET','123456,78']) assert.ok(!texte.includes(secret));
+  for (const secret of ['XX-SECRET-987','GARAGE SECRET','123456,78']) assert.ok(!texte.includes(secret));
 });
 
 test('lot 10 — association mémorisée contrôlée, colonne Montant indécidable signalée', () => {
