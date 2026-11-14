@@ -54,6 +54,27 @@
       h('a',{class:'v40-secondaire',href:'#/pc'},'Voir le dernier plan reçu ›')];
   }
 
+  // Lot 4 : contenus marketing VALIDÉS dans le Studio du Bureau (pack JSON), pour le WhatsApp manuel des fiches garage.
+  function importContenus(){
+    const file=h('input',{type:'file',accept:'.json,application/json','aria-label':'Contenus validés à importer'});
+    const res=h('p',{class:'v40-import-resultat',role:'status','aria-live':'polite'});
+    const btn=h('button',{type:'button',class:'btn v40-import-action',onclick:async()=>{
+      const f=file.files&&file.files[0];if(!f){res.textContent='Choisis le fichier du Studio.';return;}
+      btn.disabled=true;
+      try{
+        if(f.size>2*1024*1024)throw new Error('Fichier trop gros.');
+        const p=ODICOLOR_WA.lirePack(JSON.parse(await f.text()));
+        const avant=await get('meta','contenusWa');if(avant)await put('meta',avant,'contenusWaPrecedent');
+        await put('meta',Object.assign({recuLe:new Date().toISOString()},p),'contenusWa');
+        res.textContent=p.contenus.length+' contenu(s) validé(s) importé(s)'+(p.ecartes.length?' · écarté(s) : '+limite(p.ecartes.join(', '),160):'')+'. Ils apparaissent dans WhatsApp, sur la fiche garage.';
+        toast('Contenus validés enregistrés.');
+      }catch(e){res.textContent='Import refusé : '+limite(e.message,200)}
+      finally{btn.disabled=false}
+    }},'Importer les contenus');
+    return [h('p',{class:'mut'},'Fichier « Contenus validés pour le téléphone » du Studio (Bureau). Aucun envoi : chaque message reste à relire et envoyer toi-même.'),
+      h('label',{},'Sélectionner le fichier du Studio'),file,btn,res];
+  }
+
   function importPDF(){
     const fournisseur=h('input',{type:'text',maxlength:90,
       placeholder:'Carsystem, SIFA, autre…','aria-label':'Nom du fournisseur PDF'});
@@ -99,6 +120,8 @@
         importEBP('clients','clients'),'v40-import-clients'),
       fiche('Plan commercial du PC','JSON — actions issues des analyses EBP',
         importPC(),'v40-import-pc'),
+      fiche('Contenus marketing validés','JSON — Studio du Bureau, pour WhatsApp',
+        importContenus(),'v40-import-contenus'),
       fiche('Catalogues fournisseurs','PDF — notices et références techniques',
         importPDF(),'v40-import-pdf'),
       h('p',{class:'v40-import-rappel'},

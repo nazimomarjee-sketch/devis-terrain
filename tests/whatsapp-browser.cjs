@@ -29,7 +29,7 @@ test('fiche garage : WhatsApp en 2 touches, lien wa.me prérempli, journal « ou
     await page.goto(origin + '/#/client/1');
     const btn = page.locator('[data-wa="preparer"]'); await btn.waitFor();
     assert.match(await btn.textContent(), /WhatsApp · \+33 6 39 98 12 34/);
-    const boite = await btn.boundingBox(); assert.ok(boite.height >= 48, 'zone tactile ≥ 48 px : ' + boite.height);
+    const boite = await btn.boundingBox(); assert.ok(boite.height >= 70, 'objectif ergonomique : bouton ≥ 70 px : ' + boite.height);
     await btn.click(); await page.locator('[data-wa="ouvrir"]').click();
     const ouverts = await page.evaluate(() => window.__ouverts);
     assert.equal(ouverts.length, 1); assert.match(ouverts[0], /^https:\/\/wa\.me\/33639981234\?text=Bonjour%20M\.%20Fictif/);
@@ -51,5 +51,18 @@ test('numéro invalide : bouton désactivé avec le motif ; aucun lien ouvert', 
     await page.locator('.v49-wa', { hasText: 'Numéro spécial' }).waitFor();
     assert.equal(await page.locator('.v49-wa button').isDisabled(), true);
     assert.deepEqual(await page.evaluate(() => window.__ouverts), []); assert.deepEqual(errs, []);
+  } finally { await context.close(); }
+});
+
+test('lot 4 — contenus validés du Studio proposés dans WhatsApp ; le texte choisi part dans le lien', async () => {
+  const { context, page, errs } = await ouvrir([{ id: 3, nom: 'GARAGE FICTIF CONTENU', ville: 'Massy', tel: '06 39 98 12 35', statutCrm: 'client' }]);
+  try {
+    await page.evaluate(() => put('meta', { contenus: [{ id: 'C1', marque: 'Carsystem', titre: 'Vernis du mois', texte: 'Bonjour, nouveauté vernis Carsystem.', cibles: ['client'], validePar: 'X', valideLe: 'L', empreinte: 'abcdef12' }] }, 'contenusWa'));
+    await page.goto(origin + '/#/client/3'); await page.locator('[data-wa="preparer"]').click();
+    await page.selectOption('[data-wa="contenu"]', 'C1'); await page.locator('[data-wa="ouvrir"]').click();
+    const u = (await page.evaluate(() => window.__ouverts))[0];
+    assert.equal(decodeURIComponent(u.split('text=')[1]), 'Bonjour, nouveauté vernis Carsystem.');
+    const c = await page.evaluate(() => get('clients', 3)); assert.equal(c.contacts[0].modele, 'contenu:C1');
+    assert.deepEqual(errs, []);
   } finally { await context.close(); }
 });

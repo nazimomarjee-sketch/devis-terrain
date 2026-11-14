@@ -1502,14 +1502,14 @@ async function pageTournee() {
 // Aucun envoi automatique : le lien ouvre WhatsApp avec le message prérempli, l'envoi reste un geste du commercial.
 // Le journal du garage (c.contacts) ne note que « WhatsApp ouvert » ; la relance programmée devient le rappel du garage
 // (actions du jour, tournée) sans jamais avancer un rappel déjà prévu plus tôt.
-function carteWhatsApp(c) {
+function carteWhatsApp(c, pack) {
   const W = ODICOLOR_WA, num = W.normaliser(c.tel, S.indicatif), auj = aujourdhui();
   const histo = h('div', { class: 'wa-histo' }), editeur = h('div', { class: 'wa-editeur', hidden: true });
   const dessinerHisto = () => {
     const l = (Array.isArray(c.contacts) ? c.contacts : []).filter(x => x && x.canal === 'whatsapp').slice(-3).reverse();
     histo.replaceChildren(...l.map(x => h('small', { class: 'mut', style: 'display:block' }, dateFr(x.jour + 'T12:00:00') + ' · ' + W.libelleStatut(x.statut) + (x.relance ? ' · relance le ' + dateFr(x.relance + 'T12:00:00') : ''))));
   };
-  if (!num.ok) return h('section', { class: 'carte v49-wa' }, h('button', { class: 'btn sec', disabled: true, style: 'min-height:48px;width:100%' }, 'WhatsApp'), h('small', { class: 'mut' }, num.motif + ' — corrige le téléphone dans « Profil ».'), histo);
+  if (!num.ok) return h('section', { class: 'carte v49-wa' }, h('button', { class: 'btn sec', disabled: true, style: 'min-height:72px;width:100%' }, 'WhatsApp'), h('small', { class: 'mut' }, num.motif + ' — corrige le téléphone dans « Profil ».'), histo);
   const vals = { contact: c.contactNom || '', garage: c.nom, vendeur: S.vendeur || '', societe: S.societe || 'Odicolor' };
   let modele = (Array.isArray(c.contacts) && c.contacts.some(x => x && x.canal === 'whatsapp')) ? 'relance' : 'presentation';
   const texte = h('textarea', { rows: 4, maxlength: 1500, 'aria-label': 'Message WhatsApp' }, W.rediger(modele, vals));
@@ -1527,17 +1527,21 @@ function carteWhatsApp(c) {
     await putMany('clients', [c]); dessinerHisto();
     toast(r.doublon ? 'WhatsApp rouvert (déjà noté aujourd’hui). L’envoi n’est pas confirmé.' : 'WhatsApp ouvert : relis et envoie toi-même.' + (rel ? ' Relance le ' + dateFr(rel + 'T12:00:00') + '.' : ''));
   };
-  editeur.append(choix, texte, h('label', { class: 'rang' }, avecRelance, h('span', {}, 'Relance le'), dateRel),
-    h('button', { class: 'btn vert', type: 'button', style: 'min-height:56px;width:100%', 'data-wa': 'ouvrir', onclick: ouvrir }, 'Ouvrir WhatsApp'),
+  // Lot 4 : contenus validés dans le Studio du Bureau (importés dans Réglages → Imports), proposés selon la cible du garage.
+  const contenus = W.contenusPour(c, pack);
+  const choixContenu = contenus.length ? h('select', { 'aria-label': 'Contenu validé', 'data-wa': 'contenu', onchange: ev => { const x = contenus.find(y => y.id === ev.target.value); if (!x) return; modele = 'contenu:' + x.id; texte.value = x.texte; [...choix.children].forEach(b => b.setAttribute('aria-pressed', 'false')); } },
+    h('option', { value: '' }, 'Contenus validés (' + contenus.length + ')'), contenus.map(x => h('option', { value: x.id }, x.marque + ' · ' + x.titre))) : null;
+  editeur.append(choix, choixContenu, texte, h('label', { class: 'rang' }, avecRelance, h('span', {}, 'Relance le'), dateRel),
+    h('button', { class: 'btn vert', type: 'button', style: 'min-height:72px;width:100%;font-size:1.1em', 'data-wa': 'ouvrir', onclick: ouvrir }, 'Ouvrir WhatsApp'),
     h('small', { class: 'mut' }, 'Ouvrir WhatsApp ne prouve pas l’envoi : seul « WhatsApp ouvert » est noté.'));
   dessinerHisto();
   return h('section', { class: 'carte v49-wa' },
-    h('button', { class: 'btn vert', type: 'button', style: 'min-height:56px;width:100%', 'data-wa': 'preparer', 'aria-expanded': 'false',
+    h('button', { class: 'btn vert', type: 'button', style: 'min-height:72px;width:100%;font-size:1.1em', 'data-wa': 'preparer', 'aria-expanded': 'false',
       onclick: ev => { editeur.hidden = !editeur.hidden; ev.currentTarget.setAttribute('aria-expanded', String(!editeur.hidden)); } }, 'WhatsApp · ' + num.affichage),
     num.avertissement ? h('small', { class: 'mut' }, num.avertissement) : null, editeur, histo);
 }
 async function pageClient(id) {
-  const c = await get('clients', id);
+  const c = await get('clients', id), contenusWa = await get('meta', 'contenusWa');
   if (!c) return nonTrouve();
   const eurK = v => v == null ? '—' : Math.round(v).toLocaleString('fr-FR') + ' €';
   const verdict = h('div'), fiche = h('div'), zoneRech = h('div');
@@ -1696,7 +1700,7 @@ async function pageClient(id) {
       c.tel?h('a',{class:'btn sec',href:'tel:'+String(c.tel).replace(/[^0-9+]/g,'')},'Appeler'):
         h('button',{class:'btn sec',disabled:true},'Appeler'),
       h('a',{class:'btn sec',href:'#/signaler/'+c.id},'Incident')),
-    carteWhatsApp(c),
+    carteWhatsApp(c, contenusWa),
     h('section',{class:'carte v36-prochaine'},
       h('strong',{},'Prochaine action'),
       h('label',{},'À faire'),etape,

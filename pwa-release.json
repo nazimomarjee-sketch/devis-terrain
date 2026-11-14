@@ -1,5 +1,5 @@
 {
-  "id": "6966a8e2f6fcfbf2a59a024417aa00b97b5409ab6c819f1b5a4dbfd8ba30a824",
+  "id": "5fa927bc2003cda636bb563c0db20d538a7505605a6c24f109b028c0d026090d",
   "assets": [
     {
       "path": "accueil-v23.css",
@@ -19,7 +19,7 @@
     },
     {
       "path": "app.js",
-      "sha256": "4bad573c704463c13f37d8cbecb100df326642ff07e0aaed71b09f65ddb80425"
+      "sha256": "45089e4bc177f8e8dd6a47e914f0422a351ff1855635545d9da8eaec8469db0b"
     },
     {
       "path": "apparence-v26.css",
@@ -155,11 +155,11 @@
     },
     {
       "path": "imports-centralises-v40.js",
-      "sha256": "2d5d21ec558b2c5919ced63211dbe13b00d650008a925342b519a15373841d5f"
+      "sha256": "7a9f6483f2efd86e3245840075b73beb11f439f67b10dee784b7bd11b39c5ddb"
     },
     {
       "path": "index.html",
-      "sha256": "f41cd152c85953657e953beb58938d7d81834d90d5107eb49300860c675d1a0e"
+      "sha256": "dd84f0558a42cfc29c014137f572c1399691b2174d3326df9fa8b4a0b02639dc"
     },
     {
       "path": "logo-96.png",
@@ -203,7 +203,7 @@
     },
     {
       "path": "pwa-client.js",
-      "sha256": "41a54c54c8bc1c78a75899da9abfba92aef072fda0b40d5b40fbb78399da88de"
+      "sha256": "c44228683304f8017a3945ed5191dd392cf3a5216035986f78ece4b0486f57af"
     },
     {
       "path": "rappels-produits-v24.js",
@@ -263,7 +263,7 @@
     },
     {
       "path": "whatsapp-v49.js",
-      "sha256": "a41181a61760a4015d919f3191d16eb549ae018ab3e7fb3137ac3de73d3b3a3a"
+      "sha256": "fb04b386454ee20506ddee2c9a4e98ae45eb6e5b5f7e5da38e5b4ff08f59f485"
     },
     {
       "path": "xlsx.mini.min.js",

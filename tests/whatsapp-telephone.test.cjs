@@ -52,3 +52,16 @@ test('relance proposée : J+2, jamais un samedi ni un dimanche', () => {
   assert.equal(W.relanceProposee('2026-11-16'), '2026-11-18');
   assert.equal(W.relanceProposee('2026-11-13', 1), '2026-11-16'); // vendredi + 1 = samedi → lundi
 });
+
+test('lot 4 — pack du Studio : seuls les contenus validés de marques actives (jamais Roberlo), sans doublon ; cible du garage en premier', () => {
+  const S = require('../bureau/studio.js');
+  const v = x => ({ ...S.valider(S.normaliser({ type: 'message', marque: 'carsystem', titre: 'T', texte: 'Bonjour', cibles: ['prospect'], ...x }), { par: 'Responsable fictif', le: 'L' }), id: x.id });
+  const pack = S.pack([v({ id: 'P1', titre: 'Prospects', cibles: ['prospect'] }), v({ id: 'C1', titre: 'Clients', cibles: ['client'], marque: 'sifa' })], { le: 'L' });
+  pack.contenus.push({ ...pack.contenus[0] }, { id: 'R1', marque: 'Roberlo', titre: 'Ancien', texte: 'x', validePar: 'X', empreinte: 'abcdef12' }, { id: 'NV', marque: 'Sifa', titre: 'Non validé', texte: 'x' });
+  const p = W.lirePack(pack);
+  assert.deepEqual(p.contenus.map(c => c.id), ['P1', 'C1']); assert.match(p.ecartes.join(), /Ancien \(marque non active\)/); assert.match(p.ecartes.join(), /Non validé/);
+  assert.deepEqual(W.contenusPour({ statutCrm: 'client' }, p).map(c => c.id), ['C1', 'P1']);
+  assert.deepEqual(W.contenusPour({ statutCrm: 'prospect' }, p).map(c => c.id), ['P1', 'C1']);
+  assert.throws(() => W.lirePack({ appli: 'plan-pc' }), /invalide/);
+  assert.equal(W.noterOuverture([], { maintenant: 'm', jour: '2026-11-14', texte: 't', modele: 'contenu:P1', intl: '33639981234' }).entree.modele, 'contenu:P1');
+});

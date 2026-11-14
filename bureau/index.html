@@ -1,4 +1,11 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}/* Lot 4 : Studio marketing (rayons et contrastes du thème) */
+.studio .studio-champ{display:flex;flex-direction:column;gap:4px;margin:8px 0}.studio .studio-champ span{font-size:13px;color:var(--texte2,#B9B6B1)}
+.studio .studio-grille{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.studio textarea{width:100%;border-radius:12px;padding:10px;background:#16181C;color:inherit;border:1px solid #2A2E35}
+.studio .studio-cibles,.studio .studio-cible{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0}
+.studio .studio-bloquants{color:#F2A33A;margin:8px 0;padding-left:18px}.studio .studio-visuel svg{width:100%;max-width:420px;height:auto;border-radius:16px}
+.studio pre{white-space:pre-wrap;background:#16181C;border-radius:12px;padding:12px;font-family:inherit}
+</style></head><body>
 <title>Ville ODICOLOR</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap">
@@ -350,6 +357,7 @@ select.recherche{appearance:auto}
 <script src="encaissements.js"></script>
 <script src="../communes-centres.js"></script>
 <script src="tournee.js"></script>
+<script src="studio.js"></script>
 <script src="decisions-comptes.js"></script>
 <script src="verifier-comptes.js"></script>
 <script src="ville/modele-commune.js"></script>
@@ -1077,7 +1085,7 @@ function ouvrirFiche(x){
 // ================= En-tête : onglets, recherche, données =================
 function rendreEntete(){
   const r = route(), depChoix = TERRITOIRES.find(t=>t.id===etat.choix).dep;
-  const ong = [['bureau','Bureau','devis','#bureau'],['ville','Ville','ville','#ville'],['carte','Carte','carte','#carte-' + (r.D ? r.D.dep : depChoix)],['simulation','Simulation','sim','#simulation']];
+  const ong = [['bureau','Bureau','devis','#bureau'],['ville','Ville','ville','#ville'],['carte','Carte','carte','#carte-' + (r.D ? r.D.dep : depChoix)],['studio','Studio','devis','#studio'],['simulation','Simulation','sim','#simulation']];
   $('#onglets').replaceChildren(...ong.map(([k,l,ic,href]) => h('a',{class:'onglet'+(k==='simulation'?' sim':''), href, 'aria-current': (r.ecran===k || (k==='ville' && r.ecran==='a-classer')) ? 'page' : null}, icone(ic), l)));
   const mode = $('#mode'); mode.className = 'mode' + (etat.mode==='reel'?' reel':''); mode.textContent = etat.mode==='reel' ? 'Mes garages' : 'Démo';
   mode.setAttribute('aria-expanded', String(etat.donneesOuvertes));
@@ -1506,6 +1514,7 @@ function route(){
   if (m && L0.depInfo(m[1])) { const D = L0.depInfo(m[1]); return {ecran:'carte', D, porte: m[2] ? TERRITOIRES.find(x=>x.id===m[2] && x.dep===D.dep) : null}; }
   if (hs === '#simulation') return {ecran:'simulation'};
   if (hs === '#bureau') return {ecran:'bureau'};
+  if (hs === '#studio') return {ecran:'studio'};
   if (hs === '#a-classer') return {ecran:'a-classer'};
   if (hs === '#verifier-comptes') return {ecran:'verifier-comptes'};
   const mv = /^#commune-(\d{5})$/.exec(hs); if (mv) return {ecran:'commune', insee:mv[1]};
@@ -1514,14 +1523,88 @@ function route(){
 }
 function choisir(id){ etat.choix = id; rendre(); }
 function allerCarte(dep, porteId){ etat.recherche=''; etat.commune=''; location.hash = 'carte-' + dep + (porteId ? '-' + porteId : ''); }
+// ================= Lot 4 : Studio marketing (14/11/2026) =================
+// Règles dans bureau/studio.js : marques actives seulement, jamais de prix inventé, droits des images, scénario ≠ vidéo,
+// validation humaine liée à la version exacte. Rien n'est envoyé : exports en fichiers locaux, diffusion par le WhatsApp manuel.
+etat.studio = { biblio: [], courant: null, filtre: '' };
+const telechargerFichier = (contenu, nom, type) => { const a = h('a',{href:URL.createObjectURL(new Blob([contenu],{type})), download:nom}); document.body.appendChild(a); a.click(); a.remove(); };
+function vueStudio(){
+  const St = Studio, E = etat.studio, maintenant = () => new Date().toISOString();
+  const c = E.courant || St.normaliser({ type:'message', marque:'carsystem', cibles:['prospect'] });
+  const champ = (lib, el) => h('label',{class:'studio-champ'}, h('span',{}, lib), el);
+  const inp = (v, attrs = {}) => h('input',Object.assign({class:'recherche', value:v || ''}, attrs));
+  const type = h('select',{'data-studio':'type'}, Object.entries(St.TYPES).map(([k,l]) => h('option',{value:k, selected:c.type===k}, l)));
+  const marque = h('select',{'data-studio':'marque'}, St.MARQUES.filter(m => m.active || m.id === c.marque).map(m => h('option',{value:m.id, selected:c.marque===m.id, disabled:!m.active}, m.nom + (m.active ? '' : ' (non active)'))));
+  const titre = inp(c.titre,{'data-studio':'titre', maxlength:120}), texte = h('textarea',{rows:4, maxlength:1500, 'data-studio':'texte'}, c.texte || '');
+  const pRef = inp(c.produit.ref,{maxlength:40}), pNom = inp(c.produit.nom,{maxlength:120}), pCar = inp(c.produit.caracteristiques,{maxlength:400}), pSrc = inp(c.produit.source,{maxlength:300, placeholder:'Page du catalogue officiel, fiche technique…'});
+  const kPrix = inp(c.conditions.prix,{maxlength:60, 'data-studio':'prix'}), kRem = inp(c.conditions.remise,{maxlength:60, 'data-studio':'remise'}), kVal = inp(c.conditions.validite,{maxlength:60, 'data-studio':'validite'}), kSrc = inp(c.conditions.source,{maxlength:300, 'data-studio':'source-conditions', placeholder:'Ex. conditions validées par la direction le …'});
+  const cibles = Object.entries(St.CIBLES).map(([k,l]) => { const b = h('input',{type:'checkbox', checked:c.cibles.includes(k), 'data-cible':k, style:'width:24px;min-height:24px'}); return [k, b, h('label',{class:'studio-cible'}, b, l)]; });
+  const plans = h('textarea',{rows:4, 'data-studio':'plans', placeholder:'Un plan par ligne : durée en s | image | texte'}, (c.plans || []).map(p => [p.duree, p.image, p.texte].join(' | ')).join('\n'));
+  let image = c.image; const droits = h('input',{type:'checkbox', checked:!!(image && image.droitsConfirmes), 'data-studio':'droits', style:'width:24px;min-height:24px'});
+  const fichierImg = h('input',{type:'file', accept:'image/png,image/jpeg,image/webp', onchange:ev => { const f = ev.target.files[0]; if (!f) return; if (f.size > 2*1024*1024) { alert('Image trop lourde (2 Mo maximum).'); return; }
+    const r = new FileReader(); r.onload = () => { image = { nom:f.name, donnees:r.result, droitsConfirmes:false }; droits.checked = false; majApercu(); }; r.readAsDataURL(f); }});
+  const lire = () => St.normaliser({ id:c.id, type:type.value, marque:marque.value, titre:titre.value, texte:texte.value,
+    produit:{ ref:pRef.value, nom:pNom.value, caracteristiques:pCar.value, source:pSrc.value },
+    conditions:{ prix:kPrix.value, remise:kRem.value, validite:kVal.value, source:kSrc.value },
+    cibles: cibles.filter(([,b]) => b.checked).map(([k]) => k), image: image ? Object.assign({}, image, { droitsConfirmes:droits.checked }) : null,
+    plans: plans.value.split('\n').map(l => l.split('|').map(x => x.trim())).filter(x => x.join('')).map(([d,i,t]) => ({ duree:Number(d) || 5, image:i || '', texte:t || '' })) });
+  const avec = x => Object.assign(x, { validation:c.validation, historique:c.historique, statut:c.statut });
+  const apercu = h('div',{class:'studio-apercu', 'data-studio':'apercu'}), bloquants = h('ul',{class:'studio-bloquants', 'data-studio':'bloquants'}), etatC = h('span',{class:'badge', 'data-studio':'statut'});
+  const LIB = { brouillon:['Brouillon','b-vide'], a_verifier:['À vérifier','b-alerte'], valide:['Validé','b-confirme'], archive:['Archivé','b-vide'] };
+  function majApercu(){
+    const x = avec(lire()), st = St.statut(x), pb = St.controler(x);
+    etatC.textContent = LIB[st][0]; etatC.className = 'badge ' + LIB[st][1];
+    bloquants.replaceChildren(...pb.map(t => h('li',{}, t)));
+    if (x.type === 'scenario') apercu.replaceChildren(h('pre',{class:'studio-scenario'}, St.scenarioTexte(x)));
+    else if (x.type === 'message') apercu.replaceChildren(h('pre',{class:'studio-message'}, St.texteDiffusion(x)));
+    else { const d = h('div',{class:'studio-visuel'}); d.innerHTML = St.visuelSVG(x); apercu.replaceChildren(d); }
+  }
+  [type, marque, titre, texte, pRef, pNom, pCar, pSrc, kPrix, kRem, kVal, kSrc, plans, droits, ...cibles.map(([,b]) => b)].forEach(el => el.addEventListener('input', majApercu));
+  const msg = h('p',{class:'info', 'aria-live':'polite', 'data-studio':'message'});
+  const enregistrer = () => { try { const r = St.enregistrer(E.biblio, avec(lire()), { le:maintenant(), nouvelId:() => 'S' + Date.now().toString(36) + Math.random().toString(36).slice(2,6) }); E.biblio = r.biblio; E.courant = r.contenu; signalerChangement(); rendre(); return r.contenu; } catch (e) { msg.textContent = e.message; return null; } };
+  const valideur = inp('',{placeholder:'Nom de la personne qui valide', 'data-studio':'valideur', maxlength:60});
+  const valider = () => { const x = enregistrer(); if (!x) return; try { const v = St.valider(x, { par:valideur.value, le:maintenant() }); E.biblio = E.biblio.map(y => y.id === v.id ? v : y); E.courant = v; signalerChangement(); rendre(); } catch (e) { E.courant = x; rendre(); setTimeout(() => { const m = document.querySelector('[data-studio="message"]'); if (m) m.textContent = e.message; }); } };
+  const form = h('section',{class:'bloc studio-form'}, h('div',{class:'titre-bloc'}, c.id ? 'Modifier le contenu' : 'Nouveau contenu', ' ', etatC),
+    h('div',{class:'studio-grille'}, champ('Type', type), champ('Marque', marque)), champ('Titre', titre), champ('Texte', texte),
+    h('details',{class:'info'}, h('summary',{}, 'Produit (références officielles uniquement)'), champ('Référence', pRef), champ('Désignation', pNom), champ('Caractéristiques', pCar), champ('Source officielle', pSrc),
+      St.marque(marque.value) && St.marque(marque.value).docs && St.marque(marque.value).docs.length ? h('p',{}, St.marque(marque.value).docs.map(d => h('a',{href:d.url, target:'_blank', rel:'noopener'}, d.titre))) : h('p',{class:'info'}, 'Aucune documentation officielle enregistrée pour cette marque : ne rien affirmer sans source.')),
+    h('details',{class:'info', open: c.conditions.prix || c.conditions.remise ? '' : null}, h('summary',{}, 'Conditions commerciales (jamais inventées)'), h('div',{class:'studio-grille'}, champ('Prix', kPrix), champ('Remise', kRem)), champ('Validité', kVal), champ('Source des conditions', kSrc)),
+    h('div',{class:'studio-cibles'}, h('span',{}, 'Pour : '), cibles.map(([,,l]) => l)),
+    h('details',{class:'info'}, h('summary',{}, 'Image (visuel) et plans (scénario)'), champ('Image', fichierImg), h('label',{class:'studio-cible'}, droits, 'Je confirme détenir les droits d’utilisation de cette image'), champ('Plans du scénario', plans)),
+    bloquants, msg,
+    h('div',{class:'actions'}, h('button',{class:'btn', 'data-studio':'enregistrer', onclick:enregistrer}, 'Enregistrer'), valideur, h('button',{class:'btn principal', 'data-studio':'valider', onclick:valider}, 'Valider pour diffusion'),
+      h('button',{class:'btn discret', onclick:() => { E.courant = null; rendre(); }}, 'Nouveau')),
+    h('p',{class:'regle'}, 'La validation vaut pour cette version exacte : toute modification remet le contenu « à vérifier ». Aucun envoi automatique.'));
+  const telechargements = h('div',{class:'actions'},
+    h('button',{class:'btn', onclick:() => { const x = avec(lire()); if (x.type === 'scenario') telechargerFichier(St.scenarioTexte(x), 'scenario-' + (x.id || 'brouillon') + '.txt', 'text/plain;charset=utf-8'); else telechargerFichier(St.visuelSVG(x), 'visuel-' + (x.id || 'brouillon') + '.svg', 'image/svg+xml'); }}, 'Télécharger l’aperçu'));
+  const filtre = h('select',{'aria-label':'Filtrer la bibliothèque', onchange:ev => { E.filtre = ev.target.value; rendre(); }}, [['','Toutes les marques'], ...St.MARQUES.map(m => [m.id, m.nom])].map(([v,l]) => h('option',{value:v, selected:E.filtre===v}, l)));
+  const lignes = E.biblio.filter(x => !E.filtre || x.marque === E.filtre).slice().reverse().map(x => { const st = St.statut(x);
+    return h('button',{class:'ligne', 'data-contenu':x.id, onclick:() => { E.courant = x; rendre(); }}, h('span',{}, x.titre || '(sans titre)', h('small',{}, St.TYPES[x.type] + ' · ' + ((St.marque(x.marque) || {}).nom || '?'))), h('span',{class:'badge ' + LIB[st][1]}, LIB[st][0])); });
+  const biblio = h('section',{class:'bloc'}, h('div',{class:'titre-bloc'}, 'Bibliothèque · ' + E.biblio.length), filtre, h('div',{class:'liste', style:'max-height:none'}, lignes.length ? lignes : h('p',{class:'info'}, 'Aucun contenu.')),
+    h('div',{class:'actions'},
+      h('button',{class:'btn', 'data-studio':'pack', onclick:() => { const p = St.pack(E.biblio, { le:maintenant() }); telechargerFichier(JSON.stringify(p, null, 1), 'contenus-odicolor-' + jourIso() + '.json', 'application/json'); }}, 'Contenus validés pour le téléphone'),
+      h('button',{class:'btn discret', onclick:() => telechargerFichier(JSON.stringify({ appli:'odicolor-studio', version:1, biblio:E.biblio }), 'studio-odicolor-' + jourIso() + '.json', 'application/json')}, 'Sauvegarder la bibliothèque'),
+      h('label',{class:'btn discret'}, 'Ouvrir une bibliothèque', h('input',{type:'file', accept:'.json', hidden:true, onchange:async ev => { const f = ev.target.files[0]; if (!f) return; try { const o = JSON.parse(await f.text()); if (o.appli !== 'odicolor-studio' || !Array.isArray(o.biblio)) throw new Error('Fichier de bibliothèque invalide');
+        const par = new Map(E.biblio.map(x => [x.id, x])); for (const x of o.biblio) if (x && x.id && !par.has(x.id)) par.set(x.id, St.normaliser(x) && Object.assign(St.normaliser(x), { id:x.id, validation:x.validation, historique:x.historique, statut:x.statut }));
+        E.biblio = [...par.values()]; signalerChangement(); rendre(); } catch (e) { alert(e.message); } }}))),
+    h('p',{class:'regle'}, 'Rien n’est supprimé : un contenu de marque non active (Roberlo) reste dans l’historique, archivé, et n’est jamais proposé.'));
+  const garages = etat.mode === 'reel' ? (etat.garages || []).map(g => ({ id:g.id, nom:g.nom, client:g.statut === 'client' || g.statutCrm === 'client' || !!g.client, inactif:!!g.inactif || g.statut === 'inactif', compteBloque:!!(g.compteBloque || (g.compte && g.compte.statut === 'bloque')) })) : [];
+  const props = St.proposer(garages, E.biblio);
+  const propositions = h('section',{class:'bloc', 'data-studio':'propositions'}, h('div',{class:'titre-bloc'}, 'Propositions par garage · ' + props.length),
+    etat.mode !== 'reel' ? h('p',{class:'info'}, 'Charge la sauvegarde du téléphone (Mes garages) pour voir les propositions. Données fictives en démo : aucune proposition.') :
+    props.length ? h('div',{class:'liste', style:'max-height:none'}, props.slice(0, 60).map(p => h('div',{class:'ligne'}, h('span',{}, p.nom, h('small',{}, p.raison)), h('small',{}, p.contenus.map(x => x.marque + ' · ' + x.titre).join(' / '))))) : h('p',{class:'info'}, 'Aucun contenu validé ne correspond aux garages chargés.'),
+    h('p',{class:'regle'}, 'Une proposition n’est pas une diffusion : l’envoi reste manuel, garage par garage, depuis le téléphone. Comptes bloqués exclus.'));
+  setTimeout(majApercu);
+  return h('div',{class:'ecran'}, h('div',{class:'panneau studio'}, form, h('section',{class:'bloc'}, h('div',{class:'titre-bloc'}, 'Aperçu'), apercu, telechargements), biblio, propositions));
+}
 function rendre(){
   const r = route();
   if (r.porte) etat.choix = r.porte.id;
   if (r.ecran !== 'carte' && carte) { carte.remove(); carte = null; }
   rendreEntete(); rendreKpis(); rendreFiltres();
-  $('#kpis').hidden = ['simulation','bureau','commune','communes','verifier-comptes'].includes(r.ecran);
+  $('#kpis').hidden = ['simulation','bureau','studio','commune','communes','verifier-comptes'].includes(r.ecran);
   $('#vue').replaceChildren(r.ecran === 'verifier-comptes' ? vueVerifierComptes() : ['commune','communes'].includes(r.ecran) ? (sansSourceMV() || (r.ecran === 'commune' ? vueCommuneMV(r.insee) : vueCommunesMV(r.dep)))
-    : r.ecran==='carte' ? vueCarte(r.D, r.porte) : r.ecran==='simulation' ? vueSimulation() : r.ecran==='bureau' ? vueBureau() : r.ecran==='a-classer' ? vueAClasser() : vueVille());
+    : r.ecran==='carte' ? vueCarte(r.D, r.porte) : r.ecran==='simulation' ? vueSimulation() : r.ecran==='bureau' ? vueBureau() : r.ecran==='studio' ? vueStudio() : r.ecran==='a-classer' ? vueAClasser() : vueVille());
   rendreFil();
   const sc = document.getElementById('scene'); if (sc && sc.scrollWidth > sc.clientWidth) { const t = TERRITOIRES.find(x=>x.id===etat.choix), [px] = iso(...pos(t)); sc.scrollLeft = (px + 495) / 990 * sc.scrollWidth - sc.clientWidth/2; }
 }
@@ -1600,7 +1683,7 @@ window.OdicolorBureau = Object.freeze({
     const s = etat.sauvegardeTelephone || null, E = etat.ebp;
     etat.journalExporte = etat.decisions; // celui qui part dans le coffre : confirmé seulement si l'enregistrement réussit
     return { version:2, telephone: s && s.telephone, garagesTelephone: s && s.garages, rapport: s && s.rapport,
-      ebp: { pieces:E.pieces, reglements:E.reglements, clients:E.clients, arrete:E.arrete, arreteConfirmee:!!E.arreteConfirmee }, decisionsComptes: etat.decisions };
+      ebp: { pieces:E.pieces, reglements:E.reglements, clients:E.clients, arrete:E.arrete, arreteConfirmee:!!E.arreteConfirmee }, decisionsComptes: etat.decisions, studio: { biblio: etat.studio.biblio } };
   },
   // Décisions (sans écran au lot A ; l'écran « Vérifier les comptes » du lot B utilisera ces mêmes fonctions).
   decisions: Object.freeze({
@@ -1611,6 +1694,7 @@ window.OdicolorBureau = Object.freeze({
   restaurer(d, enregistreLe){
     if (!d || (d.version !== 1 && d.version !== 2)) return false;
     // Version 1 (avant le lot A) : aucun journal → journal vide. Version 2 : journal relu et contrôlé, rien n'est jeté.
+    if (d.studio && Array.isArray(d.studio.biblio)) etat.studio.biblio = d.studio.biblio; // Lot 4 : bibliothèque du studio
     const lu = DecisionsComptes.lire(d.version === 2 ? d.decisionsComptes : null);
     etat.decisions = lu.journal || d.decisionsComptes; etat.decisionsConfirmees = etat.decisions; etat.decisionsAlerte = lu.erreur ? lu.erreur + ' : conservé tel quel, nouvelles décisions bloquées.'
       : lu.illisibles.length ? lu.illisibles.length + ' décision(s) illisible(s) dans le coffre : conservées telles quelles, nouvelles décisions bloquées.' : null;

@@ -56,7 +56,7 @@ const ODICOLOR_WA = (() => {
     const cle = 'wa|' + jour + '|' + empreinte(texte);
     const deja = liste.find(x => x && x.cle === cle);
     if (deja) return { contacts: liste, entree: deja, doublon: true };
-    const entree = { cle, canal: 'whatsapp', statut: 'whatsapp_ouvert', le: maintenant, jour, modele: MODELES[modele] ? modele : 'libre',
+    const entree = { cle, canal: 'whatsapp', statut: 'whatsapp_ouvert', le: maintenant, jour, modele: MODELES[modele] || /^contenu:[\w-]{1,40}$/.test(String(modele)) ? modele : 'libre',
       numero: '+' + intl, apercu: String(texte).slice(0, 120), relance: /^\d{4}-\d\d-\d\d$/.test(relance) ? relance : '' };
     liste.push(entree);
     return { contacts: liste.slice(-MAX_JOURNAL), entree, doublon: false };
@@ -67,7 +67,28 @@ const ODICOLOR_WA = (() => {
     const w = d.getUTCDay(); if (w === 6) d.setUTCDate(d.getUTCDate() + 2); else if (w === 0) d.setUTCDate(d.getUTCDate() + 1);
     return d.toISOString().slice(0, 10);
   }
+  // Lot 4 : pack de contenus VALIDÉS produit par le Studio du Bureau. Seules les marques actives sont gardées.
+  const MARQUES_ACTIVES = ['Carsystem', 'Abel Auto', 'Sifa'];
+  function lirePack(o) {
+    if (!o || o.appli !== 'odicolor-contenus' || o.version !== 1 || !Array.isArray(o.contenus)) throw new Error('Fichier de contenus invalide (attendu : contenus validés du Studio).');
+    const vus = new Set(), contenus = [], ecartes = [];
+    for (const x of o.contenus.slice(0, 300)) {
+      const id = String(x && x.id || '').slice(0, 40), ok = /^[\w-]{1,40}$/.test(id) && x.validePar && /^[0-9a-f]{8}$/.test(String(x.empreinte || '')) && typeof x.texte === 'string' && x.texte.trim();
+      if (!ok) { ecartes.push((x && x.titre) || id || '?'); continue; }
+      if (!MARQUES_ACTIVES.includes(x.marque)) { ecartes.push(x.titre + ' (marque non active)'); continue; }
+      if (vus.has(id)) continue; vus.add(id);
+      contenus.push({ id, marque: x.marque, titre: String(x.titre || '').slice(0, 120), texte: String(x.texte).slice(0, MAX_TEXTE),
+        cibles: (Array.isArray(x.cibles) ? x.cibles : []).filter(c => ['client', 'prospect', 'dormant'].includes(c)), validePar: String(x.validePar).slice(0, 60), valideLe: String(x.valideLe || '').slice(0, 30), empreinte: x.empreinte });
+    }
+    return { date: String(o.date || '').slice(0, 30), contenus, ecartes };
+  }
+  // Contenus proposés pour un garage : ceux de sa cible d'abord.
+  function contenusPour(c, pack) {
+    const l = pack && Array.isArray(pack.contenus) ? pack.contenus : [];
+    const cible = c && c.statutCrm === 'client' ? (c.dormant ? 'dormant' : 'client') : 'prospect';
+    return l.slice().sort((a, b) => (b.cibles.includes(cible) - a.cibles.includes(cible)) || a.titre.localeCompare(b.titre, 'fr'));
+  }
   const libelleStatut = s => s === 'whatsapp_ouvert' ? 'WhatsApp ouvert (envoi non confirmé)' : 'Inconnu';
-  return { normaliser, MODELES, rediger, lien, empreinte, noterOuverture, relanceProposee, libelleStatut };
+  return { normaliser, MODELES, MARQUES_ACTIVES, lirePack, contenusPour, rediger, lien, empreinte, noterOuverture, relanceProposee, libelleStatut };
 })();
 if (typeof module === 'object' && module.exports) module.exports = ODICOLOR_WA;
