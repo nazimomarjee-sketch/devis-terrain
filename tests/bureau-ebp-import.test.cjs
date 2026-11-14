@@ -184,3 +184,78 @@ test('lot 1 — mêmes en-têtes que l’import du téléphone : le Bureau lit l
     assert.equal(t.nouvelles[0].montantHt, b.pieces[0].htCents, 'même HT que le téléphone : ' + e.join(' | '));
   }
 });
+
+
+// ---------- Lot 10 : formats et sécurité de l'import (données fictives) ----------
+test('lot 10 — FEC séparé du commercial, séparateur pipe reconnu sans faux positif sur un seul mot', () => {
+  const fec = E.lireCsv('JournalCode|EcritureDate|CompteNum|Debit|Credit\nVE|20261114|411000|100,00|0,00');
+  assert.equal(fec[0].length, 5);
+  assert.equal(E.estFec(fec[0]), true);
+  assert.equal(E.analyser('fec', fec).type, 'fec');
+  assert.throws(() => E.lirePieces(fec), /FEC comptable/);
+  assert.throws(() => E.lireReglements(fec), /FEC comptable/);
+  assert.equal(E.estFec(['Montant HT', 'Débit', 'Date']), false);
+});
+
+test('lot 10 — ligne tronquée rejetée et n° de ligne physique après cellule multiligne', () => {
+  const csv = 'Type;N° pièce;Date;Client;Montant HT\nFacture;FA-OK;01/11/2026;"GARAGE\nFICTIF";10,00\nFacture;FA-ERR;01/11/2026;Sans montant';
+  const r = E.lirePieces(E.lireCsv(csv));
+  assert.deepEqual(r.pieces.map(x => x.no), ['FA-OK']);
+  assert.equal(r.lues, 2);
+  assert.equal(r.acceptees, 1);
+  assert.equal(r.rejetees, 1);
+  assert.equal(r.ignorees[0].ligne, 4);
+  assert.match(r.ignorees[0].motif, /Ligne tronquée/);
+});
+
+test('lot 10 — mode strict refuse globalement la moindre ligne rejetée ; tolérant garde les bonnes', () => {
+  const t = [['Type','N° pièce','Date','Client','Montant HT'],['Facture','FA-OK','01/11/2026','G','10,00'],['Facture','FA-ERR','01/11/2026','G','1.234']];
+  const r = E.lirePieces(t, { mode: 'tolere' });
+  assert.equal(r.pieces.length, 1);
+  assert.equal(r.rejetees, 1);
+  assert.throws(() => E.lirePieces(t, { mode: 'strict' }), /Import strict refusé.*ligne/);
+  assert.throws(() => E.lirePieces(t, { mode: 'inconnu' }), /Mode d.import inconnu/);
+  const g = E.lireReglements([['N° facture','Échéance','Montant TTC'],['FA-OK','01/11/2026','10,00'],['FA-ERR','01/11/2026','1.234']], { mode:'tolere' });
+  assert.equal(g.rejetees, 1);
+  assert.throws(() => E.lireReglements([['N° facture','Échéance','Montant TTC'],['FA-ERR','01/11/2026','1.234']], { mode:'strict' }), /strict refusé/);
+});
+
+test('lot 10 — avoir avec montant ou date douteux jamais déduit du CA', () => {
+  const r = E.lirePieces([['Type','N° pièce','Date','Client','Montant HT'],
+    ['Avoir','AV-INVALIDE','01/11/2026','G','1.234'],
+    ['Avoir','AV-DATE','inconnue','G','10,00'],
+    ['Avoir','AV-OK','02/11/2026','G','10,00']]);
+  assert.equal(r.avoirs.length, 1);
+  assert.equal(r.avoirs[0].no, 'AV-OK');
+  assert.equal(r.rejetees, 2);
+});
+
+test('lot 10 — doublon inter-import bloqué par consolidation existante, correction non additionnée', () => {
+  const P = require('../bureau/performance.js');
+  const a = E.lirePieces([['Type','N° pièce','Date','Client','Montant HT'],['Facture','FA-UNIQUE','01/11/2026','G','100,00']]);
+  const b = E.lirePieces([['Type','N° pièce','Date','Client','Montant HT'],['Facture','FA-UNIQUE','01/11/2026','G','110,00']]);
+  const c = P.consolider([{ ...a, provenance:{empreinte:'fichier-1', fichier:'x.csv'} },{ ...a, provenance:{empreinte:'fichier-1', fichier:'x.csv'} },{ ...b, provenance:{empreinte:'fichier-2', fichier:'y.csv'} }]);
+  assert.equal(c.doublonsFichier.length, 1);
+  assert.equal(c.pieces.length, 1);
+  assert.equal(c.pieces[0].htCents, 11000);
+  assert.equal(c.modifiees.length, 1);
+});
+
+test('lot 10 — rapport JSON anonymisé : zéro numéro, client, montant ou valeur brute', () => {
+  const r = E.lirePieces([['Type','N° pièce','Date','Client','Montant HT'],
+    ['Inconnu','FA-SECRET-987','01/11/2026','GARAGE SECRET','123456,78']]);
+  const j = E.rapportAnomalies(r), texte = JSON.stringify(j);
+  assert.equal(j.rejetees, 1);
+  assert.equal(j.lues, 1);
+  assert.equal(j.anomalies[0].ligne, 2);
+  for (const secret of ['FA-SECRET-987','GARAGE SECRET','123456,78']) assert.ok(!texte.includes(secret));
+});
+
+test('lot 10 — association mémorisée contrôlée, colonne Montant indécidable signalée', () => {
+  const t = [['Type','N° pièce','Date','Client','Montant HT','Montant'],['Facture','FA-1','01/11/2026','G','10,00','12,00']];
+  const a = E.analyser('pieces',t);
+  assert.ok(a.ambiguites.some(x => x.colonne === 'Montant'));
+  assert.deepEqual(E.appliquerCarteMemorisee('pieces',t[0],{ ht:'Montant HT' }).carte,{ ht:'Montant HT' });
+  assert.throws(() => E.appliquerCarteMemorisee('pieces',t[0],{ ht:'Inexistante' }), /absente/);
+  assert.throws(() => E.appliquerCarteMemorisee('pieces',t[0],{ no:'Date', date:'Date' }), /deux champs/);
+});
