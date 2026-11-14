@@ -151,6 +151,19 @@
     if (!histoDormants) manques.push('Les 12 derniers mois ne sont pas couverts par une période d’export déclarée : dormants non déterminés');
     return { seuils: S, liste: visites.concat(out.sort((a, b) => a.priorite - b.priorite)), manques };
   }
+  // ---------- Lot 9 : fiabilité du CA du mois ----------
+  // fiable : CA calculé ET une période déclarée couvre du 1er du mois à la date d'export. à vérifier : CA calculé mais couverture
+  // non prouvée, ou part non attribuée à un garage. manquant : pas calculable. Un code client absent ne rend JAMAIS le CA nul :
+  // le montant reste dans le total, « non attribué géographiquement ».
+  function fiabiliteCA(ca, periodes, arrete) {
+    if (!ca || ca.statut !== 'renseigne') return { niveau: 'manquant', raisons: [ca && ca.motif ? ca.motif : 'Export des pièces EBP non chargé'] };
+    const r = [];
+    if (!(periodes || []).length) r.push('Aucune période d’export déclarée : impossible de prouver que le mois est complet');
+    else if (!couvre(periodes, ca.debut, ca.fin)) r.push('La période déclarée ne couvre pas tout le mois jusqu’au ' + ca.fin + ' : CA peut-être sous-estimé');
+    if (ca.nonAttribue && ca.nonAttribue.cents) r.push(ca.nonAttribue.lignes.length + ' pièce(s) non attribuée(s) à un garage (code client absent ou inconnu) : comptées dans le total, hors communes');
+    if ((ca.incomplets || []).length) r.push(...ca.incomplets);
+    return { niveau: r.length ? 'a_verifier' : 'fiable', raisons: r };
+  }
   // ---------- Réglages du pilotage (lot 7), enregistrés dans le coffre ----------
   const BORNES = { devisSansCommandeJours: [1, 120], commandeSansFactureJours: [1, 120], demandeRelanceJours: [1, 60], dormantMinJours: [30, 360], dormantMaxJours: [60, 730] };
   function reglages(entree = {}) {
@@ -171,6 +184,6 @@
   }
   const derniereDecision = (journal, id) => (journal || []).filter(x => x.id === id).pop() || null;
 
-  const api = { periodeValide, fusionnerPeriodes, couvre, BORNES, reglages, consolider, REGLES_CATEGORIES, categories, objectif, SEUILS, recommandations, decider, derniereDecision, utils: { debutMois, finMois, moisPrec, ajouter } };
+  const api = { fiabiliteCA, periodeValide, fusionnerPeriodes, couvre, BORNES, reglages, consolider, REGLES_CATEGORIES, categories, objectif, SEUILS, recommandations, decider, derniereDecision, utils: { debutMois, finMois, moisPrec, ajouter } };
   if (typeof module === 'object' && module.exports) module.exports = api; else racine.Performance = api;
 })(typeof self !== 'undefined' ? self : this);

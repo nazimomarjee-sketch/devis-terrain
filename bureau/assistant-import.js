@@ -65,6 +65,7 @@
     const compte = { lues, reconnues: lues - rejetees, rejetees, nouvelles: null, identiques: null, modifiees: null };
     if (!lues) add('bloquant', 'Le fichier ne contient aucune ligne de données sous les en-têtes.');
     if (lues && rejetees === lues) add('bloquant', 'Aucune ligne n’a pu être lue : vérifie le choix des colonnes.');
+    else if (rejetees > lues / 2) add('confirmation', 'Plus de la moitié des lignes sont rejetées (' + rejetees + ' sur ' + lues + ') : le fichier n’est probablement pas le bon export, ou les colonnes sont mal associées. Coche la case de confirmation pour importer quand même.');
     else if (rejetees) add('attention', rejetees + ' ligne(s) seront ignorées : ' + [...new Set((r.ignorees || []).map(x => String(x.motif).replace(/ pour .*$/, '').replace(/ \(.*\)$/, '')))].slice(0, 4).join(' ; ') + '.');
     if (e.empreinte && (e.existant && e.existant.empreintes || []).includes(e.empreinte)) add('info', 'Ce fichier a déjà été importé : rien ne changera (aucun double comptage).');
     if (type === 'pieces') {
@@ -107,7 +108,7 @@
       if ((r.anomalies || []).length) add('attention', r.anomalies.length + ' SIRET invalide(s) : ignorés pour le rapprochement.');
     }
     absentesEnClair(type, r.correspondance).forEach(t => add('info', t));
-    return { compte, anomalies: A, validable: !A.some(a => a.gravite === 'bloquant') };
+    return { compte, anomalies: A, validable: !A.some(a => a.gravite === 'bloquant'), confirmationRequise: A.some(a => a.gravite === 'confirmation') };
   }
   const absentesEnClair = (type, corr) => colonnesAbsentes(type, corr).map(x => 'Colonne « ' + x.libelle + ' » absente : ' + x.consequence);
   // Correspondances validées (format d'export → choix de colonnes par NOM), réutilisées aux imports suivants.
@@ -117,6 +118,26 @@
     return l.concat([{ signature: analyse.signature, type: analyse.type, carte, ligneEntete: analyse.ligneEntete }]).slice(-30);
   }
   const correspondancePour = (liste, sig) => (Array.isArray(liste) ? liste : []).find(x => x.signature === sig) || null;
-  const api = { ETAPES, CONSEQUENCES, colonnesAbsentes, bilanFichier, donneesAbsentes, apercu, memoriserCorrespondance, correspondancePour };
+  // ---------- Lot 9 : écran de contrôle — chaque source classée fiable / à vérifier / manquante, avec ses raisons ----------
+  // x = { E (etat.ebp), telephone, objectifCents, fiabiliteCA (Performance.fiabiliteCA), correspondances }
+  function controle(x) {
+    const E = x.E || {}, L = [], ligne = (domaine, niveau, raisons) => L.push({ domaine, niveau, raisons: raisons.filter(Boolean) });
+    ligne('Date de l’export EBP', E.arreteConfirmee ? 'fiable' : (E.pieces || E.clients || E.reglements) ? 'a_verifier' : 'manquant',
+      [E.arreteConfirmee ? 'Confirmée : ' + E.arrete : E.arrete ? 'Proposée (' + E.arrete + ') mais non confirmée' : 'Aucune']);
+    const bf = (type, lib) => { if (!E[type]) return ligne(lib, 'manquant', [E.erreur && E.erreur[type] ? 'Dernier fichier refusé : ' + E.erreur[type] : 'Non chargé']);
+      const b = bilanFichier(type, E[type], type === 'pieces' ? E.pieces.consolidation : null);
+      ligne(lib, b.niveau === 'ok' ? 'fiable' : 'a_verifier', [b.fichier + ' : ' + b.retenues + ' ligne(s) retenue(s) sur ' + b.lues, b.ecartees ? b.ecartees + ' ligne(s) écartée(s)' : null,
+        ...b.absentes.map(a => 'Colonne « ' + a.libelle + ' » absente'), ...b.corrections]); };
+    bf('clients', 'Fichier clients'); bf('pieces', 'Pièces de vente'); bf('reglements', 'Échéancier des règlements (TTC)');
+    const c = E.pieces && E.pieces.consolidation, per = c && c.periodes || [];
+    ligne('Périodes d’export déclarées', !E.pieces ? 'manquant' : per.length && !c.nonDeclares ? 'fiable' : 'a_verifier',
+      [per.length ? per.map(p => 'du ' + p.du + ' au ' + p.au).join(' · ') : 'Aucune période déclarée', c && c.nonDeclares ? c.nonDeclares + ' export(s) sans période' : null]);
+    const f = x.fiabiliteCA || { niveau: 'manquant', raisons: ['Non calculé'] };
+    ligne('CA facturé HT du mois (factures − avoirs)', f.niveau, f.raisons.length ? f.raisons : ['Calculé sur une période déclarée complète']);
+    ligne('Sauvegarde du téléphone', x.telephone ? 'fiable' : 'manquant', [x.telephone ? 'Chargée (' + String(x.telephone.date || '').slice(0, 10) + ')' + ' · ' + ((x.telephone.demandes || []).length) + ' demande(s) de devis' : 'Non chargée : garages, demandes de devis et prospects absents']);
+    ligne('Objectif mensuel', x.objectifCents ? 'fiable' : 'manquant', [x.objectifCents ? 'Saisi' : 'Non saisi (cible annoncée : 20 000 € HT)']);
+    return { lignes: L, resume: { fiable: L.filter(l => l.niveau === 'fiable').length, a_verifier: L.filter(l => l.niveau === 'a_verifier').length, manquant: L.filter(l => l.niveau === 'manquant').length } };
+  }
+  const api = { controle, ETAPES, CONSEQUENCES, colonnesAbsentes, bilanFichier, donneesAbsentes, apercu, memoriserCorrespondance, correspondancePour };
   if (typeof module === 'object' && module.exports) module.exports = api; else racine.AssistantImport = api;
 })(typeof self !== 'undefined' ? self : this);
