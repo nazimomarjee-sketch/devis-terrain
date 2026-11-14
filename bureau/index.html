@@ -5,6 +5,7 @@
 .studio .studio-cibles,.studio .studio-cible{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0}
 .studio .studio-bloquants{color:#F2A33A;margin:8px 0;padding-left:18px}.studio .studio-visuel svg{width:100%;max-width:420px;height:auto;border-radius:16px}
 .studio pre{white-space:pre-wrap;background:#16181C;border-radius:12px;padding:12px;font-family:inherit}
+.kpis-commerce{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}.kpis-commerce .kpi{background:#16181C;border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:4px}.kpis-commerce .kpi b{font-size:22px}
 </style></head><body>
 <title>Ville ODICOLOR</title>
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -56,6 +57,8 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .donnees{position:absolute;right:max(16px,env(safe-area-inset-right,0px));top:calc(100% + 6px);width:min(360px,calc(100vw - 32px));z-index:70}
 @media (max-width:720px){.onglets{order:3;width:100%;margin-left:0}.onglet{flex:1;justify-content:center;padding:0 8px}.cherche input{width:40vw}}
 @media (max-width:480px){.onglet svg{display:none}.onglet{padding:0 4px;font-size:14px}}
+/* Lot 4-5 : 6 onglets ; au format téléphone ils passent sur deux rangées (jamais de défilement horizontal de la page). */
+@media (max-width:720px){.onglets{flex-wrap:wrap;row-gap:6px}.onglet{flex:1 1 30%;min-width:0;min-height:44px}}
 
 /* Indicateurs */
 .kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;padding-block:14px 4px}
@@ -358,6 +361,7 @@ select.recherche{appearance:auto}
 <script src="../communes-centres.js"></script>
 <script src="tournee.js"></script>
 <script src="studio.js"></script>
+<script src="commerce.js"></script>
 <script src="decisions-comptes.js"></script>
 <script src="verifier-comptes.js"></script>
 <script src="ville/modele-commune.js"></script>
@@ -1085,7 +1089,7 @@ function ouvrirFiche(x){
 // ================= En-tête : onglets, recherche, données =================
 function rendreEntete(){
   const r = route(), depChoix = TERRITOIRES.find(t=>t.id===etat.choix).dep;
-  const ong = [['bureau','Bureau','devis','#bureau'],['ville','Ville','ville','#ville'],['carte','Carte','carte','#carte-' + (r.D ? r.D.dep : depChoix)],['studio','Studio','devis','#studio'],['simulation','Simulation','sim','#simulation']];
+  const ong = [['bureau','Bureau','devis','#bureau'],['ville','Ville','ville','#ville'],['carte','Carte','carte','#carte-' + (r.D ? r.D.dep : depChoix)],['commerce','Commerce','devis','#commerce'],['studio','Studio','devis','#studio'],['simulation','Simulation','sim','#simulation']];
   $('#onglets').replaceChildren(...ong.map(([k,l,ic,href]) => h('a',{class:'onglet'+(k==='simulation'?' sim':''), href, 'aria-current': (r.ecran===k || (k==='ville' && r.ecran==='a-classer')) ? 'page' : null}, icone(ic), l)));
   const mode = $('#mode'); mode.className = 'mode' + (etat.mode==='reel'?' reel':''); mode.textContent = etat.mode==='reel' ? 'Mes garages' : 'Démo';
   mode.setAttribute('aria-expanded', String(etat.donneesOuvertes));
@@ -1515,6 +1519,7 @@ function route(){
   if (hs === '#simulation') return {ecran:'simulation'};
   if (hs === '#bureau') return {ecran:'bureau'};
   if (hs === '#studio') return {ecran:'studio'};
+  if (hs === '#commerce') return {ecran:'commerce'};
   if (hs === '#a-classer') return {ecran:'a-classer'};
   if (hs === '#verifier-comptes') return {ecran:'verifier-comptes'};
   const mv = /^#commune-(\d{5})$/.exec(hs); if (mv) return {ecran:'commune', insee:mv[1]};
@@ -1528,6 +1533,38 @@ function allerCarte(dep, porteId){ etat.recherche=''; etat.commune=''; location.
 // validation humaine liée à la version exacte. Rien n'est envoyé : exports en fichiers locaux, diffusion par le WhatsApp manuel.
 etat.studio = { biblio: [], courant: null, filtre: '' };
 const telechargerFichier = (contenu, nom, type) => { const a = h('a',{href:URL.createObjectURL(new Blob([contenu],{type})), download:nom}); document.body.appendChild(a); a.click(); a.remove(); };
+// ================= Lot 5 : Commerce (14/11/2026) =================
+// Demandes du téléphone reliées aux pièces EBP par identifiant seulement (bureau/commerce.js). Lecture seule, rien n'est envoyé.
+function vueCommerce(){
+  const E = etat.ebp, demandes = (etat.telephone && Array.isArray(etat.telephone.demandes)) ? etat.telephone.demandes : [];
+  const suivi = Commerce.suivre({ demandes, pieces: E.pieces ? E.pieces.pieces : null, avoirs: E.pieces ? E.pieces.avoirs : [], reglements: E.reglements ? E.reglements.reglements : null, clientsEbp: E.clients ? E.clients.clients : [], liens: !!(E.pieces && E.pieces.liens) });
+  let ca = null; try { ca = caAccueil(); } catch (e) { ca = null; }
+  if (ca && ca.fictif) ca = { statut:'non_renseigne', motif:'Démo : chiffres fictifs, jamais affichés comme ton CA. Charge tes exports EBP.' };
+  const T = Commerce.tableau({ suivi, demandes, ca, objectifCents: etat.objectifCents || null, liens: !!(E.pieces && E.pieces.liens), aujourdhui: jourIso() });
+  const eu = c => c == null ? 'Non renseigné' : CaFacture.euros(c), ttc = c => c == null ? 'Non renseigné' : CaFacture.euros(c).replace(' HT', ' TTC');
+  const tuile = (lib, val, cle, note) => h('div',{class:'kpi', 'data-commerce':cle}, h('b',{}, val), h('span',{}, lib), note ? h('small',{class:'info'}, note) : null);
+  const ETQ = { demande:'Demandé (téléphone)', devis_ebp:'Devis EBP', commande:'Commande confirmée (EBP)', facture:'Facturé (EBP)', encaisse:'Encaissé' };
+  const tableauBord = h('section',{class:'bloc', 'data-commerce':'tableau'}, h('div',{class:'titre-bloc'}, 'Commerce · ' + (ca && ca.libelleMois ? ca.libelleMois : 'mois en cours')),
+    h('div',{class:'kpis-commerce'},
+      tuile('CA facturé HT du mois (EBP)', eu(T.caMois.cents), 'ca', T.caMois.motif),
+      tuile('Objectif mensuel', eu(T.objectif.cents), 'objectif', T.objectif.motif),
+      tuile('Reste pour l’objectif', eu(T.ecart.cents), 'ecart'),
+      tuile('Demandes à traiter (EBP)', String(T.demandesATraiter), 'a-traiter'),
+      tuile('Devis en attente de réponse', String(T.devisEnAttente), 'attente'),
+      tuile('Commandes sans facture', T.commandesSansFacture == null ? 'Non renseigné' : String(T.commandesSansFacture), 'commandes', T.commandesSansFacture == null ? 'Export sans colonne « pièce d’origine »' : null),
+      tuile('Taux de transformation', T.tauxTransformation.pct == null ? 'Non calculable' : T.tauxTransformation.pct + ' % (' + T.tauxTransformation.base + ')', 'taux', T.tauxTransformation.motif),
+      tuile('Clients à relancer', String(T.aRelancer.length), 'relancer', T.aRelancer.slice(0, 5).join(', ') || null)),
+    h('p',{class:'regle'}, 'Demandé ≠ devis EBP ≠ commande ≠ facturé HT ≠ encaissé (TTC). Un devis accepté n’est jamais compté comme une vente.'));
+  const lignes = suivi.map(x => h('div',{class:'ligne', 'data-suivi':x.uid},
+    h('span',{}, x.client + (x.compteBloque ? ' · COMPTE BLOQUÉ' : ''), h('small',{}, ETQ[x.etape] + (x.noDevisEbp ? ' · ' + x.noDevisEbp : '') + (x.commandes.length ? ' · ' + x.commandes.map(c => c.no).join(', ') : '') + (x.factures.length ? ' · ' + x.factures.map(f => f.no).join(', ') : ''))),
+    h('small',{}, 'Facturé ' + eu(x.factureHtCents) + ' · encaissé ' + ttc(x.encaisseTtcCents) + (x.resteTtcCents ? ' · reste ' + ttc(x.resteTtcCents) : '')),
+    x.manques.length ? h('small',{class:'info', style:'grid-column:1/-1'}, x.manques.join(' · ')) : null));
+  const suiviBloc = h('section',{class:'bloc'}, h('div',{class:'titre-bloc'}, 'Suivi des demandes · ' + suivi.length),
+    !etat.telephone ? h('p',{class:'info'}, 'Charge la sauvegarde du téléphone (Mes garages) pour voir ses demandes de devis.') : lignes.length ? h('div',{class:'liste', style:'max-height:none'}, lignes) : h('p',{class:'info'}, 'Aucune demande de devis dans la sauvegarde du téléphone.'),
+    h('p',{class:'regle'}, 'Rapprochement par numéro uniquement : n° de devis EBP saisi sur le téléphone → pièces EBP dont c’est l’origine. Jamais par le nom ni le montant.'));
+  const ecom = h('section',{class:'bloc'}, h('div',{class:'titre-bloc'}, 'Commande en ligne'), h('p',{class:'info', 'data-commerce':'ecommerce'}, 'Désactivée : aucun panier public, aucun paiement, aucune commande transmise. Prérequis : ' + Commerce.ECOMMERCE.prerequis.join(' · ') + '.'));
+  return h('div',{class:'ecran'}, h('div',{class:'panneau'}, tableauBord, suiviBloc, ecom));
+}
 function vueStudio(){
   const St = Studio, E = etat.studio, maintenant = () => new Date().toISOString();
   const c = E.courant || St.normaliser({ type:'message', marque:'carsystem', cibles:['prospect'] });
@@ -1602,9 +1639,9 @@ function rendre(){
   if (r.porte) etat.choix = r.porte.id;
   if (r.ecran !== 'carte' && carte) { carte.remove(); carte = null; }
   rendreEntete(); rendreKpis(); rendreFiltres();
-  $('#kpis').hidden = ['simulation','bureau','studio','commune','communes','verifier-comptes'].includes(r.ecran);
+  $('#kpis').hidden = ['simulation','bureau','studio','commerce','commune','communes','verifier-comptes'].includes(r.ecran);
   $('#vue').replaceChildren(r.ecran === 'verifier-comptes' ? vueVerifierComptes() : ['commune','communes'].includes(r.ecran) ? (sansSourceMV() || (r.ecran === 'commune' ? vueCommuneMV(r.insee) : vueCommunesMV(r.dep)))
-    : r.ecran==='carte' ? vueCarte(r.D, r.porte) : r.ecran==='simulation' ? vueSimulation() : r.ecran==='bureau' ? vueBureau() : r.ecran==='studio' ? vueStudio() : r.ecran==='a-classer' ? vueAClasser() : vueVille());
+    : r.ecran==='carte' ? vueCarte(r.D, r.porte) : r.ecran==='simulation' ? vueSimulation() : r.ecran==='bureau' ? vueBureau() : r.ecran==='studio' ? vueStudio() : r.ecran==='commerce' ? vueCommerce() : r.ecran==='a-classer' ? vueAClasser() : vueVille());
   rendreFil();
   const sc = document.getElementById('scene'); if (sc && sc.scrollWidth > sc.clientWidth) { const t = TERRITOIRES.find(x=>x.id===etat.choix), [px] = iso(...pos(t)); sc.scrollLeft = (px + 495) / 990 * sc.scrollWidth - sc.clientWidth/2; }
 }

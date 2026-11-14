@@ -70,6 +70,7 @@ jobs:
           node tests/demo-browser.cjs
           node tests/serveur-demo-browser.cjs
           node tests/whatsapp-browser.cjs
+          node tests/demandes-browser.cjs
       - name: Tester le Bureau et l'application locale (navigateur, données fictives)
         run: |
           for f in tests/*navigateur.cjs; do echo "== $f"; node "$f" || exit 1; done

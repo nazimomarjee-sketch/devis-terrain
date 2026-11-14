@@ -215,6 +215,10 @@ const CHAMPS = {
     ['code', 'Code article', true, [/^(code|codearticle|reference|ref|refarticle|article)$/, /^(code|ref)/]],
     ['des', 'Désignation', true, [/designation|libelle|description/, /^nom/]],
     ['prix', 'Prix de vente HT', true, [/tarif.*france/, /tarif/, /prixvente|pvht|prix.*ht/, /prix|pv/]],
+    // Lot 5 : colonnes facultatives (documents fiables uniquement) pour la recherche par marque et catégorie.
+    ['marque', 'Marque (facultatif)', false, [/^(marque|brand|fabricant)$/, /marque|fabricant/]],
+    ['categorie', 'Catégorie (facultatif)', false, [/^(categorie|famille|rubrique)$/, /categorie|famille article|rubrique/]],
+    ['conditionnement', 'Conditionnement (facultatif)', false, [/^(conditionnement|contenance|unite)$/, /conditionnement|contenance/]],
   ],
   clients: [
     ['nom', 'Nom du client', true, [/^(nom|raison|client|societe|entreprise|designation)/]],
@@ -239,7 +243,8 @@ function importerArticles(rows, debut, map, existants) {
   for (let i = debut + 1; i < rows.length; i++) {
     const r = rows[i] || [];
     if (r.every(c => clean(c) === '')) continue; // ligne totalement vide : on saute sans compter
-    lignes.push({ n: i + 1, code: clean(r[map.code]), brut: r[map.code], des: clean(r[map.des]), prixBrut: r[map.prix] });
+    const opt = k => (map[k] == null || map[k] === '' ? '' : clean(r[map[k]]).slice(0, 60)); // colonnes facultatives (lot 5)
+    lignes.push({ n: i + 1, code: clean(r[map.code]), brut: r[map.code], des: clean(r[map.des]), prixBrut: r[map.prix], marque: opt('marque'), categorie: opt('categorie'), conditionnement: opt('conditionnement') });
   }
   let espaces = 0;
   const vus = new Map();
@@ -271,7 +276,9 @@ function importerArticles(rows, debut, map, existants) {
     if (p == null) { rep.ignorees++; err(rep, l.n, l.code + ' : prix de vente manquant'); continue; }
     if (p <= 0) { rep.ignorees++; err(rep, l.n, l.code + ' : prix de vente nul ou négatif (' + num2(p) + ')'); continue; }
     if (l.code.length > 60 || l.des.length > 200) rep.avertissements.push('ligne ' + l.n + ' : texte tronqué pour ' + l.code);
-    out.push({ code: l.code.slice(0, 60), des: l.des.replace(/\s+/g, ' ').slice(0, 200), pu: p });
+    const art = { code: l.code.slice(0, 60), des: l.des.replace(/\s+/g, ' ').slice(0, 200), pu: p };
+    for (const k of ['marque', 'categorie', 'conditionnement']) if (l[k]) art[k] = l[k];
+    out.push(art);
     existants.has(l.code.slice(0, 60)) ? rep.maj++ : rep.crees++;
   }
   return { rep, items: out };
@@ -397,6 +404,8 @@ async function route() {
     else if (p[0] === 'proposition') await pageProposition();
     else if (p[0] === 'ville') await pageVille(p[1]);
     else if (p[0] === 'visite' && /^\d+$/.test(p[1] || '')) await pageVisite(Number(p[1]));
+    else if (p[0] === 'demande' && p[1] === 'nouvelle' && /^\d+$/.test(p[2] || '')) await nouvelleDemande(Number(p[2]));
+    else if (p[0] === 'demande' && p[1]) await pageDemande(p[1]);
     else nonTrouve();
   } catch (e) { console.error(e); toast('Erreur : ' + e.message, true); }
 }
@@ -1498,6 +1507,79 @@ async function pageTournee() {
     h('p', { class: 'mut' }, 'Rythme par défaut : A = 14 jours, B = 30 jours, C = 90 jours (hypothèses, à ajuster). Ta position n’est ni enregistrée ni envoyée : elle sert seulement à classer la liste.'));
   dessiner();
 }
+// ----- Lot 5 (14/11/2026) : demandes de devis (pour Mohamed / EBP), JAMAIS un devis officiel -----
+// Stockées dans meta « demandesDevis » (incluses dans la sauvegarde complète, lues par le Bureau). Aucun prix saisi ici.
+const lireDemandes = async () => { const v = await get('meta', 'demandesDevis'); return Array.isArray(v) ? v : []; };
+const ecrireDemandes = l => put('meta', l.slice(-500), 'demandesDevis');
+const compteBloqueDe = c => !!(c && ((c.compte && c.compte.statut === 'bloque') || c.bloque));
+async function carteDemandes(c) {
+  const D = ODICOLOR_DEMANDES, l = (await lireDemandes()).filter(d => d.clientId === c.id).slice(-3).reverse();
+  return h('section', { class: 'carte v50-demandes' },
+    h('a', { class: 'btn', href: '#/demande/nouvelle/' + c.id, style: 'min-height:72px;width:100%;display:flex;align-items:center;justify-content:center', 'data-demande': 'nouvelle' }, 'Demande de devis (pour EBP)'),
+    l.map(d => h('a', { class: 'ligne', href: '#/demande/' + d.uid, style: 'color:inherit;text-decoration:none', 'data-demande': d.uid },
+      h('span', { class: 'g' }, h('strong', {}, D.ETAPES[d.statut]), h('br'), h('small', { class: 'mut' }, dateFr(d.creeLe) + ' · ' + d.lignes.length + ' produit(s)' + (d.noDevisEbp ? ' · devis EBP ' + d.noDevisEbp : ''))))));
+}
+async function nouvelleDemande(clientId) {
+  const c = await get('clients', clientId); if (!c) return nonTrouve();
+  const d = ODICOLOR_DEMANDES.nouvelle({ id: c.id, nom: c.nom, codeEbp: c.codeEbp || (c.liaisonEbp && c.liaisonEbp.code) || '' }, { uid: nouvelUid(), maintenant: new Date().toISOString() });
+  await ecrireDemandes((await lireDemandes()).concat([d]));
+  location.replace('#/demande/' + d.uid);
+}
+async function pageDemande(uid) {
+  const D = ODICOLOR_DEMANDES, toutes = await lireDemandes(), i = toutes.findIndex(x => x.uid === uid); if (i < 0) return nonTrouve();
+  let d = toutes[i]; const c = await get('clients', d.clientId), pack = await get('meta', 'contenusWa');
+  const sauver = async () => { const l = await lireDemandes(), k = l.findIndex(x => x.uid === uid); if (k >= 0) l[k] = d; else l.push(d); await ecrireDemandes(l); };
+  const msg = h('p', { class: 'mut', role: 'status', 'aria-live': 'polite' });
+  const agir = async f => { try { d = f(d); await sauver(); await pageDemande(uid); } catch (e) { msg.textContent = e.message; toast(e.message, true); } };
+  const brouillon = d.statut === 'brouillon', gros = 'min-height:72px;width:100%';
+  const besoins = h('textarea', { rows: 3, maxlength: 600, disabled: !brouillon, placeholder: 'Besoin du garage : produits, volumes, problème à résoudre…', 'aria-label': 'Besoin du garage', onchange: async ev => { d = { ...d, besoins: clean(ev.target.value).slice(0, 600) }; await sauver(); } }, d.besoins || '');
+  const q = h('input', { type: 'search', placeholder: 'Référence, désignation, marque…', 'aria-label': 'Chercher un produit', disabled: !brouillon });
+  const resultats = h('div'), qte = h('input', { type: 'number', inputmode: 'numeric', min: 1, max: 9999, value: 1, 'aria-label': 'Quantité', style: 'max-width:110px' });
+  const plus = (n) => h('button', { class: 'btn sec', type: 'button', style: 'min-height:56px;min-width:56px', onclick: () => { qte.value = Math.max(1, Math.min(9999, (Number(qte.value) || 1) + n)); } }, n > 0 ? '+' : '−');
+  const ajouter = a => agir(x => D.ajouterLigne(x, { ref: a.code, des: a.des, marque: a.marque, conditionnement: a.conditionnement, qte: qte.value }));
+  const dessinerRes = () => { const r = D.chercher(CAT, q.value, { max: 12 });
+    resultats.replaceChildren(...(q.value.trim() ? (r.length ? r.map(a => h('button', { class: 'ligne', type: 'button', style: 'width:100%;min-height:56px;background:none;border:0;border-bottom:1px solid var(--line);color:inherit;font:inherit;text-align:left', onclick: () => ajouter(a) },
+      h('span', { class: 'g' }, h('strong', {}, a.code + ' · ' + a.des), h('br'), h('small', { class: 'mut' }, [a.marque, a.categorie, a.conditionnement].filter(Boolean).join(' · ') || 'Marque non renseignée dans le catalogue')))) : [h('p', { class: 'vide' }, 'Aucun produit du catalogue importé. Ajoute une ligne libre.')]) : [])); };
+  q.addEventListener('input', dessinerRes);
+  const lRef = h('input', { placeholder: 'Référence', maxlength: 40, 'aria-label': 'Référence libre' }), lDes = h('input', { placeholder: 'Désignation', maxlength: 160, 'aria-label': 'Désignation libre' });
+  const lMarque = h('select', { 'aria-label': 'Marque' }, [h('option', { value: '' }, 'Marque…'), ...D.MARQUES_ACTIVES.map(m => h('option', { value: m }, m))]);
+  const noEbp = h('input', { placeholder: 'N° du devis dans EBP', maxlength: 40, 'aria-label': 'Numéro du devis EBP', 'data-demande': 'no-ebp' });
+  const etape = (vers, lib, extra = () => ({})) => h('button', { class: 'btn' + (vers === 'refuse' || vers === 'brouillon' ? ' sec' : ''), type: 'button', style: gros, 'data-etape': vers,
+    onclick: () => agir(x => D.passer(x, vers, Object.assign({ maintenant: new Date().toISOString(), compteBloque: compteBloqueDe(c) }, extra()))) }, lib);
+  const transmettre = h('button', { class: 'btn', type: 'button', style: gros, 'data-etape': 'a_traiter', onclick: async () => {
+    try { const n = D.passer(d, 'a_traiter', { maintenant: new Date().toISOString(), compteBloque: compteBloqueDe(c) });
+      const texte = D.recapitulatif(n, { commercial: S.vendeur || '' });
+      window.open('https://wa.me/' + tel2wa(S.respTel) + '?text=' + encodeURIComponent(texte), '_blank', 'noopener');
+      d = { ...n, historique: n.historique.map((h0, k) => k === n.historique.length - 1 ? { ...h0, motif: 'Récapitulatif préparé dans WhatsApp pour ' + (S.respNom || 'le responsable') + ' (envoi non confirmé)' } : h0) };
+      await sauver(); await pageDemande(uid);
+    } catch (e) { msg.textContent = e.message; toast(e.message, true); } } }, 'Transmettre à ' + (S.respNom || 'Mohamed') + ' (WhatsApp)');
+  const marques = [...new Set(d.lignes.map(l => l.marque).filter(Boolean))];
+  const contenus = pack && Array.isArray(pack.contenus) ? pack.contenus.filter(x => marques.includes(x.marque)) : [];
+  montrer('Demande de devis',
+    h('div', { class: 'bandeau-ko', style: 'background:var(--carte2,#1c1f24);color:inherit' }, 'Demande ODICOLOR — ce n’est PAS un devis EBP. Le devis officiel est établi dans EBP.'),
+    compteBloqueDe(c) ? h('div', { class: 'bandeau-ko' }, 'COMPTE BLOQUÉ · la demande ne peut pas être transmise') : null,
+    h('section', { class: 'carte' }, h('strong', {}, d.clientNom), h('br'), h('small', { class: 'mut' }, D.ETAPES[d.statut] + (d.noDevisEbp ? ' · devis EBP ' + d.noDevisEbp : '') + (d.codeEbp ? ' · code EBP ' + d.codeEbp : ''))),
+    h('section', { class: 'carte' }, h('label', {}, 'Besoin du garage'), besoins),
+    h('section', { class: 'carte' }, h('strong', {}, 'Produits (' + d.lignes.length + ')'),
+      d.lignes.length ? d.lignes.map((l, k) => h('div', { class: 'ligne' }, h('span', { class: 'g' }, h('strong', {}, (l.ref ? l.ref + ' · ' : '') + l.des), h('br'), h('small', { class: 'mut' }, [l.marque, l.conditionnement, '× ' + l.qte].filter(Boolean).join(' · '))),
+        brouillon ? h('button', { class: 'btn sec', type: 'button', style: 'min-height:56px', 'aria-label': 'Retirer ' + (l.ref || l.des), onclick: () => agir(x => D.retirerLigne(x, k)) }, 'Retirer') : null)) : h('p', { class: 'vide' }, 'Aucun produit.'),
+      brouillon ? [h('div', { class: 'actions' }, plus(-1), qte, plus(1)), q, resultats,
+        h('details', {}, h('summary', {}, 'Ligne libre (produit hors catalogue importé)'), lRef, lDes, lMarque,
+          h('button', { class: 'btn sec', type: 'button', style: gros, onclick: () => agir(x => D.ajouterLigne(x, { ref: lRef.value, des: lDes.value, marque: lMarque.value, qte: qte.value })) }, 'Ajouter la ligne'))] : null,
+      h('small', { class: 'mut' }, 'Aucun prix ici : prix et remises sont établis dans EBP selon les conditions validées.')),
+    contenus.length ? h('section', { class: 'carte' }, h('strong', {}, 'Contenus marketing validés liés (' + contenus.length + ')'), contenus.slice(0, 5).map(x => h('small', { class: 'mut', style: 'display:block' }, x.marque + ' · ' + x.titre)),
+      h('a', { class: 'btn sec', href: '#/client/' + d.clientId, style: gros }, 'Les envoyer par WhatsApp depuis la fiche')) : null,
+    h('section', { class: 'carte' },
+      d.statut === 'brouillon' ? transmettre : null,
+      d.statut === 'a_traiter' ? [noEbp, etape('traite_ebp', 'Traité dans EBP', () => ({ noDevisEbp: noEbp.value })), etape('brouillon', 'Revenir en brouillon')] : null,
+      d.statut === 'traite_ebp' ? etape('envoye', 'Devis EBP envoyé au client') : null,
+      d.statut === 'envoye' ? [etape('accepte', 'Accepté par le client'), etape('refuse', 'Refusé par le client')] : null,
+      d.statut === 'accepte' ? h('p', { class: 'mut' }, 'Accepté : la vente n’est comptée qu’une fois la commande puis la facture présentes dans EBP.') : null,
+      msg),
+    h('details', { class: 'carte' }, h('summary', {}, 'Historique (' + d.historique.length + ')'), d.historique.map(x => h('small', { class: 'mut', style: 'display:block' }, dateFr(x.le) + ' · ' + D.ETAPES[x.etape] + (x.noDevisEbp ? ' · ' + x.noDevisEbp : '') + (x.motif ? ' · ' + x.motif : '')))),
+    h('a', { class: 'btn sec', href: '#/client/' + d.clientId, style: gros }, 'Retour à la fiche'));
+  if (brouillon) dessinerRes();
+}
 // ----- Lot 3 (14/11/2026) : WhatsApp commercial manuel depuis la fiche garage -----
 // Aucun envoi automatique : le lien ouvre WhatsApp avec le message prérempli, l'envoi reste un geste du commercial.
 // Le journal du garage (c.contacts) ne note que « WhatsApp ouvert » ; la relance programmée devient le rappel du garage
@@ -1701,6 +1783,7 @@ async function pageClient(id) {
         h('button',{class:'btn sec',disabled:true},'Appeler'),
       h('a',{class:'btn sec',href:'#/signaler/'+c.id},'Incident')),
     carteWhatsApp(c, contenusWa),
+    await carteDemandes(c),
     h('section',{class:'carte v36-prochaine'},
       h('strong',{},'Prochaine action'),
       h('label',{},'À faire'),etape,

@@ -118,7 +118,9 @@
       photos: meta.filter(e => e[0].startsWith('garage-photo-v38:')).length,
       pdf: meta.filter(e => e[0].startsWith('pdfFournisseur:')).length
     };
-    return { format: 'odicolor-2', date: h.date, clients: magasins.clients, devis: Array.isArray(magasins.devis) ? magasins.devis : [], resume,
+    // Lot 5 : demandes de devis du téléphone (meta « demandesDevis ») ; absentes des anciennes sauvegardes = liste vide.
+    const dem = meta.find(e => e[0] === 'demandesDevis'), demandes = dem && Array.isArray(dem[1]) ? dem[1].filter(objet) : [];
+    return { format: 'odicolor-2', date: h.date, clients: magasins.clients, devis: Array.isArray(magasins.devis) ? magasins.devis : [], demandes, resume,
       controle: { entete: true, pieces: pieces.length, octets: fichier.size } };
   }
 
@@ -150,7 +152,7 @@
     r.rapport.controle = lu.controle;
     r.rapport.octets = fichier.size;
     // Fiches et devis du téléphone tels quels (lecture seule) : utilisés par le pipeline du Bureau (pipeline.js).
-    r.telephone = { date: lu.date, clients: lu.clients, devis: lu.devis };
+    r.telephone = { date: lu.date, clients: lu.clients, devis: lu.devis, demandes: Array.isArray(lu.demandes) ? lu.demandes : [] };
     return r;
   }
 
