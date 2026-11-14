@@ -94,6 +94,16 @@ test('création du coffre, imports, ARRÊT BRUTAL, redémarrage : cockpit, garag
   g = await generation(p); await p.fill('[data-pilotage="objectif-saisie"]', '20000'); await p.dispatchEvent('[data-pilotage="objectif-saisie"]', 'change'); await attendreEnregistrement(p, g);
   await p.click('[data-pilotage="reglages"] summary'); await p.fill('[data-seuil="devisSansCommandeJours"]', '14');
   g = await generation(p); await p.click('[data-pilotage="enregistrer-reglages"]'); await attendreEnregistrement(p, g);
+  // Lot 8 : export aux en-têtes inhabituels, colonnes associées à la main, validé : la correspondance part dans le coffre.
+  // Avec une colonne d'origine (« Source ») : sans elle, la consolidation perdrait les liens et changerait les voyants comparés plus bas.
+  const formatInhabituel = n => 'Genre;Pièce;Jour;Raison;Valeur nette;Source\nDevis;DE-L' + n + ';0' + n + '/11/2026;GARAGE FICTIF ALPHA;10,00;\n';
+  fs.writeFileSync(path.join(travail, 'inhabituel-1.csv'), formatInhabituel(1)); fs.writeFileSync(path.join(travail, 'inhabituel-2.csv'), formatInhabituel(2));
+  await p.evaluate(() => { location.hash = 'import-ebp'; }); await p.waitForSelector('[data-assistant="etape-arrete"]');
+  for (let i = 0; i < 2; i++) await p.click('[data-assistant="suivant"]');
+  await p.setInputFiles('[data-assistant="fichier-pieces"]', path.join(travail, 'inhabituel-1.csv')); await p.waitForSelector('[data-assistant="apercu-pieces"]');
+  for (const [k, v] of [['type', 'Genre'], ['no', 'Pièce'], ['date', 'Jour'], ['client', 'Raison'], ['ht', 'Valeur nette'], ['origine', 'Source']]) await p.selectOption('[data-colonne="' + k + '"]', v);
+  await p.click('[data-assistant="recalculer"]'); await p.waitForSelector('[data-assistant="compte"]');
+  g = await generation(p); await p.click('[data-assistant="valider"]'); await attendreEnregistrement(p, g);
   await ctx.close();
   // 3. Coupure brutale du programme local (comme une panne de courant), puis relance.
   await tuer(prog);
@@ -117,6 +127,11 @@ test('création du coffre, imports, ARRÊT BRUTAL, redémarrage : cockpit, garag
   await p.evaluate(() => { location.hash = 'pilotage'; }); await p.waitForSelector('[data-pilotage="objectif"]');
   assert.match((await p.textContent('[data-pilotage="objectif"]')).replace(/\s+/g, ' '), /20 000,00 € HT/);
   await p.click('[data-pilotage="reglages"] summary'); assert.equal(await p.inputValue('[data-seuil="devisSansCommandeJours"]'), '14');
+  // Lot 8 : après redémarrage (navigateur vierge), le même format est reconnu grâce à la correspondance du coffre.
+  await p.evaluate(() => { location.hash = 'import-ebp'; }); await p.waitForSelector('[data-assistant="etape-arrete"]');
+  for (let i = 0; i < 2; i++) await p.click('[data-assistant="suivant"]');
+  await p.setInputFiles('[data-assistant="fichier-pieces"]', path.join(travail, 'inhabituel-2.csv')); await p.waitForSelector('[data-assistant="memoire"]');
+  await p.click('[data-assistant="annuler"]');
   await p.evaluate(() => { location.hash = 'bureau'; }); await p.waitForSelector('.reveil');
   await capture(p, 'local-3-cockpit-retrouve');
   assert.deepEqual(await personnages(), villeAvant, 'Ville LEGO : mêmes personnages (nom, segment, alerte) qu’avant la coupure');

@@ -49,6 +49,9 @@
   // Octets → texte : UTF-8 strict, sinon Windows-1252 (export Excel/EBP français courant).
   function decoderTexte(octets) {
     const u8 = octets instanceof Uint8Array ? octets : new Uint8Array(octets);
+    // Lot 8 : « Texte Unicode » d'Excel / EBP = UTF-16 avec marque d'ordre des octets (BOM).
+    if (u8[0] === 0xFF && u8[1] === 0xFE) return { texte: new TextDecoder('utf-16le').decode(u8.subarray(2)), encodage: 'UTF-16' };
+    if (u8[0] === 0xFE && u8[1] === 0xFF) return { texte: new TextDecoder('utf-16be').decode(u8.subarray(2)), encodage: 'UTF-16' };
     try { return { texte: new TextDecoder('utf-8', { fatal: true }).decode(u8).replace(/^﻿/, ''), encodage: 'UTF-8' }; }
     catch (_) { return { texte: new TextDecoder('windows-1252').decode(u8), encodage: 'Windows-1252' }; }
   }
@@ -138,20 +141,49 @@
     return '';
   }
 
-  function verifierTable(type, lignes) {
+  // Lot 8 : ligne d'en-tête = parmi les 15 premières, celle qui reconnaît le plus de colonnes (les lignes de titre d'un état EBP
+  // au-dessus sont ignorées). À score égal, la plus haute. Aucune ligne reconnue : la première (comportement d'origine).
+  function trouverEntete(type, lignes) {
+    let meilleur = 0, score = -1;
+    for (let i = 0; i < Math.min(15, (lignes || []).length); i++) {
+      const a = associerColonnes(type, (lignes[i] || []).map(x => texte(x, 80))), sc = Object.keys(a.carte).length - a.manquantes.length * 0.01;
+      if (sc > score) { score = sc; meilleur = i; }
+    }
+    return meilleur;
+  }
+  // Signature d'un format d'export : type + en-têtes normalisés (pour retrouver une correspondance validée).
+  const signature = (type, entetes) => type + '|' + entetes.map(norm).join('|');
+  // options : { ligneEntete, carte (clé → NOM de colonne choisi à la main) }. Une association manuelle prime sur la détection.
+  function analyser(type, lignes, options = {}) {
+    if (!Array.isArray(lignes) || !lignes.length) throw new Error('Export ' + type + ' vide.');
+    const i = options.ligneEntete != null ? options.ligneEntete : trouverEntete(type, lignes);
+    const entetes = (lignes[i] || []).map(x => texte(x, 80)), a = associerColonnes(type, entetes), carte = Object.assign({}, a.carte), def = COLONNES[type];
+    for (const [k, nom] of Object.entries(options.carte || {})) {
+      if (!def.some(d => d[0] === k)) continue;
+      if (nom === '' || nom == null) { delete carte[k]; continue; }
+      const j = entetes.indexOf(nom); if (j < 0) throw new Error('Colonne « ' + nom + ' » absente de ce fichier.');
+      for (const [k2, v] of Object.entries(carte)) if (v === j && k2 !== k) delete carte[k2];
+      carte[k] = j;
+    }
+    const manquantes = def.filter(([k, , , ob]) => ob && carte[k] == null).map(([, lib]) => lib);
+    return { type, ligneEntete: i, entetes, carte, manquantes, signature: signature(type, entetes), manuel: !!(options.carte && Object.keys(options.carte).length),
+      correspondance: def.filter(([k]) => carte[k] != null).map(([k, lib]) => ({ cle: k, libelle: lib, colonne: entetes[carte[k]] })),
+      champs: def.map(([k, lib, , ob]) => ({ cle: k, libelle: lib, obligatoire: ob, colonne: carte[k] != null ? entetes[carte[k]] : '' })), lignesTitre: i };
+  }
+  function verifierTable(type, lignes, options = {}) {
     if (!Array.isArray(lignes) || lignes.length < 2) throw new Error('Export ' + type + ' vide : aucune ligne après les en-têtes.');
-    const entetes = lignes[0].map(x => texte(x, 80));
-    const a = associerColonnes(type, entetes);
-    if (a.manquantes.length) throw new Error('Export ' + type + ' : colonne(s) obligatoire(s) introuvable(s) : ' + a.manquantes.join(', ') + '. Colonnes lues : ' + entetes.join(' | ') + '.');
-    return { entetes, ...a, corps: lignes.slice(1) };
+    const A = analyser(type, lignes, options);
+    if (A.manquantes.length) throw new Error('Export ' + type + ' : colonne(s) obligatoire(s) introuvable(s) : ' + A.manquantes.join(', ') + '. Colonnes lues : ' + A.entetes.join(' | ') + '.');
+    if (lignes.length < A.ligneEntete + 2) throw new Error('Export ' + type + ' vide : aucune ligne après les en-têtes.');
+    return { entetes: A.entetes, carte: A.carte, manquantes: [], correspondance: A.correspondance, corps: lignes.slice(A.ligneEntete + 1), decalage: A.ligneEntete };
   }
   const cellule = (r, carte, k) => (carte[k] == null ? '' : r[carte[k]]);
 
   // Pièces commerciales (devis, commandes, BL, factures). lignes = tableau de lignes (1re = en-têtes).
-  function lirePieces(lignes) {
-    const T = verifierTable('pieces', lignes), pieces = [], ignorees = [], avoirs = [], vus = new Map();
+  function lirePieces(lignes, options = {}) {
+    const T = verifierTable('pieces', lignes, options), pieces = [], ignorees = [], avoirs = [], vus = new Map();
     T.corps.forEach((r, i) => {
-      const n = i + 2, g = k => cellule(r, T.carte, k);
+      const n = i + 2 + T.decalage, g = k => cellule(r, T.carte, k);
       const no = texte(g('no'), 40), date = lireDate(g('date')), type = lireType(g('type'), no), ht = lireMontant(g('ht'));
       const client = texte(g('client'), 120) || texte(g('code'), 40);
       if (!no) return ignorees.push({ ligne: n, motif: 'N° de pièce absent' });
@@ -183,10 +215,10 @@
   //  2. sinon « Montant TTC − Montant réglé » si la colonne du réglé existe ;
   //  3. sinon : sans date de règlement → montant entier dû ; AVEC une date mais sans montant réglé → reste INCONNU (null).
   //     Avant le lot 1, ce cas était lu « soldé » : un règlement partiel devenait invisible (constaté le 13/11/2026).
-  function lireReglements(lignes) {
-    const T = verifierTable('reglements', lignes), reglements = [], ignorees = [], vus = new Set();
+  function lireReglements(lignes, options = {}) {
+    const T = verifierTable('reglements', lignes, options), reglements = [], ignorees = [], vus = new Set();
     T.corps.forEach((r, i) => {
-      const n = i + 2, g = k => cellule(r, T.carte, k);
+      const n = i + 2 + T.decalage, g = k => cellule(r, T.carte, k);
       const facture = texte(g('facture'), 40), echeance = lireDate(g('echeance')), reglement = lireDate(g('reglement')), montant = lireMontant(g('montant'));
       if (!facture) return ignorees.push({ ligne: n, motif: 'N° de facture absent' });
       if (!echeance) return ignorees.push({ ligne: n, motif: 'Échéance illisible pour ' + facture });
@@ -221,10 +253,10 @@
   }
 
   // Fichier clients EBP. Statut « bloqué » repéré dans le texte du statut.
-  function lireClientsEbp(lignes) {
-    const T = verifierTable('clients', lignes), clients = [], ignorees = [], anomalies = [], codes = new Set();
+  function lireClientsEbp(lignes, options = {}) {
+    const T = verifierTable('clients', lignes, options), clients = [], ignorees = [], anomalies = [], codes = new Set();
     T.corps.forEach((r, i) => {
-      const n = i + 2, g = k => cellule(r, T.carte, k);
+      const n = i + 2 + T.decalage, g = k => cellule(r, T.carte, k);
       const code = texte(g('code'), 40), nom = texte(g('nom'), 120);
       if (!code || !nom) return ignorees.push({ ligne: n, motif: 'Code ou nom absent' });
       if (codes.has(code)) return ignorees.push({ ligne: n, motif: 'Code client ' + code + ' en double' });
@@ -241,7 +273,7 @@
     return { clients, ignorees, anomalies, correspondance: T.correspondance, lues: T.corps.length };
   }
 
-  const api = { COLONNES, decoderTexte, lireCsv, associerColonnes, lireDate, lireMontant, montantAmbigu, siretValide, lireType, lirePieces, lireReglements, lireClientsEbp };
+  const api = { COLONNES, decoderTexte, lireCsv, associerColonnes, trouverEntete, analyser, signature, lireDate, lireMontant, montantAmbigu, siretValide, lireType, lirePieces, lireReglements, lireClientsEbp };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else racine.EbpImport = api;
 })(typeof self !== 'undefined' ? self : this);

@@ -20,7 +20,8 @@ test('assistant : 5 étapes, période déclarée, lignes écartées et colonnes 
   await ctx.route(/^https?:/, r => r.abort());
   const p = await ctx.newPage(), erreurs = []; p.on('pageerror', e => erreurs.push(e.message));
   const txt = s => p.textContent(s).then(x => x.replace(/\s+/g, ' ').trim());
-  const deposer = async (type, f) => { await p.setInputFiles('[data-assistant="fichier-' + type + '"]', path.join(dossier, f)); await p.waitForSelector('[data-assistant="bilan-' + type + '"] .badge'); };
+  // Lot 8 : choisir le fichier affiche un aperçu ; l'import n'a lieu qu'après « Valider l'import ».
+  const deposer = async (type, f) => { await p.setInputFiles('[data-assistant="fichier-' + type + '"]', path.join(dossier, f)); await p.waitForSelector('[data-assistant="apercu-' + type + '"]'); await p.click('[data-assistant="valider"]'); await p.waitForSelector('[data-assistant="bilan-' + type + '"] .badge'); };
   try {
     await p.clock.setFixedTime(new Date('2026-11-14T10:00:00'));
     await p.goto(PAGE + '#bureau'); await p.click('[data-assistant="ouvrir"]'); await p.waitForSelector('[data-assistant="etape-arrete"]');

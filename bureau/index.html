@@ -1174,24 +1174,45 @@ async function lireTableau(f){
   }
   return EbpImport.lireCsv(EbpImport.decoderTexte(buf).texte);
 }
+// Lot 8 : import en deux temps. 1) analyserFichierEbp : lecture, en-têtes, correspondance (mémorisée ou manuelle), contrôle — RIEN n'est modifié.
+// 2) appliquerImport : remplacement ATOMIQUE (le nouvel état est calculé à part, puis affecté d'un coup ; une erreur laisse tout intact).
+etat.correspondances = null; // chargées à la première utilisation (lireLocal est défini plus bas) ; coffre prioritaire
+function correspondances(){ if (!Array.isArray(etat.correspondances)) { try { const v = JSON.parse(lireLocal('odicolor-correspondances-ebp') || '[]'); etat.correspondances = Array.isArray(v) ? v : []; } catch (e) { etat.correspondances = []; } } return etat.correspondances; }
+function memoriserCorrespondance(analyse){ etat.correspondances = AssistantImport.memoriserCorrespondance(correspondances(), analyse); ecrireLocal('odicolor-correspondances-ebp', JSON.stringify(etat.correspondances)); }
+async function analyserFichierEbp(type, f, options = {}){
+  if (f.size > 50*1024*1024) throw new Error('Fichier trop gros (50 Mo maximum).');
+  if (!/\.(csv|txt|xlsx|xls)$/i.test(f.name)) throw new Error('Format non pris en charge : utilise un export Excel (.xlsx, .xls) ou texte (.csv, .txt).');
+  const lignes = options.lignes || await lireTableau(f);
+  let carte = options.carte || null;
+  const brut = EbpImport.analyser(type, lignes);
+  const memo = !carte ? AssistantImport.correspondancePour(correspondances(), brut.signature) : null; if (memo) carte = memo.carte;
+  const analyse = EbpImport.analyser(type, lignes, { carte: carte || {} });
+  const fn = EXPORTS.find(x => x[0] === type)[2];
+  const r = analyse.manquantes.length ? null : EbpImport[fn](lignes, { carte: carte || {} });
+  const empreinte = options.empreinte || await empreinteFichier(f), dateFichier = f.lastModified ? jourIso(new Date(f.lastModified)) : null;
+  const prov = r ? { fichier: f.name, nature: type, taille: f.size, dateFichier, importeLe: new Date().toISOString(), empreinte, lues: r.lues, ecartees: r.ignorees.length,
+    periode: Performance.periodeValide(options.periode) ? { du: options.periode.du, au: options.periode.au, declareeLe: new Date().toISOString() } : null } : null; // lot 7 : période déclarée
+  return { type, fichier: f.name, lignes, analyse, r, prov, empreinte, memoire: !!memo, carte };
+}
+function appliquerImport(type, r, prov){
+  const E = etat.ebp, fichier = prov.fichier;
+  if (type === 'pieces') {
+    // Lot 6 : exports de pièces successifs consolidés (historique), sans double comptage (performance.js, consolider).
+    const lots = (!E.lotsPieces.length && E.pieces ? [E.pieces] : E.lotsPieces.slice()).concat([Object.assign(r, { fichier, provenance: prov })]);
+    const C = Performance.consolider(lots);
+    const pieces = Object.assign({}, r, { pieces: C.pieces, avoirs: C.avoirs, ignorees: C.ignorees, liens: C.liens, consolidation: { imports: C.imports, modifiees: C.modifiees, doublonsFichier: C.doublonsFichier, couverture: C.couverture, dernierImport: C.dernierImport, periodes: C.periodes, nonDeclares: C.nonDeclares, horsPeriode: C.horsPeriode } });
+    E.lotsPieces = lots; E.pieces = pieces; // affectation en une fois
+  } else E[type] = Object.assign(r, { fichier, provenance: prov });
+  delete E.erreur[type];
+  proposerArrete();
+}
 async function importerEbp(type, f, options = {}){
   if (!f) return;
   delete etat.ebp.erreur[type];
   try {
-    if (f.size > 50*1024*1024) throw new Error('Fichier trop gros (50 Mo maximum).');
-    const fn = EXPORTS.find(x => x[0] === type)[2];
-    const r = EbpImport[fn](await lireTableau(f));
-    const dateFichier = f.lastModified ? jourIso(new Date(f.lastModified)) : null;
-    const prov = { fichier: f.name, nature: type, taille: f.size, dateFichier, importeLe: new Date().toISOString(), empreinte: await empreinteFichier(f), lues: r.lues, ecartees: r.ignorees.length,
-      periode: Performance.periodeValide(options.periode) ? { du: options.periode.du, au: options.periode.au, declareeLe: new Date().toISOString() } : null }; // lot 7 : période déclarée
-    if (type === 'pieces') {
-      // Lot 6 : les exports de pièces successifs s'ajoutent (historique), sans double comptage (performance.js, consolider).
-      if (!etat.ebp.lotsPieces.length && etat.ebp.pieces) etat.ebp.lotsPieces.push(etat.ebp.pieces); // pièces retrouvées dans le coffre
-      etat.ebp.lotsPieces.push(Object.assign(r, { fichier: f.name, provenance: prov }));
-      const C = Performance.consolider(etat.ebp.lotsPieces);
-      etat.ebp.pieces = Object.assign({}, r, { pieces: C.pieces, avoirs: C.avoirs, ignorees: C.ignorees, liens: C.liens, consolidation: { imports: C.imports, modifiees: C.modifiees, doublonsFichier: C.doublonsFichier, couverture: C.couverture, dernierImport: C.dernierImport, periodes: C.periodes, nonDeclares: C.nonDeclares, horsPeriode: C.horsPeriode } });
-    } else etat.ebp[type] = Object.assign(r, {fichier: f.name, provenance: prov});
-    proposerArrete();
+    const a = await analyserFichierEbp(type, f, options);
+    if (!a.r) throw new Error('Export ' + type + ' : colonne(s) obligatoire(s) introuvable(s) : ' + a.analyse.manquantes.join(', ') + '. Colonnes lues : ' + a.analyse.entetes.join(' | ') + '. Utilise l’assistant d’import pour les associer.');
+    appliquerImport(type, a.r, a.prov);
   } catch (e) { etat.ebp.erreur[type] = e.message + (etat.ebp[type] ? ' Le fichier chargé avant (' + etat.ebp[type].fichier + ') reste utilisé.' : ''); } // un fichier refusé ne fait jamais perdre le précédent
   connecterVille(); rendre(); signalerChangement();
 }
@@ -1560,11 +1581,11 @@ const telechargerFichier = (contenu, nom, type) => { const a = h('a',{href:URL.c
 // ================= Lot 6 : Pilotage de la performance (14/11/2026) =================
 // Règles écrites dans bureau/performance.js (pas d'IA). Chaque chiffre : source EBP ou « Non renseigné » avec la cause.
 // ================= Lot 7 : assistant d'import EBP, pas à pas (14/11/2026) =================
-etat.assistant = { etape: 0, periode: null };
+etat.assistant = { etape: 0, periode: null, attente: null }; // attente : import analysé, PAS encore appliqué (lot 8)
 function vueAssistantImport(){
   const A = AssistantImport, E = etat.ebp, S = etat.assistant, et = A.ETAPES[S.etape], gros = 'min-height:56px';
   if (!S.periode) { const a = E.arrete || jourIso(); S.periode = { du: (Number(a.slice(0,4)) - 1) + a.slice(4,7) + '-01', au: a }; }
-  const aller = n => { S.etape = Math.max(0, Math.min(A.ETAPES.length - 1, n)); rendre(); };
+  const aller = n => { S.etape = Math.max(0, Math.min(A.ETAPES.length - 1, n)); S.attente = null; rendre(); }; // changer d'étape abandonne l'aperçu non validé
   const NIV = { ok:['Prêt','b-confirme'], attention:['À vérifier','b-alerte'], erreur:['Problème','b-alerte'] };
   const carteBilan = (type) => { const b = A.bilanFichier(type, E[type], type === 'pieces' && E.pieces ? E.pieces.consolidation : null);
     if (E.erreur[type]) return h('div',{class:'message erreur', 'data-assistant':'erreur-' + type}, 'Fichier refusé : ' + E.erreur[type]);
@@ -1573,8 +1594,32 @@ function vueAssistantImport(){
       b.motifs.length ? h('ul',{}, b.motifs.slice(0, 6).map(m => h('li',{}, m.n + ' × ' + m.motif))) : null,
       b.absentes.length ? h('div',{}, h('b',{}, 'Colonnes absentes et conséquences :'), h('ul',{}, b.absentes.map(x => h('li',{}, x.libelle + ' — ' + x.consequence)))) : null,
       b.corrections.length ? h('div',{}, h('b',{}, 'Corrections détectées :'), h('ul',{}, b.corrections.map(x => h('li',{}, x)))) : null); };
+  // Lot 8 : choisir un fichier ne modifie rien ; l'aperçu s'affiche, puis « Valider l'import » ou « Annuler ».
+  const preparer = async (type, f, opts) => { try { const a = await analyserFichierEbp(type, f, opts); a.fichierObjet = f; a.options = opts; S.attente = a; delete E.erreur[type]; }
+    catch (e) { S.attente = null; E.erreur[type] = e.message + (E[type] ? ' Les données déjà chargées restent utilisées.' : ''); } rendre(); };
   const fichier = (type, opts) => h('label',{class:'btn principal', style:gros}, 'Choisir le fichier', h('input',{type:'file', accept:'.csv,.txt,.xlsx,.xls', hidden:true, 'data-assistant':'fichier-' + type,
-    onchange:async ev => { const f = ev.target.files[0]; ev.target.value = ''; if (f) await importerEbp(type, f, opts ? opts() : {}); }}));
+    onchange:async ev => { const f = ev.target.files[0]; ev.target.value = ''; if (f) await preparer(type, f, opts ? opts() : {}); }}));
+  const blocAttente = type => { const a = S.attente; if (!a || a.type !== type) return null;
+    const ap = a.r ? A.apercu({ type, r:a.r, empreinte:a.empreinte, existant:{ pieces:E.pieces ? E.pieces.pieces : [], avoirs:E.pieces ? E.pieces.avoirs : [], empreintes:(E.lotsPieces || []).map(l => l.provenance && l.provenance.empreinte).filter(Boolean) },
+      clientsEbp: E.clients ? E.clients.clients : undefined, arrete:E.arrete, periode:a.prov && a.prov.periode }) : null;
+    const choix = a.analyse.champs.map(c => [c, h('select',{'data-colonne':c.cle, 'aria-label':c.libelle}, [h('option',{value:''}, '— aucune —'), ...a.analyse.entetes.filter(Boolean).map(n => h('option',{value:n, selected:n === c.colonne}, n))])]);
+    const recalculer = async () => { const carte = {}; for (const [c, sel] of choix) carte[c.cle] = sel.value; await preparer(type, a.fichierObjet, Object.assign({}, a.options, { carte, lignes:a.lignes, empreinte:a.empreinte })); };
+    const GRAV = { bloquant:['Bloquant','b-alerte'], attention:['À vérifier','b-alerte'], info:['Info','b-vide'] };
+    return h('section',{class:'carte-bilan', 'data-assistant':'apercu-' + type},
+      h('p',{}, h('b',{}, 'Aperçu avant import : ' + a.fichier), ' · rien n’est encore modifié.'),
+      a.analyse.lignesTitre ? h('p',{class:'info'}, a.analyse.lignesTitre + ' ligne(s) de titre ignorée(s) avant les en-têtes.') : null,
+      a.memoire ? h('p',{class:'info', 'data-assistant':'memoire'}, 'Colonnes associées comme lors de ton dernier import de ce format.') : null,
+      a.analyse.manquantes.length ? h('p',{class:'message erreur', 'data-assistant':'manquantes'}, 'Colonne(s) indispensable(s) non trouvée(s) : ' + a.analyse.manquantes.join(', ') + '. Indique-les ci-dessous.') : null,
+      h('details',{open: a.analyse.manquantes.length ? '' : null, 'data-assistant':'colonnes'}, h('summary',{}, 'Colonnes du fichier (' + a.analyse.correspondance.length + ' reconnue(s))'),
+        h('div',{class:'studio-grille'}, choix.map(([c, sel]) => h('label',{class:'studio-champ'}, h('span',{}, c.libelle + (c.obligatoire ? ' *' : '')), sel))),
+        h('button',{class:'btn', style:gros, 'data-assistant':'recalculer', onclick:recalculer}, 'Appliquer ces colonnes')),
+      ap ? [h('p',{'data-assistant':'compte'}, ap.compte.reconnues + ' ligne(s) reconnue(s), ' + ap.compte.rejetees + ' rejetée(s)' + (ap.compte.nouvelles != null ? ' · ' + ap.compte.nouvelles + ' nouvelle(s), ' + ap.compte.identiques + ' déjà connue(s), ' + ap.compte.modifiees + ' modifiée(s)' : '')),
+        h('ul',{'data-assistant':'anomalies'}, ap.anomalies.map(x => h('li',{}, h('span',{class:'badge ' + GRAV[x.gravite][1]}, GRAV[x.gravite][0]), ' ', x.texte)))] : null,
+      h('div',{class:'actions'},
+        h('button',{class:'btn principal', style:gros, 'data-assistant':'valider', disabled: !(ap && ap.validable), onclick:() => { try { appliquerImport(type, a.r, a.prov); if (a.analyse.manuel || a.memoire) memoriserCorrespondance(a.analyse); S.attente = null; }
+          catch (e) { E.erreur[type] = 'Import interrompu : ' + e.message + '. Les données précédentes sont conservées.'; S.attente = null; } connecterVille(); rendre(); signalerChangement(); }}, 'Valider l’import'),
+        h('button',{class:'btn discret', style:gros, 'data-assistant':'annuler', onclick:() => { S.attente = null; rendre(); }}, 'Annuler')));
+  };
   let corps;
   if (et.id === 'arrete') corps = [h('label',{class:'studio-champ'}, h('span',{}, 'Date des exports'), h('input',{type:'date', class:'recherche', value:E.arrete, max:jourIso(), 'data-assistant':'arrete',
     onchange:ev => { E.arrete = ev.target.value; E.arreteConfirmee = !!ev.target.value; S.periode = null; connecterVille(); signalerChangement(); rendre(); }})),
@@ -1583,12 +1628,12 @@ function vueAssistantImport(){
       au = h('input',{type:'date', class:'recherche', value:S.periode.au, 'data-assistant':'periode-au', onchange:ev => { S.periode.au = ev.target.value; }});
     corps = [h('p',{class:'info'}, 'Indique la période choisie dans EBP pour cet export. Elle seule prouve qu’un mois est complet (un mois sans pièce peut être un mois non exporté).'),
       h('div',{class:'studio-grille'}, h('label',{class:'studio-champ'}, h('span',{}, 'Exporté du'), du), h('label',{class:'studio-champ'}, h('span',{}, 'au'), au)),
-      fichier('pieces', () => ({ periode: { du: S.periode.du, au: S.periode.au } })), carteBilan('pieces')]; }
+      fichier('pieces', () => ({ periode: { du: S.periode.du, au: S.periode.au } })), blocAttente('pieces'), carteBilan('pieces')]; }
   else if (et.id === 'bilan') { const manque = A.donneesAbsentes(E);
     corps = [h('div',{'data-assistant':'bilan-final'}, ['clients','pieces','reglements'].map(t => h('div',{}, h('h3',{}, A.ETAPES.find(x => x.id === t).titre), carteBilan(t))),
       h('h3',{}, 'Données absentes'), manque.length ? h('ul',{'data-assistant':'absentes'}, manque.map(m => h('li',{}, m))) : h('p',{class:'info', 'data-assistant':'absentes'}, 'Rien ne manque pour le pilotage.')),
       h('div',{class:'actions'}, h('a',{class:'btn principal', href:'#pilotage', style:gros}, 'Voir le pilotage'), h('a',{class:'btn', href:'#commerce', style:gros}, 'Voir le commerce'))]; }
-  else corps = [fichier(et.id), carteBilan(et.id)];
+  else corps = [fichier(et.id), blocAttente(et.id), carteBilan(et.id)];
   return h('div',{class:'ecran'}, h('div',{class:'panneau'}, h('section',{class:'bloc assistant', 'data-assistant':'etape-' + et.id},
     h('div',{class:'titre-bloc'}, 'Import EBP · étape ' + (S.etape + 1) + ' sur ' + A.ETAPES.length + ' · ' + et.titre), h('p',{class:'sous'}, et.aide), corps,
     h('div',{class:'actions'}, S.etape > 0 ? h('button',{class:'btn discret', style:gros, 'data-assistant':'precedent', onclick:() => aller(S.etape - 1)}, 'Précédent') : null,
@@ -1841,7 +1886,7 @@ window.OdicolorBureau = Object.freeze({
     const s = etat.sauvegardeTelephone || null, E = etat.ebp;
     etat.journalExporte = etat.decisions; // celui qui part dans le coffre : confirmé seulement si l'enregistrement réussit
     return { version:2, telephone: s && s.telephone, garagesTelephone: s && s.garages, rapport: s && s.rapport,
-      ebp: { pieces:E.pieces, reglements:E.reglements, clients:E.clients, arrete:E.arrete, arreteConfirmee:!!E.arreteConfirmee }, decisionsComptes: etat.decisions, studio: { biblio: etat.studio.biblio }, perfDecisions: etat.perfDecisions, reglagesPilotage: reglagesPilotage() };
+      ebp: { pieces:E.pieces, reglements:E.reglements, clients:E.clients, arrete:E.arrete, arreteConfirmee:!!E.arreteConfirmee }, decisionsComptes: etat.decisions, studio: { biblio: etat.studio.biblio }, perfDecisions: etat.perfDecisions, reglagesPilotage: reglagesPilotage(), correspondancesEbp: correspondances() };
   },
   // Décisions (sans écran au lot A ; l'écran « Vérifier les comptes » du lot B utilisera ces mêmes fonctions).
   decisions: Object.freeze({
@@ -1854,6 +1899,7 @@ window.OdicolorBureau = Object.freeze({
     // Version 1 (avant le lot A) : aucun journal → journal vide. Version 2 : journal relu et contrôlé, rien n'est jeté.
     if (d.studio && Array.isArray(d.studio.biblio)) etat.studio.biblio = d.studio.biblio; // Lot 4 : bibliothèque du studio
     if (Array.isArray(d.perfDecisions)) etat.perfDecisions = d.perfDecisions; // Lot 6
+    if (Array.isArray(d.correspondancesEbp)) etat.correspondances = d.correspondancesEbp; // Lot 8 : choix de colonnes validés
     if (d.reglagesPilotage) { etat.reglagesPilotage = Performance.reglages(d.reglagesPilotage); if (etat.reglagesPilotage.objectifCents) etat.objectifCents = etat.reglagesPilotage.objectifCents; } // Lot 7 : le coffre fait foi
     const lu = DecisionsComptes.lire(d.version === 2 ? d.decisionsComptes : null);
     etat.decisions = lu.journal || d.decisionsComptes; etat.decisionsConfirmees = etat.decisions; etat.decisionsAlerte = lu.erreur ? lu.erreur + ' : conservé tel quel, nouvelles décisions bloquées.'
