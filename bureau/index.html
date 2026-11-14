@@ -1594,7 +1594,7 @@ const telechargerFichier = (contenu, nom, type) => { const a = h('a',{href:URL.c
 // ================= Lot 6 : Pilotage de la performance (14/11/2026) =================
 // Règles écrites dans bureau/performance.js (pas d'IA). Chaque chiffre : source EBP ou « Non renseigné » avec la cause.
 // ================= Lot 7 : assistant d'import EBP, pas à pas (14/11/2026) =================
-etat.assistant = { etape: 0, periode: null, attente: null }; // attente : import analysé, PAS encore appliqué (lot 8)
+etat.assistant = { etape: 0, periode: null, attente: null, mode:'tolere' }; // attente : import analysé, PAS encore appliqué (lot 8)
 function vueAssistantImport(){
   const A = AssistantImport, E = etat.ebp, S = etat.assistant, et = A.ETAPES[S.etape], gros = 'min-height:56px';
   if (!S.periode) { const a = E.arrete || jourIso(); S.periode = { du: (Number(a.slice(0,4)) - 1) + a.slice(4,7) + '-01', au: a }; }
@@ -1611,7 +1611,7 @@ function vueAssistantImport(){
   const preparer = async (type, f, opts) => { try { const a = await analyserFichierEbp(type, f, opts); a.fichierObjet = f; a.options = opts; S.attente = a; delete E.erreur[type]; }
     catch (e) { S.attente = null; E.erreur[type] = e.message + (E[type] ? ' Les données déjà chargées restent utilisées.' : ''); } rendre(); };
   const fichier = (type, opts) => h('label',{class:'btn principal', style:gros}, 'Choisir le fichier', h('input',{type:'file', accept:'.csv,.txt,.xlsx,.xls', hidden:true, 'data-assistant':'fichier-' + type,
-    onchange:async ev => { const f = ev.target.files[0]; ev.target.value = ''; if (f) await preparer(type, f, opts ? opts() : {}); }}));
+    onchange:async ev => { const f = ev.target.files[0]; ev.target.value = ''; if (f) await preparer(type, f, Object.assign({}, opts ? opts() : {}, {mode:S.mode})); }}));
   const blocAttente = type => { const a = S.attente; if (!a || a.type !== type) return null;
     const ap = a.r ? A.apercu({ type, r:a.r, empreinte:a.empreinte, existant:{ pieces:E.pieces ? E.pieces.pieces : [], avoirs:E.pieces ? E.pieces.avoirs : [], empreintes:(E.lotsPieces || []).map(l => l.provenance && l.provenance.empreinte).filter(Boolean) },
       clientsEbp: E.clients ? E.clients.clients : undefined, arrete:E.arrete, periode:a.prov && a.prov.periode }) : null;
@@ -1629,6 +1629,7 @@ function vueAssistantImport(){
       a.analyse.lignesTitre ? h('p',{class:'info'}, a.analyse.lignesTitre + ' ligne(s) de titre ignorée(s) avant les en-têtes.') : null,
       a.memoire ? h('p',{class:'info', 'data-assistant':'memoire'}, 'Colonnes associées comme lors de ton dernier import de ce format.') : null,
       a.analyse.manquantes.length ? h('p',{class:'message erreur', 'data-assistant':'manquantes'}, 'Colonne(s) indispensable(s) non trouvée(s) : ' + a.analyse.manquantes.join(', ') + '. Indique-les ci-dessous.') : null,
+      a.analyse.ambiguites.length ? h('p',{class:'message info', 'data-assistant':'ambiguites'}, 'Colonnes à vérifier : ' + a.analyse.ambiguites.map(x => '« ' + x.colonne + ' » (' + x.possibles.map(y => y.libelle).join(', ') + ')').join(' · ') + '. Choisis la correspondance ci-dessous.') : null,
       h('details',{open: a.analyse.manquantes.length ? '' : null, 'data-assistant':'colonnes'}, h('summary',{}, 'Colonnes du fichier (' + a.analyse.correspondance.length + ' reconnue(s))'),
         h('div',{class:'studio-grille'}, choix.map(([c, sel]) => h('label',{class:'studio-champ'}, h('span',{}, c.libelle + (c.obligatoire ? ' *' : '')), sel))),
         h('button',{class:'btn', style:gros, 'data-assistant':'recalculer', onclick:recalculer}, 'Appliquer ces colonnes')),
@@ -1653,7 +1654,12 @@ function vueAssistantImport(){
       h('div',{class:'actions'}, h('a',{class:'btn principal', href:'#pilotage', style:gros}, 'Voir le pilotage'), h('a',{class:'btn', href:'#commerce', style:gros}, 'Voir le commerce'))]; }
   else corps = [fichier(et.id), blocAttente(et.id), carteBilan(et.id)];
   return h('div',{class:'ecran'}, h('div',{class:'panneau'}, h('section',{class:'bloc assistant', 'data-assistant':'etape-' + et.id},
-    h('div',{class:'titre-bloc'}, 'Import EBP · étape ' + (S.etape + 1) + ' sur ' + A.ETAPES.length + ' · ' + et.titre), h('p',{class:'sous'}, et.aide), corps,
+    h('div',{class:'titre-bloc'}, 'Import EBP · étape ' + (S.etape + 1) + ' sur ' + A.ETAPES.length + ' · ' + et.titre),
+    h('label',{class:'studio-champ'}, h('span',{}, 'Contrôle des lignes à l’import'),
+      h('select',{'data-assistant':'mode','aria-label':'Mode de contrôle',onchange:ev => { S.mode = ev.target.value; S.attente = null; rendre(); }},
+        h('option',{value:'tolere',selected:S.mode === 'tolere'}, 'Tolérant : garder les bonnes lignes, expliquer les autres'),
+        h('option',{value:'strict',selected:S.mode === 'strict'}, 'Strict : tout refuser si une ligne est incorrecte'))),
+    h('p',{class:'sous'}, et.aide), corps,
     h('div',{class:'actions'}, S.etape > 0 ? h('button',{class:'btn discret', style:gros, 'data-assistant':'precedent', onclick:() => aller(S.etape - 1)}, 'Précédent') : null,
       S.etape < A.ETAPES.length - 1 ? h('button',{class:'btn', style:gros, 'data-assistant':'suivant', onclick:() => aller(S.etape + 1)}, 'Suivant') : null),
     h('p',{class:'regle'}, 'Lecture seule : rien n’est modifié dans EBP ni envoyé. Fichiers réels : seulement sur le PC ODICOLOR, avec l’accord de la direction.'))));
