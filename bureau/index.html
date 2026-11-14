@@ -1143,14 +1143,20 @@ async function empreinteFichier(f){ try { const b = await f.arrayBuffer(); const
 // Lot 1 : journal des anomalies d'un import, exportable (CSV « ; », UTF-8 avec BOM pour Excel). Rien n'est envoyé : téléchargement local.
 function journalAnomalies(type){
   const r = etat.ebp[type]; if (!r) return '';
-  const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"', pv = r.provenance || {};
-  const lignes = [['Fichier','Empreinte SHA-256','Importé le','Nature','Ligne','Gravité','Motif'].map(q).join(';')];
-  for (const x of r.ignorees) lignes.push([pv.fichier || r.fichier, pv.empreinte, pv.importeLe, type, x.ligne, 'Ligne écartée', x.motif].map(q).join(';'));
-  for (const x of (r.anomalies || [])) lignes.push([pv.fichier || r.fichier, pv.empreinte, pv.importeLe, type, x.ligne, 'Anomalie', x.motif].map(q).join(';'));
+  const rapport = EbpImport.rapportAnomalies(r), q = v => '"' + String(v == null ? '' : v).replace(/"/g,'""') + '"';
+  const lignes = [['Type','Ligne','Gravité','Motif'].map(q).join(';')];
+  for (const x of rapport.anomalies) lignes.push([rapport.type,x.ligne,x.gravite,x.motif].map(q).join(';'));
   return '\ufeff' + lignes.join('\r\n') + '\r\n';
 }
 function exporterAnomalies(type){
-  const a = h('a',{href:URL.createObjectURL(new Blob([journalAnomalies(type)],{type:'text/csv;charset=utf-8'})), download:'anomalies-' + type + '-' + jourIso() + '.csv'});
+  const url = URL.createObjectURL(new Blob([journalAnomalies(type)],{type:'text/csv;charset=utf-8'}));
+  const a = h('a',{href:url, download:'anomalies-' + type + '-' + jourIso() + '.csv'});
+  document.body.appendChild(a); a.click(); a.remove();
+}
+function exporterAnomaliesJson(type){
+  const rapport = EbpImport.rapportAnomalies(etat.ebp[type]);
+  const url = URL.createObjectURL(new Blob([JSON.stringify(rapport,null,2)],{type:'application/json'}));
+  const a = h('a',{href:url, download:'rapport-anomalies-' + type + '-' + jourIso() + '.json'});
   document.body.appendChild(a); a.click(); a.remove();
 }
 function proposerArrete(){
@@ -1186,10 +1192,13 @@ async function analyserFichierEbp(type, f, options = {}){
   const lignes = options.lignes || await lireTableau(f);
   let carte = options.carte || null;
   const brut = EbpImport.analyser(type, lignes);
-  const memo = !carte ? AssistantImport.correspondancePour(correspondances(), brut.signature) : null; if (memo) carte = memo.carte;
-  const analyse = EbpImport.analyser(type, lignes, { carte: carte || {} });
+  let memo = !carte ? AssistantImport.correspondancePour(correspondances(), brut.signature) : null;
+  if (memo) { try { carte = EbpImport.appliquerCarteMemorisee(type, brut.entetes, memo.carte).carte; }
+    catch (e) { memo = null; carte = null; } }
+  const optionsLecture = { carte: carte || {}, mode: options.mode || 'tolere' };
+  const analyse = EbpImport.analyser(type, lignes, optionsLecture);
   const fn = EXPORTS.find(x => x[0] === type)[2];
-  const r = analyse.manquantes.length ? null : EbpImport[fn](lignes, { carte: carte || {} });
+  const r = analyse.manquantes.length ? null : EbpImport[fn](lignes, optionsLecture);
   const empreinte = options.empreinte || await empreinteFichier(f), dateFichier = f.lastModified ? jourIso(new Date(f.lastModified)) : null;
   const prov = r ? { fichier: f.name, nature: type, taille: f.size, dateFichier, importeLe: new Date().toISOString(), empreinte, lues: r.lues, ecartees: r.ignorees.length,
     periode: Performance.periodeValide(options.periode) ? { du: options.periode.du, au: options.periode.au, declareeLe: new Date().toISOString() } : null } : null; // lot 7 : période déclarée
@@ -1265,7 +1274,8 @@ function vueBureau(){
         h('p',{}, 'Colonnes retenues : ' + r.correspondance.map(c => c.libelle + ' ← « ' + c.colonne + ' »').join(' · ')),
         r.provenance ? h('p',{class:'provenance'}, 'Provenance : ' + r.provenance.fichier + ' · ' + Math.round(r.provenance.taille / 1024) + ' Ko · fichier du ' + frDate(r.provenance.dateFichier) + ' · importé le ' + new Date(r.provenance.importeLe).toLocaleString('fr-FR') + (r.provenance.empreinte ? ' · empreinte ' + r.provenance.empreinte.slice(0, 12) : '')) : null,
         r.anomalies && r.anomalies.length ? h('ul',{}, r.anomalies.slice(0, 50).map(x => h('li',{}, 'Ligne ' + x.ligne + ' : ' + x.motif))) : null,
-        (r.ignorees.length || (r.anomalies && r.anomalies.length)) ? h('button',{type:'button', class:'btn', 'data-anomalies':type, onclick:() => exporterAnomalies(type)}, 'Exporter le journal des anomalies (CSV)') : null,
+        (r.ignorees.length || (r.anomalies && r.anomalies.length)) ? [h('button',{type:'button',class:'btn','data-anomalies':type,onclick:()=>exporterAnomalies(type)},'Exporter le journal anonymisé (CSV)'),
+         h('button',{type:'button',class:'btn','data-anomalies-json':type,onclick:()=>exporterAnomaliesJson(type)},'Rapport anonymisé (JSON)')] : null,
         r.ignorees.length ? h('ul',{}, r.ignorees.slice(0, 50).map(x => h('li',{}, 'Ligne ' + x.ligne + ' : ' + x.motif))) : null,
         type === 'pieces' && !r.liens ? h('div',{class:'message erreur'}, 'Colonne « pièce d’origine » absente : impossible de relier devis, commandes, livraisons et factures. Les retards ne sont pas fiables.') : null,
         r.avoirs && r.avoirs.length ? h('p',{}, r.avoirs.length + ' avoir(s) lu(s), non déduit(s) du CA (règle à valider) : ' + r.avoirs.map(x => x.no).join(', ')) : null) : null); };
@@ -1584,7 +1594,7 @@ const telechargerFichier = (contenu, nom, type) => { const a = h('a',{href:URL.c
 // ================= Lot 6 : Pilotage de la performance (14/11/2026) =================
 // Règles écrites dans bureau/performance.js (pas d'IA). Chaque chiffre : source EBP ou « Non renseigné » avec la cause.
 // ================= Lot 7 : assistant d'import EBP, pas à pas (14/11/2026) =================
-etat.assistant = { etape: 0, periode: null, attente: null }; // attente : import analysé, PAS encore appliqué (lot 8)
+etat.assistant = { etape: 0, periode: null, attente: null, mode:'tolere' }; // attente : import analysé, PAS encore appliqué (lot 8)
 function vueAssistantImport(){
   const A = AssistantImport, E = etat.ebp, S = etat.assistant, et = A.ETAPES[S.etape], gros = 'min-height:56px';
   if (!S.periode) { const a = E.arrete || jourIso(); S.periode = { du: (Number(a.slice(0,4)) - 1) + a.slice(4,7) + '-01', au: a }; }
@@ -1601,7 +1611,7 @@ function vueAssistantImport(){
   const preparer = async (type, f, opts) => { try { const a = await analyserFichierEbp(type, f, opts); a.fichierObjet = f; a.options = opts; S.attente = a; delete E.erreur[type]; }
     catch (e) { S.attente = null; E.erreur[type] = e.message + (E[type] ? ' Les données déjà chargées restent utilisées.' : ''); } rendre(); };
   const fichier = (type, opts) => h('label',{class:'btn principal', style:gros}, 'Choisir le fichier', h('input',{type:'file', accept:'.csv,.txt,.xlsx,.xls', hidden:true, 'data-assistant':'fichier-' + type,
-    onchange:async ev => { const f = ev.target.files[0]; ev.target.value = ''; if (f) await preparer(type, f, opts ? opts() : {}); }}));
+    onchange:async ev => { const f = ev.target.files[0]; ev.target.value = ''; if (f) await preparer(type, f, Object.assign({}, opts ? opts() : {}, {mode:S.mode})); }}));
   const blocAttente = type => { const a = S.attente; if (!a || a.type !== type) return null;
     const ap = a.r ? A.apercu({ type, r:a.r, empreinte:a.empreinte, existant:{ pieces:E.pieces ? E.pieces.pieces : [], avoirs:E.pieces ? E.pieces.avoirs : [], empreintes:(E.lotsPieces || []).map(l => l.provenance && l.provenance.empreinte).filter(Boolean) },
       clientsEbp: E.clients ? E.clients.clients : undefined, arrete:E.arrete, periode:a.prov && a.prov.periode }) : null;
@@ -1619,6 +1629,7 @@ function vueAssistantImport(){
       a.analyse.lignesTitre ? h('p',{class:'info'}, a.analyse.lignesTitre + ' ligne(s) de titre ignorée(s) avant les en-têtes.') : null,
       a.memoire ? h('p',{class:'info', 'data-assistant':'memoire'}, 'Colonnes associées comme lors de ton dernier import de ce format.') : null,
       a.analyse.manquantes.length ? h('p',{class:'message erreur', 'data-assistant':'manquantes'}, 'Colonne(s) indispensable(s) non trouvée(s) : ' + a.analyse.manquantes.join(', ') + '. Indique-les ci-dessous.') : null,
+      a.analyse.ambiguites.length ? h('p',{class:'message info', 'data-assistant':'ambiguites'}, 'Colonnes à vérifier : ' + a.analyse.ambiguites.map(x => '« ' + x.colonne + ' » (' + x.possibles.map(y => y.libelle).join(', ') + ')').join(' · ') + '. Choisis la correspondance ci-dessous.') : null,
       h('details',{open: a.analyse.manquantes.length ? '' : null, 'data-assistant':'colonnes'}, h('summary',{}, 'Colonnes du fichier (' + a.analyse.correspondance.length + ' reconnue(s))'),
         h('div',{class:'studio-grille'}, choix.map(([c, sel]) => h('label',{class:'studio-champ'}, h('span',{}, c.libelle + (c.obligatoire ? ' *' : '')), sel))),
         h('button',{class:'btn', style:gros, 'data-assistant':'recalculer', onclick:recalculer}, 'Appliquer ces colonnes')),
@@ -1643,7 +1654,12 @@ function vueAssistantImport(){
       h('div',{class:'actions'}, h('a',{class:'btn principal', href:'#pilotage', style:gros}, 'Voir le pilotage'), h('a',{class:'btn', href:'#commerce', style:gros}, 'Voir le commerce'))]; }
   else corps = [fichier(et.id), blocAttente(et.id), carteBilan(et.id)];
   return h('div',{class:'ecran'}, h('div',{class:'panneau'}, h('section',{class:'bloc assistant', 'data-assistant':'etape-' + et.id},
-    h('div',{class:'titre-bloc'}, 'Import EBP · étape ' + (S.etape + 1) + ' sur ' + A.ETAPES.length + ' · ' + et.titre), h('p',{class:'sous'}, et.aide), corps,
+    h('div',{class:'titre-bloc'}, 'Import EBP · étape ' + (S.etape + 1) + ' sur ' + A.ETAPES.length + ' · ' + et.titre),
+    h('label',{class:'studio-champ'}, h('span',{}, 'Contrôle des lignes à l’import'),
+      h('select',{'data-assistant':'mode','aria-label':'Mode de contrôle',onchange:ev => { S.mode = ev.target.value; S.attente = null; rendre(); }},
+        h('option',{value:'tolere',selected:S.mode === 'tolere'}, 'Tolérant : garder les bonnes lignes, expliquer les autres'),
+        h('option',{value:'strict',selected:S.mode === 'strict'}, 'Strict : tout refuser si une ligne est incorrecte'))),
+    h('p',{class:'sous'}, et.aide), corps,
     h('div',{class:'actions'}, S.etape > 0 ? h('button',{class:'btn discret', style:gros, 'data-assistant':'precedent', onclick:() => aller(S.etape - 1)}, 'Précédent') : null,
       S.etape < A.ETAPES.length - 1 ? h('button',{class:'btn', style:gros, 'data-assistant':'suivant', onclick:() => aller(S.etape + 1)}, 'Suivant') : null),
     h('p',{class:'regle'}, 'Lecture seule : rien n’est modifié dans EBP ni envoyé. Fichiers réels : seulement sur le PC ODICOLOR, avec l’accord de la direction.'))));
@@ -1821,7 +1837,13 @@ function vueStudio(){
   setTimeout(majApercu);
   return h('div',{class:'ecran'}, h('div',{class:'panneau studio'}, form, h('section',{class:'bloc'}, h('div',{class:'titre-bloc'}, 'Aperçu'), apercu, telechargements), biblio, propositions));
 }
+// Un changement de champ peut provoquer un blur pendant replaceChildren : éviter
+// qu'un second rendu retire à nouveau les mêmes nœuds (observé en CI Chromium).
+let renduEnCours = false, renduDiffere = false;
 function rendre(){
+  if (renduEnCours) { renduDiffere = true; return; }
+  renduEnCours = true;
+  try {
   const r = route();
   if (r.porte) etat.choix = r.porte.id;
   if (r.ecran !== 'carte' && carte) { carte.remove(); carte = null; }
@@ -1831,6 +1853,10 @@ function rendre(){
     : r.ecran==='carte' ? vueCarte(r.D, r.porte) : r.ecran==='simulation' ? vueSimulation() : r.ecran==='bureau' ? vueBureau() : r.ecran==='studio' ? vueStudio() : r.ecran==='commerce' ? vueCommerce() : r.ecran==='pilotage' ? vuePilotage() : r.ecran==='import-ebp' ? vueAssistantImport() : r.ecran==='controle' ? vueControle() : r.ecran==='a-classer' ? vueAClasser() : vueVille());
   rendreFil();
   const sc = document.getElementById('scene'); if (sc && sc.scrollWidth > sc.clientWidth) { const t = TERRITOIRES.find(x=>x.id===etat.choix), [px] = iso(...pos(t)); sc.scrollLeft = (px + 495) / 990 * sc.scrollWidth - sc.clientWidth/2; }
+  } finally {
+    renduEnCours = false;
+    if (renduDiffere) { renduDiffere = false; queueMicrotask(rendre); }
+  }
 }
 
 // ================= Import (lecture seule) =================

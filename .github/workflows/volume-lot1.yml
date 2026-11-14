@@ -1,0 +1,41 @@
+name: Volume Lot 1 — endurance
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  volume:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Récupérer le code de la branche exécutée
+        uses: actions/checkout@v4
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # Pas de package-lock.json ni de dépendances de production.
+      - name: Installer Playwright comme la CI ODICOLOR
+        run: |
+          npm install --no-save --ignore-scripts playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Test de volume (2 000 garages, restauration IndexedDB réelle)
+        shell: bash
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: |
+          set -o pipefail
+          node tests/volume-lot1-browser.cjs 2>&1 | tee volume-lot1.log
+      - name: Conserver les mesures et erreurs même en cas d'échec
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: volume-lot1-resultats
+          path: volume-lot1.log
+          if-no-files-found: warn
+          retention-days: 14
