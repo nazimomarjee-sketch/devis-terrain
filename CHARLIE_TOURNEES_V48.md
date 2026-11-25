@@ -1,0 +1,34 @@
+# CHARLIE — optimiseur de tournées commerciales (v48)
+
+## Ce qui existe
+| Élément | Fichier | Rôle |
+|---|---|---|
+| Moteur pur (Samsung, Bureau, Node) | `tournee-optimiseur-v48.js` | scoring commercial explicable, matrices OSRM/estimées, adaptateur VROOM contrôlé, solveur local de repli, recalcul, proches, prévu/réalisé, apprentissage, agents + audit, commandes |
+| Interface Samsung | `tournee-v48.js/.css` | route `#/charlie` : 8 gros boutons, proposition à valider, hors ligne |
+| Cockpit Bureau | `bureau/tournee.html/.js` | carte SVG locale d'un fichier `charlie-tournee/v1` exporté du Samsung |
+| Moteur routier local | `infra/routage/` | docker-compose OSRM + VROOM + script graphe La Réunion |
+| Tests | `tests/tournee-v48.test.cjs`, `tests/bureau-tournee-v48.test.cjs`, `tests/navigateur/charlie-v48.e2e.mjs` | unitaires, intégration, fuzz, navigateur |
+
+La tournée historique (`#/tournee`) n'est pas modifiée : un lien « Tournée optimisée CHARLIE » y est ajouté ; si CHARLIE échoue, l'écran propose de revenir à la tournée habituelle.
+
+## Licences et hébergement (gratuit)
+- VROOM : BSD-2-Clause (fichier `LICENSE` lu sur le dépôt). OSRM : BSD-2-Clause (`LICENSE.TXT` lu). Utilisés comme **services HTTP** : aucun code copié, aucune dépendance embarquée.
+- Cartes : OpenStreetMap, licence ODbL → attribution « © contributeurs OpenStreetMap » si une carte avec fond est affichée (la carte Bureau actuelle n'en utilise aucun).
+- Ne pas utiliser les serveurs de démonstration publics en production. Hébergement : `infra/routage` sur un PC avec Docker (extrait La Réunion Geofabrik, ~dizaines de Mo). Coût : 0 €.
+- Contrainte réseau : une PWA servie en HTTPS ne peut pas appeler `http://IP-locale` (contenu mixte). Il faut un accès HTTPS privé (ex. reverse proxy + VPN privé). **Non testé ici.**
+
+## Règles de vérité (appliquées par le code et par l'audit)
+- Valeurs par défaut = hypothèses affichées : journée 08:00-17:00, pause 45 min entre 12h-14h, visite 30 min tant qu'aucune durée réelle n'est apprise (≥ 2 visites), horaires garage = journée entière si non renseignés (`c.horaires` optionnel), temps de trajet estimés (vol d'oiseau × 1,35 à 40 km/h) tant qu'OSRM n'est pas configuré. Chacune est signalée dans l'écran.
+- Feuille de Laurent = plan du jour de la page « Feuille de route » existante (visites, étapes, reports). Ses visites sont **obligatoires** ; tout écart (retrait, ajout, changement d'ordre) est listé et la proposition est toujours « À VALIDER ». `c.rdv = {date, heure}` (optionnel) fixe un rendez-vous.
+- Potentiel commercial : uniquement priorité A/B/C, échéance, rappel, devis envoyés (montant HT), dormants, prospects, `volume` saisi sur la fiche (déclaratif). **Aucun import EBP direct** : rien n'est inventé ni supposé vérifié.
+- Rien d'envoyé au solveur hors coordonnées/durées/créneaux/priorités (test + audit `FUITE_NOM_VERS_SOLVEUR`). Navigation : coordonnées seules dans l'URL Waze/Google.
+- Vérification d'adresses (BAN, api-adresse.data.gouv.fr) : uniquement sur demande, après confirmation, texte d'adresse sans nom ni téléphone ; seules les correspondances à score ≥ 0,8 sont enregistrées, les autres sont laissées « à contrôler ».
+
+## Agents orchestrés (`organiserJournee`)
+mémoire → historique → analyse commerciale → tournée/géolocalisation → performance/objectifs → optimiseur → audit. Chaque étape alimente la suivante sans saisie ; l'audit refuse la proposition (garage inventé, chevauchement, doublon, fuite de nom, Laurent perdu, validation humaine absente). Commandes reconnues : « organise ma journée commerciale », « le client est absent », « annulé », « en retard de 20 minutes », « recalcule », « suivant », « terminé », « GPS/Waze », « dicter ».
+
+## Apprentissage
+Chaque VISITE TERMINÉE (durée confirmée par l'utilisateur) ou ABSENT met à jour `meta.charlieAppris` : durée moyenne lissée par garage (utilisée dès 2 visites, valeurs hors 5-180 min ignorées), absences, créneaux de passage, difficultés.
+
+## Limites connues (voir rapport)
+Pas de synchronisation temps réel Samsung ↔ Bureau (export/ouverture de fichier, même canal que « Lien avec le PC ») ; pas d'accès à la base ODICOLOR réelle ni à EBP depuis cette session ; moteurs OSRM/VROOM non exécutés ici (réseau bloqué vers Geofabrik/ghcr) ; test sur le Samsung physique non réalisé ; l'intégration dans le dépôt `cockpit-carrosserie` (agent Oompa Loompa Tournée) n'est pas faite : session sans droit d'écriture sur ce dépôt.

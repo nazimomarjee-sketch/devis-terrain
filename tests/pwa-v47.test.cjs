@@ -24,7 +24,7 @@ test('toutes les feuilles de style et tous les scripts sont accessibles hors lig
 test('pas de doublon dans les ressources hors ligne',()=>{
  assert.equal(new Set(shell).size,shell.length);
 });
-test('version cache et afficheur préparés pour V47',()=>{
- assert.match(sw,/const CACHE='terrain-v47'/);
- assert.match(readFileSync(join(root,'imports-centralises-v40.js'),'utf8'),/ODICOLOR Solution · v47/);
+test('version cache et afficheur préparés pour V48',()=>{
+ assert.match(sw,/const CACHE='terrain-v48'/);
+ assert.match(readFileSync(join(root,'imports-centralises-v40.js'),'utf8'),/ODICOLOR Solution · v48/);
 });

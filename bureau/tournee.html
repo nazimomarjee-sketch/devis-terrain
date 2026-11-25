@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Cockpit — Tournée CHARLIE</title>
+<style>:root{color-scheme:light dark;--bg:#fff;--fg:#1a1a1a;--mut:#666;--ln:#ddd}@media(prefers-color-scheme:dark){:root{--bg:#141619;--fg:#eee;--mut:#aaa;--ln:#333}}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:15px/1.4 system-ui,sans-serif}h1{font-size:1.3rem;margin:0 0 8px}main{max-width:1100px;margin:auto}
+.kpis{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.kpi{border:1px solid var(--ln);border-radius:10px;padding:8px 12px;min-width:110px}.kpi b{display:block;font-size:1.3rem}.kpi small{color:var(--mut)}
+svg{width:100%;height:auto;border:1px solid var(--ln);border-radius:10px;background:rgba(128,128,128,.07)}table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid var(--ln);padding:6px;text-align:left}
+#msg{color:#c0392b}.mut{color:var(--mut)}</style></head>
+<body><main><h1>Tournée CHARLIE — vue Bureau</h1>
+<p class="mut">Ouvre le fichier exporté depuis ODICOLOR (Samsung : Ma tournée → Réglages → Exporter). Rien n’est envoyé sur Internet : la carte est dessinée localement, sans fond de carte externe.</p>
+<input type="file" id="fichier" accept="application/json,.json" aria-label="Fichier de tournée"><p id="msg" role="alert"></p>
+<div class="kpis" id="kpi"></div><svg id="carte" viewBox="0 0 760 520" role="img" aria-label="Carte de la tournée"></svg>
+<p class="mut">● vert = vu · orange = absent · rouge = à faire · gris = retiré · contour noir = visite de Laurent · carré = départ</p>
+<h2>Visites</h2><table><thead><tr><th>#</th><th>Garage</th><th>Heure</th><th>Type</th><th>Origine</th><th>État</th></tr></thead><tbody id="liste"></tbody></table>
+<h2>Écarts par rapport au programme de Laurent</h2><ul id="ecarts"></ul><p class="mut" id="source"></p></main>
+<script src="../tournee-optimiseur-v48.js"></script><script src="tournee.js"></script></body></html>
