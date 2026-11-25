@@ -1,0 +1,9 @@
+# Données volumineuses ou locales du moteur routier : jamais dans le dépôt
+data/
+data-new/
+data-prev/
+data-echec/
+logs/
+.verrou
+vroom-conf/
+acces-samsung/.env

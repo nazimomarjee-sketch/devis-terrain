@@ -1,0 +1,61 @@
+# ODICOLOR — accès HTTPS PRIVÉ du Samsung au moteur routier du PC (OSRM + VROOM). NON INSTALLÉ, NON ACTIVÉ : fichier de configuration prêt à l'emploi.
+# Pourquoi : la PWA est servie en HTTPS ; un navigateur bloque les appels vers http://IP-locale (contenu mixte). OSRM/VROOM restent liés à 127.0.0.1
+# (voir ../docker-compose.yml) ; seul ce proxy Caddy, écoutant UNIQUEMENT sur l'adresse du réseau privé (Tailscale), est joignable depuis le téléphone.
+# Variables lues dans .env (voir .env.exemple ; générer le jeton avec generer-jeton.ps1) :
+#   MOTEUR_HOTE   nom MagicDNS Tailscale du PC (ex. mon-pc.xxxx.ts.net) : Caddy obtient seul le certificat HTTPS via Tailscale
+#   MOTEUR_IP     adresse Tailscale du PC (100.x.y.z) : le proxy n'écoute QUE là (jamais sur le Wi-Fi/LAN ni sur Internet)
+#   ORIGINE_PWA   origine exacte de la PWA (ex. https://exemple.github.io), sans « / » final : seule origine autorisée par CORS
+#   MOTEUR_JETON  secret long aléatoire placé dans le CHEMIN : https://HOTE/JETON/osrm et https://HOTE/JETON/vroom
+# Lancement (à la main, jamais en service ouvert) : caddy run --config Caddyfile --envfile .env
+# Dans ODICOLOR > Ma tournée > Réglages : OSRM = https://HOTE/JETON/osrm   VROOM = https://HOTE/JETON/vroom
+# Sécurité : ne JAMAIS activer de « log » (le jeton figurerait dans les journaux) ; régénérer le jeton en cas de doute (redémarrer Caddy).
+{
+	admin off
+}
+
+{$MOTEUR_HOTE} {
+	bind {$MOTEUR_IP}
+
+	request_body {
+		max_size 512KB
+	}
+	header {
+		Access-Control-Allow-Origin "{$ORIGINE_PWA}"
+		Access-Control-Allow-Methods "GET, POST, OPTIONS"
+		Access-Control-Allow-Headers "Content-Type"
+		Access-Control-Max-Age "600"
+		Vary Origin
+		X-Content-Type-Options nosniff
+		Cache-Control "no-store"
+		-Server
+	}
+
+	# Pré-vérification CORS du navigateur (POST JSON vers VROOM) : aucune donnée, pas de jeton.
+	@preflight method OPTIONS
+	handle @preflight {
+		respond 204
+	}
+
+	# OSRM : uniquement le calcul de matrices et d'itinéraires, en lecture.
+	handle_path /{$MOTEUR_JETON}/osrm/* {
+		@interdit not path /table/v1/driving/* /route/v1/driving/*
+		respond @interdit 403
+		reverse_proxy 127.0.0.1:5000
+	}
+
+	# VROOM : un seul point d'entrée, POST uniquement.
+	handle /{$MOTEUR_JETON}/vroom {
+		@pasPost not method POST
+		respond @pasPost 405
+		rewrite * /
+		reverse_proxy 127.0.0.1:3000
+	}
+
+	# Tout le reste (mauvais jeton compris) : 404 identique, sans indice.
+	handle {
+		respond 404
+	}
+
+	# Limitation de débit : PAS dans Caddy de base (greffon caddy-ratelimit à compiler : non installé ici). Protection actuelle = réseau privé
+	# Tailscale (appareils autorisés seulement) + jeton + taille de corps limitée. Si un greffon est ajouté, limiter à quelques requêtes/s par IP.
+}
