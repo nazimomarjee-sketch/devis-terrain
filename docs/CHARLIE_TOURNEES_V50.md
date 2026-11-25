@@ -40,3 +40,18 @@ Secteurs couverts (déc. 2026, S1/S2) : **77** (1 et 8 déc.), **95** (2, 7, 9),
 - Hors secteur du jour : un garage **non** prévu par Laurent n'est pas proposé ; un garage **prévu par Laurent** hors secteur est conservé avec l'alerte `SECTEUR_DIFFERENT`.
 - Positions : adresse vérifiée (GPS) sinon **centre de commune** (comme `carte-v48.js`) ; les tournées calculées sur des centres de commune sont signalées « approximatives ».
 - Moteur routier : `infra/routage/` (extrait Île-de-France : 75, 77, 78, 91-95). `node infra/routage/verifier-moteur.cjs` contrôle OSRM + VROOM sur un point par secteur ; testé ici contre de FAUX serveurs seulement.
+
+
+## Chaîne commerciale CHARLIE (v50, lot « finalisation »)
+| Brique | Fichier | Rôle |
+|---|---|---|
+| Cœur (UN SEUL cerveau) | `charlie-optimiseur-v50.js` | scoring, secteurs, optimisation, recalcul, audit, mémoire. Copié à l'identique dans le cockpit (garde-fou sha256) |
+| Contexte téléphone | `charlie-contexte-v50.js` | finance EBP, horaires par jour, durées par type, rapprochement des noms de Laurent |
+| Synchronisation | `charlie-sync-v50.js` | file hors-ligne, fusion sans perte (409), jeton en en-tête, HTTPS obligatoire |
+| Airtable | `charlie-airtable-v50.js`, `scripts/charlie-airtable-sync.cjs` | lecture seule de « Comptes » et « Tournées » ; retours PRÉPARÉS (jamais envoyés sans validation) |
+| Bureau | `bureau/charlie-carte.html/.js` | carte locale, suivi automatique (15 s) ; fichier exporté = secours |
+
+**Flux** : Airtable/cockpit (feuille de Laurent) → CHARLIE → Samsung (`GET /api/tournee/laurent/{date}`) → optimisation locale (même cœur) → validation humaine → `PUT /api/tournee/jour/{date}` → Bureau.
+**Règles EBP** : le CA et la dernière facture ne comptent que pour les pièces importées d'EBP (`source:'ebp'`) ; une saisie manuelle ou un champ Airtable non « Vérifiée EBP » est ignoré par le scoring. Retard de paiement et compte bloqué sont **protecteurs** (alertes même sans import). Marge : **toujours « manquante »** (prix d'achat EBP non disponible).
+**Mémoire** : journal borné (1 500 événements) des validations/refus, visites, absences, retards, fins de journée ; durées apprises par garage dès 2 visites ; « enseignements » proposés (jamais appliqués seuls).
+**Laurent** : ses visites sont obligatoires ; les noms sont rapprochés sans devinette (exact ou mêmes mots) ; une faute de frappe est proposée à confirmation et mémorisée comme alias.

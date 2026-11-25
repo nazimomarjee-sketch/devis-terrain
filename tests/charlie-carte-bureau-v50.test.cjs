@@ -20,3 +20,14 @@ test('fichier invalide ou piégé refusé',()=>{
 test('projection : un seul point et aucun point ne cassent la carte',()=>{
   assert.deepEqual(B.projeter([],100,100),[]);const p=B.projeter([{lat:-21,lng:55}],760,520);assert.ok(Number.isFinite(p[0].x)&&Number.isFinite(p[0].y));
 });
+
+test('suivi automatique du Bureau : même état que le Samsung, version inchangée ignorée, HTTP refusé, erreurs claires',async()=>{
+  const p=await plan();const etat={jour:'2026-12-01',plan:{...p,requete:undefined},reel:[],faits:[],retires:[],depart:{lat:-20.8789,lng:55.4481}};
+  const rec=[];const f=(code=200)=>async(u,o)=>{rec.push([u,o.headers.Authorization]);return{ok:code===200,status:code,json:async()=>({version:3,etat,majLe:'2026-12-01T09:00:00Z'})};};
+  const r=await B.lireServeur({url:'https://charlie.exemple.test/',jeton:'J'},'2026-12-01',f(),null);
+  assert.equal(r.version,3);assert.equal(r.vue.noeuds.length,p.ordre.length);assert.equal(rec[0][0],'https://charlie.exemple.test/api/tournee/jour/2026-12-01');assert.equal(rec[0][1],'Bearer J');
+  assert.equal((await B.lireServeur({url:'https://charlie.exemple.test',jeton:'J'},'2026-12-01',f(),3)).inchange,true);
+  await assert.rejects(()=>B.lireServeur({url:'http://charlie.exemple.test',jeton:'J'},'2026-12-01',f()),/HTTPS/);
+  await assert.rejects(()=>B.lireServeur({url:'https://c.test',jeton:'J'},'2026-12-01',f(401)),/401/);
+  const vide=async()=>({ok:true,status:200,json:async()=>({version:0,etat:null})});assert.equal((await B.lireServeur({url:'https://c.test',jeton:'J'},'2026-12-01',vide)).vide,true);
+});

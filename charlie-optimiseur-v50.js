@@ -323,28 +323,36 @@
     if (matriceFournie && matriceFournie.durees.length === pts.length) return matriceFournie;
     return matriceEstimee(pts);
   }
+  // Multi-départ déterministe : plusieurs ordres d'insertion (priorité, éloignement, angle, mélanges à graine fixe) ; on garde le meilleur
+  // selon (visites obligatoires servies, score des facultatives servies, durée totale). Même résultat à chaque appel avec les mêmes données.
   function resoudreLocal(prep, matrice) {
     const M = matricePrep(prep, matrice), J = prep.correspondance, n = J.length;
-    const ordreIns = [...Array(n).keys()].map((i) => i + 1).sort((a, b) => (J[b - 1].obligatoire - J[a - 1].obligatoire) || (J[b - 1].priorite - J[a - 1].priorite) || (J[a - 1].fenetres[0][0] - J[b - 1].fenetres[0][0]));
-    let seq = [], non = [];
-    for (const k of ordreIns) {
-      let meilleur = null;
-      for (let p = 0; p <= seq.length; p++) { const c = seq.slice(0, p).concat([k], seq.slice(p)), s = simuler(prep, M, c); if (s && (!meilleur || s.duree < meilleur.s.duree)) meilleur = { c, s }; }
-      if (meilleur) seq = meilleur.c; else non.push(k);
-    }
-    let cur = simuler(prep, M, seq), amelio = true, tours = 0;
-    while (cur && amelio && tours++ < 40) { amelio = false;
-      for (let i = 0; i < seq.length && !amelio; i++) for (let j = i + 1; j < seq.length && !amelio; j++) {
-        const c = seq.slice(0, i).concat(seq.slice(i, j + 1).reverse(), seq.slice(j + 1)), s = simuler(prep, M, c);
-        if (s && s.duree < cur.duree) { seq = c; cur = s; amelio = true; } }
-      for (let i = 0; i < seq.length && !amelio; i++) { const k = seq[i], rest = seq.filter((_, x) => x !== i);
-        for (let p = 0; p <= rest.length && !amelio; p++) { if (p === i) continue; const c = rest.slice(0, p).concat([k], rest.slice(p)), s = simuler(prep, M, c);
-          if (s && s.duree < cur.duree) { seq = c; cur = s; amelio = true; } } }
-    }
+    const ids = [...Array(n).keys()].map((i) => i + 1);
+    const parPrio = (a, b) => (J[b - 1].obligatoire - J[a - 1].obligatoire) || (J[b - 1].priorite - J[a - 1].priorite) || (J[a - 1].fenetres[0][0] - J[b - 1].fenetres[0][0]);
+    const loin = (a, b) => (J[b - 1].obligatoire - J[a - 1].obligatoire) || (M.durees[0][b] - M.durees[0][a]);
+    const proche = (a, b) => (J[b - 1].obligatoire - J[a - 1].obligatoire) || (M.durees[0][a] - M.durees[0][b]);
+    const tot = (a, b) => (J[b - 1].obligatoire - J[a - 1].obligatoire) || (J[a - 1].fenetres[0][1] - J[b - 1].fenetres[0][1]);
+    const ordres = [ids.slice().sort(parPrio), ids.slice().sort(loin), ids.slice().sort(proche), ids.slice().sort(tot)];
+    let graine = 2463534242; const rnd = () => { graine ^= graine << 13; graine >>>= 0; graine ^= graine >>> 17; graine ^= graine << 5; graine >>>= 0; return graine / 4294967296; };
+    for (let r = 0; r < Math.min(40, 4 + n * 3); r++) { const o = ids.slice().sort(parPrio); for (let i = o.length - 1; i > 0; i--) { const k = Math.floor(rnd() * (i + 1)); [o[i], o[k]] = [o[k], o[i]]; } ordres.push(o.sort((a, b) => J[b - 1].obligatoire - J[a - 1].obligatoire)); }
+    const construire = (ordre) => {
+      let seq = []; const non = [];
+      for (const k of ordre) { let m = null; for (let p = 0; p <= seq.length; p++) { const c = seq.slice(0, p).concat([k], seq.slice(p)), s = simuler(prep, M, c); if (s && (!m || s.duree < m.s.duree)) m = { c, s }; } if (m) seq = m.c; else non.push(k); }
+      let cur = simuler(prep, M, seq), amelio = true, tours = 0;
+      while (cur && amelio && tours++ < 40) { amelio = false;
+        for (let i = 0; i < seq.length && !amelio; i++) for (let j = i + 1; j < seq.length && !amelio; j++) { const c = seq.slice(0, i).concat(seq.slice(i, j + 1).reverse(), seq.slice(j + 1)), s = simuler(prep, M, c); if (s && s.duree < cur.duree) { seq = c; cur = s; amelio = true; } }
+        for (let i = 0; i < seq.length && !amelio; i++) { const k = seq[i], rest = seq.filter((_, x) => x !== i); for (let p = 0; p <= rest.length && !amelio; p++) { if (p === i) continue; const c = rest.slice(0, p).concat([k], rest.slice(p)), s = simuler(prep, M, c); if (s && s.duree < cur.duree) { seq = c; cur = s; amelio = true; } } }
+      }
+      // tentative de replacer les non planifiés après amélioration (le gain de temps peut libérer de la place)
+      for (const k of non.slice()) { let m = null; for (let p = 0; p <= seq.length; p++) { const c = seq.slice(0, p).concat([k], seq.slice(p)), s = simuler(prep, M, c); if (s && (!m || s.duree < m.s.duree)) m = { c, s }; } if (m) { seq = m.c; cur = m.s; non.splice(non.indexOf(k), 1); } }
+      return { seq, non, cur: cur || simuler(prep, M, []) };
+    };
+    const valeur = (r) => [r.seq.filter((k) => J[k - 1].obligatoire).length, r.seq.reduce((s, k) => s + J[k - 1].priorite, 0), -(r.cur ? r.cur.duree : 1e9)];
+    const meilleur = (a, b) => { const x = valeur(a), y = valeur(b); for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] > y[i] ? a : b; return a; };
+    let best = null; for (const o of ordres) { const r = construire(o); best = best ? meilleur(best, r) : r; }
     prep.matriceVerif = M; prep.matriceUtilisee = M;
-    if (!cur) cur = simuler(prep, M, []);
-    if (!cur) return { code: 0, routes: [], unassigned: J.map((j) => ({ id: j.id })) };
-    return { code: 0, routes: [{ vehicle: 1, steps: cur.steps }], unassigned: non.map((k) => ({ id: J[k - 1].id })) };
+    if (!best.cur) return { code: 0, routes: [], unassigned: J.map((j) => ({ id: j.id })) };
+    return { code: 0, routes: [{ vehicle: 1, steps: best.cur.steps }], unassigned: best.non.map((k) => ({ id: J[k - 1].id })) };
   }
   // Évalue un ordre IMPOSÉ (référence = ordre de Laurent) avec les mêmes contraintes ; null si impossible.
   function evaluerOrdre(prep, matrice, ordreGarageIds) {

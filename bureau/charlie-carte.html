@@ -7,6 +7,11 @@ svg{width:100%;height:auto;border:1px solid var(--ln);border-radius:10px;backgro
 #msg{color:#c0392b}.mut{color:var(--mut)}</style></head>
 <body><main><h1>Tournée CHARLIE — vue Bureau</h1>
 <p class="mut">Ouvre le fichier exporté depuis ODICOLOR (Samsung : Ma tournée → Réglages → Exporter). Rien n’est envoyé sur Internet : la carte est dessinée localement, sans fond de carte externe.</p>
+<details open><summary><strong>Synchronisation automatique avec CHARLIE</strong></summary>
+<p class="mut">Adresse HTTPS de ton CHARLIE et jeton (gardé seulement dans cet onglet) : la carte se met à jour toute seule toutes les 15 secondes, comme le Samsung.</p>
+<label>Adresse <input id="url" type="url" placeholder="https://…" style="width:60%"></label> <label>Jeton <input id="jeton" type="password" autocomplete="off"></label> <label>Jour <input id="jour" type="date"></label>
+<button id="suivre" type="button">Suivre la tournée</button><p id="etatsync" class="mut" role="status"></p></details>
+<p class="mut"><strong>Secours</strong> si CHARLIE est injoignable : ouvrir le fichier exporté.</p>
 <input type="file" id="fichier" accept="application/json,.json" aria-label="Fichier de tournée"><p id="msg" role="alert"></p>
 <div class="kpis" id="kpi"></div><svg id="carte" viewBox="0 0 760 520" role="img" aria-label="Carte de la tournée"></svg>
 <p class="mut">● vert = vu · orange = absent · rouge = à faire · gris = retiré · contour noir = visite de Laurent · carré = départ</p>

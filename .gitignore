@@ -6,3 +6,9 @@ scratch/
 *.odicolor
 sauvegarde-devis-*.json
 odicolor-echange-pc-*.json
+
+# CHARLIE : données commerciales privées, jamais dans le dépôt public
+*.snapshot.json
+airtable-snapshot*.json
+charlie-tournee-*.json
+*.xlsx

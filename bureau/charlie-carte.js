@@ -34,11 +34,30 @@
       kpi: { prevus: ordre.length, vus: vus.length, absents: ordre.filter((o) => o.etat === 'absent').length, restants: ordre.filter((o) => o.etat === 'a_faire').length, km: d.plan.totaux ? d.plan.totaux.km : null, conduiteMin: d.plan.totaux ? d.plan.totaux.conduiteMin : null, clientPrevuMin: d.plan.totaux ? d.plan.totaux.clientMin : null, clientReelMin: minClient },
       ecartsLaurent: d.plan.ecartsLaurent || [], bilan, source: d.plan.source || null };
   }
-  const API = { valider, projeter, vueJournee };
+  // Synchronisation automatique (lecture seule) : même état que le Samsung, servi par CHARLIE. Le jeton reste en mémoire de l'onglet.
+  async function lireServeur({ url, jeton }, jour, fetchImpl, depuis) {
+    if (!/^https:\/\//.test(url || '') && !/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?(\/|$)/.test(url || '')) throw new Error('Adresse CHARLIE refusée : HTTPS obligatoire.');
+    const r = await fetchImpl(url.replace(/\/$/, '') + '/api/tournee/jour/' + jour, { headers: { Authorization: 'Bearer ' + jeton }, credentials: 'omit', referrerPolicy: 'no-referrer' });
+    if (!r.ok) throw new Error('CHARLIE a répondu ' + r.status + '.');
+    const j = await r.json(); if (!j.etat) return { version: j.version, vide: true };
+    if (depuis != null && j.version === depuis) return { version: j.version, inchange: true };
+    return { version: j.version, majLe: j.majLe, vue: vueJournee({ schema: 'charlie-tournee/v1', ...j.etat, jour: j.etat.jour || jour }) };
+  }
+  const API = { valider, projeter, vueJournee, lireServeur };
   if (typeof module === 'object' && module.exports) { module.exports = API; return; }
   racine.CharlieBureau = API;
   document.addEventListener('DOMContentLoaded', () => {
     const $ = (s) => document.querySelector(s), esc = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    let minuteur = null, version = null;
+    async function suivre() {
+      const url = $('#url').value.trim(), jeton = $('#jeton').value.trim(), jour = $('#jour').value || new Date().toISOString().slice(0, 10);
+      try { const r = await lireServeur({ url, jeton }, jour, (u, o) => fetch(u, o), version); version = r.version;
+        if (r.vide) $('#msg').textContent = 'Aucune tournée enregistrée pour ce jour.'; else if (!r.inchange) { dessiner(r.vue); $('#msg').textContent = ''; }
+        $('#etatsync').textContent = '🟢 Synchronisé avec CHARLIE à ' + new Date().toTimeString().slice(0, 5) + ' (version ' + r.version + ')'; }
+      catch (e) { $('#etatsync').textContent = '🟠 ' + e.message + ' Réessai automatique.'; }
+    }
+    $('#suivre').addEventListener('click', () => { clearInterval(minuteur); version = null; try { sessionStorage.setItem('charlie.url', $('#url').value.trim()); } catch (e) { /* ignoré */ } suivre(); minuteur = setInterval(suivre, 15000); });
+    try { $('#url').value = sessionStorage.getItem('charlie.url') || ''; } catch (e) { /* ignoré */ }
     $('#fichier').addEventListener('change', (ev) => {
       const f = ev.target.files[0]; if (!f) return; if (f.size > 5 * 1024 * 1024) { $('#msg').textContent = 'Fichier trop gros.'; return; }
       const r = new FileReader(); r.onload = () => { try { dessiner(vueJournee(JSON.parse(r.result))); $('#msg').textContent = ''; } catch (e) { $('#msg').textContent = e.message; } }; r.readAsText(f);
