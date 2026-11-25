@@ -245,5 +245,10 @@
     await routeAvant();
     if (p[0] === 'tournee' && typeof app !== 'undefined' && app.firstChild) app.insertBefore(h('a', { class: 'btn gros charlie-entree', href: '#/charlie' }, '🧭 Tournée optimisée CHARLIE'), app.firstChild);
   };
+  // app.js démarre sa première route et branche `hashchange` AVANT le chargement de ce module (scripts suivants) :
+  // l'écouteur d'origine garde l'ancienne fonction. On intercepte donc nos deux routes et on rejoue la route au chargement.
+  const NOS_ROUTES = /^#\/(charlie|tournee)(\/|$)/;
+  addEventListener('hashchange', (ev) => { if (NOS_ROUTES.test(location.hash)) { ev.stopImmediatePropagation(); route(); } }, true);
+  if (document.readyState !== 'complete') addEventListener('load', () => { if (NOS_ROUTES.test(location.hash)) route(); });
   window.__charlie = { pageCharlie, contexte, optimiser, recalculer, verifierAdresses };
 })();

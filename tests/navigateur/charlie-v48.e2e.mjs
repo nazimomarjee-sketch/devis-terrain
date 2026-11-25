@@ -49,7 +49,7 @@ must(await page.locator('.charlie-grille').count()>0,'tournée consultable hors 
 await ctx.setOffline(false);await page.waitForTimeout(800);
 // moteur routier configuré mais en panne : repli local signalé
 await page.goto(url+'#/charlie');await page.evaluate(async()=>{const db=await new Promise(ok=>{const r=indexedDB.open('devis-terrain',1);r.onsuccess=()=>ok(r.result);});await new Promise(ok=>{const t=db.transaction('meta','readwrite');t.objectStore('meta').put({osrm:'http://127.0.0.1:1',vroom:'http://127.0.0.1:1'},'charlieReglages');t.oncomplete=ok;});});
-await page.reload();await page.waitForSelector('.charlie-grille');await page.click('.charlie-b:has-text("OPTIMISER")');await page.waitForSelector('text=Proposition de CHARLIE',{timeout:20000});
+await page.reload();await page.waitForSelector('.charlie-grille',{timeout:15000}).catch(async e=>{console.error('DIAG',page.url(),JSON.stringify((await page.locator('body').innerText().catch(()=>'?')).slice(0,300)));throw e;});await page.click('.charlie-b:has-text("OPTIMISER")');await page.waitForSelector('text=Proposition de CHARLIE',{timeout:20000});
 must(await page.locator('text=repli').count()>0||await page.locator('text=ESTIMÉS').count()>0,'panne OSRM/VROOM : repli local signalé, tournée produite');
 must(erreurs.length===0,'aucune erreur JavaScript'+(erreurs.length?' : '+erreurs.join(' | '):''));
 await b.close();srv.close();
