@@ -1,5 +1,5 @@
 {
-  "id": "c983789abdd929111716f134f3c3291d8250449fc9b7d947963822aafb11abc9",
+  "id": "161e21b0d246b726dcc02b927e4e98072432fd83b900500f89661f8149e038d5",
   "assets": [
     {
       "path": "accueil-v23.css",
@@ -87,15 +87,15 @@
     },
     {
       "path": "charlie-optimiseur-v50.js",
-      "sha256": "81421ce7d9955adf3990a0ea2cc247f2bb29f038eccd8c19e76d1d90563822ce"
+      "sha256": "e6776a161cf064941a8a980c4cb5f17359d33b65bc641c445ab6fdcdd290a6d1"
     },
     {
       "path": "charlie-tournee-v50.css",
-      "sha256": "293212b27f3bfec68926d70960b3948c2fd83f9a6d054f117df9cdef8fe82f02"
+      "sha256": "7a477d18b5b43b93dfb2dd429723e74cabf13eb6cd7b35bcfe45dd8db1207c37"
     },
     {
       "path": "charlie-tournee-v50.js",
-      "sha256": "b3cfae538efe9b9d803a497f2ffd437719a5cc7f4163b507b1ca0c52647012ec"
+      "sha256": "c9ecef5ab77c3f90e11e8c29e4a25fda956d2c6b4115b9047b0ec24e9f7c9311"
     },
     {
       "path": "cockpit-v48.js",
@@ -175,7 +175,7 @@
     },
     {
       "path": "index.html",
-      "sha256": "9339ad7a3865ab9b4c3a590d42a3ee7a68eb0a869f2547af23203bb387571aed"
+      "sha256": "dedae02bfcc86d68414ee1f17a59fe2785734aca65fd53c10985dca7e81026e6"
     },
     {
       "path": "logo-96.png",
@@ -219,7 +219,7 @@
     },
     {
       "path": "pwa-client.js",
-      "sha256": "cc09243b364901407563a158b268af9048a03813b6a76204d5245539e7f2418d"
+      "sha256": "a1ec70c84eb3a3db8f5bb42fcaae544550e891689ef1b6baf1420dc94a5fead0"
     },
     {
       "path": "rappels-produits-v24.js",

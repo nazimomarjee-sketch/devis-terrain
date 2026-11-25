@@ -6,7 +6,7 @@
 | Moteur pur (Samsung, Bureau, Node) | `charlie-optimiseur-v50.js` | scoring commercial explicable, matrices OSRM/estimées, adaptateur VROOM contrôlé, solveur local de repli, recalcul, proches, prévu/réalisé, apprentissage, agents + audit, commandes |
 | Interface Samsung | `charlie-tournee-v50.js/.css` | route `#/charlie` : 8 gros boutons, proposition à valider, hors ligne |
 | Cockpit Bureau | `bureau/charlie-carte.html/.js` | carte SVG locale d'un fichier `charlie-tournee/v1` exporté du Samsung |
-| Moteur routier local | `infra/routage/` | docker-compose OSRM + VROOM + script graphe La Réunion |
+| Moteur routier local | `infra/routage/` | docker-compose OSRM + VROOM + script graphe Île-de-France |
 | Tests | `tests/charlie-optimiseur-v50.test.cjs`, `tests/charlie-carte-bureau-v50.test.cjs`, `tests/navigateur/charlie-v50.e2e.mjs` | unitaires, intégration, fuzz, navigateur |
 
 La tournée historique (`#/tournee`) n'est pas modifiée : un lien « Tournée optimisée CHARLIE » y est ajouté ; si CHARLIE échoue, l'écran propose de revenir à la tournée habituelle.
@@ -14,7 +14,7 @@ La tournée historique (`#/tournee`) n'est pas modifiée : un lien « Tournée o
 ## Licences et hébergement (gratuit)
 - VROOM : BSD-2-Clause (fichier `LICENSE` lu sur le dépôt). OSRM : BSD-2-Clause (`LICENSE.TXT` lu). Utilisés comme **services HTTP** : aucun code copié, aucune dépendance embarquée.
 - Cartes : OpenStreetMap, licence ODbL → attribution « © contributeurs OpenStreetMap » si une carte avec fond est affichée (la carte Bureau actuelle n'en utilise aucun).
-- Ne pas utiliser les serveurs de démonstration publics en production. Hébergement : `infra/routage` sur un PC avec Docker (extrait La Réunion Geofabrik, ~dizaines de Mo). Coût : 0 €.
+- Ne pas utiliser les serveurs de démonstration publics en production. Hébergement : `infra/routage` sur un PC avec Docker (extrait Île-de-France Geofabrik (plusieurs centaines de Mo, RAM à mesurer)). Coût : 0 €.
 - Contrainte réseau : une PWA servie en HTTPS ne peut pas appeler `http://IP-locale` (contenu mixte). Il faut un accès HTTPS privé (ex. reverse proxy + VPN privé). **Non testé ici.**
 
 ## Règles de vérité (appliquées par le code et par l'audit)
@@ -32,3 +32,11 @@ Chaque VISITE TERMINÉE (durée confirmée par l'utilisateur) ou ABSENT met à j
 
 ## Limites connues (voir rapport)
 Pas de synchronisation temps réel Samsung ↔ Bureau (export/ouverture de fichier, même canal que « Lien avec le PC ») ; pas d'accès à la base ODICOLOR réelle ni à EBP depuis cette session ; moteurs OSRM/VROOM non exécutés ici (réseau bloqué vers Geofabrik/ghcr) ; test sur le Samsung physique non réalisé ; l'intégration dans le dépôt `cockpit-carrosserie` (agent Oompa Loompa Tournée) n'est pas faite : session sans droit d'écriture sur ce dépôt.
+
+
+## Secteurs de la feuille de route de Laurent (v50)
+Secteurs couverts (déc. 2026, S1/S2) : **77** (1 et 8 déc.), **95** (2, 7, 9), **94** (3), **93** (4, 11), **91/92** (10). Départ par défaut : Massy–Palaiseau (centre de commune, comme le Bureau).
+- Table dates → secteurs dans `charlie-optimiseur-v50.js` (`SECTEURS_LAURENT`, dates et départements seulement, transcrits du cockpit `src/charlie-laurent*.js` qui fait foi). Samedi/dimanche ou date inconnue : aucun secteur inventé, pas de filtre.
+- Hors secteur du jour : un garage **non** prévu par Laurent n'est pas proposé ; un garage **prévu par Laurent** hors secteur est conservé avec l'alerte `SECTEUR_DIFFERENT`.
+- Positions : adresse vérifiée (GPS) sinon **centre de commune** (comme `carte-v48.js`) ; les tournées calculées sur des centres de commune sont signalées « approximatives ».
+- Moteur routier : `infra/routage/` (extrait Île-de-France : 75, 77, 78, 91-95). `node infra/routage/verifier-moteur.cjs` contrôle OSRM + VROOM sur un point par secteur ; testé ici contre de FAUX serveurs seulement.

@@ -1,7 +1,7 @@
 /* ODICOLOR v48 — Ma tournée CHARLIE : gros boutons, peu de défilement, contrastes forts */
 .charlie-entree{display:block;text-align:center;margin:0 0 12px;min-height:56px}
 .charlie-grille{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
-.charlie-b{min-height:68px;font-size:1.02rem;font-weight:800;letter-spacing:.2px;line-height:1.15;padding:10px 8px;width:100%;touch-action:manipulation}
+main .charlie-grille .charlie-b{min-height:68px!important;font-size:1.02rem;font-weight:800;letter-spacing:.2px;line-height:1.15;padding:10px 8px;width:100%;touch-action:manipulation}
 .charlie-prochain{padding:14px}
 .charlie-nom{font-size:1.45rem;font-weight:800;line-height:1.15;margin:4px 0}
 .charlie-ligne{font-size:1.05rem;margin:2px 0 6px}

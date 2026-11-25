@@ -8,11 +8,11 @@ const srv=http.createServer((q,r)=>{let p=decodeURIComponent(q.url.split('?')[0]
 await new Promise(ok=>srv.listen(0,'127.0.0.1',ok));const url='http://127.0.0.1:'+srv.address().port+'/';
 const must=(c,m)=>{if(!c){console.error('ÉCHEC : '+m);process.exitCode=1;throw new Error(m);}console.log('OK  : '+m);};
 const b=await chromium.launch();
-const ctx=await b.newContext({viewport:{width:412,height:915},deviceScaleFactor:1,geolocation:{latitude:-20.8789,longitude:55.4481},permissions:['geolocation'],locale:'fr-FR'});
+const ctx=await b.newContext({viewport:{width:412,height:915},deviceScaleFactor:1,geolocation:{latitude:48.7263,longitude:2.2696},permissions:['geolocation'],locale:'fr-FR'});
 const page=await ctx.newPage();const erreurs=[];page.on('pageerror',e=>erreurs.push(e.message));
-await page.goto(url);await page.waitForSelector('#app');
-const P=[[-20.8823,55.4504,'A'],[-20.9007,55.5100,'A'],[-20.94,55.29,'B'],[-21.01,55.27,'B'],[-21.34,55.48,'C']];
-await page.evaluate(async(P)=>{const db=await new Promise((ok,ko)=>{const r=indexedDB.open('devis-terrain',1);r.onsuccess=()=>ok(r.result);r.onerror=()=>ko(r.error);});
+await page.goto(url);await page.waitForSelector('#app');await page.waitForFunction(async()=>{const d=await indexedDB.databases();return d.some(x=>x.name==='devis-terrain'&&x.version>=2);});await page.waitForTimeout(500);
+const P=[[48.7309,2.2713,'A'],[48.7000,2.2300,'A'],[48.7600,2.3200,'B'],[48.7800,2.2800,'B'],[48.6900,2.3300,'C']];
+await page.evaluate(async(P)=>{const db=await new Promise((ok,ko)=>{const r=indexedDB.open('devis-terrain');r.onsuccess=()=>ok(r.result);r.onerror=()=>ko(r.error);});
  const tx=db.transaction('clients','readwrite'),s=tx.objectStore('clients');s.clear();
  P.forEach((p,i)=>s.put({nom:'Garage Test '+(i+1),priorite:p[2],statutCrm:i%2?'client':'prospect',visites:[],ent:{lat:p[0],lng:p[1],adresse:i+' rue test'},tel:'0262000'+i}));
  await new Promise(ok=>tx.oncomplete=ok);},P);
@@ -33,7 +33,7 @@ const nom1=await page.locator('.charlie-nom').innerText();must(/Garage Test/.tes
 const popupP=ctx.waitForEvent('page',{timeout:5000}).catch(()=>null);await page.click('.charlie-b:has-text("GPS")');const pop=await popupP;
 must(pop&&/waze\.com\/ul\?ll=-?\d+\.\d{6},-?\d+\.\d{6}&navigate=yes/.test(pop.url())||true,'GPS ouvre Waze avec coordonnées seules');
 page.once('dialog',d=>d.accept('25'));await page.click('.charlie-b:has-text("VISITE TERMINÉE")');await page.waitForTimeout(500);
-const visites=await page.evaluate(async()=>{const db=await new Promise(ok=>{const r=indexedDB.open('devis-terrain',1);r.onsuccess=()=>ok(r.result);});return await new Promise(ok=>{const r=db.transaction('clients').objectStore('clients').getAll();r.onsuccess=()=>ok(r.result.map(c=>c.visites.length));});});
+const visites=await page.evaluate(async()=>{const db=await new Promise(ok=>{const r=indexedDB.open('devis-terrain');r.onsuccess=()=>ok(r.result);});return await new Promise(ok=>{const r=db.transaction('clients').objectStore('clients').getAll();r.onsuccess=()=>ok(r.result.map(c=>c.visites.length));});});
 must(visites.reduce((a,b)=>a+b,0)===1,'visite enregistrée dans la fiche (source unique)');
 await page.click('.charlie-b:has-text("CLIENT ABSENT")');await page.waitForSelector('text=Nouvelle organisation proposée',{timeout:15000});
 must(await page.locator('text=ÉCARTS À VALIDER').count()>0||await page.locator('text=Aucun écart').count()>0,'nouvelle organisation proposée après absence');
@@ -42,13 +42,13 @@ must(await page.locator('text=Prévu / réalisé').count()>0,'bilan prévu/réal
 await page.fill('input[aria-label="Commande à Charlie"]','Charlie, recalcule la tournée');
 // hors ligne : la dernière tournée reste consultable
 await page.evaluate(()=>navigator.serviceWorker.ready.then(()=>true));await page.reload();await page.waitForTimeout(1500);
-const caches_=await page.evaluate(async()=>(await caches.keys()).concat((await (await caches.open((await caches.keys())[0])).keys()).map(r=>r.url.split('/').pop())));
-must(caches_.includes('terrain-v48')&&caches_.includes('charlie-tournee-v50.js')&&caches_.includes('charlie-optimiseur-v50.js'),'nouveaux fichiers présents dans le cache hors ligne');
+const caches_=await page.evaluate(async()=>{const out=[];for(const k of await caches.keys())for(const r of await (await caches.open(k)).keys())out.push(r.url.split('/').pop().split('?')[0]);return out;});
+must(caches_.includes('charlie-tournee-v50.js')&&caches_.includes('charlie-optimiseur-v50.js')&&caches_.includes('charlie-tournee-v50.css'),'nouveaux fichiers présents dans le cache hors ligne');
 await ctx.setOffline(true);await page.goto(url+'#/charlie').catch(()=>{});await page.waitForSelector('.charlie-grille',{timeout:10000}).catch(()=>{});
 must(await page.locator('.charlie-grille').count()>0,'tournée consultable hors connexion');
 await ctx.setOffline(false);await page.waitForTimeout(800);
 // moteur routier configuré mais en panne : repli local signalé
-await page.goto(url+'#/charlie');await page.evaluate(async()=>{const db=await new Promise(ok=>{const r=indexedDB.open('devis-terrain',1);r.onsuccess=()=>ok(r.result);});await new Promise(ok=>{const t=db.transaction('meta','readwrite');t.objectStore('meta').put({osrm:'http://127.0.0.1:1',vroom:'http://127.0.0.1:1'},'charlieReglages');t.oncomplete=ok;});});
+await page.goto(url+'#/charlie');await page.evaluate(async()=>{const db=await new Promise(ok=>{const r=indexedDB.open('devis-terrain');r.onsuccess=()=>ok(r.result);});await new Promise(ok=>{const t=db.transaction('meta','readwrite');t.objectStore('meta').put({osrm:'http://127.0.0.1:1',vroom:'http://127.0.0.1:1'},'charlieReglages');t.oncomplete=ok;});});
 await page.reload();await page.waitForSelector('.charlie-grille',{timeout:15000}).catch(async e=>{console.error('DIAG',page.url(),JSON.stringify((await page.locator('body').innerText().catch(()=>'?')).slice(0,300)));throw e;});await page.click('.charlie-b:has-text("OPTIMISER")');await page.waitForSelector('text=Proposition de CHARLIE',{timeout:20000});
 must(await page.locator('text=repli').count()>0||await page.locator('text=ESTIMÉS').count()>0,'panne OSRM/VROOM : repli local signalé, tournée produite');
 must(erreurs.length===0,'aucune erreur JavaScript'+(erreurs.length?' : '+erreurs.join(' | '):''));

@@ -35,10 +35,13 @@
       if (c && c.rdv && c.rdv.date === auj && T.hms(c.rdv.heure) != null) l.heure = c.rdv.heure;
       laurent.push(l);
     }
-    const ctxFns = { echeance: (c) => (typeof echeance === 'function' ? echeance(c, now.getTime()) : null), relanceDue: (d, ms) => relanceDue(d, ms), montantHt: (d) => totaux(d).ht / 100 };
+    if (typeof ODICOLOR_CARTE !== 'undefined' && typeof ODICOLOR_COMMUNES_CENTRES !== 'undefined') { try { ODICOLOR_CARTE.charger(ODICOLOR_COMMUNES_CENTRES); } catch (e) { /* déjà chargé */ } }
+    const placer = (c) => { if (typeof ODICOLOR_CARTE === 'undefined') return null; const p = ODICOLOR_CARTE.placer(c); return p && p.precision ? p : null; };
+    const secteurs = T.secteursDuJour(auj);
+    const ctxFns = { placer, echeance: (c) => (typeof echeance === 'function' ? echeance(c, now.getTime()) : null), relanceDue: (d, ms) => relanceDue(d, ms), montantHt: (d) => totaux(d).ht / 100 };
     const plage = [T.hms(R.debut) ?? T.DEFAUTS.plage[0], T.hms(R.fin) ?? T.DEFAUTS.plage[1]];
     const pauses = T.hms(R.pauseDebut) != null && T.hms(R.pauseFin) != null && R.pauseMin > 0 ? [{ creneau: [T.hms(R.pauseDebut), T.hms(R.pauseFin)], duree: R.pauseMin * 60 }] : [];
-    return { clients, devis, appris, R, now, auj, laurent, ctxFns, plage, pauses, maintenant: now.getTime() };
+    return { clients, devis, appris, R, now, auj, laurent, secteurs, ctxFns, plage, pauses, maintenant: now.getTime() };
   }
   const positionActuelle = () => new Promise((ok) => {
     if (!navigator.geolocation) return ok(null);
@@ -55,9 +58,10 @@
   async function optimiser(etat0) {
     const C = await contexte(); let depart = await positionActuelle();
     if (!depart) { const d = await lireMeta('charlieDepart', null); if (d && T.posOk(d)) depart = { ...d, source: 'dernier départ mémorisé' }; }
+    if (!depart && typeof ODICOLOR_COMMUNES_CENTRES !== 'undefined') { for (const insee of T.DEFAUTS.rattachement.insee) { const r = ODICOLOR_COMMUNES_CENTRES.find((x) => x[0] === insee); if (r) { depart = { lat: r[2], lng: r[3], source: 'rattachement ' + T.DEFAUTS.rattachement.nom + ' (centre de commune)' }; break; } } }
     if (!depart) { toast('Position de départ introuvable : active la localisation du téléphone.', true); return null; }
     await ecrireMeta('charlieDepart', { lat: depart.lat, lng: depart.lng });
-    const r = await T.organiserJournee({ clients: C.clients, devis: C.devis, laurent: C.laurent, depart, plage: C.plage, pauses: C.pauses, appris: C.appris, maintenant: C.maintenant, ctxFns: C.ctxFns, ...moteurs(C.R) });
+    const r = await T.organiserJournee({ clients: C.clients, devis: C.devis, laurent: C.laurent, depart, plage: C.plage, pauses: C.pauses, appris: C.appris, maintenant: C.maintenant, ctxFns: C.ctxFns, secteurs: C.secteurs, ...moteurs(C.R) });
     const etat = etat0 && etat0.jour === C.auj ? etat0 : { jour: C.auj, plan: null, curseur: 0, reel: [], faits: [], retires: [] };
     etat.proposition = { plan: r.plan || null, statut: r.statut, trace: r.trace.map((t) => ({ agent: t.agent, statut: t.statut, resume: t.resume })), exclus: r.exclus || [], erreur: r.erreur || null, audit: r.audit || null, genereLe: new Date().toISOString(), departSource: depart.source, laurent: C.laurent.map((l) => l.id) };
     etat.depart = { lat: depart.lat, lng: depart.lng };
@@ -81,7 +85,7 @@
     await ecrireMeta('charlieAppris', A); await sauverEtat(etat);
   }
   async function recalculer(etat, evenement) {
-    const C = await contexte(), { candidats } = T.construireCandidats({ clients: C.clients, devis: C.devis, laurent: C.laurent, appris: C.appris, plage: C.plage, maintenant: C.maintenant, ctxFns: C.ctxFns });
+    const C = await contexte(), { candidats } = T.construireCandidats({ clients: C.clients, devis: C.devis, laurent: C.laurent, appris: C.appris, plage: C.plage, maintenant: C.maintenant, ctxFns: C.ctxFns, secteurs: C.secteurs });
     let pos = await positionActuelle(); const dernier = etat.reel.length ? etat.plan.ordre.find((o) => o.garageId === etat.reel[etat.reel.length - 1].garageId) : null;
     if (!pos && dernier) pos = { ...dernier.pos, source: 'dernier garage visité' }; if (!pos) pos = etat.depart;
     const rec = await T.recalculer({ candidats, tous: candidats, faits: etat.faits, retires: etat.retires, planPrecedent: etat.plan, positionActuelle: pos, depart: etat.depart, maintenantS: secDuJour(), plage: C.plage, pauses: C.pauses, pauseFaite: secDuJour() > (C.pauses[0] ? C.pauses[0].creneau[1] : 0), laurent: C.laurent.map((l) => l.id), ...moteurs(C.R) }, evenement);
@@ -140,7 +144,7 @@
     const entete = h('div', { class: 'carte obj charlie-prochain' });
     if (cible) {
       const lien = T.lienNavigation(cible.pos, R.appli);
-      entete.append(h('small', { class: 'etiq' }, 'PROCHAIN · ' + (rests.length) + ' restant(s)'), h('div', { class: 'charlie-nom' }, cible.nom),
+      entete.append(h('small', { class: 'etiq' }, 'PROCHAIN · ' + (rests.length) + ' restant(s)' + (T.secteursDuJour(auj).length ? ' · secteur ' + T.secteursDuJour(auj).join('/') : '')), h('div', { class: 'charlie-nom' }, cible.nom),
         h('div', { class: 'charlie-ligne' }, cible.debut + ' · ' + cible.duree / 60 + ' min · trajet ' + cible.trajetMin + ' min / ' + cible.trajetKm + ' km'),
         h('small', { class: 'mut' }, (cible.laurent ? 'Feuille de Laurent' : 'Ajout CHARLIE') + ' · ' + (cible.type || '').replace(/_/g, ' ') + ' · score ' + cible.score + (cible.rdv ? ' · RDV fixé' : '') + (cible.dureeSource.startsWith('HYP') ? ' · durée = hypothèse' : '')),
         lien ? null : h('small', { class: 'mut' }, 'Position inconnue : navigation impossible.'));

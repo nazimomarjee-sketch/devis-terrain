@@ -178,7 +178,7 @@ test('orchestration de bout en bout : agents, audit, validation humaine',async()
   const b=base();b.laurent=[{id:1,heure:'09:00'},{id:3}];
   const r=await T.organiserJournee(b);
   assert.ok(['PROPOSITION_A_VALIDER','CONFLIT_A_RESOUDRE'].includes(r.statut),r.statut);
-  assert.deepEqual(r.trace.map(t=>t.agent),['memoire','historique','analyse-commerciale','tournee-geo','performance','optimiseur','audit']);
+  assert.deepEqual(r.trace.map(t=>t.agent),['memoire','historique','secteur','analyse-commerciale','tournee-geo','performance','optimiseur','audit']);
   assert.equal(r.audit.ok,true);assert.equal(r.validationHumaineRequise,true);
   assert.ok(r.plan.ordre.find(o=>o.garageId==='1').laurent);
 });

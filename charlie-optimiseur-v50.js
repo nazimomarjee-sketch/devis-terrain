@@ -19,6 +19,7 @@
     toleranceRdv: 10 * 60,                   // retard toléré sur un rendez-vous fixé
     vitesseKmh: 40, facteurRoute: 1.35,      // HYPOTHÈSES de la matrice ESTIMÉE (repli sans OSRM)
     rayonProchesKm: 6, maxProches: 5,
+    rattachement: { nom: 'Massy–Palaiseau', insee: ['91477', '91377'] }, // point de départ par défaut (comme le Bureau) : centre de commune, jamais une adresse
     seuilDormantJours: 90
   });
   const POIDS = Object.freeze({ A: 30, B: 20, C: 10, rappel: 15, echeanceMax: 25, devisRelance: 20, devisGros: 10, devisMoyen: 5,
@@ -63,6 +64,18 @@
     } finally { if (t) clearTimeout(t); }
   }
 
+  // ---------- secteurs de la feuille de route de Laurent ----------
+  // Grille « PLANNING SEMAINE NAZIM » de Laurent (classeur Feuille_de_route_Nazim.xlsx, onglet PLANING) : secteur par jour, SEMAINE 1 puis SEMAINE 2.
+  // Dates + secteurs UNIQUEMENT (aucun nom ni adresse de garage dans le dépôt public). S1 = semaine du 30/11/2026 (le 1er déc. = mardi, secteur 77,
+  // cohérent avec le cockpit). Au-delà de S2 la rotation n'est PAS connue : aucun secteur n'est extrapolé.
+  const GRILLE_LAURENT = Object.freeze({ debut: '2026-11-30', semaines: Object.freeze([Object.freeze(['95', '77', '95', '94', '93']), Object.freeze(['95', '77', '95', '91/92', '93'])]) });
+  const SECTEURS_LAURENT = (() => { const o = {}; GRILLE_LAURENT.semaines.forEach((sem, w) => sem.forEach((sec, j) => { const d = new Date(GRILLE_LAURENT.debut + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + 7 * w + j); o[d.toISOString().slice(0, 10)] = sec; })); return Object.freeze(o); })();
+  const DEPARTEMENTS_IDF = Object.freeze(['75', '77', '78', '91', '92', '93', '94', '95']);
+  const parserSecteurs = (t) => String(t == null ? '' : t).split(/[\/,; ]+/).filter((x) => DEPARTEMENTS_IDF.includes(x));
+  const secteursDuJour = (jour, table = SECTEURS_LAURENT) => parserSecteurs(table[jour]);
+  const secteursLaurent = () => [...new Set(Object.values(SECTEURS_LAURENT).flatMap(parserSecteurs))].sort();
+  const departementDe = (insee, cp) => (/^\d{5}$/.test(insee || '') ? String(insee).slice(0, 2) : /^\d{5}$/.test(cp || '') ? String(cp).slice(0, 2) : null);
+
   // ---------- score commercial explicable ----------
   // ctx : { maintenant:ms, devis:[…du client…], rythmeJours(c), echeance(c)->{pct,rappel,du,jours}, montantHt(d)->€ }
   function scorer(c, ctx) {
@@ -99,14 +112,16 @@
   // ---------- candidats ----------
   // entree : { clients[], devis[], laurent:[{id,heure?,duree?}], maintenant, plage, appris, ctxFns }
   function construireCandidats(entree) {
-    const { clients, devis = [], laurent = [], appris = null, plage = DEFAUTS.plage } = entree;
+    const { clients, devis = [], laurent = [], appris = null, plage = DEFAUTS.plage } = entree, secteurs = Array.isArray(entree.secteurs) ? entree.secteurs : [];
     const maintenant = entree.maintenant || Date.now();
     const parClient = new Map(); devis.forEach((d) => { if (d && d.clientId != null) { const k = String(d.clientId); (parClient.get(k) || parClient.set(k, []).get(k)).push(d); } });
     const lau = new Map(laurent.map((l, i) => [String(l.id), { ...l, rang: i }]));
     const candidats = [], exclus = [];
     for (const c of clients) {
       const L = lau.get(String(c.id));
-      const pos = c.ent && posOk({ lat: c.ent.lat, lng: c.ent.lng }) ? { lat: c.ent.lat, lng: c.ent.lng } : null;
+      const pl = entree.ctxFns && typeof entree.ctxFns.placer === 'function' ? entree.ctxFns.placer(c) : (c.ent && posOk({ lat: c.ent.lat, lng: c.ent.lng }) ? { lat: c.ent.lat, lng: c.ent.lng, precision: 'gps' } : null);
+      const pos = pl && posOk({ lat: pl.lat, lng: pl.lng }) ? { lat: pl.lat, lng: pl.lng } : null, posQualite = pos ? (pl.precision || 'gps') : null;
+      const dep = departementDe(pl && pl.insee || c.insee, c.cp);
       const s = scorer(c, { ...entree.ctxFns, maintenant, devis: parClient.get(String(c.id)) || [] });
       const dureeA = dureeAppris(appris, c.id);
       const duree = L && Number.isInteger(L.duree) && L.duree > 0 ? L.duree : dureeA ? dureeA.secondes : DEFAUTS.dureeVisite;
@@ -117,7 +132,8 @@
       else if (horaires.length) { creneaux = horaires; creneauxSource = 'horaires d’ouverture de la fiche'; }
       else if (appris && appris.garages && appris.garages[c.id] && appris.garages[c.id].fenetres && appris.garages[c.id].fenetres.length) { creneaux = appris.garages[c.id].fenetres; creneauxSource = 'disponibilité apprise des visites réelles'; }
       if (!creneaux) creneaux = [plage.slice()];
-      const item = { id: String(c.id), nom: c.nom, pos, laurent: !!L, rangLaurent: L ? L.rang : null, rdv: !!(L && hms(L.heure) != null),
+      if (secteurs.length && !L && dep && !secteurs.includes(dep)) { exclus.push({ id: String(c.id), nom: c.nom, raison: 'HORS_SECTEUR_DU_JOUR', laurent: false, detail: 'Département ' + dep + ' hors secteur du jour (' + secteurs.join('/') + ')' }); continue; }
+      const item = { id: String(c.id), nom: c.nom, pos, posQualite, dep, horsSecteur: !!(L && secteurs.length && dep && !secteurs.includes(dep)), laurent: !!L, rangLaurent: L ? L.rang : null, rdv: !!(L && hms(L.heure) != null),
         score: L ? Math.max(s.score, 100) : s.score, scoreCommercial: s.score, composantes: s.composantes, manquants: s.manquants, type: s.type, derniereVisite: s.derniereVisite,
         duree, dureeSource, creneaux, creneauxSource, adresse: (c.ent && c.ent.adresse) || c.ville || c.villeProspection || null, tel: c.tel || null };
       if (!pos) { exclus.push({ id: item.id, nom: c.nom, raison: 'POSITION_INCONNUE', laurent: !!L, detail: 'Adresse non vérifiée : aucune coordonnée fiable, visite non optimisable.' }); if (!L) continue; }
@@ -302,6 +318,9 @@
     });
     km += (Mx.distances[prev][0] || 0) / 1000; conduiteS += Mx.durees[prev][0] || 0;
     const nonPlanifies = verif.nonPlanifies.map((n) => { const c = parGarage.get(n.garageId); return { garageId: n.garageId, nom: c.nom, obligatoire: n.obligatoire, laurent: c.laurent, score: c.scoreCommercial, raison: 'Ne tient pas dans la journée avec les rendez-vous, trajets et pauses' }; }).concat(incompatibles);
+    const approx = ordre.filter((o) => parGarage.get(o.garageId).posQualite === 'commune').length;
+    if (approx) alertes.push(approx + ' garage(s) positionnés au CENTRE DE LEUR COMMUNE (pas à l’adresse) : trajets approximatifs. Vérifier les adresses pour une tournée exacte.');
+    planifiables.filter((c) => c.horsSecteur).forEach((c) => alertes.push('SECTEUR_DIFFERENT : ' + c.nom + ' (dép. ' + c.dep + ') figure sur la feuille de Laurent hors du secteur du jour ' + (entree.secteurs || []).join('/') + ' — conservé, à confirmer avec Laurent.'));
     const ordreLaurent = (entree.laurent || []).map(String);
     const ecartsLaurent = comparerLaurent(ordreLaurent, ordre.map((o) => o.garageId), nonPlanifies, candidats);
     let reference = null;
@@ -406,9 +425,10 @@
     const appris = deps.appris || null;
     note('memoire', 'OK', appris ? Object.keys(appris.garages).length + ' garage(s) avec historique appris' : 'Aucun apprentissage disponible : valeurs par défaut signalées');
     // 2. Historique client + 3. Analyse commerciale (scoring explicable)
-    const { candidats, exclus } = construireCandidats({ clients: deps.clients, devis: deps.devis, laurent: deps.laurent, appris, plage: deps.plage, maintenant: deps.maintenant, ctxFns: deps.ctxFns });
+    const { candidats, exclus } = construireCandidats({ clients: deps.clients, devis: deps.devis, laurent: deps.laurent, appris, plage: deps.plage, maintenant: deps.maintenant, ctxFns: deps.ctxFns, secteurs: deps.secteurs || [] });
     note('historique', 'OK', candidats.length + ' garage(s) analysés', { sansRythme: candidats.filter((c) => c.manquants.includes('rythme')).length });
     const types = candidats.reduce((m, c) => (m[c.type] = (m[c.type] || 0) + 1, m), {});
+    note('secteur', 'OK', deps.secteurs && deps.secteurs.length ? 'Secteur du jour (feuille de Laurent) : ' + deps.secteurs.join(' / ') + ', ' + exclus.filter((e) => e.raison === 'HORS_SECTEUR_DU_JOUR').length + ' garage(s) hors secteur non proposés' : 'Aucun secteur défini pour ce jour : pas de filtre');
     note('analyse-commerciale', 'OK', 'Types : ' + (Object.entries(types).map(([k, v]) => v + ' ' + k).join(', ') || 'aucun'), { types });
     // 4. Tournée et géolocalisation
     const sansPos = exclus.filter((e) => e.raison === 'POSITION_INCONNUE'), inconnus = exclus.filter((e) => e.raison === 'GARAGE_INCONNU_DE_LA_BASE');
@@ -424,7 +444,7 @@
     note('performance', obj ? 'OK' : 'INFO', obj && obj.visitesJour ? 'Objectif déclaré : ' + obj.visitesJour + ' visites/jour' : 'Aucun objectif déclaré : pas de seuil appliqué');
     // 6. Optimisation
     let plan;
-    try { plan = await proposerTournee({ candidats, depart: deps.depart, retour: deps.retour, plage: deps.plage || DEFAUTS.plage, pauses: deps.pauses, laurent: (deps.laurent || []).map((l) => String(l.id)), solveur: deps.solveur, matrice }); }
+    try { plan = await proposerTournee({ candidats, depart: deps.depart, retour: deps.retour, plage: deps.plage || DEFAUTS.plage, pauses: deps.pauses, laurent: (deps.laurent || []).map((l) => String(l.id)), secteurs: deps.secteurs || [], solveur: deps.solveur, matrice }); }
     catch (e) { note('optimiseur', 'ECHEC', e.message); sortie.statut = 'ECHEC'; sortie.erreur = e.message; return sortie; }
     note('optimiseur', plan.repli ? 'REPLI' : 'OK', plan.ordre.length + ' visite(s) planifiée(s), moteur ' + plan.moteur);
     // 7. Audit et contrôle indépendant
@@ -465,7 +485,7 @@
     return null;
   }
 
-  const API = { DEFAUTS, POIDS, posOk, hms, fmt, norm, distanceKm, matriceEstimee, matriceOSRM, scorer, construireCandidats, preparerVisites, verifierProposition, resoudreLocal, evaluerOrdre,
+  const API = { GRILLE_LAURENT, SECTEURS_LAURENT, DEPARTEMENTS_IDF, parserSecteurs, secteursDuJour, secteursLaurent, departementDe, DEFAUTS, POIDS, posOk, hms, fmt, norm, distanceKm, matriceEstimee, matriceOSRM, scorer, construireCandidats, preparerVisites, verifierProposition, resoudreLocal, evaluerOrdre,
     proposerTournee, comparerLaurent, recalculer, suggererProches, lienNavigation, comparerPrevuReel, nouvelApprentissage, apprendre, dureeAppris, organiserJournee, auditerProposition, interpreterCommande };
   if (typeof module === 'object' && module.exports) module.exports = API; else racine.TourneeOpt = API;
 })(typeof window !== 'undefined' ? window : globalThis);

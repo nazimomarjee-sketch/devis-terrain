@@ -1,13 +1,13 @@
 # Moteur de routage local GRATUIT pour CHARLIE : OSRM (temps/distances) + VROOM (optimisation).
 # Licences : OSRM = BSD-2-Clause, VROOM = BSD-2-Clause, données OpenStreetMap = ODbL (attribution « © contributeurs OpenStreetMap »).
-# Aucun abonnement. Machine suggérée : PC Windows/Linux du bureau avec Docker (≈ 2 Go RAM pour La Réunion).
-# Préparation (une fois) : ./preparer-reunion.sh  → télécharge l'extrait OSM de La Réunion et construit le graphe OSRM.
+# Aucun abonnement. Machine suggérée : PC Windows/Linux du bureau avec Docker (plusieurs Go de RAM pour l’Île-de-France : à mesurer sur la machine cible).
+# Préparation (une fois) : ./preparer-idf.sh  → télécharge l'extrait OSM Île-de-France et construit le graphe OSRM.
 # Démarrage : docker compose up -d   (OSRM : http://127.0.0.1:5000  — VROOM : http://127.0.0.1:3000)
-# Ne PAS exposer ces ports sur Internet ; depuis le Samsung, passer par un proxy HTTPS privé (voir docs/CHARLIE_TOURNEES_V48.md).
+# Ne PAS exposer ces ports sur Internet ; depuis le Samsung, passer par un proxy HTTPS privé (voir docs/CHARLIE_TOURNEES_V50.md).
 services:
   osrm:
     image: ghcr.io/project-osrm/osrm-backend:v5.27.1
-    command: osrm-routed --algorithm mld /data/reunion-latest.osrm
+    command: osrm-routed --algorithm mld /data/ile-de-france-latest.osrm
     volumes: ["./data:/data:ro"]
     ports: ["127.0.0.1:5000:5000"]
     restart: unless-stopped
