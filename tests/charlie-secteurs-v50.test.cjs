@@ -9,11 +9,16 @@ function garages(dep,n,depart=0){
   const rows=CENTRES.filter(r=>r[0].startsWith(dep)&&r[4]).slice(depart,depart+n);
   return rows.map((r,i)=>({id:Number(dep)*100+i+1,nom:'Garage Synthétique '+dep+'-'+(i+1),ville:r[1],cp:r[4].split(' ')[0],priorite:'AB'[i%2],statutCrm:'client',visites:[]}));
 }
-test('grille du classeur de Laurent : S1 95/77/95/94/93, S2 95/77/95/91-92/93, dates cohérentes avec le cockpit',()=>{
-  const g=T.SECTEURS_LAURENT;assert.equal(Object.keys(g).length,10);
-  assert.deepEqual(Object.values(g),['95','77','95','94','93','95','77','95','91/92','93']);
-  for(const [jour,sec] of Object.entries(g)){const wd=new Date(jour+'T12:00:00Z').getUTCDay();assert.ok(wd>=1&&wd<=5,jour+' jour ouvré');}
-  assert.equal(g['2026-12-01'],'77','mardi 1er décembre = secteur 77 (J1 du cockpit)');assert.equal(g['2026-12-10'],'91/92');assert.equal(g['2026-12-14'],undefined,'au-delà de S2 : rien d’extrapolé');
+test('grille de Laurent : S1 95/77/95/94/93, S2 95/77/95/91-92/93, rotation alternée = 22 journées de décembre comme Airtable',()=>{
+  const g=T.SECTEURS_LAURENT,jours=Object.keys(g);assert.equal(jours.length,22,'22 journées (comme la table Airtable Tournées)');
+  assert.equal(jours[0],'2026-12-01');assert.equal(jours.at(-1),'2026-12-31');assert.ok(!g['2026-12-25'],'Noël exclu');assert.ok(!g['2026-11-30'],'prise de poste le 1er décembre');
+  const s=(d)=>g[d];assert.deepEqual(['01','02','03','04'].map(d=>s('2026-12-'+d)),['77','95','94','93']);
+  assert.deepEqual(['07','08','09','10','11'].map(d=>s('2026-12-'+d)),['95','77','95','91/92','93']);
+  assert.deepEqual(['14','15','16','17','18'].map(d=>s('2026-12-'+d)),['95','77','95','94','93'],'S1 de nouveau');
+  assert.deepEqual(['21','22','23','24'].map(d=>s('2026-12-'+d)),['95','77','95','91/92'],'S2');
+  assert.deepEqual(['28','29','30','31'].map(d=>s('2026-12-'+d)),['95','77','95','94'],'S1');
+  assert.equal(T.semaineDe('2026-12-01'),'S1');assert.equal(T.semaineDe('2026-12-10'),'S2');assert.equal(T.semaineDe('2027-01-04'),null,'rien d’extrapolé en 2027');
+  for(const j of jours){const wd=new Date(j+'T12:00:00Z').getUTCDay();assert.ok(wd>=1&&wd<=5,j+' jour ouvré');}
 });
 test('table de Laurent : tous les secteurs des deux semaines, 91/92 en deux départements',()=>{
   assert.deepEqual(T.secteursLaurent(),['77','91','92','93','94','95']);
