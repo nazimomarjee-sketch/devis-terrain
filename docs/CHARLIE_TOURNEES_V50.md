@@ -3,11 +3,11 @@
 ## Ce qui existe
 | Élément | Fichier | Rôle |
 |---|---|---|
-| Moteur pur (Samsung, Bureau, Node) | `tournee-optimiseur-v48.js` | scoring commercial explicable, matrices OSRM/estimées, adaptateur VROOM contrôlé, solveur local de repli, recalcul, proches, prévu/réalisé, apprentissage, agents + audit, commandes |
-| Interface Samsung | `tournee-v48.js/.css` | route `#/charlie` : 8 gros boutons, proposition à valider, hors ligne |
-| Cockpit Bureau | `bureau/tournee.html/.js` | carte SVG locale d'un fichier `charlie-tournee/v1` exporté du Samsung |
+| Moteur pur (Samsung, Bureau, Node) | `charlie-optimiseur-v50.js` | scoring commercial explicable, matrices OSRM/estimées, adaptateur VROOM contrôlé, solveur local de repli, recalcul, proches, prévu/réalisé, apprentissage, agents + audit, commandes |
+| Interface Samsung | `charlie-tournee-v50.js/.css` | route `#/charlie` : 8 gros boutons, proposition à valider, hors ligne |
+| Cockpit Bureau | `bureau/charlie-carte.html/.js` | carte SVG locale d'un fichier `charlie-tournee/v1` exporté du Samsung |
 | Moteur routier local | `infra/routage/` | docker-compose OSRM + VROOM + script graphe La Réunion |
-| Tests | `tests/tournee-v48.test.cjs`, `tests/bureau-tournee-v48.test.cjs`, `tests/navigateur/charlie-v48.e2e.mjs` | unitaires, intégration, fuzz, navigateur |
+| Tests | `tests/charlie-optimiseur-v50.test.cjs`, `tests/charlie-carte-bureau-v50.test.cjs`, `tests/navigateur/charlie-v50.e2e.mjs` | unitaires, intégration, fuzz, navigateur |
 
 La tournée historique (`#/tournee`) n'est pas modifiée : un lien « Tournée optimisée CHARLIE » y est ajouté ; si CHARLIE échoue, l'écran propose de revenir à la tournée habituelle.
 

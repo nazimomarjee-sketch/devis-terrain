@@ -1,6 +1,6 @@
 'use strict';
 const {test}=require('node:test');const assert=require('node:assert/strict');
-const T=require('../tournee-optimiseur-v48.js');const B=require('../bureau/tournee.js');
+const T=require('../charlie-optimiseur-v50.js');const B=require('../bureau/charlie-carte.js');
 const cli=(id,nom,lat,lng,extra={})=>({id,nom,priorite:'A',statutCrm:'client',visites:[],ent:{lat,lng},...extra});
 async function plan(){
   const r=await T.organiserJournee({clients:[cli(1,'G1',-20.88,55.45),cli(2,'G2',-20.90,55.51),cli(3,'G3',-20.94,55.29)],devis:[],laurent:[{id:1},{id:2}],depart:{lat:-20.8789,lng:55.4481},plage:[28800,61200],

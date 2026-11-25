@@ -1,4 +1,4 @@
-// Test navigateur (Chromium/Playwright), hors suite `node --test` : node tests/navigateur/charlie-v48.e2e.mjs
+// Test navigateur (Chromium/Playwright), hors suite `node --test` : node tests/navigateur/charlie-v50.e2e.mjs
 // Données 100 % synthétiques, base IndexedDB du navigateur de test uniquement (jamais la base réelle).
 import {createRequire} from 'node:module';import http from 'node:http';import {readFileSync,existsSync} from 'node:fs';import {join,extname} from 'node:path';import {fileURLToPath} from 'node:url';
 const require=createRequire(import.meta.url);const {chromium}=require('playwright');
@@ -43,7 +43,7 @@ await page.fill('input[aria-label="Commande à Charlie"]','Charlie, recalcule la
 // hors ligne : la dernière tournée reste consultable
 await page.evaluate(()=>navigator.serviceWorker.ready.then(()=>true));await page.reload();await page.waitForTimeout(1500);
 const caches_=await page.evaluate(async()=>(await caches.keys()).concat((await (await caches.open((await caches.keys())[0])).keys()).map(r=>r.url.split('/').pop())));
-must(caches_.includes('terrain-v48')&&caches_.includes('tournee-v48.js')&&caches_.includes('tournee-optimiseur-v48.js'),'nouveaux fichiers présents dans le cache hors ligne');
+must(caches_.includes('terrain-v48')&&caches_.includes('charlie-tournee-v50.js')&&caches_.includes('charlie-optimiseur-v50.js'),'nouveaux fichiers présents dans le cache hors ligne');
 await ctx.setOffline(true);await page.goto(url+'#/charlie').catch(()=>{});await page.waitForSelector('.charlie-grille',{timeout:10000}).catch(()=>{});
 must(await page.locator('.charlie-grille').count()>0,'tournée consultable hors connexion');
 await ctx.setOffline(false);await page.waitForTimeout(800);

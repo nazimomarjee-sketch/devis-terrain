@@ -1,7 +1,7 @@
 'use strict';
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
-const T=require('../tournee-optimiseur-v48.js');
+const T=require('../charlie-optimiseur-v50.js');
 const H=(s)=>T.hms(s);
 // Jeu d'essai 100 % synthétique, uniquement dans les tests (jamais dans la base réelle).
 const P={dep:{lat:-20.8789,lng:55.4481},a:{lat:-20.8823,lng:55.4504},b:{lat:-20.9007,lng:55.5100},c:{lat:-20.9400,lng:55.2900},d:{lat:-21.0100,lng:55.2700},e:{lat:-21.3400,lng:55.4800}};

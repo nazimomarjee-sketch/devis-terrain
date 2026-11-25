@@ -24,7 +24,7 @@
     valider(d);
     const faits = new Set((d.faits || []).map(String)), retires = new Set((d.retires || []).map(String)), reel = d.reel || [];
     const ordre = d.plan.ordre.map((o) => ({ ...o, etat: reel.find((r) => r.garageId === o.garageId) ? reel.find((r) => r.garageId === o.garageId).resultat : retires.has(o.garageId) ? 'retire' : 'a_faire' }));
-    const T = racine.TourneeOpt || (typeof require === 'function' ? require('../tournee-optimiseur-v48.js') : null);
+    const T = racine.TourneeOpt || (typeof require === 'function' ? require('../charlie-optimiseur-v50.js') : null);
     const bilan = T ? T.comparerPrevuReel(d.plan, reel) : null;
     const vus = ordre.filter((o) => o.etat === 'vu'), minClient = Math.round(reel.filter((r) => r.resultat === 'vu').reduce((s, r) => s + Math.max(0, r.finS - r.arriveeS), 0) / 60);
     const couleurs = { vu: '#2e9e5b', absent: '#e0a030', retire: '#888', a_faire: '#d41f2b' };
