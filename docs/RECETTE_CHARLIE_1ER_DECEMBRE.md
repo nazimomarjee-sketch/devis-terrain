@@ -9,6 +9,7 @@ Convention : ✅ vérifié automatiquement (commande donnée) · 👤 à vérifi
 | A1 ✅ | Toute la suite (unitaire, intégration, chaîne complète, confidentialité) | `node --test tests/*.test.cjs` | 0 échec |
 | A2 ✅ | PWA à jour et intègre | `node scripts/build-pwa.cjs --check` | « Construction vérifiée » |
 | A3 ✅ | Parcours navigateur (Chromium, format Samsung) | `node tests/navigateur/charlie-v50.e2e.mjs` | 21 « OK », 0 « ÉCHEC » |
+| A5 ✅ | Téléphone ↔ vrai serveur CHARLIE (dépôt cockpit, données synthétiques) | `cd cockpit-carrosserie && node --disable-warning=ExperimentalWarning ../devis-terrain/tests/integration/charlie-serveur-reel.mjs` | 10 « OK » |
 | A4 ✅ | Moteur routier réel (sur le PC cible) | `node infra/routage/verifier-moteur.cjs` | 6 secteurs « OK » + VROOM « OK » |
 
 ## B. Samsung (👤, 15 minutes, la veille — lundi 30/11)
@@ -35,3 +36,10 @@ Un problème pendant la journée → « Tournée habituelle (inchangée) » en b
 
 ## E. Critères d'acceptation après la première semaine
 Compter (sans inventer) : visites réalisées / prévues, absences, écart d'heure d'arrivée moyen, durées réelles vs prévues (écran « Ce que CHARLIE a appris »). Décider d'ajuster pauses/durées **sur mesures**, pas au ressenti (AGENTS.md : « sans mesures, valeurs = hypothèses »).
+
+## F. Points connus avant la reprise
+- **Cœur unique** : le cœur est identique dans `devis-terrain` et `cockpit-carrosserie` (garde-fou `tests/charlie-coeur-partage-v50.test.cjs` + empreinte côté cockpit). Toute modification du cœur = resynchroniser (`scripts/resynchroniser-coeur.mjs`) des deux côtés.
+- **Feuille de Laurent côté CHARLIE** : servie pour le **01/12 → 11/12** (calendrier du cockpit). Du 14/12 au 31/12 (rotation S1/S2 confirmée par Airtable) : à transcrire dans le cockpit **après ta validation** ; d'ici là le téléphone retombe sur la feuille de route de l'application (aucun garage inventé).
+- **Heures de rendez-vous** : absentes du calendrier de Laurent ; à saisir sur la fiche (`rdv`) si un rendez-vous est fixé.
+- **Charge du 01/12 (secteur 77)** : 11 passages, dont 1 sans code postal dans le classeur ; ne tient pas en 8h-17h à 30 min/visite depuis Massy–Palaiseau → décider avec Laurent des reports (CHARLIE signale le conflit, ne supprime rien).
+- **Moteur routier** : tant qu'il n'est pas installé et vérifié (A4), les trajets sont des estimations et les positions des centres de commune : bien lire la mention « approximatif » dans la proposition.

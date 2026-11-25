@@ -91,12 +91,14 @@
     await ecrireMeta('charlieDepart', { lat: depart.lat, lng: depart.lng });
     const r = await T.organiserJournee({ clients: C.clients, devis: C.devis, laurent: C.laurent, depart, plage: C.plage, pauses: C.pauses, appris: C.appris, maintenant: C.maintenant, ctxFns: C.ctxFns, secteurs: C.secteurs, ...C.opt, ...moteurs(C.R) });
     const etat = etat0 && etat0.jour === C.auj ? etat0 : { jour: C.auj, plan: null, curseur: 0, reel: [], faits: [], retires: [] };
-    etat.proposition = { plan: r.plan || null, statut: r.statut, trace: r.trace.map((t) => ({ agent: t.agent, statut: t.statut, resume: t.resume })), exclus: r.exclus || [], erreur: r.erreur || null, audit: r.audit || null, genereLe: new Date().toISOString(), departSource: depart.source, laurent: C.laurent.map((l) => l.id), laurentInfo: C.laurentInfo, erreursHoraires: C.erreursHoraires };
+    etat.proposition = { plan: r.plan || null, statut: r.statut, trace: r.trace.map((t) => ({ agent: t.agent, statut: t.statut, resume: t.resume })), exclus: r.exclus || [], erreur: r.erreur || null, audit: r.audit || null, genereLe: new Date().toISOString(), departSource: depart.source, laurent: C.laurent.map((l) => l.id), laurentInfo: C.laurentInfo, erreursHoraires: C.erreursHoraires,
+      candidats: (r.candidats || []).map((c) => { const { tel, adresse, ...reste } = c; return reste; }), plage: C.plage, pauses: C.pauses, secteurs: C.secteurs };
     etat.depart = { lat: depart.lat, lng: depart.lng };
     await sauverEtat(etat); return etat;
   }
   async function valider(etat) {
     const p = etat.proposition && etat.proposition.plan; if (!p || (etat.proposition.audit && !etat.proposition.audit.ok)) return;
+    const pr = etat.proposition; etat.candidats = pr.candidats; etat.plage = pr.plage; etat.pauses = pr.pauses; etat.secteurs = pr.secteurs;
     etat.plan = { ...p, requete: undefined, valideLe: new Date().toISOString() }; etat.curseur = 0; memoriser({ type: 'proposition_validee', jour: etat.jour, moteur: p.moteur, ecarts: (p.ecartsLaurent || []).length }); delete etat.proposition;
     const T0 = await lireTournees(); T0[etat.jour] = { ids: p.ordre.map((o) => Number(o.garageId)), res: T0[etat.jour] && T0[etat.jour].res || {}, debut: new Date().toISOString(), termine: false, charlie: true };
     await ecrireTournees(T0); await sauverEtat(etat);
@@ -113,7 +115,7 @@
     await ecrireMeta('charlieAppris', A); await sauverEtat(etat);
     const prevu = etat.plan && etat.plan.ordre.find((x) => x.garageId === o.garageId);
     memoriser({ type: resultat === 'vu' ? 'visite' : 'absent', jour: etat.jour, garageId: o.garageId, dureeS: resultat === 'vu' ? dureeS : undefined, dureePrevueS: prevu ? prevu.duree : undefined, resultat });
-    syncClient().then((sc) => sc && sc.observation({ garageId: o.garageId, resultat, dureeS: resultat === 'vu' ? dureeS : undefined, jour: now.getDay(), debutS: resultat === 'vu' ? fin - dureeS : fin, finS: fin })).catch(() => {});
+    syncClient().then((sc) => sc && sc.observation({ jour: etat.jour, garageId: o.garageId, resultat, dureeS: resultat === 'vu' ? dureeS : undefined, jourSemaine: now.getDay(), debutS: resultat === 'vu' ? fin - dureeS : fin, finS: fin })).catch(() => {});
     if (!restants(etat).length && etat.plan) memoriser({ type: 'journee', jour: etat.jour, prevus: etat.plan.ordre.length, faits: etat.faits.length, absents: etat.reel.filter((r) => r.resultat === 'absent').length, finReelleS: fin, finPrevueS: etat.plan.ordre.length ? etat.plan.ordre[etat.plan.ordre.length - 1].finS : undefined });
   }
   async function recalculer(etat, evenement) {
@@ -229,7 +231,8 @@
     const bilan = etat && etat.plan && etat.reel && etat.reel.length ? bloc_bilan(etat) : null;
     const reglages_ = bloc_reglages(R, redessiner);
     const tot = etat && etat.plan && !hier ? h('p', { class: 'mut' }, etat.plan.totaux.visites + ' visites · ' + etat.plan.totaux.km + ' km · conduite ' + fmtMin(etat.plan.totaux.conduiteMin) + ' · clients ' + fmtMin(etat.plan.totaux.clientMin) + ' · ' + etat.plan.source) : null;
-    const pastille = h('small', { class: 'mut', role: 'status' }, { non_configure: '⚪ Synchronisation non configurée (réglages) — fonctionne en autonome', synchronise: '🟢 Synchronisé avec CHARLIE' + (syncEtat.derniereSync ? ' à ' + syncEtat.derniereSync.slice(11, 16) : ''), en_attente: '🟠 ' + syncEtat.enAttente + ' modification(s) en attente d’envoi', hors_ligne: '🟠 Hors ligne : tout est conservé sur le téléphone' }[syncEtat.etat] || '');
+    const rejets = syncEtat.conflits > 0 ? ' · ⚠ ' + syncEtat.conflits + ' envoi(s) fusionné(s) ou refusé(s) par CHARLIE' : '';
+    const pastille = h('small', { class: 'mut', role: 'status' }, ({ non_configure: '⚪ Synchronisation non configurée (réglages) — fonctionne en autonome', synchronise: '🟢 Synchronisé avec CHARLIE' + (syncEtat.derniereSync ? ' à ' + syncEtat.derniereSync.slice(11, 16) : ''), en_attente: '🟠 ' + syncEtat.enAttente + ' modification(s) en attente d’envoi', hors_ligne: '🟠 Hors ligne : tout est conservé sur le téléphone' }[syncEtat.etat] || '') + (syncEtat.etat === 'non_configure' ? '' : rejets));
     const LI = (etat && etat.proposition && etat.proposition.laurentInfo) || null;
     const aConfirmer = LI && (LI.inconnus.length || LI.ambigus.length) ? h('div', { class: 'carte alerte' }, h('strong', {}, 'Feuille de Laurent : ' + (LI.inconnus.length + LI.ambigus.length) + ' garage(s) à rapprocher'),
       h('small', { class: 'mut', style: 'display:block' }, 'Source : ' + LI.source + '. CHARLIE ne devine jamais : confirme la bonne fiche (mémorisé pour les prochaines fois).'),
