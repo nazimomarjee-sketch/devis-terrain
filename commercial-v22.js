@@ -48,7 +48,8 @@ var pageOpportunites;
   function fiabilite(pc) {
     if (!pc) return {ok:false,raison:'Aucun plan du PC importé sur ce téléphone.'};
     if (!pc.arrete || !iso(pc.arrete)) return {ok:false,raison:'Date de l’export EBP absente.'};
-    const jours=Math.floor((Date.now()-new Date(pc.arrete+'T12:00:00').getTime())/864e5);
+    // Écart en jours calendaires locaux (ecartJours, app.js) : l'export du jour reste valable dès minuit.
+    const jours=ecartJours(pc.arrete);
     if(jours<0 || jours>7) return {ok:false,raison:'Export EBP daté de '+jours+' jours : les opportunités sont suspendues (seuil provisoire : 7 jours).'};
     if(pc.chiffre?.source!=='import') return {ok:false,raison:'Export réel EBP non déclaré : démonstration ou données incomplètes.'};
     if(pc.sources?.commercial?.fiable!==true || pc.sources.importIgnorees>0)
@@ -156,7 +157,8 @@ var pageOpportunites;
     const box=h('div',{class:'carte v22-entry'},h('div',{class:'v22-between'},h('strong',{},'Préparer les visites utiles'),tag(f.ok?signals.length+' signal(s) EBP':'Preuves manquantes','warn')),
       h('p',{class:'mut'},'Les signaux EBP aident à choisir un garage. Ils ne calculent ni l’itinéraire optimal ni le temps de trajet.'),
       h('div',{class:'actions'},link('#/opportunites','Voir les opportunités')));
-    app.prepend(box);
+    // Tournée en cours : l'entrée « opportunités » passe SOUS la liste (la liste des garages reste visible en premier).
+    if(app.querySelector('.t-liste'))app.append(box);else app.prepend(box);
   };
   pagePlus=function(){anciennePlus();app.prepend(h('a',{href:'#/opportunites',class:'carte v22-entry',style:'display:block;text-decoration:none;color:inherit'},
     h('strong',{},'Opportunités commerciales'),h('p',{class:'mut'},'Reconquête, baisse d’achats, devis acceptés : avec leurs preuves.')))};

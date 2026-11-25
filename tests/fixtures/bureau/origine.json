@@ -1,0 +1,59 @@
+{
+  "generePar": "tests/support/generer-fixtures-odicolor.cjs",
+  "codeTelephone": "sauvegarde-locale.js",
+  "codeTelephoneSha256": "d7857c85e27369f161944083ae282635ec399a43c05a32432b13ca1d2436a1fe",
+  "branche": "fix/lot1-f01-f03-recuperation",
+  "donnees": "Fictives uniquement",
+  "fichiers": [
+    {
+      "fichier": "telephone-jeu-samsung.odicolor",
+      "octets": 34117,
+      "sha256": "7c7b2721ffe28c63c3b516ca3c4c1519268aa254d9342eb8884d54aeac05af93",
+      "garages": 3,
+      "noms": [
+        "GARAGE SYNTHETIQUE 0001",
+        "GARAGE SYNTHETIQUE 0002",
+        "GARAGE SYNTHETIQUE 0003"
+      ],
+      "avertissement": ""
+    },
+    {
+      "fichier": "telephone-idf.odicolor",
+      "octets": 1526,
+      "sha256": "0fa9bb73aa2953b8698ce9cf54545dcfbba0ec1a48ec42a929ef5334a9b2dc6e",
+      "garages": 6,
+      "noms": [
+        "GARAGE FICTIF IDF 1",
+        "GARAGE FICTIF IDF 2",
+        "GARAGE FICTIF IDF 3",
+        "GARAGE FICTIF IDF 4",
+        "GARAGE FICTIF IDF 5",
+        "GARAGE FICTIF IDF 1"
+      ],
+      "avertissement": ""
+    },
+    {
+      "fichier": "telephone-vide.odicolor",
+      "octets": 302,
+      "sha256": "64de1acd8f3e5bcea2b492c5514b98873a353d07cc09c7cc7db7820bc81729a9",
+      "garages": 0,
+      "noms": [],
+      "avertissement": ""
+    },
+    {
+      "fichier": "telephone-copie-a-reparer.odicolor",
+      "octets": 1692,
+      "sha256": "e2ca04eb15e0aa2edca0c86b4c186e7f4b775198fd2224689e24ee3df5056ea6",
+      "garages": 6,
+      "noms": [
+        "GARAGE FICTIF IDF 1",
+        "GARAGE FICTIF IDF 2",
+        "GARAGE FICTIF IDF 3",
+        "GARAGE FICTIF IDF 4",
+        "GARAGE FICTIF IDF 5",
+        "GARAGE FICTIF IDF 1"
+      ],
+      "avertissement": "Devis lié à un garage absent."
+    }
+  ]
+}

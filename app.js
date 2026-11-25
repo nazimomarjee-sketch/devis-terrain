@@ -84,31 +84,64 @@ const qtxt = q => (q / 100).toLocaleString('fr-FR', { maximumFractionDigits: 2 }
 const pct = c => (c / 100).toLocaleString('fr-FR', { maximumFractionDigits: 2 });
 
 // ---------- base locale ----------
-const DB = { db: null };
+const DB = { db: null, maintenance: false };
+// Une session ouverte partage ce verrou ; une restauration attend son exclusivité.
+// Un onglet rendu obsolète ferme sa connexion et doit être rechargé avant écriture.
+const VERROU_STOCKAGE = 'odicolor-portefeuille-local';
+let libererSessionStockage = null;
+const canalStockage = typeof BroadcastChannel === 'function' ? new BroadcastChannel(VERROU_STOCKAGE) : null;
+if (canalStockage) canalStockage.onmessage = event => {
+  if (event.data !== 'restauration' || !DB.db) return;
+  DB.maintenance = true; DB.db.close();
+  if (libererSessionStockage) { libererSessionStockage(); libererSessionStockage=null; }
+  toast('Une restauration est en cours dans un autre onglet. Recharge cet onglet avant de travailler.', true);
+};
+function tenirSessionStockage() {
+  if (!navigator.locks) return Promise.resolve();
+  return new Promise((resolve,reject)=>{
+    navigator.locks.request(VERROU_STOCKAGE,{mode:'shared'},()=>new Promise(release=>{
+      libererSessionStockage=release;resolve();
+    })).catch(reject);
+  });
+}
+async function avecRestaurationExclusive(action) {
+  if (!navigator.locks) throw new Error('Restauration indisponible : utilise une version récente de Chrome sur une adresse HTTPS. La sauvegarde reste accessible.');
+  if (libererSessionStockage) { libererSessionStockage(); libererSessionStockage=null; }
+  if (canalStockage) canalStockage.postMessage('restauration');
+  toast('Restauration : les autres onglets doivent fermer leur accès aux données.');
+  try { return await navigator.locks.request(VERROU_STOCKAGE,{mode:'exclusive'},action); }
+  finally { await tenirSessionStockage(); }
+}
 const rq = r => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
-const st = (n, m = 'readonly') => DB.db.transaction(n, m).objectStore(n);
+const st = (n, m = 'readonly') => {
+  if (m === 'readwrite' && DB.maintenance) throw new Error('Restauration en cours : écriture suspendue.');
+  return DB.db.transaction(n, m).objectStore(n);
+};
 const getAll = n => rq(st(n).getAll());
 const get = (n, k) => rq(st(n).get(k));
 const put = (n, v, k) => rq(st(n, 'readwrite').put(v, k));
 const del = (n, k) => rq(st(n, 'readwrite').delete(k));
 function putMany(n, items) {
   return new Promise((res, rej) => {
+    if (DB.maintenance) { rej(new Error('Restauration en cours : écriture suspendue.')); return; }
     const t = DB.db.transaction(n, 'readwrite'), s = t.objectStore(n);
     items.forEach(i => s.put(i));
     t.oncomplete = () => res(); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error);
   });
 }
-function openDB() {
+async function openDB() {
+  await tenirSessionStockage();
   return new Promise((res, rej) => {
-    const r = indexedDB.open('devis-terrain', 1);
+    const r = indexedDB.open('devis-terrain', 2);
     r.onupgradeneeded = () => {
-      const d = r.result;
-      d.createObjectStore('articles', { keyPath: 'code' });
-      d.createObjectStore('clients', { keyPath: 'id', autoIncrement: true });
-      d.createObjectStore('devis', { keyPath: 'id', autoIncrement: true });
-      d.createObjectStore('meta');
+      ODICOLOR_BACKUP.schema(r.result);
     };
-    r.onsuccess = () => { DB.db = r.result; res(); };
+    r.onsuccess = () => {
+      DB.db = r.result;
+      DB.db.onversionchange = () => { DB.db.close(); DB.maintenance=true; toast('Ferme puis rouvre l’application pour terminer la mise à jour.', true); };
+      res();
+    };
+    r.onblocked = () => toast('Ferme les autres onglets ODICOLOR puis réessaie : ils bloquent l’ouverture du stockage.', true);
     r.onerror = () => rej(r.error);
   });
 }
@@ -132,9 +165,11 @@ function chercher(q, max = 15) {
 
 // ---------- lecture de fichiers (xlsx / csv) ----------
 const MAX_OCTETS = 10 * 1024 * 1024, MAX_LIGNES = 50000;
+// Exports EBP (pièces ligne par ligne d'article) : bien plus gros qu'un tarif ; lus en mémoire sur le téléphone, d'où une borne explicite.
+const LIMITES_EBP = { octets: 40 * 1024 * 1024, lignes: 300000 };
 function chargerXlsx() {
   if (window.XLSX) return Promise.resolve();
-  return new Promise((res, rej) => { const s = h('script', { src: 'xlsx.mini.min.js' }); s.onload = res; s.onerror = () => rej(new Error('Lecteur Excel introuvable')); document.head.append(s); });
+  return new Promise((res, rej) => { const s = h('script', { src: window.ODICOLOR_PWA.asset('xlsx.mini.min.js'), integrity:window.ODICOLOR_PWA.integrity('xlsx.mini.min.js'), crossorigin:'anonymous' }); s.onload = res; s.onerror = () => rej(new Error('Lecteur Excel introuvable')); document.head.append(s); });
 }
 function parseCSV(text) {
   const first = text.split(/\r?\n/, 1)[0];
@@ -151,8 +186,9 @@ function parseCSV(text) {
   if (f !== '' || row.length) { row.push(f); rows.push(row); }
   return rows;
 }
-async function lireFichier(file) {
-  if (file.size > MAX_OCTETS) throw new Error('Fichier trop gros (10 Mo maximum).');
+async function lireFichier(file, limites = {}) {
+  const maxOctets = limites.octets || MAX_OCTETS, maxLignes = limites.lignes || MAX_LIGNES;
+  if (file.size > maxOctets) throw new Error('Fichier trop gros (' + Math.round(maxOctets / 1048576) + ' Mo maximum). Exporte une période plus courte.');
   const buf = await file.arrayBuffer();
   const nom = file.name.toLowerCase();
   let feuilles; // [{nom, rows: tableau de tableaux, la ligne i = ligne Excel i+1}]
@@ -165,7 +201,7 @@ async function lireFichier(file) {
     try { txt = new TextDecoder('utf-8', { fatal: true }).decode(buf); } catch (e) { txt = new TextDecoder('windows-1252').decode(buf); }
     feuilles = [{ nom: 'CSV', rows: parseCSV(txt.replace(/^﻿/, '')) }];
   }
-  feuilles.forEach(f => { if (f.rows.length > MAX_LIGNES + 1) throw new Error('Plus de ' + MAX_LIGNES + ' lignes : découpe le fichier.'); });
+  feuilles.forEach(f => { if (f.rows.length > maxLignes + 1) throw new Error('Plus de ' + maxLignes + ' lignes : exporte une période plus courte.'); });
   return feuilles;
 }
 function ligneEntete(rows) {
@@ -179,6 +215,10 @@ const CHAMPS = {
     ['code', 'Code article', true, [/^(code|codearticle|reference|ref|refarticle|article)$/, /^(code|ref)/]],
     ['des', 'Désignation', true, [/designation|libelle|description/, /^nom/]],
     ['prix', 'Prix de vente HT', true, [/tarif.*france/, /tarif/, /prixvente|pvht|prix.*ht/, /prix|pv/]],
+    // Lot 5 : colonnes facultatives (documents fiables uniquement) pour la recherche par marque et catégorie.
+    ['marque', 'Marque (facultatif)', false, [/^(marque|brand|fabricant)$/, /marque|fabricant/]],
+    ['categorie', 'Catégorie (facultatif)', false, [/^(categorie|famille|rubrique)$/, /categorie|famille article|rubrique/]],
+    ['conditionnement', 'Conditionnement (facultatif)', false, [/^(conditionnement|contenance|unite)$/, /conditionnement|contenance/]],
   ],
   clients: [
     ['nom', 'Nom du client', true, [/^(nom|raison|client|societe|entreprise|designation)/]],
@@ -203,7 +243,8 @@ function importerArticles(rows, debut, map, existants) {
   for (let i = debut + 1; i < rows.length; i++) {
     const r = rows[i] || [];
     if (r.every(c => clean(c) === '')) continue; // ligne totalement vide : on saute sans compter
-    lignes.push({ n: i + 1, code: clean(r[map.code]), brut: r[map.code], des: clean(r[map.des]), prixBrut: r[map.prix] });
+    const opt = k => (map[k] == null || map[k] === '' ? '' : clean(r[map[k]]).slice(0, 60)); // colonnes facultatives (lot 5)
+    lignes.push({ n: i + 1, code: clean(r[map.code]), brut: r[map.code], des: clean(r[map.des]), prixBrut: r[map.prix], marque: opt('marque'), categorie: opt('categorie'), conditionnement: opt('conditionnement') });
   }
   let espaces = 0;
   const vus = new Map();
@@ -235,7 +276,9 @@ function importerArticles(rows, debut, map, existants) {
     if (p == null) { rep.ignorees++; err(rep, l.n, l.code + ' : prix de vente manquant'); continue; }
     if (p <= 0) { rep.ignorees++; err(rep, l.n, l.code + ' : prix de vente nul ou négatif (' + num2(p) + ')'); continue; }
     if (l.code.length > 60 || l.des.length > 200) rep.avertissements.push('ligne ' + l.n + ' : texte tronqué pour ' + l.code);
-    out.push({ code: l.code.slice(0, 60), des: l.des.replace(/\s+/g, ' ').slice(0, 200), pu: p });
+    const art = { code: l.code.slice(0, 60), des: l.des.replace(/\s+/g, ' ').slice(0, 200), pu: p };
+    for (const k of ['marque', 'categorie', 'conditionnement']) if (l[k]) art[k] = l[k];
+    out.push(art);
     existants.has(l.code.slice(0, 60)) ? rep.maj++ : rep.crees++;
   }
   return { rep, items: out };
@@ -321,8 +364,13 @@ function apparition() {
 }
 addEventListener('scroll', () => { const on = scrollY > 110; document.body.classList.toggle('defile', on); }, { passive: true });
 function nonTrouve() { montrer('Introuvable', h('p', { class: 'vide' }, 'Cette page n’existe pas. '), h('a', { class: 'btn', href: '#/' }, 'Retour')); }
+// Origine dédiée au terrain : stockage navigateur distinct de la démonstration.
+const HOTE_TERRAIN = 'terrain-odicolor-production.up.railway.app';
+const espaceTerrain = () => location.hostname === HOTE_TERRAIN;
+async function marquerDemo() { try { document.body.toggleAttribute('data-demo', !!(await get('meta', 'demo'))); document.body.toggleAttribute('data-test-env', /\.up\.railway\.app$/.test(location.hostname) && !espaceTerrain()); } catch (e) { /* sans effet */ } }
 async function route() {
-  const p = (location.hash || '#/').slice(2).split('/');
+  marquerDemo();
+  const p = (location.hash || '#/').slice(2).split('?')[0].split('/');
   { const q = p[0] || 'accueil', tab = q === 'accueil' ? 'accueil' : q === 'tournee' ? 'tournee' : (q === 'clients' || q === 'client') ? 'clients' : (q === 'devis' || q === 'nouveau') ? 'devis' : (q === 'catalogue' || q === 'article' || q === 'catalogues-pdf') ? 'catalogue' : 'plus'; document.querySelectorAll('.onglets a').forEach(x => x.classList.toggle('on', x.dataset.p === tab)); }
   try {
     if (p[0] === '' || p[0] === undefined) await pageAccueil();
@@ -344,6 +392,20 @@ async function route() {
     else if (p[0] === 'comparateur') await pageComparateur();
     else if (p[0] === 'evolution') await pageEvolution();
     else if (p[0] === 'travail') await pageTravail(p[1]);
+    else if (p[0] === 'ca' && p[1] === 'import') await pageCAImport();
+    else if (p[0] === 'clients-ebp') await pageClientsEbp();
+    else if (p[0] === 'ca') await pageCA();
+    else if (p[0] === 'cockpit') await pageCockpit();
+    else if (p[0] === 'carte') await pageCarte();
+    else if (p[0] === 'autotest') await pageAutotest();
+    else if (p[0] === 'demo') await pageDemo();
+    else if (p[0] === 'agenda') await pageAgenda(p[1] === 'nouveau' ? Number(p[2]) || null : null);
+    else if (p[0] === 'secteurs') await pageSecteurs(p[1]);
+    else if (p[0] === 'proposition') await pageProposition();
+    else if (p[0] === 'ville') await pageVille(p[1]);
+    else if (p[0] === 'visite' && /^\d+$/.test(p[1] || '')) await pageVisite(Number(p[1]));
+    else if (p[0] === 'demande' && p[1] === 'nouvelle' && /^\d+$/.test(p[2] || '')) await nouvelleDemande(Number(p[2]));
+    else if (p[0] === 'demande' && p[1]) await pageDemande(p[1]);
     else nonTrouve();
   } catch (e) { console.error(e); toast('Erreur : ' + e.message, true); }
 }
@@ -552,17 +614,22 @@ function tableauDeBord(dv, cl, sigs, ext = {}) {
   const envoyes = dv.filter(d => d.lignes.length && d.statut !== 'brouillon');
   const duMois = envoyes.filter(d => cleMois(envoiDe(d)) === mk);
   const acceptesMois = dv.filter(d => d.statut === 'accepte' && d.reponseLe && cleMois(d.reponseLe) === mk);
-  const ca = dv.filter(d => d.commandeLe && cleMois(d.commandeLe) === mk).reduce((a, d) => a + totaux(d).ht, 0);
+  // CA = FACTURES HT (avoirs déduits) saisies dans l'appli ; commandes et encaissements sont des indicateurs SÉPARÉS (jamais additionnés au CA).
+  const cmdMois = dv.filter(d => d.commandeLe && cleMois(d.commandeLe) === mk).reduce((a, d) => a + totaux(d).ht, 0);
+  const caRenseigne = ODICOLOR_CA.aDesPieces(ext.caFacture), caMois = ODICOLOR_CA.calculerMois(ext.caFacture, mk), ca = caRenseigne ? caMois.totalCents : 0;
+  const encMois = cl.reduce((a, c) => a + (Array.isArray(c.factures) ? c.factures : []).filter(f => f && f.regleLe && String(f.regleLe).slice(0, 7) === mk).reduce((b, f) => b + (f.montant || 0), 0), 0);
   const attente = dv.filter(d => d.statut === 'envoye' && d.lignes.length), attHt = attente.reduce((a, d) => a + totaux(d).ht, 0);
   const visitesMois = cl.reduce((a, c) => a + (Array.isArray(c.visites) ? c.visites : []).filter(v => v && v.res === 'vu' && typeof v.date === 'string' && v.date.slice(0, 7) === mk).length, 0);
   const obj = objectifDuMois(now), jr = joursOuvres(now, new Date(now.getFullYear(), now.getMonth() + 1, 0, 23));
+  { const w = ODICOLOR_CA.calculer(ext.caFacture, SW.l, jourLocal(now)); SW.ca = caRenseigne ? w.totalCents : 0; }
   const bloc = (titre, ca, cible) => h('div', { class: 'colobj' }, h('div', { class: 'mut' }, titre), h('div', { class: 'gros-chiffre' }, eur(ca)),
     h('div', { class: 'piste', role: 'img', 'aria-label': Math.round(ca / cible * 100) + ' % de l’objectif ' + titre }, h('div', { class: 'rempli', style: 'width:' + Math.min(100, Math.round(ca / cible * 100)) + '%' })),
     h('div', { class: 'mut' }, 'sur ' + eur(cible) + ' · ' + Math.round(ca / cible * 100) + ' %'));
   const JNOM = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
   const carteObj = (obj || SW.cible) ? (() => {
     const reste = obj ? Math.max(0, obj.cents - ca) : 0, pcM = obj ? Math.min(100, Math.round(ca / obj.cents * 100)) : 0, pcS = SW.cible ? Math.min(100, Math.round(SW.ca / SW.cible * 100)) : 0;
-    return h('div', { class: 'carte obj hero' }, h('div', { class: 'elan-tete' }, h('strong', {}, obj ? 'Objectif du mois (' + obj.rang + '/' + S.objectifs.length + ')' : 'Objectif de la semaine'), h('small', {}, 'Commandes envoyées HT')),
+    return h('div', { class: 'carte obj hero' }, h('div', { class: 'elan-tete' }, h('strong', {}, obj ? 'Objectif du mois (' + obj.rang + '/' + S.objectifs.length + ')' : 'Objectif de la semaine'), h('small', {}, 'CA facturé HT')),
+      caRenseigne ? null : h('p', { class: 'mut' }, h('strong', {}, 'CA facturé non renseigné. '), 'Saisis tes factures et avoirs HT pour suivre ton objectif. ', h('a', { href: '#/ca' }, 'Saisir mon CA facturé')),
       obj ? [h('div', { class: 'gros-chiffre' }, eur(ca), h('span', {}, ' sur ' + eur(obj.cents))),
         h('div', { class: 'piste', role: 'img', 'aria-label': pcM + ' % de l’objectif du mois' }, h('div', { class: 'rempli', style: 'width:' + pcM + '%' })),
         h('div', { class: 'lh' }, h('span', {}, pcM + ' %'), h('span', {}, reste ? 'reste ' + eur(reste) : 'objectif du mois atteint')),
@@ -571,7 +638,8 @@ function tableauDeBord(dv, cl, sigs, ext = {}) {
         h('div', { class: 'lh' }, h('strong', {}, 'Cette semaine : ' + eur(SW.ca) + ' sur ' + eur(SW.cible)), h('span', {}, pcS + ' %')),
         h('p', { class: 'mut' }, JNOM[now.getDay()] + ' · jour ' + SW.j + '/' + SW.ouv + (SW.fait ? ' · attendu ce soir pour tenir le rythme : ' + eur(SW.attendu) + ' ' : ' · la semaine commence : rien à rattraper '), SW.fait ? h('strong', { class: 'pastille ' + (SW.ca >= SW.attendu ? 'ok' : 'ko') }, (SW.ca >= SW.attendu ? '+' : '−') + eur(Math.abs(SW.ca - SW.attendu))) : null, SW.ca >= SW.cible ? ' · objectif de la semaine atteint' : ''),
         SW.derive ? h('p', { class: 'mut' }, 'Cible de la semaine déduite du mois (jours ouvrés), à valider : tu peux la fixer dans Réglages.') : null) : null,
-      h('p', { class: 'mut' }, 'En attente de réponse : ' + eur(attHt) + ' (' + attente.length + ' devis). Objectif : commandes envoyées HT sur ce téléphone, pas factures ni encaissements.'));
+      h('p', { class: 'mut' }, 'Autres indicateurs (ils ne comptent pas dans le CA) : commandes envoyées ce mois ' + eur(cmdMois) + ' HT · encaissé ce mois ' + eur(encMois) + ' · en attente de réponse ' + eur(attHt) + ' (' + attente.length + ' devis).'),
+      h('p', { class: 'mut' }, caRenseigne ? 'CA facturé du mois : ' + caMois.nFactures + ' facture(s)' + (caMois.nAvoirs ? ', ' + caMois.nAvoirs + ' avoir(s) déduit(s)' : '') + ', saisi(es) par toi. ' : '', h('a', { href: '#/ca' }, 'Voir / saisir le CA facturé')));
   })() : h('div', { class: 'carte' }, h('strong', {}, 'Pas d’objectif réglé. '), 'Entre ton objectif mensuel dans ', h('a', { href: '#/reglages' }, 'Réglages'), '.');
   const nbBloques = cl.filter(c => c.compte && c.compte.statut === 'bloque').length, nbAccSansCmd = dv.filter(d => d.statut === 'accepte' && !d.commandeLe).length, nbRel = dv.filter(d => relanceDue(d, now.getTime()) != null).length, nbRep = cl.filter(c => (Number(c.reports) || 0) >= 3).length;
   const tAl = (n, l, href, ko) => h('a', { class: 'alt' + (n && ko ? ' ko' : ''), href }, h('strong', {}, n), h('span', {}, l));
@@ -614,7 +682,7 @@ function tableauDeBord(dv, cl, sigs, ext = {}) {
 
 async function pageAccueil() {
   const [dv, cl, sigs] = [await getAll('devis'), await getAll('clients'), await lireSig()];
-  const ext = { point: await get('meta', 'point'), appels: await lireAppels(), tournees: await lireTournees(), sigs, pc: await lirePC() };
+  const ext = { point: await get('meta', 'point'), appels: await lireAppels(), tournees: await lireTournees(), sigs, pc: await lirePC(), caFacture: await get('meta', 'caFacture') };
   dv.sort((a, b) => b.id - a.id);
   const prenom = (S.vendeur || '').trim().split(' ')[0], JN = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
   montrer('Bonjour, ' + (S.accueilNom || 'Mr Omarjee'),
@@ -1010,7 +1078,7 @@ async function pageTravail(k) {
   const vertsAVoir = cl.filter(c => c.compte && c.compte.statut === 'ouvert').filter(c => { const vs = (Array.isArray(c.visites) ? c.visites : []).filter(v => v && v.res === 'vu').map(v => jourLocal(v.date)).sort(); return !vs.length || ecartJours(vs[vs.length - 1], now.getTime()) > 30; });
   const relances = dv.filter(d => relanceDue(d, now.getTime()) != null), sansCmd = dv.filter(d => d.statut === 'accepte' && !d.commandeLe);
   const nAct = tag => pc ? pc.actions.filter(a => a.tag === tag && a.statut !== 'fait' && (tag !== 'Commande' || a.responsable !== 'Toi')).length : 0;
-  const manque = cible - M.cmdHt;
+  const caStore = await get('meta', 'caFacture'), caPer = { renseigne: ODICOLOR_CA.aDesPieces(caStore), r: ODICOLOR_CA.calculer(caStore, per.debut, per.fin) };
   const fil = [nb(M.clients, 'client visité', 'clients visités'), nb(M.devis, 'devis', 'devis'), nb(M.cmd, 'commande', 'commandes')].concat(E ? [nb(E.cur.facN, 'facture (EBP)', 'factures (EBP)')] : []).join('  →  ');
   // Conversion par cohorte : suivre les MÊMES devis, et non deux flux de semaines différentes.
   const cohorte = dv.filter(d=>d.lignes&&d.lignes.length&&d.statut!=='brouillon'&&
@@ -1024,7 +1092,9 @@ async function pageTravail(k) {
       vertsAVoir.length ? h('a', { class: 'btn sec', href: '#/tournee' }, vertsAVoir.length + ' client' + (vertsAVoir.length > 1 ? 's' : '') + ' vert' + (vertsAVoir.length > 1 ? 's' : '') + ' pas vu' + (vertsAVoir.length > 1 ? 's' : '') + ' depuis 30 j : préparer la tournée') : null),
     ligne('2 · Devis envoyés', source('MOI'), nb(M.devis, 'devis', 'devis'), eur(M.devisHt) + ' HT', deltaTxt(M.devis, P.devis, null, per.plib),
       relances.length ? h('a', { class: 'btn sec', href: '#/devis/' + relances[0].id }, 'Relancer ' + nb(relances.length, 'devis', 'devis') + ' sans réponse') : null),
-    ligne('3 · Commandes envoyées', source('MOI'), nb(M.cmd, 'commande', 'commandes'), eur(M.cmdHt) + ' HT' + (cible ? ' · objectif ' + eur(cible) + (manque > 0 ? ' · il manque ' + eur(manque) : ' · atteint') : ''), deltaTxt(M.cmdHt, P.cmdHt, eur, per.plib),
+    ligne('2b · CA facturé HT (saisi)', source('MOI'), caPer.renseigne ? eur(caPer.r.totalCents) : 'Non renseigné', caPer.renseigne ? caPer.r.nFactures + ' facture(s)' + (caPer.r.nAvoirs ? ' − ' + caPer.r.nAvoirs + ' avoir(s)' : '') + (cible ? ' · objectif ' + eur(cible) + (cible - caPer.r.totalCents > 0 ? ' · il manque ' + eur(cible - caPer.r.totalCents) : ' · atteint') : '') : 'Aucune facture saisie : le CA n’est pas deviné à partir des commandes.', null,
+      h('a', { class: 'btn sec', href: '#/ca' }, 'Saisir / voir le CA facturé')),
+    ligne('3 · Commandes envoyées (≠ CA)', source('MOI'), nb(M.cmd, 'commande', 'commandes'), eur(M.cmdHt) + ' HT · indicateur d’activité, distinct du CA facturé', deltaTxt(M.cmdHt, P.cmdHt, eur, per.plib),
       sansCmd.length ? h('a', { class: 'btn sec', href: '#/devis/' + sansCmd[0].id }, nb(sansCmd.length, 'devis accepté', 'devis acceptés') + ' sans commande : envoyer') : null),
     E ? ligne('4 · Commandes retrouvées dans EBP', source('EBP du ' + dateExp), nb(E.cur.cmdN, 'commande', 'commandes'), eur(Math.round(E.cur.cmdHt * 100)) + ' HT' + (M.cmdHt > Math.round(E.cur.cmdHt * 100) ? ' · ' + eur(M.cmdHt - Math.round(E.cur.cmdHt * 100)) + ' déclarés mais pas encore dans EBP' : ''), E.prev ? deltaTxt(E.cur.cmdN, E.prev.cmdN, null, per.plib) : null,
       nAct('Commande') ? h('a', { class: 'btn sec', href: '#/pc' }, nb(nAct('Commande'), 'commande à vérifier', 'commandes à vérifier') + ' avec ' + (S.respNom || 'ton responsable')) : null) : pasExport('4 · Commandes retrouvées dans EBP'),
@@ -1069,10 +1139,10 @@ function blocCompte(c, sauver) {
   const ech = h('input', { type: 'date', 'aria-label': 'Échéance de la facture' });
   const dessiner = () => {
     const ouvertes = c.factures.filter(f => !f.regleLe), du = ouvertes.reduce((a, f) => a + (f.montant || 0), 0), ret = ouvertes.filter(f => enRetard(f)).reduce((a, f) => a + (f.montant || 0), 0);
-    resume.replaceChildren(
+    resume.replaceChildren(...[
       co.statut === 'bloque' ? h('div', { class: 'bandeau-ko' }, 'COMPTE BLOQUÉ : pas de commande sans règlement au comptant.') : null,
       co.statut === 'encours' ? h('p', { class: 'mut' }, 'Ouverture en cours : récupère Kbis, RIB et conditions signées.') : null,
-      h('div', { class: 'quatre trois' }, h('div', {}, h('strong', {}, eur(du)), h('small', { class: 'mut' }, 'à encaisser')), h('div', {}, h('strong', { class: ret ? 'ko' : '' }, eur(ret)), h('small', { class: 'mut' }, 'en retard')), h('div', {}, h('strong', {}, co.plafond ? Math.round(du / co.plafond * 100) + ' %' : '—'), h('small', { class: 'mut' }, 'du plafond'))));
+      h('div', { class: 'quatre trois' }, h('div', {}, h('strong', {}, eur(du)), h('small', { class: 'mut' }, 'à encaisser')), h('div', {}, h('strong', { class: ret ? 'ko' : '' }, eur(ret)), h('small', { class: 'mut' }, 'en retard')), h('div', {}, h('strong', {}, co.plafond ? Math.round(du / co.plafond * 100) + ' %' : '—'), h('small', { class: 'mut' }, 'du plafond')))].filter(Boolean));
     liste.replaceChildren(...(c.factures.length ? c.factures.slice().sort((a, b) => (a.regleLe ? 1 : 0) - (b.regleLe ? 1 : 0) || String(a.echeance).localeCompare(String(b.echeance))).map(f => {
       const r = enRetard(f), jr = r ? ecartJours(f.echeance) : 0;
       const pr = h('input', { type: 'date', value: f.promesse || '', 'aria-label': 'Promesse de paiement le' });
@@ -1140,7 +1210,7 @@ async function pageComparateur() {
 }
 function pagePlus() {
   const L = (href, t, d) => h('a', { class: 'ligne', href, style: 'color:inherit;text-decoration:none' }, h('span', { class: 'g' }, h('strong', {}, t), h('br'), h('small', {}, d)), h('span', {}, '›'));
-  montrer('Plus', L('#/travail', 'Mon travail', 'Tes 6 chiffres : visites, devis, commandes, factures, impayés'), L('#/point', 'Point du lundi', 'Le récap de la semaine écoulée : bilan, UN changement, engagements'), L('#/feuille', 'Feuille de route', 'Le plan de la semaine qui commence, jour par jour'), L('#/pc', 'Lien avec le PC', 'Envoyer ta sauvegarde au PC, recevoir le plan de la semaine'), L('#/evolution', 'Évolution', 'Tous les indicateurs, semaine par semaine, avec leur courbe'), L('#/signalements', 'Signalements', 'Problèmes remontés avec photo et leur suivi'), L('#/signaler', 'Signaler un problème', 'Photo + note envoyées à ton responsable'),
+  montrer('Plus', L('#/autotest', 'Autotest du téléphone', 'Vérifie automatiquement stockage, chiffrement, hors ligne, vitesse : un seul rapport à copier'), espaceTerrain() ? null : L('#/demo', 'Démonstration (données fictives)', 'Charger un jeu 100 % fictif sur un téléphone vide, fichiers d’essai EBP'), L('#/agenda', 'Rendez-vous', 'Ton agenda avec heures ; intégré à la tournée du jour'), L('#/secteurs', 'Secteurs', 'CA, clients actifs/dormants, prospects et priorités par département et commune'), L('#/clients-ebp', 'Clients EBP', 'Relier les codes clients EBP à tes garages (tu valides chaque lien)'), L('#/ville', 'Ma Ville', 'Tes garages commune par commune, en vue LEGO tactile'), L('#/carte', 'Carte commerciale', 'Tous tes garages sur la carte, regroupés, hors ligne'), L('#/cockpit', 'Cockpit', 'Tes priorités du jour : CA, relances, devis, prospects, clients à voir'), L('#/ca', 'CA facturé HT', 'Tes factures et avoirs HT : le chiffre d’affaires, sans doublon'), L('#/travail', 'Mon travail', 'Tes 6 chiffres : visites, devis, commandes, factures, impayés'), L('#/point', 'Point du lundi', 'Le récap de la semaine écoulée : bilan, UN changement, engagements'), L('#/feuille', 'Feuille de route', 'Le plan de la semaine qui commence, jour par jour'), L('#/pc', 'Lien avec le PC', 'Envoyer ta sauvegarde au PC, recevoir le plan de la semaine'), L('#/evolution', 'Évolution', 'Tous les indicateurs, semaine par semaine, avec leur courbe'), L('#/signalements', 'Signalements', 'Problèmes remontés avec photo et leur suivi'), L('#/signaler', 'Signaler un problème', 'Photo + note envoyées à ton responsable'),
     L('#/comparateur', 'Comparateur de coût', 'Coût réel au m² : produit actuel contre produit proposé'), L('#/reglages', 'Réglages', 'Objectifs, responsable, TVA, sauvegarde'));
 }
 
@@ -1357,41 +1427,44 @@ async function pageTournee() {
   const cl = await getAll('clients'), parId = new Map(cl.map(c => [c.id, c]));
   const T = await lireTournees(), auj = jourLocal(new Date()), plan = T[auj];
   const repetes = cl.filter(c => (Number(c.reports) || 0) >= 3);
-  const alerteRep = repetes.length ? h('div', { class: 'carte alerte' }, h('strong', {}, '🔁 Reportés 3 fois ou plus : '), repetes.map(c => c.nom).join(', '), h('br'), h('small', {}, 'Soit tu les vois vraiment, soit tu baisses leur priorité sur la fiche.')) : null;
+  const alerteRep = repetes.length ? h('div', { class: 'carte alerte' }, h('strong', {}, '🔁 Reportés 3 fois ou plus : '), repetes.map(c => c.nom).join(', '), h('br'), h('small', {}, 'Souhaites-tu les voir en priorité, ou baisser leur priorité sur la fiche ?')) : null;
   if (plan && Array.isArray(plan.ids) && plan.ids.length) {
     const st = statsTournee(plan), r = plan.res || (plan.res = {});
     const sauver = async () => { T[auj] = plan; await ecrireTournees(T); };
-    const lignes = plan.ids.map(id => {
+    const tags = { vu: ['Vu', 'ok'], absent: ['Absent', 'warn'], reporte: ['Reporté', 'warn'], auto: ['Reporté (fin de journée)', 'warn'] };
+    // Une ligne compacte par garage : nom, commune, heure si rendez-vous, bouton Visite ; le détail s'ouvre au toucher du nom.
+    const ligne = id => {
       const c = parId.get(id); if (!c) return null;
-      const etat = r[id], tags = { vu: ['Vu', 'ok'], absent: ['Absent', 'warn'], reporte: ['Reporté', 'warn'], auto: ['Reporté (fin de journée)', 'warn'] };
-      const dateR = h('input', { type: 'date', value: prochainOuvre(), 'aria-label': 'Reporter ' + c.nom + ' au', style: 'flex:1 1 140px' });
-      const agir = async (res) => { await marquerVisite(c, res, res === 'reporte' ? dateR.value : ''); r[id] = res; await sauver(); toast(res === 'vu' ? 'Visite notée : ' + c.nom : res === 'absent' ? 'Absent : rappel dans 2 jours.' : 'Reporté au ' + dateFr(c.reporteAu) + '.'); pageTournee(); };
-      return h('div', { class: 'carte' },
-        h('div', { class: 'elan-tete' }, h('strong', {}, c.nom), etat ? h('span', { class: 'tag ' + tags[etat][1] }, tags[etat][0]) : null),
-        c.etape ? h('small', { class: 'mut' }, 'Étape prévue : ' + c.etape) : null,
-        etat ? null : h('div', { class: 'trio' }, h('button', { class: 'btn vert', onclick: () => agir('vu') }, 'Vu'), h('button', { class: 'btn ambre', onclick: () => agir('absent') }, 'Absent'), h('button', { class: 'btn gris', onclick: () => agir('reporte') }, 'Reporter')),
-        etat ? null : h('label', { class: 'rang' }, h('span', { class: 'mut' }, 'Reporter au'), dateR),
-        h('div', { class: 'actions' }, h('a', { class: 'btn sec', href: '#/client/' + c.id }, 'Fiche'), etat ? h('button', { class: 'btn sec', onclick: async () => { delete r[id]; await sauver(); pageTournee(); } }, 'Annuler') : null));
-    });
+      const etat = r[id], heure = plan.rdv && plan.rdv[id], dateR = h('input', { type: 'date', value: prochainOuvre(), 'aria-label': 'Reporter ' + c.nom + ' au' });
+      const agir = async (res) => { await marquerVisite(c, res, res === 'reporte' ? dateR.value : ''); r[id] = res; await sauver(); toast(res === 'vu' ? 'Visite notée : ' + c.nom : res === 'absent' ? 'Noté absent : rappel dans 2 jours.' : 'Reporté au ' + dateFr(c.reporteAu) + '.'); pageTournee(); };
+      const detail = h('div', { class: 't-detail', hidden: true },
+        c.etape ? h('p', { class: 'mut' }, 'Étape prévue : ' + c.etape) : null, c.rappel ? h('p', { class: 'mut' }, 'Rappel prévu le ' + dateFr(c.rappel + 'T12:00:00')) : null,
+        etat ? h('div', { class: 'actions' }, h('a', { class: 'btn sec', href: '#/client/' + c.id }, 'Fiche'), h('button', { class: 'btn sec', type: 'button', onclick: async () => { delete r[id]; await sauver(); pageTournee(); } }, 'Corriger : remettre dans la tournée'))
+          : [h('div', { class: 'trio' }, h('button', { class: 'btn vert', type: 'button', onclick: () => agir('vu') }, 'Vu'), h('button', { class: 'btn ambre', type: 'button', onclick: () => agir('absent') }, 'Absent'), h('button', { class: 'btn gris', type: 'button', onclick: () => agir('reporte') }, 'Reporter')),
+            h('label', { class: 'rang' }, h('span', { class: 'mut' }, 'Reporter au'), dateR), h('div', { class: 'actions' }, h('a', { class: 'btn sec', href: '#/client/' + c.id }, 'Fiche'))]);
+      const nom = h('button', { class: 't-nom', type: 'button', 'aria-expanded': 'false', 'aria-label': (heure ? 'Rendez-vous ' + heure + ' · ' : '') + c.nom + ', détails', onclick: () => { const o = detail.hidden; detail.hidden = !o; nom.setAttribute('aria-expanded', String(o)); } },
+        h('strong', {}, (heure ? '⏰ ' + heure + ' · ' : '') + c.nom), h('small', { class: 'mut' }, [c.ville || c.villeProspection || '', etat ? tags[etat][0] : ''].filter(Boolean).join(' · ') || ' '));
+      return h('div', { class: 't-ligne' + (etat ? ' t-fait' : '') }, h('div', { class: 't-rang' }, nom, etat ? h('span', { class: 'tag ' + tags[etat][1] }, tags[etat][0]) : h('a', { class: 'btn t-visite', href: '#/visite/' + c.id + '?t=1', 'aria-label': 'Visite chez ' + c.nom }, 'Visite')), detail);
+    };
+    const aFaire = plan.ids.filter(id => !r[id]).map(ligne).filter(Boolean), faits = plan.ids.filter(id => r[id]).map(ligne).filter(Boolean);
     const restants = plan.ids.filter(i => !r[i]).map(i => parId.get(i)).filter(Boolean), u = urlItineraire(restants);
     const pc = Math.round((st.prevus - st.restants) / st.prevus * 100);
     montrer('Tournée',
-      h('div', { class: 'carte obj' }, h('div', { class: 'elan-tete' }, h('strong', {}, 'Tournée du ' + dateFr(auj)), h('span', { class: 'tag ' + (plan.termine ? 'ok' : 'warn') }, plan.termine ? 'Terminée' : 'En cours')),
-        h('div', { class: 'gros-chiffre' }, (st.prevus - st.restants) + '/' + st.prevus, h('span', {}, ' garages traités')),
-        h('div', { class: 'piste', role: 'img', 'aria-label': pc + ' % de la tournée traitée' }, h('div', { class: 'rempli' + (st.restants ? '' : ' ok'), style: 'width:' + pc + '%' })),
-        h('div', { class: 'quatre' }, [[st.vus, 'vus', 'ok'], [st.absents, 'absents', 'warn'], [st.reportes, 'reportés', 'warn'], [st.restants, 'restants', '']].map(([v, l, k]) => h('div', {}, h('strong', { class: k }, String(v)), h('small', { class: 'mut' }, l))))),
+      h('div', { class: 'carte t-resume' }, h('div', { class: 'elan-tete' }, h('strong', {}, 'Tournée du ' + dateFr(auj) + ' · ' + (st.prevus - st.restants) + '/' + st.prevus + ' traités'), h('span', { class: 'tag ' + (plan.termine ? 'ok' : 'warn') }, plan.termine ? 'Terminée' : 'En cours')),
+        h('div', { class: 'piste t-piste', role: 'img', 'aria-label': pc + ' % de la tournée traitée' }, h('div', { class: 'rempli' + (st.restants ? '' : ' ok'), style: 'width:' + pc + '%' })),
+        h('small', { class: 'mut' }, 'Vus ' + st.vus + ' · Absents ' + st.absents + ' · Reportés ' + st.reportes + ' · Restants ' + st.restants)),
+      h('div', { class: 't-liste' }, aFaire.length ? aFaire : h('p', { class: 'vide' }, 'Tous les garages sont traités. Bravo !')),
+      faits.length ? h('details', { class: 't-faits' }, h('summary', {}, 'Déjà traités (' + faits.length + ')'), faits) : null,
+      h('div', { class: 'actions t-actions' }, u && restants.length ? h('a', { class: 'btn', href: u, target: '_blank', rel: 'noopener' }, '🗺 Itinéraire (' + Math.min(10, restants.filter(posClient).length) + ' arrêts)') : null,
+        plan.termine ? null : h('button', { class: 'btn noir', type: 'button', onclick: async () => {
+          const nd = prochainOuvre();
+          for (const id of plan.ids) if (!r[id]) { const c = parId.get(id); if (c) { await marquerVisite(c, 'reporte', nd); r[id] = 'auto'; } }
+          plan.termine = true; await sauver(); const s2 = statsTournee(plan);
+          toast('Journée terminée : ' + s2.vus + ' vus, ' + s2.absents + ' absents, ' + s2.reportes + ' reportés au ' + dateFr(nd) + '.'); pageTournee();
+        } }, 'Terminer la journée')),
       alerteRep,
-      u && restants.length ? h('a', { class: 'btn gros', href: u, target: '_blank', rel: 'noopener' }, '🗺 Itinéraire des ' + Math.min(10, restants.filter(posClient).length) + ' restants') : null,
-      lignes.filter((x, i) => x && !r[plan.ids[i]]),
-      lignes.some((x, i) => x && r[plan.ids[i]]) ? [h('h2', {}, 'Déjà traités'), lignes.filter((x, i) => x && r[plan.ids[i]])] : null,
-      plan.termine ? null : h('div', { class: 'actions' }, h('button', { class: 'btn gros noir', onclick: async () => {
-        const nd = prochainOuvre();
-        for (const id of plan.ids) if (!r[id]) { const c = parId.get(id); if (c) { await marquerVisite(c, 'reporte', nd); r[id] = 'auto'; } }
-        plan.termine = true; await sauver(); const s2 = statsTournee(plan);
-        toast('Journée terminée : ' + s2.vus + ' vus, ' + s2.absents + ' absents, ' + s2.reportes + ' reportés au ' + dateFr(nd) + '.'); pageTournee();
-      } }, 'Terminer la journée')),
       st.restants === st.prevus ? h('div', { class: 'actions' }, h('button', { class: 'btn sec', onclick: async () => { delete T[auj]; await ecrireTournees(T); pageTournee(); } }, 'Refaire la sélection')) : null,
-      h('p', { class: 'mut' }, '« Terminer la journée » reporte au prochain jour ouvré les garages non traités. Un garage reporté disparaît de la liste jusqu’à sa date.'));
+      h('p', { class: 'mut' }, '« Terminer la journée » reporte les garages restants au prochain jour ouvré ; tu pourras les corriger ensuite.'), h('div', { style: 'height:84px' }));
     return;
   }
   const dues = cl.map(c => ({ c, e: echeance(c) })).filter(x => x.e && x.e.du).sort((a, b) => (b.e.rappel - a.e.rappel) || (b.e.pct - a.e.pct));
@@ -1411,10 +1484,10 @@ async function pageTournee() {
   };
   const majItin = () => {
     const sel = ordre.filter(c => coches.has(c.id));
-    itin.replaceChildren(sel.length ? h('button', { class: 'btn gros', onclick: async () => {
+    itin.replaceChildren(...[sel.length ? h('button', { class: 'btn gros', onclick: async () => {
       T[auj] = { ids: ordre.filter(c => coches.has(c.id)).map(c => c.id), res: {}, debut: new Date().toISOString(), termine: false }; await ecrireTournees(T); toast('Tournée démarrée : ' + T[auj].ids.length + ' garages.'); pageTournee();
     } }, '▶ Démarrer ma tournée (' + sel.length + ')') : h('p', { class: 'mut' }, 'Coche au moins un garage.'),
-      sel.length > 10 ? h('p', { class: 'mut' }, 'Google Maps accepte 10 arrêts maximum : l’itinéraire prendra les 10 premiers.') : null);
+      sel.length > 10 ? h('p', { class: 'mut' }, 'Google Maps accepte 10 arrêts maximum : l’itinéraire prendra les 10 premiers.') : null].filter(Boolean));
   };
   const bPos = h('button', { class: 'btn sec', onclick: () => {
     if (!navigator.geolocation) { toast('Position indisponible sur ce navigateur.', true); return; }
@@ -1434,8 +1507,123 @@ async function pageTournee() {
     h('p', { class: 'mut' }, 'Rythme par défaut : A = 14 jours, B = 30 jours, C = 90 jours (hypothèses, à ajuster). Ta position n’est ni enregistrée ni envoyée : elle sert seulement à classer la liste.'));
   dessiner();
 }
+// ----- Lot 5 (14/11/2026) : demandes de devis (pour Mohamed / EBP), JAMAIS un devis officiel -----
+// Stockées dans meta « demandesDevis » (incluses dans la sauvegarde complète, lues par le Bureau). Aucun prix saisi ici.
+const lireDemandes = async () => { const v = await get('meta', 'demandesDevis'); return Array.isArray(v) ? v : []; };
+const ecrireDemandes = l => put('meta', l.slice(-500), 'demandesDevis');
+const compteBloqueDe = c => !!(c && ((c.compte && c.compte.statut === 'bloque') || c.bloque));
+async function carteDemandes(c) {
+  const D = ODICOLOR_DEMANDES, l = (await lireDemandes()).filter(d => d.clientId === c.id).slice(-3).reverse();
+  return h('section', { class: 'carte v50-demandes' },
+    h('a', { class: 'btn', href: '#/demande/nouvelle/' + c.id, style: 'min-height:72px;width:100%;display:flex;align-items:center;justify-content:center', 'data-demande': 'nouvelle' }, 'Demande de devis (pour EBP)'),
+    l.map(d => h('a', { class: 'ligne', href: '#/demande/' + d.uid, style: 'color:inherit;text-decoration:none', 'data-demande': d.uid },
+      h('span', { class: 'g' }, h('strong', {}, D.ETAPES[d.statut]), h('br'), h('small', { class: 'mut' }, dateFr(d.creeLe) + ' · ' + d.lignes.length + ' produit(s)' + (d.noDevisEbp ? ' · devis EBP ' + d.noDevisEbp : ''))))));
+}
+async function nouvelleDemande(clientId) {
+  const c = await get('clients', clientId); if (!c) return nonTrouve();
+  const d = ODICOLOR_DEMANDES.nouvelle({ id: c.id, nom: c.nom, codeEbp: c.codeEbp || (c.liaisonEbp && c.liaisonEbp.code) || '' }, { uid: nouvelUid(), maintenant: new Date().toISOString() });
+  await ecrireDemandes((await lireDemandes()).concat([d]));
+  location.replace('#/demande/' + d.uid);
+}
+async function pageDemande(uid) {
+  const D = ODICOLOR_DEMANDES, toutes = await lireDemandes(), i = toutes.findIndex(x => x.uid === uid); if (i < 0) return nonTrouve();
+  let d = toutes[i]; const c = await get('clients', d.clientId), pack = await get('meta', 'contenusWa');
+  const sauver = async () => { const l = await lireDemandes(), k = l.findIndex(x => x.uid === uid); if (k >= 0) l[k] = d; else l.push(d); await ecrireDemandes(l); };
+  const msg = h('p', { class: 'mut', role: 'status', 'aria-live': 'polite' });
+  const agir = async f => { try { d = f(d); await sauver(); await pageDemande(uid); } catch (e) { msg.textContent = e.message; toast(e.message, true); } };
+  const brouillon = d.statut === 'brouillon', gros = 'min-height:72px;width:100%';
+  const besoins = h('textarea', { rows: 3, maxlength: 600, disabled: !brouillon, placeholder: 'Besoin du garage : produits, volumes, problème à résoudre…', 'aria-label': 'Besoin du garage', onchange: async ev => { d = { ...d, besoins: clean(ev.target.value).slice(0, 600) }; await sauver(); } }, d.besoins || '');
+  const q = h('input', { type: 'search', placeholder: 'Référence, désignation, marque…', 'aria-label': 'Chercher un produit', disabled: !brouillon });
+  const resultats = h('div'), qte = h('input', { type: 'number', inputmode: 'numeric', min: 1, max: 9999, value: 1, 'aria-label': 'Quantité', style: 'max-width:110px' });
+  const plus = (n) => h('button', { class: 'btn sec', type: 'button', style: 'min-height:56px;min-width:56px', onclick: () => { qte.value = Math.max(1, Math.min(9999, (Number(qte.value) || 1) + n)); } }, n > 0 ? '+' : '−');
+  const ajouter = a => agir(x => D.ajouterLigne(x, { ref: a.code, des: a.des, marque: a.marque, conditionnement: a.conditionnement, qte: qte.value }));
+  const dessinerRes = () => { const r = D.chercher(CAT, q.value, { max: 12 });
+    resultats.replaceChildren(...(q.value.trim() ? (r.length ? r.map(a => h('button', { class: 'ligne', type: 'button', style: 'width:100%;min-height:56px;background:none;border:0;border-bottom:1px solid var(--line);color:inherit;font:inherit;text-align:left', onclick: () => ajouter(a) },
+      h('span', { class: 'g' }, h('strong', {}, a.code + ' · ' + a.des), h('br'), h('small', { class: 'mut' }, [a.marque, a.categorie, a.conditionnement].filter(Boolean).join(' · ') || 'Marque non renseignée dans le catalogue')))) : [h('p', { class: 'vide' }, 'Aucun produit du catalogue importé. Ajoute une ligne libre.')]) : [])); };
+  q.addEventListener('input', dessinerRes);
+  const lRef = h('input', { placeholder: 'Référence', maxlength: 40, 'aria-label': 'Référence libre' }), lDes = h('input', { placeholder: 'Désignation', maxlength: 160, 'aria-label': 'Désignation libre' });
+  const lMarque = h('select', { 'aria-label': 'Marque' }, [h('option', { value: '' }, 'Marque…'), ...D.MARQUES_ACTIVES.map(m => h('option', { value: m }, m))]);
+  const noEbp = h('input', { placeholder: 'N° du devis dans EBP', maxlength: 40, 'aria-label': 'Numéro du devis EBP', 'data-demande': 'no-ebp' });
+  const etape = (vers, lib, extra = () => ({})) => h('button', { class: 'btn' + (vers === 'refuse' || vers === 'brouillon' ? ' sec' : ''), type: 'button', style: gros, 'data-etape': vers,
+    onclick: () => agir(x => D.passer(x, vers, Object.assign({ maintenant: new Date().toISOString(), compteBloque: compteBloqueDe(c) }, extra()))) }, lib);
+  const transmettre = h('button', { class: 'btn', type: 'button', style: gros, 'data-etape': 'a_traiter', onclick: async () => {
+    try { const n = D.passer(d, 'a_traiter', { maintenant: new Date().toISOString(), compteBloque: compteBloqueDe(c) });
+      const texte = D.recapitulatif(n, { commercial: S.vendeur || '' });
+      window.open('https://wa.me/' + tel2wa(S.respTel) + '?text=' + encodeURIComponent(texte), '_blank', 'noopener');
+      d = { ...n, historique: n.historique.map((h0, k) => k === n.historique.length - 1 ? { ...h0, motif: 'Récapitulatif préparé dans WhatsApp pour ' + (S.respNom || 'le responsable') + ' (envoi non confirmé)' } : h0) };
+      await sauver(); await pageDemande(uid);
+    } catch (e) { msg.textContent = e.message; toast(e.message, true); } } }, 'Transmettre à ' + (S.respNom || 'Mohamed') + ' (WhatsApp)');
+  const marques = [...new Set(d.lignes.map(l => l.marque).filter(Boolean))];
+  const contenus = pack && Array.isArray(pack.contenus) ? pack.contenus.filter(x => marques.includes(x.marque)) : [];
+  montrer('Demande de devis',
+    h('div', { class: 'bandeau-ko', style: 'background:var(--carte2,#1c1f24);color:inherit' }, 'Demande ODICOLOR — ce n’est PAS un devis EBP. Le devis officiel est établi dans EBP.'),
+    compteBloqueDe(c) ? h('div', { class: 'bandeau-ko' }, 'COMPTE BLOQUÉ · la demande ne peut pas être transmise') : null,
+    h('section', { class: 'carte' }, h('strong', {}, d.clientNom), h('br'), h('small', { class: 'mut' }, D.ETAPES[d.statut] + (d.noDevisEbp ? ' · devis EBP ' + d.noDevisEbp : '') + (d.codeEbp ? ' · code EBP ' + d.codeEbp : ''))),
+    h('section', { class: 'carte' }, h('label', {}, 'Besoin du garage'), besoins),
+    h('section', { class: 'carte' }, h('strong', {}, 'Produits (' + d.lignes.length + ')'),
+      d.lignes.length ? d.lignes.map((l, k) => h('div', { class: 'ligne' }, h('span', { class: 'g' }, h('strong', {}, (l.ref ? l.ref + ' · ' : '') + l.des), h('br'), h('small', { class: 'mut' }, [l.marque, l.conditionnement, '× ' + l.qte].filter(Boolean).join(' · '))),
+        brouillon ? h('button', { class: 'btn sec', type: 'button', style: 'min-height:56px', 'aria-label': 'Retirer ' + (l.ref || l.des), onclick: () => agir(x => D.retirerLigne(x, k)) }, 'Retirer') : null)) : h('p', { class: 'vide' }, 'Aucun produit.'),
+      brouillon ? [h('div', { class: 'actions' }, plus(-1), qte, plus(1)), q, resultats,
+        h('details', {}, h('summary', {}, 'Ligne libre (produit hors catalogue importé)'), lRef, lDes, lMarque,
+          h('button', { class: 'btn sec', type: 'button', style: gros, onclick: () => agir(x => D.ajouterLigne(x, { ref: lRef.value, des: lDes.value, marque: lMarque.value, qte: qte.value })) }, 'Ajouter la ligne'))] : null,
+      h('small', { class: 'mut' }, 'Aucun prix ici : prix et remises sont établis dans EBP selon les conditions validées.')),
+    contenus.length ? h('section', { class: 'carte' }, h('strong', {}, 'Contenus marketing validés liés (' + contenus.length + ')'), contenus.slice(0, 5).map(x => h('small', { class: 'mut', style: 'display:block' }, x.marque + ' · ' + x.titre)),
+      h('a', { class: 'btn sec', href: '#/client/' + d.clientId, style: gros }, 'Les envoyer par WhatsApp depuis la fiche')) : null,
+    h('section', { class: 'carte' },
+      d.statut === 'brouillon' ? transmettre : null,
+      d.statut === 'a_traiter' ? [noEbp, etape('traite_ebp', 'Traité dans EBP', () => ({ noDevisEbp: noEbp.value })), etape('brouillon', 'Revenir en brouillon')] : null,
+      d.statut === 'traite_ebp' ? etape('envoye', 'Devis EBP envoyé au client') : null,
+      d.statut === 'envoye' ? [etape('accepte', 'Accepté par le client'), etape('refuse', 'Refusé par le client')] : null,
+      d.statut === 'accepte' ? h('p', { class: 'mut' }, 'Accepté : la vente n’est comptée qu’une fois la commande puis la facture présentes dans EBP.') : null,
+      msg),
+    h('details', { class: 'carte' }, h('summary', {}, 'Historique (' + d.historique.length + ')'), d.historique.map(x => h('small', { class: 'mut', style: 'display:block' }, dateFr(x.le) + ' · ' + D.ETAPES[x.etape] + (x.noDevisEbp ? ' · ' + x.noDevisEbp : '') + (x.motif ? ' · ' + x.motif : '')))),
+    h('a', { class: 'btn sec', href: '#/client/' + d.clientId, style: gros }, 'Retour à la fiche'));
+  if (brouillon) dessinerRes();
+}
+// ----- Lot 3 (14/11/2026) : WhatsApp commercial manuel depuis la fiche garage -----
+// Aucun envoi automatique : le lien ouvre WhatsApp avec le message prérempli, l'envoi reste un geste du commercial.
+// Le journal du garage (c.contacts) ne note que « WhatsApp ouvert » ; la relance programmée devient le rappel du garage
+// (actions du jour, tournée) sans jamais avancer un rappel déjà prévu plus tôt.
+function carteWhatsApp(c, pack) {
+  const W = ODICOLOR_WA, num = W.normaliser(c.tel, S.indicatif), auj = aujourdhui();
+  const histo = h('div', { class: 'wa-histo' }), editeur = h('div', { class: 'wa-editeur', hidden: true });
+  const dessinerHisto = () => {
+    const l = (Array.isArray(c.contacts) ? c.contacts : []).filter(x => x && x.canal === 'whatsapp').slice(-3).reverse();
+    histo.replaceChildren(...l.map(x => h('small', { class: 'mut', style: 'display:block' }, dateFr(x.jour + 'T12:00:00') + ' · ' + W.libelleStatut(x.statut) + (x.relance ? ' · relance le ' + dateFr(x.relance + 'T12:00:00') : ''))));
+  };
+  if (!num.ok) return h('section', { class: 'carte v49-wa' }, h('button', { class: 'btn sec', disabled: true, style: 'min-height:72px;width:100%' }, 'WhatsApp'), h('small', { class: 'mut' }, num.motif + ' — corrige le téléphone dans « Profil ».'), histo);
+  const vals = { contact: c.contactNom || '', garage: c.nom, vendeur: S.vendeur || '', societe: S.societe || 'Odicolor' };
+  let modele = (Array.isArray(c.contacts) && c.contacts.some(x => x && x.canal === 'whatsapp')) ? 'relance' : 'presentation';
+  const texte = h('textarea', { rows: 4, maxlength: 1500, 'aria-label': 'Message WhatsApp' }, W.rediger(modele, vals));
+  const choix = h('div', { class: 'trio wa-modeles' }, Object.entries(W.MODELES).map(([k, m]) => h('button', { class: 'btn sec', type: 'button', 'aria-pressed': String(k === modele), 'data-modele': k,
+    onclick: ev => { modele = k; texte.value = W.rediger(k, vals); [...choix.children].forEach(b => b.setAttribute('aria-pressed', String(b === ev.currentTarget))); } }, m.libelle)));
+  const avecRelance = h('input', { type: 'checkbox', checked: true, style: 'width:24px;min-height:24px', 'aria-label': 'Programmer une relance' });
+  const dateRel = h('input', { type: 'date', value: W.relanceProposee(auj), min: auj, 'aria-label': 'Date de relance' });
+  const ouvrir = async () => {
+    const t = clean(texte.value).slice(0, 1500); if (!t) { toast('Message vide.'); return; }
+    window.open(W.lien(num.intl, t), '_blank', 'noopener');
+    const rel = avecRelance.checked && /^\d{4}-\d\d-\d\d$/.test(dateRel.value) ? dateRel.value : '';
+    const r = W.noterOuverture(c.contacts, { maintenant: new Date().toISOString(), jour: auj, texte: t, modele: modele, intl: num.intl, relance: rel });
+    c.contacts = r.contacts;
+    if (rel && (!c.rappel || c.rappel > rel || c.rappel < auj)) c.rappel = rel;
+    await putMany('clients', [c]); dessinerHisto();
+    toast(r.doublon ? 'WhatsApp rouvert (déjà noté aujourd’hui). L’envoi n’est pas confirmé.' : 'WhatsApp ouvert : relis et envoie toi-même.' + (rel ? ' Relance le ' + dateFr(rel + 'T12:00:00') + '.' : ''));
+  };
+  // Lot 4 : contenus validés dans le Studio du Bureau (importés dans Réglages → Imports), proposés selon la cible du garage.
+  const contenus = W.contenusPour(c, pack);
+  const choixContenu = contenus.length ? h('select', { 'aria-label': 'Contenu validé', 'data-wa': 'contenu', onchange: ev => { const x = contenus.find(y => y.id === ev.target.value); if (!x) return; modele = 'contenu:' + x.id; texte.value = x.texte; [...choix.children].forEach(b => b.setAttribute('aria-pressed', 'false')); } },
+    h('option', { value: '' }, 'Contenus validés (' + contenus.length + ')'), contenus.map(x => h('option', { value: x.id }, x.marque + ' · ' + x.titre))) : null;
+  editeur.append(choix, choixContenu, texte, h('label', { class: 'rang' }, avecRelance, h('span', {}, 'Relance le'), dateRel),
+    h('button', { class: 'btn vert', type: 'button', style: 'min-height:72px;width:100%;font-size:1.1em', 'data-wa': 'ouvrir', onclick: ouvrir }, 'Ouvrir WhatsApp'),
+    h('small', { class: 'mut' }, 'Ouvrir WhatsApp ne prouve pas l’envoi : seul « WhatsApp ouvert » est noté.'));
+  dessinerHisto();
+  return h('section', { class: 'carte v49-wa' },
+    h('button', { class: 'btn vert', type: 'button', style: 'min-height:72px;width:100%;font-size:1.1em', 'data-wa': 'preparer', 'aria-expanded': 'false',
+      onclick: ev => { editeur.hidden = !editeur.hidden; ev.currentTarget.setAttribute('aria-expanded', String(!editeur.hidden)); } }, 'WhatsApp · ' + num.affichage),
+    num.avertissement ? h('small', { class: 'mut' }, num.avertissement) : null, editeur, histo);
+}
 async function pageClient(id) {
-  const c = await get('clients', id);
+  const c = await get('clients', id), contenusWa = await get('meta', 'contenusWa');
   if (!c) return nonTrouve();
   const eurK = v => v == null ? '—' : Math.round(v).toLocaleString('fr-FR') + ' €';
   const verdict = h('div'), fiche = h('div'), zoneRech = h('div');
@@ -1594,6 +1782,8 @@ async function pageClient(id) {
       c.tel?h('a',{class:'btn sec',href:'tel:'+String(c.tel).replace(/[^0-9+]/g,'')},'Appeler'):
         h('button',{class:'btn sec',disabled:true},'Appeler'),
       h('a',{class:'btn sec',href:'#/signaler/'+c.id},'Incident')),
+    carteWhatsApp(c, contenusWa),
+    await carteDemandes(c),
     h('section',{class:'carte v36-prochaine'},
       h('strong',{},'Prochaine action'),
       h('label',{},'À faire'),etape,
@@ -1898,6 +2088,489 @@ async function pageDevis(id) {
 }
 
 // ---------- réglages ----------
+// ---------- CA facturé HT : saisie contrôlée (factures et avoirs), historique conservé ----------
+async function pageCA() {
+  const [magasin, cl] = [await get('meta', 'caFacture'), (await getAll('clients')).sort((a, b) => String(a.nom).localeCompare(String(b.nom), 'fr'))];
+  const auj = jourLocal(new Date()), mois = auj.slice(0, 7), m = ODICOLOR_CA.calculerMois(magasin, mois), obj = objectifDuMois(new Date());
+  const type = h('select', { 'aria-label': 'Type de pièce' }, h('option', { value: 'facture' }, 'Facture'), h('option', { value: 'avoir' }, 'Avoir (déduit du CA)'));
+  const num = h('input', { maxlength: 40, placeholder: 'N° de la pièce (obligatoire)', autocapitalize: 'characters', 'aria-label': 'Numéro de la pièce' });
+  const dt = h('input', { type: 'date', value: auj, max: auj, 'aria-label': 'Date de la pièce' });
+  const mt = h('input', { inputmode: 'decimal', placeholder: 'Montant HT en € (pas TTC)', 'aria-label': 'Montant hors taxes' });
+  const cli = h('select', { 'aria-label': 'Garage (facultatif)' }, h('option', { value: '' }, 'Garage : non précisé'), cl.map(c => h('option', { value: c.id }, c.nom)));
+  const msg = h('p', { class: 'mut', role: 'status' });
+  const enregistrer = async confirme => {
+    let cents; try { cents = parseCents(mt.value); } catch (e) { cents = null; }
+    const c = cli.value ? cl.find(x => x.id === Number(cli.value)) : null;
+    try {
+      const nouveau = ODICOLOR_CA.ajouter(await get('meta', 'caFacture'), { type: type.value, numero: num.value, date: dt.value, montantHt: cents, clientId: c ? c.id : null, clientNom: c ? c.nom : '' }, { id: nouvelUid(), maintenant: new Date().toISOString(), auj, confirme });
+      await put('meta', nouveau, 'caFacture'); toast('Pièce enregistrée.'); pageCA();
+    } catch (e) {
+      if (e.confirmation) { msg.textContent = ''; if (confirm(e.controle.avertissements.join('\n') + '\n\nEnregistrer quand même ?')) await enregistrer(true); }
+      else { msg.textContent = e.message; msg.style.color = 'var(--ko)'; }
+    }
+  };
+  const lignes = (magasin && magasin.entrees ? magasin.entrees : []).slice().sort((a, b) => b.date.localeCompare(a.date) || String(b.saisiLe).localeCompare(String(a.saisiLe))).slice(0, 60).map(e =>
+    h('div', { class: 'carte', style: e.annule ? 'opacity:.55' : '' },
+      h('div', { class: 'elan-tete' }, h('strong', {}, (e.type === 'avoir' ? 'Avoir ' : 'Facture ') + e.numero + (e.annule ? ' · annulé(e)' : '')), h('span', {}, (e.type === 'avoir' ? '− ' : '') + eur(e.montantHt) + ' HT')),
+      h('p', { class: 'mut' }, dateFr(e.date + 'T12:00:00') + (e.clientNom ? ' · ' + e.clientNom : '') + ' · saisi' + (e.type === 'avoir' ? 'e' : 'e') + ' ' + new Date(e.saisiLe).toLocaleDateString('fr-FR') + (e.annule ? ' · motif : ' + e.annule.motif : '')),
+      e.annule ? null : h('button', { class: 'btn sec', type: 'button', onclick: async () => {
+        const motif = prompt('Motif de l’annulation (la pièce reste dans l’historique) :'); if (!motif || !motif.trim()) return;
+        try { await put('meta', ODICOLOR_CA.annuler(await get('meta', 'caFacture'), e.id, motif, { maintenant: new Date().toISOString() }), 'caFacture'); toast('Pièce annulée.'); pageCA(); } catch (er) { toast(er.message, true); }
+      } }, 'Annuler cette pièce')));
+  // Rattachement EXPLICITE code client EBP → garage du téléphone (jamais par le nom) : permet CA par garage et alerte de réachat.
+  const codes = [...ODICOLOR_CA.parCode(magasin, '0000-01-01', '9999-12-31').values()], liesA = new Map(cl.filter(c => c.codeEbp).map(c => [c.codeEbp, c]));
+  const nonLies = codes.filter(x => !liesA.has(x.code)).sort((a, b) => b.periodeCents - a.periodeCents);
+  const liaisons = codes.length ? h('details', { class: 'carte', open: nonLies.length > 0 }, h('summary', {}, 'Codes clients EBP : ' + (codes.length - nonLies.length) + ' rattaché(s), ' + nonLies.length + ' à rattacher'),
+    h('p', { class: 'mut' }, 'Choisis toi-même le garage : aucun rapprochement automatique par le nom.'),
+    nonLies.slice(0, 40).map(x => { const sel = h('select', { 'aria-label': 'Garage pour le code ' + x.code }, h('option', { value: '' }, 'Garage…'), cl.map(c => h('option', { value: c.id }, c.nom)));
+      return h('div', { class: 'carte' }, h('strong', {}, x.code + (x.nom ? ' · ' + x.nom : '')), h('p', { class: 'mut' }, x.nPieces + ' pièce(s)' + (x.derniereFacture ? ' · dernière facture ' + x.derniereFacture : '')), sel,
+        h('button', { class: 'btn sec', type: 'button', onclick: async () => { const c = cl.find(y => y.id === Number(sel.value)); if (!c) { toast('Choisis un garage.', true); return; } if (c.codeEbp && c.codeEbp !== x.code && !confirm(c.nom + ' est déjà rattaché au code ' + c.codeEbp + '. Le remplacer ?')) return; c.codeEbp = x.code; await putMany('clients', [c]); toast(x.code + ' rattaché à ' + c.nom + '.'); pageCA(); } }, 'Rattacher')); }),
+    [...liesA.values()].length ? h('details', {}, h('summary', {}, 'Déjà rattachés'), [...liesA.entries()].map(([code, c]) => h('p', { class: 'mut' }, code + ' → ' + c.nom))) : null) : null;
+  montrer('CA facturé HT',
+    h('div', { class: 'carte obj hero' }, h('small', { class: 'etiq' }, 'CA facturé HT · ' + mois), h('div', { class: 'gros-chiffre' }, ODICOLOR_CA.aDesPieces(magasin) ? eur(m.totalCents) : 'Non renseigné'),
+      h('p', { class: 'mut' }, ODICOLOR_CA.aDesPieces(magasin) ? m.nFactures + ' facture(s) − ' + m.nAvoirs + ' avoir(s)' + (obj ? ' · objectif ' + eur(obj.cents) : '') : 'Aucune pièce saisie ce mois : le CA n’est pas estimé à partir des commandes.')),
+    h('p', { class: 'mut' }, 'Le CA = factures HT émises moins avoirs, à leur date. Les commandes et les encaissements sont suivis à part. Un futur import EBP utilisera les mêmes règles (le numéro évite les doublons).'),
+    h('div', { class: 'actions' }, h('a', { class: 'btn sec', href: '#/ca/import' }, 'Importer un export EBP (factures et avoirs HT)'), h('a', { class: 'btn sec', href: '#/clients-ebp' }, 'Importer les clients EBP (codes)')),
+    h('h2', {}, 'Ajouter une pièce'), type, num, dt, mt, cli, msg,
+    h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onclick: () => enregistrer(false) }, 'Enregistrer')),
+    (magasin && magasin.imports && magasin.imports.length ? [h('h2', {}, 'Imports EBP'), magasin.imports.slice().reverse().map(ev => h('div', { class: 'carte', style: ev.annule ? 'opacity:.55' : '' },
+      h('strong', {}, ev.fichier + (ev.annule ? ' · annulé' : '')), h('p', { class: 'mut' }, new Date(ev.le).toLocaleString('fr-FR') + ' · ' + ev.ajoutees + ' ajoutée(s), ' + ev.identiques + ' déjà présente(s), ' + ev.conflits + ' conflit(s), ' + ev.ignorees + ' ignorée(s)' + (ev.annule ? ' · motif : ' + ev.annule.motif : '')),
+      ev.annule ? null : h('button', { class: 'btn sec', type: 'button', onclick: async () => {
+        const motif = prompt('Motif de l’annulation de cet import (les pièces restent dans l’historique) :'); if (!motif || !motif.trim()) return;
+        try { await put('meta', ODICOLOR_CA_EBP.annulerImport(await get('meta', 'caFacture'), ev.id, motif, { maintenant: new Date().toISOString() }), 'caFacture'); toast('Import annulé.'); pageCA(); } catch (er) { toast(er.message, true); }
+      } }, 'Annuler cet import')))] : null),
+    liaisons,
+    h('h2', {}, 'Historique'), lignes.length ? lignes : h('p', { class: 'vide' }, 'Aucune pièce.'));
+}
+
+// ---------- Cockpit : priorités commerciales du jour, sur le téléphone, sans PC ----------
+async function pageCockpit() {
+  const [dv, cl, caStore] = [await getAll('devis'), await getAll('clients'), await get('meta', 'caFacture')];
+  const now = new Date(), auj = jourLocal(now), mk = auj.slice(0, 7), om = objectifDuMois(now);
+  const m = ODICOLOR_CA.calculerMois(caStore, mk), debut = new Date(now.getFullYear(), now.getMonth(), 1), fin = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23);
+  const veille = new Date(now); veille.setDate(veille.getDate() - 1); veille.setHours(23, 59, 0, 0);
+  const parCode = ODICOLOR_CA.parCode(caStore, mk + '-01', ODICOLOR_CA.finDeMois(mk)), facturation = {};
+  for (const c of cl) if (c.codeEbp && parCode.has(c.codeEbp)) { const x = parCode.get(c.codeEbp); facturation[c.id] = { derniere: x.derniereFacture, moisCents: x.periodeCents }; }
+  const K = ODICOLOR_COCKPIT.calculer({ auj, facturation, clients: cl, devis: dv, relanceJours: S.relanceJours || 3, totalDevis: d => totaux(d).ht,
+    ca: { renseigne: ODICOLOR_CA.aDesPieces(caStore), moisCents: m.totalCents, nFactures: m.nFactures, nAvoirs: m.nAvoirs }, objectifMoisCents: om ? om.cents : 0,
+    jours: { ouvresTotal: joursOuvres(debut, fin), ouvresFaits: veille >= debut ? joursOuvres(debut, veille) : 0 } });
+  const agenda = await get('meta', 'agenda'), rdvJour = ODICOLOR_RDV.duJour(agenda, auj);
+  const carteRdv = rdvJour.length ? h('div', { class: 'carte' }, h('div', { class: 'elan-tete' }, h('strong', {}, 'Rendez-vous aujourd’hui'), h('small', { class: 'mut' }, String(rdvJour.length))), rdvJour.map(x => h('a', { class: 'ligne', href: '#/visite/' + x.clientId, style: 'color:inherit;text-decoration:none;display:block;min-height:48px', 'aria-label': 'Rendez-vous ' + x.heure + ' ' + x.clientNom }, h('strong', {}, x.heure + ' · ' + x.clientNom), h('br'), h('small', { class: 'mut' }, x.duree + ' min' + (x.objet ? ' · ' + x.objet : ''))))) : null;
+  const r = K.rythme, carteCA = h('div', { class: 'carte obj hero' }, h('small', { class: 'etiq' }, 'CA facturé HT · ' + mk),
+    h('div', { class: 'gros-chiffre' }, K.ca.renseigne ? eur(K.ca.moisCents) : 'Non renseigné'), om ? h('p', { class: 'mut ck-objectif' }, 'Objectif du mois : ' + eur(om.cents)) : null,
+    r.calculable ? [h('div', { class: 'piste', role: 'img', 'aria-label': r.pct + ' % de l’objectif du mois' }, h('div', { class: 'rempli', style: 'width:' + Math.max(0, Math.min(100, r.pct)) + '%' })),
+      h('p', { class: r.ecartCents >= 0 ? '' : 'mut' }, (r.ecartCents >= 0 ? 'En avance de ' : 'En retard de ') + eur(Math.abs(r.ecartCents)) + ' sur le rythme des jours ouvrés' + (r.resteParJourOuvre ? ' · ' + eur(r.resteParJourOuvre) + ' à facturer par jour ouvré restant' : ''))]
+      : h('p', { class: 'mut' }, 'Rythme non calculable : ' + r.motif + '. ', h('a', { class: 'btn sec ck-lien', href: K.ca.renseigne ? '#/reglages' : '#/ca' }, K.ca.renseigne ? 'Régler l’objectif' : 'Saisir le CA facturé')));
+  const visitable = new Set(['rappels', 'prospects', 'risque', 'reachat']);
+  const ligne = (sec, x) => h('div', { class: 'ligne', style: 'display:flex;align-items:center;gap:8px' },
+    h('a', { href: visitable.has(sec.id) ? '#/visite/' + x.id : sec.lien(x), style: 'color:inherit;text-decoration:none;flex:1;min-height:48px', 'aria-label': (visitable.has(sec.id) ? 'Visiter ' : 'Ouvrir ') + (x.nom || '') }, h('span', { class: 'g' }, h('strong', {}, x.nom || '—'), h('br'), h('small', {}, x.raison + (x.montant ? ' · ' + eur(x.montant) : '') + (x.ville ? ' · ' + x.ville : '')))),
+    visitable.has(sec.id) ? h('a', { class: 'btn sec', href: '#/client/' + x.id, style: 'min-height:44px' }, 'Fiche') : h('span', {}, '›'));
+  const cartes = K.sections.filter(sec => sec.total).map(sec => h('div', { class: 'carte' }, h('div', { class: 'elan-tete' }, h('strong', {}, sec.titre), h('small', { class: 'mut' }, sec.total + (sec.montant ? ' · ' + eur(sec.montant) : ''))),
+    sec.lignes.map(x => ligne(sec, x)), sec.total > sec.lignes.length ? h('p', { class: 'mut' }, '+ ' + (sec.total - sec.lignes.length) + ' autre(s)') : null));
+  montrer('Cockpit', carteCA, carteRdv,
+    h('div', { class: 'actions' }, h('a', { class: 'btn', href: '#/proposition' }, 'Proposer ma tournée du jour'), h('a', { class: 'btn sec', href: '#/tournee' }, 'Ma tournée'), h('a', { class: 'btn sec', href: '#/carte' }, 'Carte'), h('a', { class: 'btn sec', href: '#/secteurs' }, 'Secteurs'), h('a', { class: 'btn sec', href: '#/ca' }, 'CA facturé'), h('a', { class: 'btn sec', href: '#/feuille' }, 'Plan de la semaine')),
+    cartes.length ? h('div', { class: 'cg-grille' }, cartes) : h('p', { class: 'vide' }, 'Rien d’urgent d’après tes données : ' + cl.length + ' garage(s), ' + dv.length + ' devis. Ajoute des rappels et des priorités sur les fiches pour alimenter le cockpit.'),
+    h('p', { class: 'mut' }, 'Chaque ligne vient de ce que tu as saisi (visites, rappels, devis, factures). Rien n’est deviné.'));
+}
+
+// ---------- Imports EBP : choix manuel des colonnes (les titres seulement, jamais les données) ----------
+function colonnesEbpUI(an, carte, appliquer, ouvert) {
+  if (!an || !an.ok) return null;
+  const sels = {}, ent = an.entetes;
+  const champs = an.champs.map(c => { sels[c.cle] = h('select', { 'aria-label': 'Colonne pour ' + c.libelle }, h('option', { value: '' }, c.obligatoire ? 'Choisir…' : '— aucune —'), ent.map((e, i) => e ? h('option', { value: i, selected: carte && carte[c.cle] === i }, e) : null));
+    return h('label', {}, c.libelle + (c.obligatoire ? ' *' : ''), sels[c.cle]); });
+  const titres = 'Titres de colonnes (ligne ' + (an.debut + 1) + ') : ' + ent.filter(Boolean).join(' | ');
+  return h('details', { class: 'carte', open: !!ouvert }, h('summary', {}, 'Colonnes du fichier (à corriger si besoin)'),
+    h('p', { class: 'mut' }, 'Vérifie que chaque information vient de la bonne colonne. Le montant doit être le HT, jamais le TTC.'), champs,
+    h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onclick: () => { const c = {}; for (const k of Object.keys(sels)) if (sels[k].value !== '') c[k] = Number(sels[k].value); appliquer({ debut: an.debut, carte: c }); } }, 'Utiliser ces colonnes'),
+      h('button', { class: 'btn sec', type: 'button', onclick: async () => { try { await navigator.clipboard.writeText(titres); toast('Titres copiés (aucune donnée de client).'); } catch (e) { toast(titres, true); } } }, 'Copier les titres de colonnes')),
+    h('p', { class: 'mut' }, 'En cas de doute, copie les titres et envoie-les : ils ne contiennent aucune donnée de client.'));
+}
+// ---------- Import EBP du CA facturé : aperçu obligatoire avant écriture ----------
+async function pageCAImport() {
+  const file = h('input', { type: 'file', accept: '.xlsx,.xlsm,.csv,.txt', 'aria-label': 'Export EBP des pièces' }), zone = h('div');
+  montrer('Importer le CA depuis EBP',
+    h('a', { class: 'btn sec', href: '#/ca' }, '‹ CA facturé'),
+    h('p', { class: 'mut' }, 'Choisis l’export EBP des pièces (factures et avoirs). Seuls les montants HT des factures et avoirs comptent ; devis, commandes et bons de livraison sont ignorés. Un aperçu s’affiche : rien n’est enregistré avant ta confirmation. Réimporter le même fichier ne crée aucun doublon.'),
+    file, zone);
+  file.addEventListener('change', async () => {
+    const f = file.files[0]; if (!f) return;
+    try {
+      const feuilles = await lireFichier(f, LIMITES_EBP), magasin = await get('meta', 'caFacture'), auj = jourLocal(new Date());
+      let fe = feuilles.find(x => ODICOLOR_CA_EBP.associer(x.rows).ok) || feuilles[0];
+      let colonnes = null, typeDefaut = '';
+      const afficher = async () => {
+      const ap = ODICOLOR_CA_EBP.apercu(fe.rows, { auj, existantes: magasin ? magasin.entrees : [], colonnes, typeDefaut });
+      const an = ap.analyse || ODICOLOR_CA_EBP.analyser(fe.rows), panneau = colonnesEbpUI(an, ap.carte || (colonnes && colonnes.carte) || (an.ok ? an.carte : null), c => { colonnes = c; afficher(); }, !ap.ok);
+      if (!ap.ok) { zone.replaceChildren(h('div', { class: 'carte erreur', role: 'alert' }, 'Import à compléter : ' + ap.erreur), panneau); return; }
+      const sansTypeBloc = ap.sansType && !typeDefaut ? h('div', { class: 'carte alerte', role: 'alert' }, h('strong', {}, ap.sansType + ' ligne(s) sans type de pièce reconnaissable. '), 'Si ce fichier ne contient QUE des factures et des avoirs, tu peux les compter (un montant négatif = avoir).',
+        h('div', { class: 'actions' }, h('button', { class: 'btn sec', type: 'button', onclick: () => { if (confirm('Confirmes-tu que ce fichier ne contient que des factures et des avoirs (aucun devis, commande ou bon de livraison) ?')) { typeDefaut = 'facture'; afficher(); } } }, 'Ce fichier ne contient que des factures et avoirs'))) : null;
+      const liste = (titre, arr, f2) => arr.length ? h('details', { class: 'carte' }, h('summary', {}, titre + ' · ' + arr.length), arr.slice(0, 30).map(x => h('p', { class: 'mut' }, f2(x))), arr.length > 30 ? h('p', { class: 'mut' }, '+ ' + (arr.length - 30) + ' autre(s)') : null) : null;
+      const hc = Object.entries(ap.horsCa).map(([k, n]) => n + ' ' + k).join(', ');
+      zone.replaceChildren(
+        h('div', { class: 'carte' }, h('strong', {}, f.name), h('p', { class: 'mut' }, 'Colonnes retenues : ' + ap.correspondance.map(c => c.libelle + ' ← « ' + c.colonne + ' »').join(' · ')),
+          h('div', { class: 'gros-chiffre' }, ap.nouvelles.length + ' pièce(s) à ajouter'), h('p', {}, 'Effet sur le CA : ' + (ap.totaux.nouvellesCents < 0 ? '− ' : '') + eur(Math.abs(ap.totaux.nouvellesCents)) + ' HT (factures − avoirs)'),
+          h('p', { class: 'mut' }, ap.identiques.length + ' déjà présente(s) · ' + ap.conflits.length + ' conflit(s) non importé(s) · ' + ap.ignorees.length + ' ligne(s) ignorée(s)' + (hc ? ' · hors CA : ' + hc : '') + (ap.lignesTotal ? ' · ' + ap.lignesTotal + ' ligne(s) de total écartée(s)' : ''))),
+        ap.multiLignes.length ? h('div', { class: 'carte alerte', role: 'alert' }, h('strong', {}, ap.multiLignes.length + ' pièce(s) totalisée(s) sur plusieurs lignes : '), 'vérifie que l’export n’est pas dupliqué (' + ap.multiLignes.slice(0, 8).join(', ') + (ap.multiLignes.length > 8 ? '…' : '') + ').') : null,
+        sansTypeBloc, panneau,
+        liste('Conflits (même numéro, montant ou date différents : à vérifier à la main, rien n’est écrasé)', ap.conflits, x => x.numero + ' : export ' + eur(x.montantHt) + ' le ' + x.date + ' ≠ enregistré ' + eur(x.existant.montantHt) + ' le ' + x.existant.date),
+        liste('Lignes ignorées', ap.ignorees, x => 'Ligne ' + x.ligne + ' : ' + x.motif),
+        liste('Pièces à ajouter', ap.nouvelles, x => (x.type === 'avoir' ? 'Avoir ' : 'Facture ') + x.numero + ' · ' + x.date + ' · ' + eur(x.montantHt) + (x.clientNom ? ' · ' + x.clientNom : '')),
+        h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', disabled: ap.nouvelles.length === 0, onclick: async ev => {
+          ev.currentTarget.disabled = true;
+          try { const maintenant = new Date().toISOString(), m2 = ODICOLOR_CA_EBP.appliquer(await get('meta', 'caFacture'), ap, { idImport: nouvelUid(), nouvelId: nouvelUid, maintenant, fichier: f.name, auj }); await put('meta', m2, 'caFacture'); toast(ap.nouvelles.length + ' pièce(s) importée(s).'); location.hash = '#/ca'; }
+          catch (e) { toast('Import annulé : ' + e.message, true); ev.currentTarget.disabled = false; }
+        } }, ap.nouvelles.length ? 'Importer ces ' + ap.nouvelles.length + ' pièces' : 'Rien à importer'), h('a', { class: 'btn sec', href: '#/ca' }, 'Annuler')));
+      };
+      await afficher();
+    } catch (e) { zone.replaceChildren(h('div', { class: 'carte erreur', role: 'alert' }, 'Import impossible : ' + e.message)); }
+  });
+}
+
+// ---------- Visite terrain en 4 touches maximum ----------
+async function pageVisite(id) {
+  const c = await get('clients', id); if (!c) return nonTrouve();
+  let agendaAvant = null, enCours = false; const V = ODICOLOR_VISITE, choix = {}, avant = JSON.stringify(c), deTournee = /[?&]t=1/.test(location.hash);
+  const noteIn = h('textarea', { rows: 2, maxlength: 500, placeholder: 'Note (facultatif)', 'aria-label': 'Note de visite', autocomplete: 'off' });
+  const gros = (label, sous, fn, cls) => h('button', { class: 'btn gros ' + (cls || ''), type: 'button', style: 'min-height:68px;text-align:left;display:block;width:100%;margin:8px 0', onclick: fn }, h('strong', {}, label), sous ? h('br') : null, sous ? h('small', {}, sous) : null);
+  const entete = (n, total, titre) => [h('div', { class: 'mut' }, 'Étape ' + n + ' sur ' + total + ' · ' + c.nom), h('h2', { style: 'margin:6px 0' }, titre)];
+  const total = () => V.etapes(choix.resultat).length;
+  const enregistrer = async () => {
+    if (enCours) return;
+    enCours = true;
+    try {
+      choix.note = noteIn.value;
+      const r = V.appliquer(c, choix, { auj: aujourdhui(), nouvelId: nouvelUid, prochainOuvre: j => estOuvre(new Date(j + 'T12:00:00')) ? j : prochainOuvre(new Date(j + 'T12:00:00')) });
+      await putMany('clients', [r.client]);
+      if (choix.resultat === 'vu') { const ag = await get('meta', 'agenda'), rj = ODICOLOR_RDV.duJour(ag, aujourdhui()).filter(x => x.clientId === id); if (rj.length) { agendaAvant = { val: ag }; let m2 = ag; for (const x of rj) m2 = ODICOLOR_RDV.terminer(m2, x.id, { maintenant: new Date().toISOString() }); await put('meta', m2, 'agenda'); } }
+      if (deTournee) { const T = await lireTournees(), j = aujourdhui(), plan = T[j]; if (plan && Array.isArray(plan.ids) && plan.ids.includes(id)) { (plan.res || (plan.res = {}))[id] = choix.resultat === 'vu' ? 'vu' : choix.resultat === 'absent' ? 'absent' : 'reporte'; await ecrireTournees(T); } }
+      await fin(r.resume);
+    } catch (e) { toast(e.message, true); } finally { enCours = false; }
+  };
+  const fin = async resume => {
+    let suivant = null;
+    if (deTournee) { const T = await lireTournees(), plan = T[aujourdhui()]; if (plan && plan.ids) suivant = plan.ids.find(i => i !== id && !(plan.res || {})[i]); }
+    montrer('Visite enregistrée', h('div', { class: 'carte obj' }, h('strong', {}, c.nom), h('p', {}, resume)),
+      suivant ? h('a', { class: 'btn gros', href: '#/visite/' + suivant + '?t=1' }, 'Garage suivant de la tournée') : null,
+      h('div', { class: 'actions' }, h('a', { class: 'btn sec', href: deTournee ? '#/tournee' : '#/cockpit' }, deTournee ? 'Retour à la tournée' : 'Retour au cockpit'), h('a', { class: 'btn sec', href: '#/client/' + id }, 'Fiche'), h('a', { class: 'btn sec', href: '#/agenda/nouveau/' + id }, 'Fixer un rendez-vous'),
+        h('button', { class: 'btn sec', type: 'button', onclick: async () => { await putMany('clients', [JSON.parse(avant)]); if (agendaAvant) { if (agendaAvant.val === undefined) await rq(st('meta', 'readwrite').delete('agenda')); else await put('meta', agendaAvant.val, 'agenda'); } toast('Visite annulée : fiche remise comme avant.'); const cible = '#/visite/' + id + (deTournee ? '?t=1' : ''); if (location.hash === cible) pageVisite(id); else location.hash = cible; } }, 'Annuler cette visite')), h('div', { style: 'height:96px' }));
+  };
+  const dateIn = h('input', { type: 'date', min: aujourdhui(), 'aria-label': 'Échéance de la prochaine action' });
+  const retour = fn => h('button', {class:'btn sec', type:'button', onclick:fn}, '‹ Étape précédente');
+  const etapeSuite = () => {
+    if (choix.resultat === 'vu' && !dateIn.value) dateIn.value = aujourdhui();
+    montrer('Visite · ' + c.nom, retour(choix.resultat === 'vu' ? etapeRetour : etapeResultat),
+      ...entete(total(), total(), choix.resultat === 'vu' ? 'Et ensuite ?' : 'Quand repasser ?'),
+      noteIn, h('label', {}, 'Échéance de la prochaine action', dateIn),
+      h('p', {class:'mut'}, choix.resultat === 'vu' ? 'Date modifiable. « Aucune suite » ne programme rien.' : 'Si tu choisis une date, elle remplace le délai indiqué sur les boutons.'),
+      V.choixSuite(choix.resultat).map(s => gros(s[1], '', () => {
+        if (s[0] !== 'aucune' && (!dateIn.checkValidity() || (choix.resultat === 'vu' && !dateIn.value))) { toast('Choisis une échéance valide.', true); dateIn.focus(); return; }
+        choix.suite = s[0]; choix.echeance = s[0] === 'aucune' ? '' : dateIn.value; enregistrer();
+      }, 'sec')));
+  };
+  const etapeRetour = () => montrer('Visite · ' + c.nom, retour(etapeResultat), ...entete(2, total(), 'Qu’est-ce qui est ressorti ?'), noteIn,
+    V.RETOURS.map(r => gros(r[1], '', () => { choix.retour = r[0]; etapeSuite(); }, 'sec')));
+  const etapeResultat = () => montrer('Visite · ' + c.nom,
+    h('a', { class: 'btn sec', href: deTournee ? '#/tournee' : '#/client/' + id }, '‹ Retour'),
+    ...entete(1, 3, 'Résultat de la visite'), noteIn,
+    V.RESULTATS.map(r => gros(r[1], r[2], () => { choix.resultat = r[0]; r[0] === 'vu' ? etapeRetour() : etapeSuite(); }, r[0] === 'vu' ? 'vert' : 'sec')),
+    h('p', { class: 'mut' }, 'Le choix de la suite enregistre la visite. Tu peux revenir à l’étape précédente pour corriger.'));
+  etapeResultat();
+}
+
+// ---------- Carte commerciale : garages regroupés par zone, hors ligne, sans fond de carte externe ----------
+const CARTE_ETAT = { filtre: 'tous', marche: true, vue: null };
+async function pageCarte() {
+  const K = ODICOLOR_CARTE; K.charger(ODICOLOR_COMMUNES_CENTRES);
+  const clients = await getAll('clients'), marche = await get('meta', 'marche'), prep = K.preparer(clients, marche), parId = new Map(clients.map(c => [c.id, c]));
+  const COUL = { client: '#3BD38A', prospect_prio: '#FF2D3D', prospect: '#FFC873', refus: '#8A8F98', marche: '#6E737B' };
+  const filtres = [['tous', 'Tous'], ['client', 'Clients'], ['prospect', 'Prospects'], ['prio', 'À visiter (A/B)']];
+  const filtreFn = p => CARTE_ETAT.filtre === 'tous' ? true : CARTE_ETAT.filtre === 'client' ? p.cat === 'client' : CARTE_ETAT.filtre === 'prospect' ? (p.cat === 'prospect' || p.cat === 'prospect_prio') : p.cat === 'prospect_prio';
+  const canvas = h('canvas', { role: 'img', 'aria-label': 'Carte des garages regroupés par zone', style: 'width:100%;height:62vh;min-height:320px;touch-action:none;background:#0D0F12;border-radius:14px;display:block' });
+  const feuille = h('div'), info = h('p', { class: 'mut', role: 'status' }), chips = h('div', { class: 'actions' });
+  let vue = CARTE_ETAT.vue, groupes = [], dessinPrevu = false;
+  const taille = () => { const r = canvas.getBoundingClientRect(), d = Math.min(2, window.devicePixelRatio || 1); canvas.width = Math.max(1, Math.round(r.width * d)); canvas.height = Math.max(1, Math.round(r.height * d)); return { l: r.width, h: r.height, d }; };
+  const rayonDe = n => Math.min(21, 8 + Math.sqrt(n) * 1.7);
+  const dessiner = () => {
+    dessinPrevu = false; const { l, h: ht, d } = taille(); if (!vue) vue = K.cadrer(prep, l, ht, CARTE_ETAT.marche); vue.largeur = l; vue.hauteur = ht; CARTE_ETAT.vue = vue;
+    const t0 = performance.now(), r = K.regrouper(prep, vue, { filtre: filtreFn, marche: CARTE_ETAT.marche, rayon: 48 }); groupes = r.groupes;
+    const g = canvas.getContext('2d'); g.setTransform(d, 0, 0, d, 0, 0); g.clearRect(0, 0, l, ht); g.textAlign = 'center'; g.textBaseline = 'middle';
+    for (const gr of groupes.sort((a, b) => a.n - b.n)) {
+      const nGar = gr.n - gr.marche, dom = ['client', 'prospect_prio', 'prospect', 'refus'].filter(k => gr.cats[k]).sort((a, b) => gr.cats[b] - gr.cats[a])[0];
+      const ray = rayonDe(gr.n);
+      if (gr.marche) { g.beginPath(); g.arc(gr.x, gr.y, ray + (nGar ? 4 : 0), 0, 7); g.strokeStyle = COUL.marche; g.lineWidth = 2; g.setLineDash([4, 3]); g.stroke(); g.setLineDash([]); if (!nGar) { g.fillStyle = 'rgba(110,115,123,.25)'; g.fill(); } }
+      if (nGar) { g.beginPath(); g.arc(gr.x, gr.y, rayonDe(nGar), 0, 7); g.fillStyle = COUL[dom]; g.fill(); }
+      g.fillStyle = nGar ? '#0D0F12' : '#C9CDD3'; g.font = '700 ' + (ray > 18 ? 14 : 12) + 'px system-ui'; g.fillText(String(nGar || gr.marche), gr.x, gr.y);
+    }
+    canvas.dataset.groupes = String(groupes.length); canvas.dataset.visibles = String(r.visibles); canvas.dataset.ms = (performance.now() - t0).toFixed(1);
+    info.textContent = prep.points.length + ' garage(s) sur la carte (' + prep.approx + ' placés au centre de leur commune, pas à l’adresse)' + (prep.nonPlaces.length ? ' · ' + prep.nonPlaces.length + ' sans position' : '') + ' · ' + r.visibles + ' dans la vue' + (marche ? ' · marché recensé : ' + marche.communes.reduce((a, c) => a + c[1], 0) + ' établissements' : '');
+  };
+  const planifier = () => { if (!dessinPrevu) { dessinPrevu = true; requestAnimationFrame(dessiner); } };
+  const chipsRendre = () => chips.replaceChildren(...[...filtres.map(([k, l]) => h('button', { class: 'btn ' + (CARTE_ETAT.filtre === k ? '' : 'sec'), type: 'button', 'aria-pressed': String(CARTE_ETAT.filtre === k), onclick: () => { CARTE_ETAT.filtre = k; chipsRendre(); feuille.replaceChildren(); planifier(); } }, l)),
+    marche ? h('button', { class: 'btn ' + (CARTE_ETAT.marche ? '' : 'sec'), type: 'button', 'aria-pressed': String(CARTE_ETAT.marche), onclick: () => { CARTE_ETAT.marche = !CARTE_ETAT.marche; chipsRendre(); planifier(); } }, 'Marché recensé') : null].filter(Boolean));
+  // Gestes : glisser, pincer, molette ; un toucher bref ouvre la zone touchée.
+  const ptrs = new Map(); let depart = null, dist0 = 0;
+  canvas.addEventListener('pointerdown', e => { canvas.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.offsetX, y: e.offsetY }); depart = { x: e.offsetX, y: e.offsetY, t: Date.now(), bouge: false }; if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; dist0 = Math.hypot(a.x - b.x, a.y - b.y); depart.bouge = true; } });
+  canvas.addEventListener('pointermove', e => {
+    const p = ptrs.get(e.pointerId); if (!p) return; const dx = e.offsetX - p.x, dy = e.offsetY - p.y;
+    if (ptrs.size === 2) { ptrs.set(e.pointerId, { x: e.offsetX, y: e.offsetY }); const [a, b] = [...ptrs.values()], dn = Math.hypot(a.x - b.x, a.y - b.y); if (dist0 > 0 && dn > 0) { vue = K.zoomer(vue, dn / dist0, (a.x + b.x) / 2, (a.y + b.y) / 2); dist0 = dn; planifier(); } return; }
+    if (Math.hypot(e.offsetX - depart.x, e.offsetY - depart.y) > 6) depart.bouge = true;
+    if (depart.bouge) { vue = K.deplacer(vue, dx, dy); ptrs.set(e.pointerId, { x: e.offsetX, y: e.offsetY }); planifier(); }
+  });
+  const fin = e => { const bref = depart && !depart.bouge && Date.now() - depart.t < 600; ptrs.delete(e.pointerId); if (bref && ptrs.size === 0) ouvrirZone(e.offsetX, e.offsetY); if (ptrs.size === 0) depart = null; };
+  canvas.addEventListener('pointerup', fin); canvas.addEventListener('pointercancel', e => { ptrs.delete(e.pointerId); depart = null; });
+  canvas.addEventListener('wheel', e => { e.preventDefault(); vue = K.zoomer(vue, e.deltaY < 0 ? 1.25 : 0.8, e.offsetX, e.offsetY); planifier(); }, { passive: false });
+  const ouvrirZone = (x, y) => {
+    let best = null, bd = 1e9; for (const g of groupes) { const dd = Math.hypot(g.x - x, g.y - y); if (dd < Math.max(rayonDe(g.n) + 8, 26) && dd < bd) { best = g; bd = dd; } }
+    if (!best) { feuille.replaceChildren(); return; }
+    const nGar = best.n - best.marche, lignes = best.ids.map(id => parId.get(id)).filter(Boolean);
+    feuille.replaceChildren(h('div', { class: 'carte', role: 'region', 'aria-label': 'Zone touchée' },
+      h('strong', {}, nGar + ' garage(s)' + (best.marche ? ' · ' + best.marche + ' établissement(s) recensé(s)' : '')),
+      best.marche ? h('p', { class: 'mut' }, 'Marché recensé (' + best.communes.join(', ') + (best.communes.length >= 12 ? '…' : '') + ') : établissements 45.20A, PAS des carrosseries-peinture qualifiées.') : null,
+      lignes.map(c => { const pos = K.placer(c); return h('div', { class: 'ligne', style: 'display:flex;gap:8px;align-items:center' },
+        h('span', { class: 'g', style: 'flex:1' }, h('strong', {}, c.nom), h('br'), h('small', {}, (c.statutCrm === 'client' ? 'Client' : 'Prospect') + (c.priorite ? ' · priorité ' + c.priorite : '') + ' · ' + (c.ville || pos.commune || '—') + (pos.precision === 'commune' ? ' (position = centre de la commune)' : ''))),
+        h('a', { class: 'btn', href: '#/visite/' + c.id, style: 'min-height:44px' }, 'Visiter'), h('a', { class: 'btn sec', href: '#/client/' + c.id, style: 'min-height:44px' }, 'Fiche')); }),
+      nGar > lignes.length ? h('p', { class: 'mut' }, '+ ' + (nGar - lignes.length) + ' autre(s) : zoome pour les voir un par un.') : null));
+  };
+  const importer = h('input', { type: 'file', accept: '.csv,.txt', 'aria-label': 'Recensement par commune (CSV)' });
+  importer.addEventListener('change', async () => {
+    const f = importer.files[0]; if (!f) return;
+    try {
+      const rows = parseCSV((new TextDecoder('utf-8').decode(await f.arrayBuffer())).replace(/^﻿/, '')).filter(r => r.some(c => clean(c) !== '')), ent = (rows[0] || []).map(c => clean(c).toLowerCase());
+      const iI = ent.indexOf('commune_insee'), iN = ent.findIndex(c => c === 'etablissements');
+      if (iI < 0 || iN < 0) throw new Error('Colonnes « commune_insee » et « etablissements » introuvables (colonnes lues : ' + ent.join(', ') + ').');
+      const com = [], vus = new Set(); let rejets = 0;
+      for (const r of rows.slice(1)) { const insee = clean(r[iI]), n = Number(clean(r[iN])); if (!/^\d{5}$/.test(insee) || !Number.isInteger(n) || n < 0 || vus.has(insee)) { rejets++; continue; } vus.add(insee); com.push([insee, n]); }
+      if (!com.length) throw new Error('Aucune ligne valide.');
+      await put('meta', { version: 1, fichier: f.name, importeLe: new Date().toISOString(), note: 'Établissements 45.20A recensés par commune (source : fichier fourni). Pas des carrosseries-peinture qualifiées.', communes: com }, 'marche');
+      toast(com.length + ' communes importées' + (rejets ? ', ' + rejets + ' ligne(s) refusée(s)' : '') + '.'); pageCarte();
+    } catch (e) { toast('Import impossible : ' + e.message, true); }
+  });
+  montrer('Carte commerciale', chips, canvas, info,
+    h('div', { class: 'actions' }, h('button', { class: 'btn sec', type: 'button', 'aria-label': 'Zoom avant', onclick: () => { vue = K.zoomer(vue, 1.6, vue.largeur / 2, vue.hauteur / 2); planifier(); } }, '＋'), h('button', { class: 'btn sec', type: 'button', 'aria-label': 'Zoom arrière', onclick: () => { vue = K.zoomer(vue, 1 / 1.6, vue.largeur / 2, vue.hauteur / 2); planifier(); } }, '－'),
+      h('button', { class: 'btn sec', type: 'button', onclick: () => { vue = K.cadrer(prep, vue.largeur, vue.hauteur, CARTE_ETAT.marche); planifier(); } }, 'Tout voir')),
+    h('p', { class: 'mut' }, h('span', { style: 'color:#3BD38A' }, '● client '), h('span', { style: 'color:#FF2D3D' }, '● prospect A/B '), h('span', { style: 'color:#FFC873' }, '● prospect '), h('span', { style: 'color:#8A8F98' }, '● refus '), '◌ marché recensé (pointillés). Pas de fond de carte : fonctionne hors ligne.'),
+    feuille,
+    prep.nonPlaces.length ? h('details', { class: 'carte' }, h('summary', {}, prep.nonPlaces.length + ' garage(s) sans position'), prep.nonPlaces.slice(0, 40).map(n => h('p', { class: 'mut' }, h('a', { href: '#/client/' + n.id }, n.nom), ' — ' + n.motif))) : null,
+    h('details', { class: 'carte' }, h('summary', {}, 'Marché recensé : importer un fichier'), h('p', { class: 'mut' }, 'Fichier CSV « par commune » du recensement (colonnes commune_insee ; etablissements). Il apporte seulement des nombres par commune, pas de noms ni d’adresses.'), importer,
+      marche ? h('p', { class: 'mut' }, 'Chargé : ' + marche.fichier + ' (' + marche.communes.length + ' communes)') : null),
+    h('div', { style: 'height:96px' }));
+  chipsRendre(); planifier();
+}
+
+// ---------- Ma Ville sur le téléphone : même modèle et même dessin que le Bureau, alimentés par les fiches du téléphone ----------
+async function modeleVille() {
+  const cl = await getAll('clients');
+  return { cl, m: ModeleCommune.construire({ arrete: jourLocal(new Date()), dates: { Terrain: jourLocal(new Date()) }, terrain: cl, clientsEbp: [], piecesEbp: [], annuaire: [], liaisonsValidees: [] }) };
+}
+async function pageVille(insee) {
+  const { cl, m } = await modeleVille();
+  if (!insee) {
+    const a = ModeleCommune.agreger(m, { portee: 'mes_garages' }), tete = h('p', { class: 'mut' }, cl.length + ' garage(s) · ' + a.idf.total + ' placé(s) dans une commune' + (a.aClasser.total ? ' · ' + a.aClasser.total + ' à classer (commune inconnue)' : '') + '. Données : celles de ce téléphone.');
+    const parDep = a.parDep.map(d => h('div', { class: 'carte' }, h('strong', {}, (L0nom(d.dep)) + ' (' + d.dep + ')'), h('small', { class: 'mut' }, ' · ' + d.total + ' garage(s)'),
+      a.parCommune.filter(c => c.dep === d.dep).sort((x, y) => y.total - x.total || x.commune.localeCompare(y.commune, 'fr')).map(c => h('a', { class: 'ligne', href: '#/ville/' + c.insee, style: 'color:inherit;text-decoration:none;display:flex;min-height:48px;align-items:center;gap:8px' },
+        h('span', { style: 'flex:1' }, h('strong', {}, c.commune), h('br'), h('small', { class: 'mut' }, c.en_compte + ' en compte · ' + c.sans_compte + ' sans compte · ' + c.a_verifier + ' à vérifier')), h('strong', {}, String(c.total)), h('span', {}, '›')))));
+    montrer('Ma Ville', tete, parDep.length ? parDep : h('p', { class: 'vide' }, 'Aucun garage placé dans une commune. Renseigne la ville et le code postal sur les fiches.'),
+      a.aClasser.total ? h('details', { class: 'carte' }, h('summary', {}, a.aClasser.total + ' garage(s) à classer'), m.aClasser.slice(0, 60).map(e => h('p', { class: 'mut' }, e.nom.valeur))) : null, h('div', { style: 'height:96px' }));
+    return;
+  }
+  const c = ModeleCommune.commune(m, insee);
+  if (!c) { montrer('Ma Ville', h('a', { class: 'btn sec', href: '#/ville' }, '‹ Toutes les communes'), h('p', { class: 'vide' }, 'Aucun garage dans cette commune.')); return; }
+  const hote = h('div', { class: 'vc-hote' });
+  montrer(c.commune, h('a', { class: 'btn sec', href: '#/ville' }, '‹ Toutes les communes'), hote, h('div', { style: 'height:96px' }));
+  VueCommune.monter(hote, c, { fictif: false, etiquette: 'MES GARAGES', sources: ['Fiches de ce téléphone'], portee: 'mes_garages', compte: 'tous',
+    fil: [{ libelle: 'Ma Ville', href: '#/ville' }, { libelle: c.commune }],
+    ouvrirFiche: (uid, e) => { const ref = e.sources.find(x => /^tel:/.test(x.ref)); if (ref) location.hash = '#/client/' + ref.ref.slice(4); else toast('Cette fiche ne vient pas de ce téléphone.', true); } });
+}
+const L0nom = dep => { const D = BureauLogique.depInfo(dep); return D ? D.nom : 'Département ' + dep; };
+
+// ---------- Proposition de tournée du jour : garages proches et prioritaires, à cocher puis valider ----------
+async function pageProposition() {
+  const [dv, cl, caStore] = [await getAll('devis'), await getAll('clients'), await get('meta', 'caFacture')];
+  ODICOLOR_CARTE.charger(ODICOLOR_COMMUNES_CENTRES);
+  const now = new Date(), auj = jourLocal(now), mk = auj.slice(0, 7), parCode = ODICOLOR_CA.parCode(caStore, mk + '-01', ODICOLOR_CA.finDeMois(mk)), facturation = {};
+  for (const c of cl) if (c.codeEbp && parCode.has(c.codeEbp)) { const x = parCode.get(c.codeEbp); facturation[c.id] = { derniere: x.derniereFacture, moisCents: x.periodeCents }; }
+  const sections = ODICOLOR_COCKPIT.calculer({ auj, facturation, clients: cl, devis: dv, relanceJours: S.relanceJours || 3, totalDevis: d => totaux(d).ht, ca: { renseigne: false }, sansLimite: true }).sections;
+  const parId = new Map(cl.map(c => [c.id, c])), position = id => { const c = parId.get(id), p = c ? ODICOLOR_CARTE.placer(c) : null; return p && p.precision ? { lat: p.lat, lng: p.lng } : null; };
+  const T0 = await lireTournees(), existant = T0[auj], r0 = ODICOLOR_TOURNEE.proposer(sections, position, { max: 8, rayonKm: 25 });
+  const agenda = await get('meta', 'agenda'), rdvJour = ODICOLOR_RDV.duJour(agenda, auj), integ = ODICOLOR_RDV.integrer(rdvJour, r0.ids, position), heures = {};
+  for (const x of integ.sequence) if (x.rdv) heures[x.id] = x.rdv.heure;
+  const r = { ...r0, ids: integ.sequence.map(x => x.id), details: integ.sequence.map(x => r0.details.find(d => d.id === x.id) || { id: x.id, score: 0, raisons: ['Rendez-vous ' + x.rdv.heure + (x.rdv.duree ? ' (' + x.rdv.duree + ' min)' : '')] }), avert: integ.avertissements };
+  const coches = new Map(r.ids.map(id => [id, h('input', { type: 'checkbox', checked: true, 'aria-label': 'Inclure ' + (parId.get(id) || {}).nom, style: 'width:24px;height:24px' })]));
+  const valider = async () => {
+    const ids = r.ids.filter(id => coches.get(id).checked); if (!ids.length) { toast('Coche au moins un garage.', true); return; }
+    const T = await lireTournees(); const ex = T[auj];
+    if (ex && ex.ids && Object.keys(ex.res || {}).length && !confirm('Une tournée est déjà commencée aujourd’hui (' + Object.keys(ex.res).length + ' garage(s) traité(s)). La remplacer ?')) return;
+    T[auj] = { ids, res: {}, rdv: Object.fromEntries(ids.filter(id => heures[id]).map(id => [id, heures[id]])) }; await ecrireTournees(T); toast('Tournée du jour : ' + ids.length + ' garage(s).'); location.hash = '#/tournee';
+  };
+  montrer('Tournée proposée',
+    r.ids.length ? [h('div', { class: 'carte obj' }, h('strong', {}, r.ids.length + ' garage(s) proches les uns des autres'), h('p', { class: 'mut' }, 'Distance à vol d’oiseau ≈ ' + r.kmApprox + ' km entre les garages (position = centre de la commune quand le GPS manque). Ordre de passage : du plus proche au plus proche.' + (r.sansPosition ? ' ' + r.sansPosition + ' garage(s) prioritaire(s) sans position ne sont pas proposés.' : ''))),
+      r.details.map((d, i) => { const c = parId.get(d.id); return h('label', { class: 'carte', style: 'display:flex;gap:12px;align-items:flex-start;min-height:56px' }, coches.get(d.id), h('span', { style: 'flex:1' }, h('strong', {}, (i + 1) + '. ' + c.nom), h('br'), h('small', { class: 'mut' }, (heures[d.id] ? '⏰ RDV ' + heures[d.id] + ' · ' : '') + (c.ville || '') + ' · ' + d.raisons.join(' · ')))); }),
+      (r.avert && r.avert.length) ? h('div', { class: 'carte alerte', role: 'alert' }, h('strong', {}, 'Attention : '), r.avert.join(' ')) : null,
+      h('div', { class: 'actions' }, h('button', { class: 'btn gros', type: 'button', onclick: valider }, 'Valider cette tournée'), h('a', { class: 'btn sec', href: '#/cockpit' }, 'Annuler')),
+      existant && existant.ids ? h('p', { class: 'mut' }, 'Une tournée existe déjà aujourd’hui (' + existant.ids.length + ' garage(s)). La valider la remplace.') : null]
+      : [h('p', { class: 'vide' }, r.motif || 'Rien à proposer.'), h('p', { class: 'mut' }, 'Renseigne la ville et le code postal sur les fiches, ajoute des rappels et des priorités A/B : la proposition s’en nourrit.'), h('a', { class: 'btn sec', href: '#/tournee' }, 'Choisir à la main')],
+    h('div', { style: 'height:96px' }));
+}
+
+// ---------- Import EBP des clients : rapprochement des codes, validation explicite par l'utilisateur ----------
+async function pageClientsEbp() {
+  const E = ODICOLOR_EBP_CLIENTS, file = h('input', { type: 'file', accept: '.xlsx,.xlsm,.csv,.txt', 'aria-label': 'Export EBP des clients' }), zone = h('div');
+  montrer('Clients EBP ↔ garages', h('p', { class: 'mut' }, 'Choisis l’export EBP des clients (code, nom, ville, code postal…). Le téléphone PROPOSE des liens ; aucun n’est enregistré sans ton accord. Un lien relie le code EBP au garage : il donne ensuite le CA par garage et l’alerte de réachat.'), file, zone);
+  file.addEventListener('change', async () => {
+    const f = file.files[0]; if (!f) return;
+    try {
+      const feuilles = await lireFichier(f, LIMITES_EBP), fe = feuilles.find(x => E.associer(x.rows).ok) || feuilles[0]; let colonnes = null, lu = E.lire(fe.rows);
+      const dessiner = async () => {
+        lu = E.lire(fe.rows, colonnes);
+        const an = lu.analyse || E.analyser(fe.rows), panneau = colonnesEbpUI(an, lu.carte || (colonnes && colonnes.carte) || (an.ok ? an.carte : null), c => { colonnes = c; dessiner(); }, !lu.ok);
+        if (!lu.ok) { zone.replaceChildren(h('div', { class: 'carte erreur', role: 'alert' }, 'Import à compléter : ' + lu.erreur), panneau); return; }
+        const garages = await getAll('clients'), r = E.rapprocher(lu.clients, garages), parCode = new Map(lu.clients.map(c => [c.code, c])), parId = new Map(garages.map(g => [g.id, g])), auj = jourLocal(new Date());
+        const ctx = { auj, fichier: f.name, auteur: S.vendeur || 'Moi' };
+        const lier = async (decisions) => {
+          const ap = E.appliquer(garages, decisions, parCode, ctx);
+          if (ap.modifies.length) { await putMany('clients', ap.modifies); await put('meta', { version: 1, fichier: f.name, importeLe: new Date().toISOString(), clients: lu.clients.map(({ ligne, ...c }) => c) }, 'ebpClients'); }
+          toast(ap.modifies.length + ' lien(s) enregistré(s)' + (ap.refus.length ? ', ' + ap.refus.length + ' refusé(s) : ' + ap.refus[0].motif : '') + '.', ap.modifies.length === 0); await dessiner();
+        };
+        const coches = new Map(r.fortes.map(x => [x.code, h('input', { type: 'checkbox', 'aria-label': 'Lier ' + x.code, style: 'width:24px;height:24px' })]));
+        const nomG = id => { const g = parId.get(id); return g ? g.nom + (g.ville ? ' · ' + g.ville : '') + (g.cp ? ' ' + g.cp : '') : '—'; };
+        const bloquesNb = lu.clients.filter(c => c.bloque).length;
+        zone.replaceChildren(
+          h('div', { class: 'carte' }, h('strong', {}, f.name), h('p', { class: 'mut' }, 'Colonnes retenues : ' + lu.correspondance.map(c => c.libelle + ' ← « ' + c.colonne + ' »').join(' · ')),
+            h('p', {}, lu.clients.length + ' client(s) EBP · ' + r.liees.length + ' déjà lié(s) · ' + r.fortes.length + ' proposition(s) forte(s) · ' + r.aVerifier.length + ' à vérifier · ' + r.sansGarage.length + ' sans garage' + (bloquesNb ? ' · ' + bloquesNb + ' compte(s) bloqué(s) dans EBP' : '')),
+            lu.ignorees.length || lu.conflitsCode.length ? h('p', { class: 'mut' }, lu.ignorees.length + ' ligne(s) ignorée(s)' + (lu.conflitsCode.length ? ' · ' + lu.conflitsCode.length + ' code(s) répété(s) avec un autre nom : ' + lu.conflitsCode.slice(0, 5).map(c => c.code).join(', ') : '') + '.') : null),
+          panneau,
+          r.fortes.length ? h('details', { class: 'carte', open: true }, h('summary', {}, 'Propositions fortes · ' + r.fortes.length),
+            h('p', { class: 'mut' }, 'Même nom et même code postal (ou ville), unique des deux côtés. Relis, coche, valide.'),
+            r.fortes.slice(0, 200).map(x => h('label', { class: 'ligne', style: 'display:flex;gap:10px;align-items:center;min-height:52px' }, coches.get(x.code), h('span', { style: 'flex:1' }, h('strong', {}, x.code + ' → ' + nomG(x.id)), h('br'), h('small', { class: 'mut' }, (parCode.get(x.code) || {}).nom + ' · ' + x.raison)))),
+            h('div', { class: 'actions' }, h('button', { class: 'btn sec', type: 'button', onclick: () => coches.forEach(c => { c.checked = true; }) }, 'Tout cocher'),
+              h('button', { class: 'btn', type: 'button', onclick: async () => { const d = r.fortes.filter(x => coches.get(x.code).checked).map(x => ({ code: x.code, id: x.id, methode: 'nom+lieu' })); if (!d.length) { toast('Coche au moins un lien.', true); return; } if (confirm('Lier ' + d.length + ' code(s) EBP à leur garage ?')) await lier(d); } }, 'Lier les liens cochés'))) : null,
+          r.aVerifier.length ? h('details', { class: 'carte' }, h('summary', {}, 'À vérifier · ' + r.aVerifier.length),
+            r.aVerifier.slice(0, 100).map(x => { const c = parCode.get(x.code), sel = h('select', { 'aria-label': 'Garage pour ' + x.code }, h('option', { value: '' }, 'Choisir le garage…'), x.candidats.map(k => h('option', { value: k.id }, nomG(k.id) + ' — ' + k.raison)));
+              return h('div', { class: 'carte' }, h('strong', {}, x.code + ' · ' + c.nom), h('p', { class: 'mut' }, [c.ville, c.cp].filter(Boolean).join(' ') + ' · ' + x.raison), sel, h('button', { class: 'btn sec', type: 'button', onclick: async () => { if (!sel.value) { toast('Choisis un garage.', true); return; } await lier([{ code: x.code, id: Number(sel.value), methode: 'verifie' }]); } }, 'Lier')); })) : null,
+          r.sansGarage.length ? h('details', { class: 'carte' }, h('summary', {}, 'Sans garage correspondant · ' + r.sansGarage.length),
+            h('p', { class: 'mut' }, 'Aucun garage du téléphone ne correspond. Tu peux créer la fiche (client) : jamais fait automatiquement.'),
+            r.sansGarage.slice(0, 100).map(code => { const c = parCode.get(code); return h('div', { class: 'ligne', style: 'display:flex;gap:8px;align-items:center;min-height:52px' }, h('span', { style: 'flex:1' }, h('strong', {}, code + ' · ' + c.nom), h('br'), h('small', { class: 'mut' }, [c.ville, c.cp].filter(Boolean).join(' '))),
+              h('button', { class: 'btn sec', type: 'button', onclick: async () => { await putMany('clients', [E.nouveauGarage(c, ctx)]); await put('meta', { version: 1, fichier: f.name, importeLe: new Date().toISOString(), clients: lu.clients.map(({ ligne, ...x }) => x) }, 'ebpClients'); toast('Fiche créée : ' + c.nom + '.'); await dessiner(); } }, 'Créer la fiche')); }),
+            r.sansGarage.length > 1 ? h('button', { class: 'btn', type: 'button', onclick: async () => { if (!confirm('Créer ' + r.sansGarage.length + ' fiche(s) client ?')) return; await putMany('clients', r.sansGarage.map(code => E.nouveauGarage(parCode.get(code), ctx))); await put('meta', { version: 1, fichier: f.name, importeLe: new Date().toISOString(), clients: lu.clients.map(({ ligne, ...x }) => x) }, 'ebpClients'); toast(r.sansGarage.length + ' fiche(s) créée(s).'); await dessiner(); } }, 'Créer les ' + r.sansGarage.length + ' fiches') : null) : null,
+          r.liees.length ? h('p', { class: 'mut' }, r.liees.length + ' code(s) déjà lié(s) à un garage.') : null, h('div', { style: 'height:96px' }));
+      };
+      await dessiner();
+    } catch (e) { zone.replaceChildren(h('div', { class: 'carte erreur', role: 'alert' }, 'Import impossible : ' + e.message)); }
+  });
+}
+
+// ---------- Analyse commerciale par secteur (département puis commune) ----------
+async function pageSecteurs(dep) {
+  ODICOLOR_CARTE.charger(ODICOLOR_COMMUNES_CENTRES);
+  const [cl, caStore, marche] = [await getAll('clients'), await get('meta', 'caFacture'), await get('meta', 'marche')], now = new Date(), auj = jourLocal(now), mk = auj.slice(0, 7);
+  const parCode = ODICOLOR_CA.parCode(caStore, mk + '-01', ODICOLOR_CA.finDeMois(mk)), facturation = {};
+  for (const c of cl) if (c.codeEbp && parCode.has(c.codeEbp)) { const x = parCode.get(c.codeEbp); facturation[c.id] = { derniere: x.derniereFacture, moisCents: x.periodeCents }; }
+  const communes = new Map(ODICOLOR_COMMUNES_CENTRES.map(r => [r[0], { nom: r[1] }]));
+  const r = ODICOLOR_SECTEUR.calculer({ auj, clients: cl, facturation, communes, marche: marche ? marche.communes : [], caTotalMoisCents: ODICOLOR_CA.aDesPieces(caStore) ? ODICOLOR_CA.calculerMois(caStore, mk).totalCents : null,
+    placer: c => { const p = ODICOLOR_CARTE.placer(c); return p.insee ? { insee: p.insee, commune: p.commune } : null; } });
+  const carteSecteur = (x, lien) => h(lien ? 'a' : 'div', Object.assign({ class: 'carte', style: 'display:block;color:inherit;text-decoration:none' }, lien ? { href: lien } : {}),
+    h('div', { class: 'elan-tete' }, h('strong', {}, x.nom), h('small', { class: 'mut' }, x.garages + ' garage(s)')),
+    h('p', {}, 'CA du mois ', h('strong', {}, ODICOLOR_CA.aDesPieces(caStore) ? eur(x.caMoisCents) : 'non renseigné'), ' · ', x.actifs + ' actif(s) · ' + x.dormants + ' dormant(s)' + (x.sansSuivi ? ' · ' + x.sansSuivi + ' sans suivi de facturation' : '')),
+    h('p', { class: 'mut' }, x.prospects + ' prospect(s) (' + x.prospectsPrio + ' A/B) · ' + x.visites30 + ' vu(s) en 30 j' + (x.marche ? ' · marché recensé ' + x.marche + ' (couverture ' + x.couverturePct + ' %)' : '')),
+    x.raisons.length ? h('p', { class: 'mut' }, 'À faire : ' + x.raisons.join(' · ')) : null);
+  const entete = h('div', { class: 'carte obj' }, h('strong', {}, r.totaux.garages + ' garage(s) · ' + r.totaux.clients + ' client(s) · ' + r.totaux.actifs + ' actif(s) · ' + r.totaux.dormants + ' dormant(s) · ' + r.totaux.prospects + ' prospect(s)'),
+    h('p', { class: 'mut' }, 'Actif = client lié à un code EBP facturé depuis moins de ' + r.seuilJours + ' j. Dormant = lié mais plus de ' + r.seuilJours + ' j. Un client non lié n’est ni actif ni dormant : on ne le devine pas (' + 'Plus › Clients EBP pour relier les codes).'),
+    r.controle ? h('p', { class: 'mut' }, 'CA du mois : ' + eur(r.controle.totalCents) + ' au total · ' + eur(r.controle.secteursCents) + ' attribué à un secteur · ' + eur(r.controle.nonAttribueCents) + ' non attribué (code non lié ou garage sans commune).') : h('p', { class: 'mut' }, 'CA facturé non saisi : colonnes CA à « non renseigné ».'));
+  if (!dep) {
+    montrer('Secteurs', entete, h('h2', {}, 'Départements'), r.departements.length ? r.departements.map(d => carteSecteur({ ...d, nom: d.nom }, '#/secteurs/' + d.dep)) : h('p', { class: 'vide' }, 'Aucun garage placé dans un secteur.'),
+      r.sans.garages ? carteSecteur(r.sans) : null, h('div', { style: 'height:96px' }));
+    return;
+  }
+  const lignes = r.communes.filter(c => c.dep === dep);
+  montrer('Secteur ' + dep, h('a', { class: 'btn sec', href: '#/secteurs' }, '‹ Tous les départements'), entete, lignes.length ? lignes.map(c => carteSecteur(c, '#/ville/' + c.id)) : h('p', { class: 'vide' }, 'Aucun garage dans ce département.'), h('div', { style: 'height:96px' }));
+}
+
+// ---------- Rendez-vous avec heure ----------
+async function pageAgenda(clientPre) {
+  const cl = (await getAll('clients')).sort((a, b) => String(a.nom).localeCompare(String(b.nom), 'fr')), parId = new Map(cl.map(c => [c.id, c])), auj = jourLocal(new Date());
+  const A = await get('meta', 'agenda'), R = ODICOLOR_RDV;
+  const cli = h('select', { 'aria-label': 'Garage du rendez-vous' }, h('option', { value: '' }, 'Garage…'), cl.map(c => h('option', { value: c.id, selected: c.id === clientPre }, c.nom)));
+  const dt = h('input', { type: 'date', value: auj, min: auj, 'aria-label': 'Date du rendez-vous' }), hr = h('input', { type: 'time', value: '09:00', 'aria-label': 'Heure du rendez-vous' });
+  const du = h('select', { 'aria-label': 'Durée' }, R.DUREES.map(d => h('option', { value: d, selected: d === R.DUREE_DEFAUT }, d + ' min'))), ob = h('input', { maxlength: 200, placeholder: 'Objet (facultatif)', 'aria-label': 'Objet du rendez-vous' }), msg = h('p', { class: 'mut', role: 'status' });
+  const sauver = async (m, texte) => { await put('meta', m, 'agenda'); if (texte) toast(texte); pageAgenda(null); };
+  const creer = async confirme => {
+    const c = parId.get(Number(cli.value));
+    try { await sauver(R.ajouter(await get('meta', 'agenda'), { clientId: c ? c.id : 0, clientNom: c ? c.nom : '', date: dt.value, heure: hr.value, duree: Number(du.value), objet: ob.value }, { id: nouvelUid(), maintenant: new Date().toISOString(), auj, confirme }), 'Rendez-vous enregistré.'); }
+    catch (e) { if (e.confirmation) { if (confirm(e.controle.avertissements.join('\n') + '\n\nEnregistrer quand même ?')) await creer(true); } else { msg.textContent = e.message; msg.style.color = 'var(--ko)'; } }
+  };
+  const aVenir = R.aVenir(A, auj, 14);
+  const carteRdv = r => { const c = parId.get(r.clientId);
+    const nd = h('input', { type: 'date', value: r.date, min: auj, 'aria-label': 'Nouvelle date' }), nh = h('input', { type: 'time', value: r.heure, 'aria-label': 'Nouvelle heure' });
+    return h('div', { class: 'carte' }, h('div', { class: 'elan-tete' }, h('strong', {}, r.heure + ' · ' + (c ? c.nom : r.clientNom)), h('small', { class: 'mut' }, r.duree + ' min')),
+      r.objet ? h('p', { class: 'mut' }, r.objet) : null, c && c.ville ? h('p', { class: 'mut' }, c.ville) : null,
+      h('div', { class: 'actions' }, h('a', { class: 'btn', href: '#/visite/' + r.clientId }, 'Visiter'),
+        h('button', { class: 'btn sec', type: 'button', onclick: async () => { await sauver(R.terminer(await get('meta', 'agenda'), r.id, { maintenant: new Date().toISOString() }), 'Rendez-vous terminé.'); } }, 'Terminé'),
+        h('button', { class: 'btn sec', type: 'button', onclick: async () => { const mo = prompt('Motif de l’annulation :'); if (!mo || !mo.trim()) return; await sauver(R.annuler(await get('meta', 'agenda'), r.id, mo, { maintenant: new Date().toISOString() }), 'Rendez-vous annulé.'); } }, 'Annuler')),
+      h('details', {}, h('summary', {}, 'Déplacer'), nd, nh, h('button', { class: 'btn sec', type: 'button', onclick: async () => { try { await sauver(R.deplacer(await get('meta', 'agenda'), r.id, nd.value, nh.value, { maintenant: new Date().toISOString(), auj }), 'Rendez-vous déplacé.'); } catch (e) { toast(e.message, true); } } }, 'Enregistrer le déplacement'))); };
+  const jours = [...new Set(aVenir.map(r => r.date))];
+  montrer('Rendez-vous', h('div', { class: 'carte obj' }, h('strong', {}, aVenir.filter(r => r.date === auj).length + ' rendez-vous aujourd’hui · ' + aVenir.length + ' dans les 14 jours'), h('p', { class: 'mut' }, 'Les rendez-vous du jour deviennent des points fixes de la tournée proposée. Les temps de trajet affichés sont des estimations à vol d’oiseau.')),
+    h('div', { class: 'actions' }, h('a', { class: 'btn', href: '#/proposition' }, 'Proposer ma tournée du jour')),
+    jours.length ? jours.map(j => [h('h2', {}, j === auj ? 'Aujourd’hui' : dateFr(j + 'T12:00:00')), aVenir.filter(r => r.date === j).map(carteRdv)]) : h('p', { class: 'vide' }, 'Aucun rendez-vous à venir.'),
+    h('h2', {}, 'Nouveau rendez-vous'), cli, dt, hr, du, ob, msg, h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onclick: () => creer(false) }, 'Enregistrer')), h('div', { style: 'height:96px' }));
+}
+
+// ---------- Démonstration : données 100 % fictives, uniquement sur une base vide ----------
+async function pageDemo() {
+  if (espaceTerrain()) return montrer('Mon espace de travail', h('section', {class:'carte'}, h('strong', {}, 'Cet espace est réservé à tes garages.'), h('p', {}, 'Les essais avec des données fictives restent dans la démonstration séparée.'), h('a', {class:'btn', href:'#/'}, 'Retour à l’accueil')));
+  const [cl, dv, ar, demo] = [await getAll('clients'), await getAll('devis'), await getAll('articles'), await get('meta', 'demo')], auj = jourLocal(new Date());
+  const vide = !cl.length && !dv.length && !ar.length, d = ODICOLOR_DEMO.generer(auj, ODICOLOR_COMMUNES_CENTRES);
+  const telecharger2 = (nom, texte) => telecharger(nom, texte, 'text/csv');
+  montrer('Démonstration',
+    h('div', { class: 'carte alerte' }, h('strong', {}, 'DONNÉES 100 % FICTIVES. '), 'Garages « DÉMO », montants inventés. Jamais mélangé à tes vraies données : le chargement n’est possible que sur un téléphone VIDE.'),
+    demo ? h('div', { class: 'carte' }, h('strong', {}, 'Démonstration chargée le ' + dateFr(demo.creeLe + 'T12:00:00')), h('p', { class: 'mut' }, 'Quitter efface ces données fictives (une copie de récupération reste dans Réglages).'),
+      h('button', { class: 'btn danger', type: 'button', onclick: async () => { if (!confirm('Quitter la démonstration et effacer les données fictives ?')) return; try { await restaurerSauvegardeLocale({ appli: 'devis-terrain', version: 2, date: new Date().toISOString(), stores: { articles: [], clients: [], devis: [], meta: [] } }); DB.db.close(); location.hash = '#/'; location.reload(); } catch (e) { toast('Impossible : ' + e.message, true); } } }, 'Quitter la démonstration'))
+      : h('div', { class: 'carte' }, h('strong', {}, d.resume.garages + ' garages (' + d.resume.clients + ' clients, ' + d.resume.prospects + ' prospects) · ' + d.resume.devis + ' devis · 2 rendez-vous'),
+        vide ? h('button', { class: 'btn', type: 'button', onclick: async () => { try { await restaurerSauvegardeLocale({ appli: 'devis-terrain', version: 2, date: new Date().toISOString(), stores: { articles: [], clients: d.clients, devis: d.devis, meta: [['settings', { ...SET_DEF, ...d.settings }], ['agenda', d.agenda], ['demo', { version: 1, creeLe: auj }]] } }); DB.db.close(); location.hash = '#/cockpit'; location.reload(); } catch (e) { toast('Chargement impossible : ' + e.message, true); } } }, 'Charger la démonstration')
+          : h('p', { class: 'mut' }, 'Ce téléphone contient déjà des données (' + cl.length + ' garage(s), ' + dv.length + ' devis) : la démonstration ne peut pas y être chargée, pour ne rien mélanger ni remplacer. Utilise un autre profil de navigateur ou un téléphone vide.')),
+    h('h2', {}, 'Fichiers d’essai EBP (fictifs)'), h('p', { class: 'mut' }, 'À importer pour essayer tout le parcours : clients (Plus › Clients EBP), puis pièces (CA facturé › Importer un export EBP), puis recensement (Carte). Noms de colonnes EBP = hypothèse, à confirmer avec un vrai export.'),
+    Object.entries(d.fichiers).map(([nom, txt]) => h('div', { class: 'actions' }, h('button', { class: 'btn sec', type: 'button', onclick: () => telecharger2(nom, txt) }, 'Télécharger ' + nom))), h('div', { style: 'height:96px' }));
+}
+
+// ---------- Autotest : contrôles exécutés sur le téléphone lui-même, un seul rapport ----------
+async function pageAutotest() {
+  const liste = h('div'), resume = h('p', { role: 'status' }), rapport = h('textarea', { 'aria-label': 'Rapport de l’autotest', readonly: 'readonly', rows: 10, style: 'width:100%;font:12px monospace' });
+  const B = ODICOLOR_BACKUP, ms = async f => { const t = performance.now(), v = await f(); return [Math.round(performance.now() - t), v]; };
+  const controles = [
+    ['env', 'Appareil et affichage', async () => ({ ok: true, info: true, detail: (navigator.userAgent.match(/\(([^)]*)\)/) || ['', '?'])[1] + ' · écran ' + screen.width + '×' + screen.height + ' ×' + (window.devicePixelRatio || 1) + ' · tactile ' + (navigator.maxTouchPoints || 0) + ' · ' + (matchMedia('(display-mode: standalone)').matches ? 'application installée (plein écran)' : 'navigateur (non installée)') + ' · ' + (navigator.onLine ? 'en ligne' : 'hors ligne') })],
+    ['idb', 'Stockage IndexedDB (base temporaire séparée, tes données ne sont pas touchées)', async () => { const nom = 'odicolor-autotest-' + Date.now(); const [t] = await ms(async () => { const db = await new Promise((ok, ko) => { const r = indexedDB.open(nom, 1); r.onupgradeneeded = () => r.result.createObjectStore('x'); r.onsuccess = () => ok(r.result); r.onerror = () => ko(r.error); }); await new Promise((ok, ko) => { const tx = db.transaction('x', 'readwrite'); for (let i = 0; i < 1000; i++) tx.objectStore('x').put({ i, t: 'garage fictif ' + i }, i); tx.oncomplete = ok; tx.onerror = () => ko(tx.error); }); const n = await new Promise(ok => { const r = db.transaction('x').objectStore('x').count(); r.onsuccess = () => ok(r.result); }); db.close(); await new Promise(ok => { const r = indexedDB.deleteDatabase(nom); r.onsuccess = r.onerror = r.onblocked = ok; }); if (n !== 1000) throw new Error('1000 écrits, ' + n + ' relus'); }); return { ok: true, detail: '1000 enregistrements écrits, relus, supprimés en ' + t + ' ms' }; }],
+    ['crypto', 'Chiffrement (dérivation de clé 600 000 itérations)', async () => { const [t] = await ms(() => crypto.subtle.deriveKey({ name: 'PBKDF2', hash: 'SHA-256', salt: new Uint8Array(16), iterations: 600000 }, null, { name: 'AES-GCM', length: 256 }, false, ['encrypt']).catch(async () => { const k = await crypto.subtle.importKey('raw', new TextEncoder().encode('phrase autotest'), 'PBKDF2', false, ['deriveKey']); return crypto.subtle.deriveKey({ name: 'PBKDF2', hash: 'SHA-256', salt: new Uint8Array(16), iterations: 600000 }, k, { name: 'AES-GCM', length: 256 }, false, ['encrypt']); })); return { ok: t < 8000, detail: t + ' ms' + (t >= 3000 ? ' (lent : la sauvegarde prendra quelques secondes)' : '') }; }],
+    ['sauvegarde', 'Sauvegarde chiffrée : aller-retour complet avec photo et PDF, mauvaise phrase refusée', async () => {
+      const photo = new Blob([new Uint8Array(200000).map((_, i) => i % 251)], { type: 'image/webp' }), pdf = new Blob(['%PDF-1.4 autotest'], { type: 'application/pdf' });
+      const stores = { articles: [], clients: Array.from({ length: 500 }, (_, i) => ({ id: i + 1, nom: 'AUTOTEST ' + i, statutCrm: 'prospect' })), devis: [], meta: [['settings', {}], ['garage-photo-v38:1', { blob: photo, date: '2026-01-01' }], ['pdfFournisseursIndex', [{ id: 'p', nom: 'a.pdf', fournisseur: 'x', size: pdf.size }]], ['pdfFournisseur:p', { id: 'p', blob: pdf }]], recuperations: [] };
+      const [t1, enc] = await ms(() => B.encodeChiffre(stores, 'phrase autotest 123')), [t2, dec] = await ms(() => B.decode(enc.file, { phrase: 'phrase autotest 123' }));
+      const m = new Map(dec.stores.meta); if (dec.stores.clients.length !== 500 || m.get('garage-photo-v38:1').blob.size !== 200000 || m.get('pdfFournisseur:p').blob.size !== pdf.size) throw new Error('données différentes après relecture');
+      let refus = false; try { await B.decode(enc.file, { phrase: 'mauvaise phrase 123' }); } catch (e) { refus = e.code === 'PHRASE_INCORRECTE'; } if (!refus) throw new Error('une mauvaise phrase n’a pas été refusée');
+      return { ok: true, detail: 'chiffrement ' + t1 + ' ms, déchiffrement ' + t2 + ' ms, ' + Math.round(enc.file.size / 1024) + ' Ko' }; }],
+    ['sw', 'Hors ligne : service worker actif et à jour', async () => { if (!('serviceWorker' in navigator)) throw new Error('service worker non pris en charge'); const reg = await navigator.serviceWorker.getRegistration(); if (!reg || !reg.active) throw new Error('aucun service worker actif : rouvre l’application en ligne une fois'); return { ok: !reg.waiting, detail: 'actif · version ' + String(window.ODICOLOR_PWA.release).slice(0, 8) + (navigator.serviceWorker.controller ? ' · contrôle cette page' : ' · ne contrôle pas encore cette page (recharge)') + (reg.waiting ? ' · MISE À JOUR EN ATTENTE : ferme toutes les fenêtres puis rouvre' : '') }; }],
+    ['cache', 'Hors ligne : chaque fichier de l’application est dans la copie locale', async () => { const els = [...document.querySelectorAll('script[src],link[rel=stylesheet][href]')].map(e => e.src || e.href).filter(u => /odicolor=/.test(u)); let manque = []; for (const u of els) if (!(await caches.match(u))) manque.push(u.replace(/\?.*/, '').split('/').pop()); return { ok: els.length > 10 && !manque.length, detail: (els.length - manque.length) + '/' + els.length + ' fichiers en copie locale' + (manque.length ? ' · MANQUE : ' + manque.slice(0, 5).join(', ') : '') }; }],
+    ['stockage', 'Stockage protégé et espace disponible', async () => { const p = navigator.storage && navigator.storage.persist ? (await navigator.storage.persisted()) || (await navigator.storage.persist()) : null, e = navigator.storage && navigator.storage.estimate ? await navigator.storage.estimate() : null; return { ok: true, info: true, detail: 'protégé : ' + (p === null ? 'inconnu' : p ? 'oui' : 'non (fais des sauvegardes)') + (e ? ' · utilisé ' + Math.round((e.usage || 0) / 1048576) + ' Mo sur ' + Math.round((e.quota || 0) / 1048576) + ' Mo' : '') }; }],
+    ['vitesse', 'Vitesse : carte (5 000 garages) et Ma Ville (1 500 garages) sur CE téléphone', async () => { ODICOLOR_CARTE.charger(ODICOLOR_COMMUNES_CENTRES); const rows = ODICOLOR_COMMUNES_CENTRES.filter(r => r[4]), mk = n => Array.from({ length: n }, (_, i) => { const r = rows[(i * 7) % rows.length]; return { id: i + 1, nom: 'AUTOTEST ' + i, ville: r[1], cp: r[4].split(' ')[0], statutCrm: i % 4 ? 'prospect' : 'client' }; });
+      const [t1] = await ms(() => { const prep = ODICOLOR_CARTE.preparer(mk(5000), null); const v = ODICOLOR_CARTE.cadrer(prep, 360, 640); for (let i = 0; i < 10; i++) ODICOLOR_CARTE.regrouper(prep, ODICOLOR_CARTE.zoomer(v, 1 + i / 5, 180, 320)); });
+      const [t2] = await ms(() => ModeleCommune.construire({ arrete: jourLocal(new Date()), dates: { Terrain: jourLocal(new Date()) }, terrain: mk(1500), clientsEbp: [], piecesEbp: [], annuaire: [], liaisonsValidees: [] }));
+      return { ok: t1 < 6000 && t2 < 8000, detail: 'carte : ' + t1 + ' ms (préparation + 10 gestes) · Ma Ville : ' + t2 + ' ms' }; }]
+  ];
+  const manuels = ['Installer l’application sur l’écran d’accueil et l’ouvrir depuis l’icône.', 'Mode avion : ouvrir l’application et ajouter une visite.', 'Prendre une photo et ajouter un PDF sur une fiche garage.', 'Restaurer une sauvegarde depuis Téléchargements avec le sélecteur de fichiers (mauvaise phrase d’abord).', 'Carte et Ma Ville au doigt : fluides ? (juge visuel)'];
+  const lignes = [];
+  const maj = () => { const ok = lignes.filter(l => l.ok && !l.info).length, ko = lignes.filter(l => !l.ok).length; resume.textContent = ko ? '✗ ' + ko + ' contrôle(s) en échec sur ' + lignes.length : lignes.length < controles.length ? 'Contrôles en cours… (' + lignes.length + '/' + controles.length + ')' : '✓ Tous les contrôles automatiques réussis (' + ok + ' validés)';
+    resume.style.color = ko ? 'var(--ko)' : '';
+    rapport.value = ['ODICOLOR AUTOTEST · version ' + String(window.ODICOLOR_PWA.release).slice(0, 8) + ' · ' + new Date().toLocaleString('fr-FR'), ...lignes.map(l => (l.info ? '[INFO]  ' : l.ok ? '[OK]    ' : '[ÉCHEC] ') + l.titre + ' — ' + l.detail), '', 'À FAIRE À LA MAIN :', ...manuels.map((m, i) => (i + 1) + '. ' + m)].join('\n'); };
+  montrer('Autotest', h('div', { class: 'carte obj' }, h('strong', {}, 'Contrôles automatiques sur ton téléphone'), h('p', { class: 'mut' }, 'Aucune de tes données n’est touchée (bases temporaires séparées). À la fin : « Copier le rapport » et colle-le dans la conversation.')), resume, liste,
+    h('h2', {}, 'À faire à la main (impossible à automatiser)'), h('ol', {}, manuels.map(m => h('li', {}, m))), h('h2', {}, 'Rapport'), rapport,
+    h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onclick: async () => { try { await navigator.clipboard.writeText(rapport.value); toast('Rapport copié.'); } catch (e) { rapport.select(); toast('Sélectionne et copie le texte du rapport.', true); } } }, 'Copier le rapport'), h('button', { class: 'btn sec', type: 'button', onclick: () => pageAutotest() }, 'Relancer')), h('div', { style: 'height:96px' }));
+  maj();
+  for (const [id, titre, f] of controles) {
+    let r; try { r = await f(); } catch (e) { r = { ok: false, detail: e.message || String(e) }; }
+    const l = { id, titre, ...r }; lignes.push(l);
+    liste.append(h('div', { class: 'carte', 'data-controle': id, 'data-ok': l.ok ? '1' : '0' }, h('strong', {}, (l.info ? 'ℹ ' : l.ok ? '✓ ' : '✗ ') + titre), h('p', { class: 'mut' }, l.detail))); maj();
+  }
+}
+
 async function pageReglages() {
   const tva = h('input', { value: pct(S.tva100), inputmode: 'decimal', 'aria-label': 'TVA %' }),
     rem = h('input', { value: pct(S.remiseMax100), inputmode: 'decimal', 'aria-label': 'Remise maximale %' }),
@@ -1919,7 +2592,10 @@ async function pageReglages() {
     objs = [0, 1, 2].map(i => h('input', { value: (S.objectifs && S.objectifs[i]) ? String(S.objectifs[i] / 100) : '', inputmode: 'decimal', placeholder: 'Mois ' + (i + 1) + ' (€)', 'aria-label': 'Objectif du mois ' + (i + 1) }));
   const stock = h('p', { class: 'mut' }, 'Stockage : vérification…');
   if (navigator.storage && navigator.storage.persist) navigator.storage.persisted().then(p => { stock.textContent = p ? 'Stockage protégé : le navigateur ne l’effacera pas tout seul.' : 'Stockage non protégé : fais une sauvegarde régulièrement.'; });
-  const fich = h('input', { type: 'file', accept: '.json', 'aria-label': 'Fichier de sauvegarde' });
+  const fich = h('input', { type: 'file', accept: '.odicolor,.json', 'aria-label': 'Fichier de sauvegarde' });
+  const champPhrase = (nom) => h('input', { type: 'password', autocomplete: 'new-password', 'aria-label': nom, autocapitalize: 'off', spellcheck: 'false' });
+  const phrase1 = champPhrase('Phrase secrète'), phrase2 = champPhrase('Confirmer la phrase secrète'), phraseRestau = champPhrase('Phrase secrète de la sauvegarde à restaurer');
+  const recuperations = await panneauRecuperations(() => phrase1.value);
   montrer('Réglages',
     h('div', { class: 'carte alerte' }, 'Valeurs par défaut non confirmées : TVA 8,5 % et remise maximale 60 % sont des hypothèses. Vérifie-les avant usage réel.'),
     h('label', {}, 'TVA (%)'), tva, h('label', {}, 'Remise maximale (%)'), rem, h('label', {}, 'Indicatif WhatsApp (33 = France, 262 = La Réunion)'), ind, h('label', {}, 'Nom sur le devis'), soc, h('label', {}, 'Ton nom (joint aux devis envoyés)'), ven,
@@ -1944,130 +2620,95 @@ async function pageReglages() {
     } }, 'Enregistrer')),
     h('h2', {}, 'Sauvegarde'),
     h('p', { class: 'mut' }, 'Tes devis et clients ne sont QUE sur ce téléphone. Si tu perds le téléphone ou effaces les données du navigateur, ils sont perdus. Sauvegarde régulièrement, puis envoie le fichier où tu veux.'),
-    h('div', { class: 'actions' }, h('button', { class: 'btn', onclick: async () => { await exporterSauvegarde(); toast('Sauvegarde téléchargée.'); } }, 'Télécharger une sauvegarde')),
+    h('p', { class: 'mut' }, 'Les sauvegardes sont chiffrées avec une phrase secrète (', String(ODICOLOR_BACKUP.PHRASE_MIN), ' caractères minimum). Elle n’est jamais enregistrée : si tu l’oublies, la sauvegarde est définitivement illisible. Note-la ailleurs que sur ce téléphone.'),
+    h('label', {}, 'Phrase secrète de la sauvegarde'), phrase1, h('label', {}, 'Confirme la phrase secrète'), phrase2,
+    h('div', { class: 'actions' }, h('button', { class: 'btn', onclick: async event => {
+      const btn=event.currentTarget;
+      if(phrase1.value!==phrase2.value){toast('Les deux phrases ne sont pas identiques.',true);return}
+      btn.disabled=true;
+      try{const r=await exporterSauvegarde(phrase1.value);phrase1.value=phrase2.value='';toast('Copie chiffrée et relue : '+r.garages+' garages, '+r.photos+' photos, '+r.pdf+' PDF. Vérifie les téléchargements.');}
+      catch(e){toast('Sauvegarde impossible : '+e.message,true)}finally{btn.disabled=false}
+    } }, 'Télécharger une sauvegarde chiffrée')),
     h('label', {}, 'Restaurer une sauvegarde (contrôle avant remplacement)'), fich,
-    h('p', {class:'mut'}, 'Sécurité v47 : garages et devis contrôlés, puis restaurés ensemble. Les photos des garages et les PDF sont exclus de la sauvegarde JSON. Les restaurations risquant de mélanger les photos entre garages seront refusées. Conserve les originaux des photos et catalogues.'),
-    h('div', { class: 'actions' }, h('button', { class: 'btn sec', onclick: async () => {
+    h('label', {}, 'Phrase secrète (seulement si la sauvegarde est chiffrée)'), phraseRestau,
+    h('p', {class:'mut'}, 'La sauvegarde complète inclut clients, notes, historiques, tarifs, photos, PDF et suivi PC. Conserve une copie hors du téléphone. Ferme les autres onglets ODICOLOR avant de restaurer. L’état remplacé sera conservé dans les copies de récupération ci-dessous.'),
+    h('div', { class: 'actions' }, h('button', { class: 'btn sec', onclick: async event => {
+      const btn=event.currentTarget;btn.disabled=true;
       try {
         const f = fich.files[0]; if (!f) { toast('Choisis un fichier de sauvegarde.', true); return; }
-        if(f.size>25*1024*1024)throw new Error('Sauvegarde trop volumineuse (25 Mo maximum).');
-        const o = JSON.parse(await f.text());
-        verifierSauvegardeLocale(o);
-        await verifierCompatibilitePhotosSauvegarde(o);
-        const actuels=await getAll('clients'),devisActuels=await getAll('devis');
-        if(!confirm('ATTENTION : remplacer '+actuels.length+' garages et '+devisActuels.length+
-          ' devis actuels par '+o.clients.length+' garages et '+o.devis.length+
-          ' devis de cette sauvegarde ? Cette opération ne fusionne pas les données.'))return;
+        const o=await ODICOLOR_BACKUP.decode(f,{phrase:phraseRestau.value}),resume=verifierSauvegardeLocale(o);phraseRestau.value='';
+        const avertissement=o.version===1
+          ? ' Ancien JSON incomplet : aucun tarif, photo ou PDF n’est fourni. Le catalogue actif sera vide ; importe ensuite les tarifs EBP. Les tarifs, photos, PDF et suivis locaux remplacés resteront dans la copie de récupération, sans être mélangés au portefeuille restauré.'
+          : ' Tarifs, photos, PDF et suivis actifs seront remplacés par ceux de la sauvegarde.';
+        if(!confirm('Restaurer '+resume.garages+' garages et '+resume.devis+' devis ?'+avertissement+
+          ' L’état actuel sera archivé avant remplacement. Cette opération ne fusionne pas les fiches. L’application redémarrera ; enregistre tes saisies avant de continuer.'))return;
         await restaurerSauvegardeLocale(o);
-        await chargerBase();
-        toast('Restauration terminée : garages et devis remplacés ensemble.'); pageReglages();
+        DB.db.close();location.reload();
       } catch (e) { toast('Restauration annulée : ' + e.message, true); }
+      finally{btn.disabled=false}
     } }, 'Restaurer après contrôle')),
+    recuperations,
     stock,
     h('h2', {}, 'Données'),
     h('div', { class: 'actions' }, h('button', { class: 'btn danger', onclick: async () => {
-      if (!confirm('Tout effacer sur ce téléphone (catalogue, clients, devis) ? Irréversible.')) return;
-      for (const n of ['articles', 'clients', 'devis', 'meta']) await rq(st(n, 'readwrite').clear());
-      await chargerBase(); toast('Tout est effacé.'); location.hash = '#/';
-    } }, 'Tout effacer')),
+      if (!confirm('Effacer les données actives (tarifs, clients, devis, photos, PDF et suivis) ? Une copie locale de récupération sera conservée. Sauvegarde aussi hors du téléphone avant de continuer.')) return;
+      try{await restaurerSauvegardeLocale({appli:'devis-terrain',version:2,date:new Date().toISOString(),stores:{articles:[],clients:[],devis:[],meta:[]}});DB.db.close();location.reload();}
+      catch(e){toast('Effacement annulé : '+e.message,true)}
+    } }, 'Effacer les données actives')),
     h('p', { class: 'mut' }, 'Noyau ' + VERSION + ' · Fonctionne sans réseau · Les données restent sur ce téléphone sauf partage volontaire.'));
 }
 
 
 // ---------- v47 : restauration sûre et atomique, sans écriture partielle ----------
-// Fichier JSON uniquement. Contrôler AVANT toute suppression et refuser les ID en double.
+// Fichier complet versionné ou ancien JSON : contrôler avant toute écriture.
 function verifierSauvegardeLocale(o) {
-  if(!o || typeof o!=='object' || Array.isArray(o) || o.appli!=='devis-terrain' ||
-     !Array.isArray(o.clients) || !Array.isArray(o.devis))
-    throw new Error('Ce fichier n’est pas une sauvegarde ODICOLOR valide.');
-  if(o.clients.length>20000 || o.devis.length>50000)
-    throw new Error('Sauvegarde trop volumineuse en nombre de fiches.');
-  for(const [nom,liste] of [['garages',o.clients],['devis',o.devis]]){
-    const ids=new Set();
-    for(const enreg of liste){
-      if(!enreg || typeof enreg!=='object' || Array.isArray(enreg) ||
-        !Number.isSafeInteger(enreg.id) || enreg.id<1 || ids.has(enreg.id))
-        throw new Error('Identifiant invalide ou répété dans les '+nom+'.');
-      ids.add(enreg.id);
-      if(nom==='garages' && (typeof enreg.nom!=='string' || !enreg.nom.trim()))
-        throw new Error('Un garage de la sauvegarde ne possède pas de nom.');
-      if(nom==='devis' && !Array.isArray(enreg.lignes))
-        throw new Error('Un devis de la sauvegarde ne comporte pas de lignes valides.');
-    }
-  }
-  for(const k of ['signalements','appels','pcActions'])
-    if(o[k]!=null && !Array.isArray(o[k]))
-      throw new Error('Rubrique '+k+' incorrecte dans la sauvegarde.');
-  for(const k of ['point','tournees','comparateur','reglages'])
-    if(o[k]!=null && (typeof o[k]!=='object' || Array.isArray(o[k])))
-      throw new Error('Rubrique '+k+' incorrecte dans la sauvegarde.');
-  return {garages:o.clients.length,devis:o.devis.length};
+  return ODICOLOR_BACKUP.validate(o);
 }
-// Les photos locales sont stockées hors sauvegarde sous une clé portant l'ID.
-// Bloquer toute restauration susceptible de les afficher pour le mauvais client.
-async function verifierCompatibilitePhotosSauvegarde(o){
+async function restaurerSauvegardeLocale(o) {
+  if(DB.maintenance)throw new Error('Une restauration est déjà en cours.');
   verifierSauvegardeLocale(o);
-  const prefix='garage-photo-v38:';
-  const keys=await rq(st('meta').getAllKeys());
-  const ids=keys.filter(k=>typeof k==='string'&&k.startsWith(prefix))
-    .map(k=>Number(k.slice(prefix.length)));
-  if(!ids.length)return {photos:0};
-  const courants=await getAll('clients');
-  const actuel=new Map(courants.map(c=>[c.id,c]));
-  const importe=new Map(o.clients.map(c=>[c.id,c]));
-  for(const id of ids){
-    const avant=actuel.get(id),apres=importe.get(id);
-    if(!Number.isSafeInteger(id)||!avant||!apres)
-      throw new Error('Photo locale liée à une fiche absente de la sauvegarde. Restauration bloquée pour éviter une mauvaise association.');
-    if(normNom(avant.nom)!==normNom(apres.nom))
-      throw new Error('Le garage n°'+id+' possède une photo et son identité diffère. Restauration bloquée.');
-    const telAvant=numeroGarage(avant.tel),telApres=numeroGarage(apres.tel);
-    const villeAvant=normNom(avant.villeProspection||avant.ville);
-    const villeApres=normNom(apres.villeProspection||apres.ville);
-    const codeAvant=String(avant.code||'').trim();
-    const codeApres=String(apres.code||'').trim();
-    const telephoneIdentique=telAvant.length>=9&&telApres.length>=9&&telAvant===telApres;
-    const villeIdentique=Boolean(villeAvant&&villeApres&&villeAvant===villeApres);
-    const codeIdentique=Boolean(codeAvant&&codeApres&&codeAvant===codeApres);
-    if((telAvant&&telApres&&telAvant!==telApres)||
-       (villeAvant&&villeApres&&villeAvant!==villeApres)||
-       (codeAvant&&codeApres&&codeAvant!==codeApres)||
-       (!telephoneIdentique&&!villeIdentique&&!codeIdentique))
-      throw new Error('Identité insuffisante ou contradictoire pour la photo du garage n°'+id+
-        '. Restauration bloquée. Conserve les photos et vérifie la sauvegarde.');
-  }
-  return {photos:ids.length};
-}
-function restaurerSauvegardeLocale(o) {
-  verifierSauvegardeLocale(o);
-  // Un seul commit IndexedDB pour les garages, devis et métadonnées restaurées.
-  // Si le stockage manque ou un enregistrement échoue, toute la transaction est annulée.
-  return new Promise((resolve,reject)=>{
-    let tx;
-    try{
-      tx=DB.db.transaction(['clients','devis','meta'],'readwrite');
-      tx.oncomplete=()=>resolve();
-      tx.onabort=()=>reject(tx.error||new Error('Transaction annulée : données précédentes conservées.'));
-      tx.onerror=()=>{}; // onabort signale l’échec de la transaction complète
-      const clients=tx.objectStore('clients'),devis=tx.objectStore('devis'),meta=tx.objectStore('meta');
-      clients.clear();devis.clear();
-      o.clients.forEach(c=>clients.put(c));
-      o.devis.forEach(d=>devis.put(d));
-      if(o.signalements!=null)meta.put(o.signalements,'signalements');
-      if(o.point!=null)meta.put(o.point,'point');
-      if(o.appels!=null)meta.put(o.appels,'appels');
-      if(o.tournees!=null)meta.put(o.tournees,'tournees');
-      if(o.comparateur!=null)meta.put(o.comparateur,'comparateur');
-      if(o.pcActions!=null)meta.put(o.pcActions,'pcActions');
-      if(o.reglages!=null)meta.put({...SET_DEF,...o.reglages},'settings');
-    }catch(e){if(tx){try{tx.abort()}catch(_){}}reject(e);}
-  });
+  DB.maintenance=true;
+  try{return await avecRestaurationExclusive(()=>ODICOLOR_BACKUP.restore(DB.db,o))}
+  finally{DB.maintenance=false}
 }
 
 // ---------- lien avec le PC (sauvegarde envoyée au PC, plan de la semaine reçu du PC) ----------
-async function exporterSauvegarde() {
-  const o = { appli: 'devis-terrain', version: 1, date: new Date().toISOString(), reglages: S, clients: await getAll('clients'), devis: await getAll('devis'), signalements: await lireSig(), point: (await get('meta', 'point')) || null, comparateur: (await get('meta', 'comparateur')) || null, appels: await lireAppels(), tournees: await lireTournees(), pcActions: (await get('meta', 'pcActions')) || [] };
-  telecharger('sauvegarde-devis-' + new Date().toISOString().slice(0, 10) + '.json', JSON.stringify(o), 'application/json');
+function telechargerFichierSauvegarde(file, nom) {
+  const url=URL.createObjectURL(file),a=h('a',{href:url,download:nom});
+  document.body.append(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),30000);
+}
+async function exporterSauvegarde(phrase) {
+  // Chiffrement obligatoire : la phrase n'est jamais conservée. La copie est relue et déchiffrée AVANT d'être proposée au téléchargement.
+  const data=await ODICOLOR_BACKUP.read(DB.db);
+  const {file,summary}=await ODICOLOR_BACKUP.encodeChiffre(data,phrase);
+  const relu=await ODICOLOR_BACKUP.decode(file,{phrase});
+  if(relu.stores.clients.length!==summary.garages||relu.stores.devis.length!==summary.devis)throw new Error('Contrôle de relecture échoué : la copie n’est pas fournie.');
+  telechargerFichierSauvegarde(file,'odicolor-sauvegarde-'+new Date().toISOString().replace(/[:.]/g,'-')+'.odicolor');
+  return summary;
+}
+async function exporterSauvegardePC() {
+  const data=await ODICOLOR_BACKUP.read(DB.db,ODICOLOR_BACKUP.STORES);
+  telecharger('odicolor-echange-pc-'+new Date().toISOString().slice(0,10)+'.json',JSON.stringify(ODICOLOR_BACKUP.pcExchange(data)),'application/json');
+}
+async function panneauRecuperations(lirePhrase) {
+  const archives=await getAll(ODICOLOR_BACKUP.RECOVERY);
+  const box=h('details',{class:'carte'},h('summary',{},'États conservés avant restauration · '+archives.length),
+    h('p',{class:'mut'},'Ces copies locales permettent de retrouver l’état remplacé. Elles ne remplacent pas une sauvegarde conservée hors du téléphone. Aucune archive n’est effacée automatiquement.'));
+  const list=h('div');let visible=0;
+  const more=h('button',{class:'btn sec',type:'button'},'Afficher la suite');
+  const show=()=>{
+    for(const r of archives.slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(visible,visible+10)){
+      const btn=h('button',{class:'btn sec',type:'button',onclick:async()=>{
+        btn.disabled=true;
+        try{const ph=lirePhrase?lirePhrase():'';if(!ph)throw new Error('saisis d’abord la phrase secrète (copie chiffrée).');const {file,warning}=await ODICOLOR_BACKUP.encodeChiffre(r.stores,ph,{recovery:true});telechargerFichierSauvegarde(file,'odicolor-recuperation-'+r.id+'.odicolor');toast(warning?'Copie brute conservée : données à réparer avant restauration.':'Copie préparée : vérifie sa présence dans les téléchargements.',Boolean(warning));}
+        catch(e){toast('Export impossible : '+e.message,true)}finally{btn.disabled=false}
+      }},'Télécharger cette copie');
+      list.append(h('div',{class:'carte'},h('strong',{},new Date(r.date).toLocaleString('fr-FR')),h('p',{class:'mut'},r.stores.clients.length+' garages · '+r.stores.devis.length+' devis'),btn));
+    }
+    visible+=10;more.hidden=visible>=archives.length;
+  };
+  more.addEventListener('click',show);box.append(list,more);show();return box;
 }
 const normNom = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 const lirePC = async () => { const v = await get('meta', 'pc'); return v && v.appli === 'plan-pc' && Array.isArray(v.actions) ? v : null; };
@@ -2124,8 +2765,8 @@ async function importerPlanPC(f){
 async function pagePC() {
   const pc = await lirePC();
   montrer('Lien avec le PC',
-    h('div', { class: 'carte' }, h('strong', {}, '1. Envoyer ta sauvegarde au PC'), h('p', { class: 'mut' }, 'Devis, commandes envoyées, clients, visites, tournées. Passe le fichier au PC comme tu veux : partage Samsung, câble ou mail à toi-même. Rien ne part tout seul.'),
-      h('div', { class: 'actions' }, h('button', { class: 'btn', onclick: async () => { await exporterSauvegarde(); toast('Fichier prêt : envoie-le au PC.'); } }, 'Télécharger le fichier pour le PC'))),
+    h('div', { class: 'carte' }, h('strong', {}, '1. Envoyer les données commerciales au PC'), h('p', { class: 'mut' }, 'Devis, commandes envoyées, clients, visites, tournées. Passe le fichier au PC comme tu veux : partage Samsung, câble ou mail à toi-même. Rien ne part tout seul.'),
+      h('div', { class: 'actions' }, h('button', { class: 'btn', onclick: async () => { await exporterSauvegardePC(); toast('Fichier d’échange PC préparé.'); } }, 'Télécharger le JSON pour le PC'))),
     h('div', { class: 'carte' }, h('strong', {}, '2. Recevoir le plan du PC'),
       h('p', { class: 'mut' }, 'Les imports se trouvent dans Réglages. Le plan reste consultable ici sans modifier tes données EBP.'),
       h('a', { class: 'btn sec', href: '#/reglages' }, 'Ouvrir Réglages · Imports')),
@@ -2148,12 +2789,13 @@ async function pagePC() {
   const maj = () => { etat.textContent = navigator.onLine ? '' : 'Hors ligne'; };
   addEventListener('online', maj); addEventListener('offline', maj); maj();
   try {
+    if(!window.ODICOLOR_PWA)throw new Error('Version de l’application incomplète : recharge avec une connexion.');
+    await window.ODICOLOR_PWA.ready;
     await openDB(); await chargerBase();
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
     addEventListener('hashchange', route); await route();
   } catch (e) {
     montrer('Erreur', h('div', { class: 'carte erreur', role: 'alert' }, 'Le stockage du navigateur est indisponible (mode privé ?). ' + e.message));
   }
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
-window.__t = { nettoyerPlan, normNom, planSemaine, indicateurs, semainesJusqua, tendance, factures, enRetard, feries, estOuvre, ecartJours, relanceDue, statsTournee, prochainOuvre, echeance, cibleSemaineDe, semaineObj, lundiDe, appelsSemaine, mesures, taches, relanceDue, coutPae, calculPoint, periodePoint, texteCommande, texteSignalement, sigEnRetard, objectifDuMois, activite, serie, jourLocal, analyserTexte, statsDevis, envoyerDevis, parseCents, parseQte, ligneTotal, totaux, importerArticles, importerClients, verifierSauvegardeLocale, verifierCompatibilitePhotosSauvegarde, restaurerSauvegardeLocale, csvDevis, devinerColonnes, ligneEntete, tel2wa };
+window.__t = { nettoyerPlan, normNom, planSemaine, indicateurs, semainesJusqua, tendance, factures, enRetard, feries, estOuvre, ecartJours, relanceDue, statsTournee, prochainOuvre, echeance, cibleSemaineDe, semaineObj, lundiDe, appelsSemaine, mesures, taches, relanceDue, coutPae, calculPoint, periodePoint, texteCommande, texteSignalement, sigEnRetard, objectifDuMois, activite, serie, jourLocal, analyserTexte, statsDevis, envoyerDevis, parseCents, parseQte, ligneTotal, totaux, importerArticles, importerClients, verifierSauvegardeLocale, restaurerSauvegardeLocale, csvDevis, devinerColonnes, ligneEntete, tel2wa };

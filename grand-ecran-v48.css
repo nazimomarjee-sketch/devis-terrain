@@ -1,0 +1,15 @@
+/* Pages du cockpit sur grand écran (tablette, ordinateur) : mêmes pages que sur le téléphone, élargies. Aucun effet sous 900 px. */
+.cg-grille{display:grid;gap:12px}
+@media (min-width:900px){
+  main:has(.cg-grille),main:has(.vc-hote),main:has(canvas[data-groupes]){max-width:1180px}
+  .cg-grille{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+  .cg-grille>.carte{margin:0}
+  canvas[data-groupes]{height:68vh!important}
+}
+@media (min-width:1300px){main:has(.cg-grille){max-width:1360px}.cg-grille{grid-template-columns:repeat(3,minmax(0,1fr))}}
+
+/* Bannière permanente tant que la démonstration (données fictives) est chargée. */
+body[data-demo]::before{content:'DÉMONSTRATION — DONNÉES FICTIVES';position:fixed;top:0;left:0;right:0;z-index:9999;background:#F0952B;color:#0D0F12;text-align:center;font:700 12px system-ui;letter-spacing:.08em;padding:3px 0;pointer-events:none}
+body[data-demo]{padding-top:20px}
+body[data-test-env]:not([data-demo])::before{content:'ESPACE DE TEST PRIVÉ — N’Y SAISIS AUCUNE DONNÉE RÉELLE';position:fixed;top:0;left:0;right:0;z-index:9999;background:#F0952B;color:#0D0F12;text-align:center;font:700 12px system-ui;letter-spacing:.06em;padding:3px 0;pointer-events:none}
+body[data-test-env]:not([data-demo]){padding-top:20px}

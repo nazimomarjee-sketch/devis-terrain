@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="fr" data-theme="dark">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ODICOLOR — récupération V47</title>
+<link rel="stylesheet" href="style.css"><link rel="stylesheet" href="premium-pro-v38.css"></head>
+<body><main>
+<h1>Récupération vers le code V47</h1>
+<section class="carte"><p>Cette procédure ne diminue jamais une base v2 et n’efface aucune base. Elle crée une copie compatible v1 sur une origine ou un profil vierge, en conservant la base v2 et sa sauvegarde complète.</p>
+<p>Réservé au retour de secours documenté. Le code V47 d’origine conserve les limites de fiabilité de son audit.</p></section>
+<section class="carte"><h2>1. Exporter l’état complet de cette origine</h2>
+<p>Lecture seule des schémas 1 ou 2. Garde le fichier hors de cet appareil avant de changer de code.</p><button id="exporter-v2" class="btn">Télécharger la sauvegarde complète de cette origine</button></section>
+<section class="carte"><h2>2. Sur la destination vierge uniquement</h2>
+<p>Place ce kit avec le code V47 figé sur une autre origine isolée, ou dans un autre profil vierge. Ouvre cette page avant l’application V47.</p>
+<label>Fichier complet <input id="fichier" type="file" accept=".odicolor"></label>
+<label><input id="isole" type="checkbox"> Cette destination est isolée et dédiée à la récupération.</label>
+<button id="copier-v47" class="btn sec">Créer la copie compatible V47</button>
+<p>Une destination contenant déjà des données sera refusée. Les archives et pièces jointes restent conservées, y compris celles que l’ancien code n’affiche pas.</p></section>
+<p id="resultat" role="status" aria-live="polite"></p>
+</main><script src="sauvegarde-locale.js"></script><script src="recuperation-v47.js"></script></body></html>

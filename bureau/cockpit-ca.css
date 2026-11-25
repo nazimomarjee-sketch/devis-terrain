@@ -1,0 +1,13 @@
+/* Cockpit — CA facturé HT du mois et progression vers l'objectif. Fichier séparé : le bloc de styles verrouillé du Bureau n'est pas touché. */
+.ca-bloc{border:1px solid var(--trait,#272C33);border-radius:14px;padding:14px 16px;background:var(--carte,#16191E);margin-bottom:12px}
+.ca-titre{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--doux,#9EA3AB);text-transform:uppercase;letter-spacing:.08em;font-weight:700}
+.ca-valeur{font:800 38px var(--f-titre,"Barlow Condensed",system-ui);margin:4px 0 2px;color:var(--texte,#F4F2EF)}
+.ca-valeur.vide{font-size:24px;color:var(--doux,#9EA3AB)}
+.ca-detail{font-size:13px;color:var(--doux,#9EA3AB);margin:0 0 8px}
+.ca-jauge{height:12px;border-radius:999px;background:#22262D;overflow:hidden;margin:8px 0 4px}
+.ca-jauge i{display:block;height:100%;background:linear-gradient(90deg,#D41F2B,#FF2D3D);border-radius:999px}
+.ca-ligne{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:13.5px;padding:7px 0;border-top:1px solid var(--trait,#272C33)}
+.ca-ligne b{font-weight:700}
+.ca-saisie{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;font-size:13px;color:var(--doux,#9EA3AB)}
+.ca-saisie input{min-height:40px;width:150px;border-radius:8px;border:1px solid var(--trait,#272C33);background:var(--plateau,#101215);color:var(--texte,#F4F2EF);padding:0 10px}
+.ca-alerte{font-size:12.5px;color:#FFC873;margin:6px 0 0}

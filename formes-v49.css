@@ -1,0 +1,84 @@
+/* ODICOLOR — FORMES ET TOURNÉE COMPACTE (v49). Fichier chargé en dernier.
+   Intention de marque (AGENTS.md) : société humaine, ouverte, accueillante → angles arrondis COHÉRENTS, centralisés ici. La Ville LEGO (classes vc-*, bureau/ville) n'est pas touchée. */
+:root{--r-champ:14px;--r-bouton:16px;--r-carte:20px;--r-hero:24px;--r-ligne:16px;--r-pastille:999px;--r-toast:16px}
+body .btn{border-radius:var(--r-bouton)}
+body input:not([type=checkbox]):not([type=radio]):not([type=range]),body select,body textarea{border-radius:var(--r-champ)}
+body .carte,body .kpi,body details.carte{border-radius:var(--r-carte)}
+body .carte.obj,body .carte.hero{border-radius:var(--r-hero)}
+body .toast{border-radius:var(--r-toast)}
+body .pastille,body .tag,body .puce,body .piste,body .rempli{border-radius:var(--r-pastille)}
+body .v38-catalogue input[type=search]{border-radius:var(--r-champ)}
+/* Tournée compacte : résumé court, une ligne par garage (≥ 48 px de haut), détails au toucher, terminés repliés. */
+.t-resume{padding:12px 14px;margin:6px 0 8px}
+.t-resume .elan-tete{margin:0 0 6px;gap:8px}
+.t-resume strong{font-size:15px;line-height:1.25}
+.t-piste{height:8px;margin:2px 0 6px}
+.t-liste{display:flex;flex-direction:column;gap:6px}
+.t-ligne{background:var(--card);border:1px solid var(--line,#27323C);border-radius:var(--r-ligne);padding:4px 6px 4px 12px}
+.t-rang{display:flex;align-items:center;gap:8px;min-height:56px}
+.t-nom{flex:1 1 auto;min-width:0;text-align:left;background:none;border:0;color:inherit;font:inherit;padding:6px 0;min-height:48px;display:flex;flex-direction:column;justify-content:center;gap:2px;cursor:pointer}
+.t-nom strong{font-size:15px;line-height:1.25;overflow-wrap:anywhere}
+.t-nom small{font-size:12.5px;line-height:1.2}
+.t-nom:focus-visible,.t-visite:focus-visible{outline:2px solid #FF2D3D;outline-offset:2px}
+.t-visite{flex:none;min-width:84px;min-height:48px;padding:0 14px}
+.t-rang .tag{flex:none;align-self:center}
+.t-detail{padding:4px 0 10px}
+.t-detail .trio .btn{min-height:48px}
+.t-faits{margin:10px 0;border-radius:var(--r-ligne)}
+.t-faits>summary{min-height:48px;display:flex;align-items:center;cursor:pointer;font-weight:700;padding:0 4px}
+.t-faits .t-ligne{opacity:.75;margin-bottom:6px}
+.t-actions{margin:10px 0 4px}.t-actions .btn{min-height:48px}
+/* Sous la liste, l'introduction de page ne mange plus la place des garages. */
+main:has(.t-liste) .v38-page-intro p{display:none}
+main:has(.t-liste) .v38-page-intro{padding-block:6px}
+main:has(.t-liste) .v38-page-intro small{display:none}
+body .v38-page-intro{border-radius:var(--r-carte)}
+/* Accueil et visite : le texte peut grandir sans couper les actions. */
+body.v38-home .v38-accueil-hero{min-height:0;padding:12px 16px;margin-bottom:8px}
+body.v38-home .v38-accueil-hero strong{font-size:1.4rem;line-height:1.25}
+body .v23-objectif,body .v23-prochaine{padding:14px!important}
+body.v38-home .v23-objectif .v23-argent strong{font-size:2rem;overflow-wrap:anywhere}
+body .v23-client{font-size:1.8rem;overflow-wrap:anywhere}
+.v49-ca-details>summary,.v23-preuve>summary,.v23-suite>summary{min-height:48px;display:flex;align-items:center;cursor:pointer}
+.v49-tournee p{margin:6px 0}
+main:has(.v23-objectif) .btn,main:has([aria-label="Note de visite"]) .btn{min-width:48px;min-height:48px;white-space:normal;height:auto;overflow-wrap:anywhere;font-size:1rem}
+main:has([aria-label="Note de visite"]) input,main:has([aria-label="Note de visite"]) textarea{width:100%;min-width:0;max-width:100%;font-size:1rem;min-height:48px}
+main:has([aria-label="Note de visite"]){overflow-wrap:anywhere;padding-bottom:140px}
+main:has(.v23-objectif) .v23-chips{flex-wrap:wrap;overflow:visible}
+main:has(.v23-objectif) .v23-chip{min-width:48px;min-height:48px;font-size:1rem}
+main:has(.v23-objectif) .v23-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,8rem),1fr))}
+main:has(.v23-objectif) .v23-grid span{font-size:.875rem}
+.t-nom strong{font-size:.9375rem}.t-nom small{font-size:.78125rem;overflow-wrap:anywhere}
+.t-visite{font-size:1rem;white-space:normal}
+@media(max-width:360px){.t-rang{flex-wrap:wrap}.t-nom{flex-basis:50%}}
+
+/* Accueil compact : photo en bandeau avec fondu noir, CA résumé sur deux lignes.
+   Les détails restent accessibles et le texte peut revenir à la ligne au zoom. */
+body.v38-home .v38-accueil-hero{height:auto;min-height:112px;padding:12px 14px;display:flex;justify-content:flex-end;border:0;background-color:#06090E;background-position:center 44%;box-shadow:none}
+body.v38-home .v38-accueil-hero .v38-eyebrow{display:none}
+body.v38-home .v38-accueil-hero strong{font-size:1.25rem;margin:0;text-shadow:0 2px 8px #000}
+body.v38-home .v23-objectif{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:8px;padding:10px 12px!important}
+.v49-ca-details{min-width:0}
+.v49-ca-details>summary{gap:4px}
+.v49-ca-resume{min-width:0}
+.v49-ca-resume .etiq{font-size:.625rem;letter-spacing:.02em}
+body.v38-home .v23-objectif .v23-argent{margin:3px 0 0;gap:4px;line-height:1.25}
+body.v38-home .v23-objectif .v23-argent strong{font-family:inherit;font-size:1rem;line-height:1.25}
+body.v38-home .v23-objectif .v23-argent span{font-size:.75rem}
+.v49-ca-saisir{padding:8px 10px;align-self:start}
+.v49-ca-contenu{padding-top:8px;overflow-wrap:anywhere}
+body.v38-home .v23-client{margin:8px 0;font-size:1.5rem}
+body.v38-home .v23-description{margin:6px 0;line-height:1.4}
+body.v38-home .v23-preuve{margin:6px 0;padding:0 10px}
+body.v38-home .v23-prochaine .v23-primary{margin-top:8px;min-height:48px}
+@media(max-width:360px){body.v38-home .v23-objectif{gap:4px;padding:8px!important}}
+
+
+/* Revue du 10/11/2026 : cibles tactiles ≥ 48 px sur les éléments repérés trop petits, sans changer la mise en page. */
+.ck-objectif{margin:2px 0 6px}.ck-lien{display:flex;margin-top:8px;min-height:48px}
+main details>summary{min-height:48px;display:flex;align-items:center;cursor:pointer}
+main details>summary::-webkit-details-marker{display:none}
+main details>summary::after{content:'▾';margin-left:auto;padding-left:8px;opacity:.7}
+main details[open]>summary::after{content:'▴'}
+main label:has(>input[type=checkbox]),main label:has(>input[type=radio]){min-height:48px;display:flex;align-items:center;gap:10px}
+main .btn{min-height:48px}

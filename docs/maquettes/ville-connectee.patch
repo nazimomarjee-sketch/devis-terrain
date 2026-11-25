@@ -1,0 +1,94 @@
+--- bureau/index.html
++++ bureau/index.html
+@@ -335,9 +335,10 @@
+ <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+ <script src="communes-idf.js"></script>
+ <script src="bureau-logique.js"></script>
+-<script src="../xlsx.mini.min.js"></script>
+ <script src="ebp-import.js"></script>
+ <script src="pipeline.js"></script>
++<script src="ville-pipeline.js"></script>
++<script src="donnees-maquette.js"></script>
+ <script src="lecture-sauvegarde.js"></script>
+ <script src="annuaire.js"></script>
+ <script>
+@@ -388,7 +389,7 @@
+   const g = etat.garages, idf = g.filter(x => x.dep);
+   const n = k => idf.filter(x => x.statut === k).length;
+   const communes = new Set(idf.map(x => x.commune).filter(Boolean)).size;
+-  const ca = etat.mode === 'demo' ? idf.reduce((a, x) => a + (x.caMois || 0), 0) : null;
++  const ca = etat.mode === 'demo' || etat.ebpVille ? idf.reduce((a, x) => a + (x.caMois || 0), 0) : null; /* MAQUETTE P1 */
+   const kpi = (ic, l, v, s) => h('div',{class:'kpi'}, h('div',{class:'ic'}, icone(ic)),
+     h('div',{}, h('div',{class:'l'}, l), h('div',{class:'v'+(v==null?' petit':'')}, v==null ? 'Non renseigné' : v), h('div',{class:'s'}, s)));
+   $('#kpis').replaceChildren(
+@@ -396,7 +397,7 @@
+     kpi('cible','Prospects', n('prospect'), badgeSrc()),
+     kpi('alerte','Risque règlement', n('risque'), [badgeSrc(), '+ ' + pluriel(n('dormant'),'dormant')]),
+     kpi('lieu','Communes couvertes', communes, [h('span',{class:'badge b-confirme'},'Officiel'), pluriel(L0.aClasser(g).length,'à classer')]),
+-    kpi('euro','CA du mois', keuros(ca), ca==null ? h('span',{class:'badge b-vide'},'EBP · Lot 3') : badgeSrc()),
++    kpi('euro','CA du mois', keuros(ca), ca==null ? h('span',{class:'badge b-vide'},'EBP · Lot 3') : etat.ebpVille ? h('span',{class:'badge b-confirme'},'EBP') : badgeSrc()),
+     kpi('fiole','Essais Carsystem', null, h('span',{class:'badge b-vide'},'Lot 3')));
+ }
+ function rendreFiltres(){
+@@ -649,7 +650,7 @@
+     if (gsCommune.length > MAX) g.append(h('g',{style:'cursor:pointer', onclick:e=>{ e.stopPropagation(); choisir(t.id); }}, h('rect',{x:x+56,y:y+20,width:30,height:18,rx:9,fill:'rgba(10,11,13,.92)',stroke:'rgba(255,255,255,.3)'}),
+       h('text',{x:x+71,y:y+33,'text-anchor':'middle',style:'font:700 12px var(--f-titre);fill:#F4F2EF'}, '+' + (gsCommune.length-MAX))));
+     objets.push({p:c+r, el:g});
+-    const ligne2 = `${s.actif} cl. · ${s.prospect} pr.` + (etat.mode==='demo' && s.caMois ? ' · ' + keuros(s.caMois) : '');
++    const ligne2 = `${s.actif} cl. · ${s.prospect} pr.` + ((etat.mode==='demo' || etat.ebpVille) && s.caMois ? ' · ' + keuros(s.caMois) : '') /* MAQUETTE P2 */;
+     cartes.append(h('g',{style:'cursor:pointer', onclick:()=>choisir(t.id)}, carteLabel(x + ({massy:46, palaiseau:-20}[t.id]||0), y - haut - 54, t.nom, ligne2, s.alertes, STATUTS[dom].couleur, etat.choix===t.id)));
+   });
+ 
+@@ -679,7 +680,7 @@
+   return h('section',{class:'bloc','aria-live':'polite'},
+     h('h2',{},t.nom), h('p',{class:'sous'}, 'Porte d’entrée vers ', h('b',{style:'color:var(--texte)'}, `${t.depNom} (${t.dep})`)),
+     h('div',{class:'chiffres'}, chiffre(s.actif, 'Clients', badgeSrc()), chiffre(s.prospect, 'Prospects', badgeSrc()),
+-      chiffre(etat.mode==='demo' ? keuros(s.caMois || 0) : null, 'CA du mois', badgeSrc()), chiffre(s.alertes, 'Alertes', badgeSrc())),
++      chiffre(etat.mode==='demo' || etat.ebpVille ? keuros(s.caMois || 0) : null, 'CA du mois', etat.ebpVille ? h('span',{class:'badge b-confirme'},'EBP') : badgeSrc()), /* MAQUETTE P3 */ chiffre(s.alertes, 'Alertes', badgeSrc())),
+     h('div',{class:'dep-resume'}, h('b',{}, `Tout le ${t.dep}`), ' : ', pluriel(d.total,'garage'), ' dans ', pluriel(d.communes,'commune'),
+       d.total - s.total > 0 ? h('small',{}, `dont ${d.total - s.total} hors de ${t.nom}`) : null),
+     listePortraits(etat.garages.filter(x => x.territoire === t.id && visible(x)), t.nom),
+@@ -856,12 +857,13 @@
+     for (let i=0;i<8;i++){ const x = g[Math.floor(a()*g.length)];
+       const t = x.statut==='risque' ? 'relance' : x.statut==='prospect' ? 'prospect' : ['visite','devis','essai'][Math.floor(a()*3)];
+       const d = new Date(); d.setDate(d.getDate()-i); evts.push({t, x, quand: i===0 ? 'Aujourd’hui' : i===1 ? 'Hier' : d.toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}); }
++  } else if (etat.ebpVille) { evts = VillePipeline.filActions(etat.garages); /* MAQUETTE P4 */
+   } else {
+     evts = etat.garages.filter(x=>x.etape).sort((a,b)=>(a.etapeDate||'9999').localeCompare(b.etapeDate||'9999')).slice(0,10)
+       .map(x => ({t:'action', x, quand: x.etapeDate ? new Date(x.etapeDate+'T12:00:00').toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'}) : 'Sans date', texte:x.etape}));
+   }
+   zone.replaceChildren(
+-    h('div',{class:'fil-tete'}, h('h3',{}, etat.mode==='demo' ? 'Dernières actions commerciales' : 'Prochaines actions saisies au téléphone'), badgeSrc()),
++    h('div',{class:'fil-tete'}, h('h3',{}, etat.mode==='demo' ? 'Dernières actions commerciales' : etat.ebpVille ? 'Priorités du jour · plan du Bureau' : 'Prochaines actions saisies au téléphone'), etat.ebpVille ? h('span',{class:'badge b-confirme'},'EBP') : badgeSrc()),
+     evts.length ? h('div',{class:'fil-liste'}, evts.map(e => { const [ic,c,l] = types[e.t];
+       return h('button',{class:'evt', onclick:()=>ouvrirFiche(e.x)}, h('span',{class:'pastille', style:`background:color-mix(in srgb, ${c} 22%, transparent);color:${c}`}, icone(ic)),
+         h('span',{}, h('small',{}, e.quand), h('b',{}, e.texte || l), h('span',{class:'g'}, e.x.nom + ' · ' + (e.x.commune || '')))); }))
+@@ -993,7 +995,8 @@
+   const champ = (n, v, badge) => { const vide = v == null || v === '';
+     return h('div',{class:'champ'+(vide?' vide':'')}, h('div',{class:'n'}, n), h('div',{class:'val'}, vide ? 'Non renseigné' : v),
+       vide ? h('span',{class:'badge b-vide'}, (badge && badge[2]) || 'À compléter') : h('span',{class:'badge '+badge[0]}, badge[1])); };
+-  const prochaine = x.etape ? x.etape + (x.etapeDate ? ' · ' + new Date(x.etapeDate+'T12:00:00').toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'}) : '') : null;
++  const ae = x.actionsEbp && x.actionsEbp[0]; /* MAQUETTE P5 */
++  const prochaine = ae ? ae.t + ' · ' + ae.d : x.etape ? x.etape + (x.etapeDate ? ' · ' + new Date(x.etapeDate+'T12:00:00').toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'}) : '') : null;
+   const couche = $('#couche-fiche'), dernier = document.activeElement;
+   const fermer = () => { couche.hidden = true; couche.replaceChildren(); if (dernier && dernier.isConnected && dernier.focus) dernier.focus(); };
+   const contenu = h('div',{}), msg = h('p',{class:'info', style:'margin:6px 0 0', 'aria-live':'polite'});
+@@ -1013,7 +1016,9 @@
+     commandes:'Commandes, factures et règlements : lus dans les exports EBP au Lot 3. Le Bureau ne crée jamais de devis.' };
+   const ongletsF = h('div',{class:'sous-onglets', role:'tablist'});
+   const montrer = k => { [...ongletsF.children].forEach(b => b.setAttribute('aria-selected', String(b.dataset.k===k)));
+-    contenu.replaceChildren(k==='infos' ? infos() : h('div',{class:'vide-onglet'}, h('span',{class:'badge b-vide'}, k==='commandes'?'EBP · Lot 3':'Lot 3'), h('p',{}, vides[k]))); };
++    contenu.replaceChildren(k==='infos' ? infos() : (k==='commandes' && x.ebp) ? h('div',{class:'champs'},
++      champ('CA commandé sur 12 mois', euros(x.ebp.ca12), ['b-confirme','EBP']), champ('Dernière commande', x.ebp.derniereCommande, ['b-confirme','EBP']),
++      ...x.ebp.lignes.map(l => champ('Situation', l, ['b-confirme','EBP'])), ...(x.actionsEbp||[]).map(a => champ('Preuve · ' + a.t, a.preuve, ['b-confirme','EBP']))) : h('div',{class:'vide-onglet'}, h('span',{class:'badge b-vide'}, k==='commandes'?'EBP · Lot 3':'Lot 3'), h('p',{}, vides[k]))); };
+   [['infos','Informations'],['historique','Historique'],['commandes','Commandes']].forEach(([k,l]) => ongletsF.append(h('button',{role:'tab', 'data-k':k, onclick:()=>montrer(k)}, l)));
+   const dejaLa = etat.tournee.includes(x.id);
+   const btnFermer = h('button',{class:'fermer', onclick:fermer, 'aria-label':'Fermer la fiche'},'×');
+@@ -1189,6 +1194,7 @@
+ 
+ $('#mode').addEventListener('click', () => { etat.donneesOuvertes = !etat.donneesOuvertes; rendreEntete(); });
+ window.addEventListener('hashchange', () => { const c = $('#couche-fiche'); c.hidden = true; c.replaceChildren(); rendre(); });
++if (window.__MAQUETTE) { Object.assign(etat, {mode:'reel', garages:window.__MAQUETTE.garages, rapport:L0.rapportClassement(window.__MAQUETTE.garages), ebpVille:window.__MAQUETTE.ebp, choix:'massy'}); }
+ monterRecherche();
+ rendre();
+ })();

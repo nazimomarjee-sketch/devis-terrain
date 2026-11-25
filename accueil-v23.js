@@ -11,22 +11,36 @@
   const compteBloque = c => Boolean(c && c.compte && c.compte.statut==='bloque');
   const dateExport = pc => pc && dateValide(pc.arrete) ? 'EBP du '+dateFr(pc.arrete+'T12:00:00') : 'EBP non synchronisé';
 
-  function carteObjectif(dv, pc, now) {
-    const sw=semaineObj(dv,now), objectif=Math.max(0,Number(sw.cible)||0);
-    const pct=objectif?Math.min(100,Math.round(sw.ca/objectif*100)):0;
+  // Objectif = CA FACTURÉ HT (factures − avoirs saisis). Les commandes et les encaissements restent affichés à part : jamais confondus avec le CA.
+  function carteObjectif(dv, pc, now, caStore, cl) {
+    const sw=semaineObj(dv,now), objectif=Math.max(0,Number(sw.cible)||0), om=objectifDuMois(now);
+    const renseigne=ODICOLOR_CA.aDesPieces(caStore), auj=jourLocal(now), mk=auj.slice(0,7);
     const source=pc && pc.chiffre && pc.chiffre.source==='import';
     const jourPc=pc && dateValide(pc.arrete) ? ecartJours(pc.arrete,now.getTime()) : Infinity;
-    const ligne=source && jourPc>=0 && jourPc<=7
+    const ligneEbp=source && jourPc>=0 && jourPc<=7
       ? dateExport(pc)+' · montants EBP à consulter sur Mon travail'
-      : 'Données EBP non validées ou anciennes · chiffre issu du téléphone';
+      : 'Données EBP non validées ou anciennes';
+    const caSem=renseigne?ODICOLOR_CA.calculer(caStore,sw.l,auj).totalCents:0, mois=renseigne?ODICOLOR_CA.calculerMois(caStore,mk):null;
+    const pct=objectif?Math.max(0,Math.min(100,Math.round(caSem/objectif*100))):0;
+    const cmdMois=dv.filter(d=>d.commandeLe&&String(d.commandeLe).slice(0,7)===mk).reduce((a,d)=>a+totaux(d).ht,0);
+    const encMois=(cl||[]).reduce((a,c)=>a+(Array.isArray(c.factures)?c.factures:[]).filter(f=>f&&f.regleLe&&String(f.regleLe).slice(0,7)===mk).reduce((b,f)=>b+(f.montant||0),0),0);
     return h('section',{class:'carte v23-objectif'},
-      h('div',{class:'v23-between'},h('small',{class:'etiq'},'OBJECTIF · COMMANDES ENVOYÉES HT'),h('small',{class:'mut'},'Cette semaine')),
-      h('div',{class:'v23-argent'},h('strong',{},montant(sw.ca)),h('span',{class:'mut'},objectif?' / '+montant(objectif):' · objectif à régler')),
-      objectif?h('div',{class:'piste',role:'progressbar','aria-valuenow':pct,'aria-valuemin':'0','aria-valuemax':'100','aria-label':'Avancement de l’objectif hebdomadaire'},
-        h('div',{class:'rempli',style:'width:'+pct+'%'})):null,
-      h('p',{class:'mut'},objectif?(pct+' % · reste '+montant(Math.max(0,objectif-sw.ca))+' à commander'):'Définir un objectif pour suivre les ventes de la semaine.'),
-      h('small',{class:'v23-source'},'Source : commandes que tu déclares envoyées · '+ligne),
-      !objectif?lien('#/reglages','Régler mon objectif'):null);
+      h('details',{class:'v49-ca-details'},
+        h('summary',{'aria-label':'Détails du CA facturé'},
+          h('span',{class:'v49-ca-resume'},
+            h('small',{class:'etiq'},'OBJECTIF · CA FACTURÉ HT'),
+            h('span',{class:'v23-argent'},h('strong',{},renseigne?montant(caSem):'Non renseigné'),
+              h('span',{class:'mut'},objectif?' / '+montant(objectif):' · semaine')))),
+        h('div',{class:'v49-ca-contenu'},
+          h('small',{class:'mut'},'Cette semaine'),
+          objectif&&renseigne?h('div',{class:'piste',role:'progressbar','aria-valuenow':pct,'aria-valuemin':'0','aria-valuemax':'100','aria-label':'Avancement de l’objectif hebdomadaire en CA facturé'},
+            h('div',{class:'rempli',style:'width:'+pct+'%'})):null,
+          h('p',{class:'mut'},!renseigne?'Saisis tes factures et avoirs HT.':objectif?(pct+' % · reste '+montant(Math.max(0,objectif-caSem))+' à facturer'):'Définir un objectif pour suivre le CA de la semaine.'),
+          renseigne&&om?h('p',{class:'mut'},'Mois : '+montant(mois.totalCents)+' sur '+montant(om.cents)+' ('+Math.max(0,Math.min(100,Math.round(mois.totalCents/om.cents*100)))+' %)'):null,
+          h('small',{class:'v23-source'},'Source : factures et avoirs HT saisis par toi · indicateurs séparés ce mois : commandes envoyées '+montant(cmdMois)+' HT · encaissé '+montant(encMois)+' · '+ligneEbp),
+          h('div',{class:'actions'},lien('#/cockpit','Cockpit','sec'),!objectif?lien('#/reglages','Régler mon objectif'):null))),
+      h('a',{href:'#/ca',class:'btn sec v49-ca-saisir','aria-label':'Saisir mon CA facturé'},'Saisir'));
+
   }
 
   function candidats(dv,cl,pc,tours) {
@@ -156,13 +170,17 @@
   }
 
   pageAccueil=async function (){
-    const [dv,cl,pc,tours,rapport]=await Promise.all([
-      getAll('devis'),getAll('clients'),lirePC(),lireTournees(),get('meta','rapport_articles')]);
+    const [dv,cl,pc,tours,rapport,caStore]=await Promise.all([
+      getAll('devis'),getAll('clients'),lirePC(),lireTournees(),get('meta','rapport_articles'),get('meta','caFacture')]);
     const now=new Date(), JN=['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
     const actions=candidats(dv,cl,pc,tours);
     montrer('Bonjour, '+(S.accueilNom||'Mr Omarjee'),
-      carteObjectif(dv,pc,now),
+      carteObjectif(dv,pc,now,caStore,cl),
       carteAction(actions),
+      (()=>{const plan=tours&&tours[jourLocal(now)], ids=plan&&Array.isArray(plan.ids)?plan.ids:[], faits=ids.filter(id=>(plan.res||{})[id]).length;
+        return h('section',{class:'carte v49-tournee'},h('strong',{},'Ma tournée'),
+          p(ids.length ? faits+' traité(s) · '+(ids.length-faits)+' restant(s)' : 'Aucune tournée préparée.'),
+          lien('#/tournee',ids.length?'Voir toute la tournée':'Préparer ma tournée'))})(),
       rechercheProduits(rapport),
       raccourcis(dv,pc),
       h('div',{class:'fab noprint'},h('a',{class:'btn gros noir',href:'#/nouveau'},'+ Nouveau devis')),

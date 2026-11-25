@@ -1,0 +1,75 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><link rel="stylesheet" href="commun.css"><title>95 département</title>
+<style>.deps{display:flex;flex-wrap:wrap;gap:5px}.deps span{padding:5px 10px;border-radius:999px;border:1px solid var(--trait);font:700 13px "Barlow Condensed";color:var(--doux)}
+.deps span.p{border-color:#FF2D3D;color:#fff}.deps span.on{background:var(--rouge);border-color:var(--rouge)}.deps span.s{border-style:dashed;opacity:.6}
+.kg{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}.kc{background:var(--plateau);border-radius:10px;padding:8px 10px}.kc b{font-size:19px;display:block}.kc small{color:var(--doux);font-size:11.3px}.kc .badge{float:right;margin-top:3px}
+.sugc{display:flex;align-items:center;gap:10px;border:1px solid rgba(255,200,115,.35);border-radius:12px;padding:10px 12px;color:#FFC873;font-size:13px;min-height:44px}.sugc b{color:#F4F2EF;font-weight:600}.sugc span:last-child{margin-left:auto;font-size:18px}
+.lc{display:grid;grid-template-columns:1fr auto;gap:3px 8px;align-items:center;padding:8px 0;border-top:1px solid var(--trait);font-size:13px;min-height:44px}.lc small{color:var(--doux)}.lc .barre{grid-column:1/3}
+.carte-tap{position:absolute;background:rgba(14,16,20,.96);border:1.5px solid #FF2D3D;border-radius:14px;padding:12px 14px;width:250px;box-shadow:0 10px 30px rgba(0,0,0,.6)}
+.carte-tap h4{margin:0;font:800 19px "Barlow Condensed";letter-spacing:.03em}.carte-tap p{margin:4px 0 0;font-size:12.5px;color:var(--doux)}.carte-tap .go{margin-top:10px;background:var(--rouge);color:#fff;text-align:center;border-radius:10px;padding:11px;font-weight:700}
+.outils{position:absolute;right:14px;bottom:14px;display:flex;flex-direction:column;gap:8px}.outils span{width:46px;height:46px;border-radius:12px;background:rgba(14,16,20,.9);border:1px solid var(--trait);display:grid;place-items:center;font-size:20px;color:var(--texte)}
+.approx{position:absolute;left:16px;top:12px;font-size:12px;color:var(--doux);background:rgba(10,11,13,.8);border:1px dashed #3A404A;border-radius:8px;padding:5px 9px}</style></head><body>
+<script src="iso.js"></script><script src="batiments.js"></script><script src="data95.js"></script><script>
+const K=comptes(C95);
+const cat=c=>{const E=c[3],n=f=>E.filter(f).length;return [['#D41F2B',n(e=>e[1]==='client-carrosserie')],['#0B0B0D',n(e=>e[1]==='client-mecanique'),true],['#F0952B',n(e=>e[1]==='prospect-carrosserie')],['#3E86F0',n(e=>e[1]==='prospect-mecanique')],['#4A4F58',n(e=>e[0]==='q'),false,true],['#1E2126',n(e=>e[0]==='x')]];};
+const catTour=c=>{const l=cat(c);return [l[5],l[4],l[3],l[2],l[1],l[0]];}; // gris en bas, couleurs commerciales en haut
+const bar=c=>`<div class="barre">${cat(c).map(([col,n])=>n?`<i style="width:${n/c[3].length*100}%;background:${col==='#0B0B0D'?'#F4F2EF':col==='#4A4F58'?'#8A9099':col==='#1E2126'?'#3A3E45':col}"></i>`:'').join('')}</div>`;
+document.body.innerHTML=`<header><div class="logo"><i></i><div><b>ODICOLOR <em>2.0</em></b><small>BUREAU · ÎLE-DE-FRANCE</small></div></div>
+<nav><a>Bureau</a><a class="on">Ma Ville</a><a>Carte</a></nav><div class="recherche">⌕ Garage, commune ou SIRET</div><div class="maquette">MAQUETTE · DONNÉES FICTIVES</div></header>
+<div class="fil"><div class="etapes"><span class="on">① 95 Val-d’Oise</span><span>② Commune</span><span>③ Garage</span></div>
+<div class="puces"><span class="puce">👆 Toucher : aperçu · 2ᵉ toucher : ouvrir</span><span class="puce">🤏 Pincer : zoomer</span><span class="puce">☰ Liste : tout en texte</span></div></div>
+<main><div id="scene"></div><aside>
+ <div class="bloc" style="padding:11px 14px"><div class="tb">Départements · prioritaires sans ordre</div><div class="deps"><span class="p on">95</span><span class="p">94</span><span class="p">91</span><span class="p">77</span><span class="p">93</span><span class="s">75</span><span class="s">78</span><span class="s">92</span></div></div>
+ <div class="bloc" style="padding:11px 14px"><div class="titre" style="font-size:22px">95 · Val-d’Oise <span style="font:400 12.5px system-ui;color:var(--doux)">· l’agence est ici</span></div>
+  <div class="kg"><div class="kc"><span class="badge b-estime">3 sources</span><b>${K.total}</b><small>établissements recensés</small></div>
+  <div class="kc"><span class="badge b-ebp">EBP</span><b>${K.clients}</b><small>clients · dont ${K.dormants} dormant</small></div>
+  <div class="kc"><span class="badge b-terrain">Airtable</span><b>${K.prospCarr+K.prospMeca}</b><small>prospects · ${K.visites} visités</small></div>
+  <div class="kc"><span class="badge b-inconnu">EBP</span><b>Inconnu</b><small>CA HT facturé du mois</small></div>
+  <div class="kc"><b style="color:#C9CDD3">${K.aQualifier}</b><small>? à qualifier (SIRENE)</small></div>
+  <div class="kc"><b style="color:#7A8089">${K.horsCible}</b><small>⊘ hors cible</small></div></div></div>
+ <div class="sugc">💡 <span><b>Suggestion du cockpit</b> · 1 secteur</span><span>▸</span></div>
+ <div class="bloc" style="padding:6px 14px"><div class="tb" style="margin:6px 0 2px">Communes · toucher pour ouvrir</div>
+ ${[...C95].sort((a,b)=>b[3].length-a[3].length).slice(0,5).map(c=>`<div class="lc"><b>${c[0]}</b><small>${c[3].length} étab.${c[3].some(e=>e[3]==='alerte')?' · <span style="color:#F0343F">●</span>':''}${c[3].some(e=>e[3]==='dormant')?' · ☾':''} ›</small>${bar(c)}</div>`).join('')}
+ <div style="color:var(--doux);font-size:12px;padding:6px 0">+ 8 communes · ☰ voir tout</div></div>
+</aside></main>`;
+const S=18, g=1.3, O=[2.30,49.00];
+const km=(lon,lat)=>[(lon-O[0])*73.2,(lat-O[1])*111.2];
+const iso=(lon,lat)=>{const [E,N]=km(lon,lat);return [(E*g/C30-2*N*g)/2,(-E*g/C30-2*N*g)/2];};
+const PL=C95.map(c=>{const n=c[3].length,s=2.4+Math.sqrt(n)*0.75;const [x,y]=iso(c[1],c[2]);return {c,w:s,d:s,x,y};});
+const AG=(()=>{const [x,y]=iso(2.475,49.05);return {ag:true,w:7.2,d:5.8,x:x-1,y:y-6};})();
+const tous=[...PL,AG];
+for(let it=0;it<500;it++)for(let i=0;i<tous.length;i++)for(let j=i+1;j<tous.length;j++){const a=tous[i],b=tous[j];
+ const ox=(a.w+b.w)/2+1.6-Math.abs((a.x+a.w/2)-(b.x+b.w/2)), oy=(a.d+b.d)/2+1.6-Math.abs((a.y+a.d/2)-(b.y+b.d/2));
+ if(ox>0&&oy>0){const fa=a.ag?0:(b.ag?1:0.5),fb=1-fa;if(ox<oy){const s=Math.sign((a.x+a.w/2)-(b.x+b.w/2))||1;a.x+=s*ox*fa;b.x-=s*ox*fb;}else{const s=Math.sign((a.y+a.d/2)-(b.y+b.d/2))||1;a.y+=s*oy*fa;b.y-=s*oy*fb;}}}
+const tmp=Scene(S,0,0);let mnx=1e9,mxx=-1e9,mny=1e9,mxy=-1e9;
+tous.forEach(p=>[[p.x,p.y],[p.x+p.w,p.y],[p.x,p.y+p.d],[p.x+p.w,p.y+p.d]].forEach(q=>{const [a,b]=tmp.P(q[0],q[1],0);mnx=Math.min(mnx,a);mxx=Math.max(mxx,a);mny=Math.min(mny,b);mxy=Math.max(mxy,b);}));
+const sc=Scene(S,560-(mnx+mxx)/2,430-(mny+mxy)/2);
+const CONT=[[1.60,49.23],[2.0,49.24],[2.35,49.2],[2.60,49.13],[2.59,49.0],[2.50,48.97],[2.45,48.98],[2.33,48.95],[2.20,48.94],[2.15,48.96],[1.98,49.0],[1.60,49.06]];
+sc.add(-6000,`<rect x="-2000" y="-2000" width="5000" height="5000" fill="#0C0E11"/>`);
+sc.poly(-5000,CONT.map(p=>[...iso(...p),0]),'fill="#161A21" stroke="#FF2D3D" stroke-width="1.3" stroke-opacity=".3"');
+const route=(pts,l)=>{sc.add(-4000,`<polyline points="${sc.pts(pts.map(p=>[...iso(...p),0]))}" fill="none" stroke="#2B313A" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/><polyline points="${sc.pts(pts.map(p=>[...iso(...p),0]))}" fill="none" stroke="#59606B" stroke-width="1.1" stroke-dasharray="8 10"/>`);
+ const [a,b]=iso(...pts[Math.floor(pts.length/2)]),[sx,sy]=sc.P(a,b,0);sc.add(-3990,`<rect x="${sx-14}" y="${sy-8}" width="28" height="15" rx="3" fill="#1E3A8A"/><text x="${sx}" y="${sy+3.5}" text-anchor="middle" font-family="Barlow Condensed" font-weight="800" font-size="10.5" fill="#fff">${l}</text>`);};
+route([[2.36,48.93],[2.42,48.98],[2.48,49.01],[2.55,49.08],[2.60,49.13]],'A1');
+route([[2.22,48.93],[2.24,48.96],[2.17,49.01],[2.08,49.04],[1.98,49.07]],'A15');
+route([[2.08,49.06],[2.20,49.06],[2.32,49.05],[2.42,49.03],[2.52,48.99]],'N104');
+const SEL='Gonesse', SECT=['Gonesse','Sarcelles','Garges-lès-Gonesse'];
+let carteTap=null;
+PL.forEach(p=>{const sel=p.c[0]===SEL;
+ sc.boite(p.x,p.y,p.w,p.d,0.22,{haut:sel?'#2C2226':'#232933',gauche:'#161A21',droite:'#12151B',prof:-900+p.x+p.y});
+ if(sel)sc.neon(p.x,p.y,p.w,p.d,0.22,'#FF2D3D',{epais:2,prof:-899+p.x+p.y});
+ const tx=p.x+p.w/2-0.6,ty=p.y+p.d/2-0.6,z=tourCommune(sc,tx,ty,catTour(p.c));
+ const [cx,cy]=sc.P(tx+0.6,ty+0.6,z+0.55),t=`${p.c[0].toUpperCase()}`,L=t.length*6+44;
+ const al=p.c[3].some(e=>e[3]==='alerte'),dm=p.c[3].some(e=>e[3]==='dormant');
+ sc.add(9500+cy/1000,`<g><rect x="${cx-L/2}" y="${cy-24}" width="${L}" height="20" rx="5" fill="rgba(10,11,13,.9)" stroke="${sel?'#FF2D3D':'#3A414D'}"/><text x="${cx-L/2+8}" y="${cy-10}" font-family="Barlow Condensed" font-weight="700" font-size="11.5" fill="#E4E7EB" letter-spacing=".04em">${t}</text><text x="${cx+L/2-8}" y="${cy-10}" text-anchor="end" font-family="Barlow Condensed" font-weight="800" font-size="12" fill="#fff">${p.c[3].length}</text>${al?`<circle cx="${cx+L/2}" cy="${cy-24}" r="6" fill="#F0343F"/>`:''}${dm?`<text x="${cx-L/2-3}" y="${cy-20}" font-size="11" fill="#C9C0FF">☾</text>`:''}</g>`);
+ if(sel){const [rx,ry]=sc.P(p.x+p.w,p.y+p.d/2,0.3);carteTap=[rx,ry];}});
+const sect=PL.filter(p=>SECT.includes(p.c[0]));
+const x1=Math.min(...sect.map(p=>p.x))-0.6,y1=Math.min(...sect.map(p=>p.y))-0.6,x2=Math.max(...sect.map(p=>p.x+p.w))+0.6,y2=Math.max(...sect.map(p=>p.y+p.d))+0.6;
+sc.add(-850,`<polygon points="${sc.pts([[x1,y1,0],[x2,y1,0],[x2,y2,0],[x1,y2,0]])}" fill="none" stroke="#FFC873" stroke-width="1" stroke-dasharray="4 6" opacity=".55"/>`);
+const [sx,sy]=sc.P(x1,y2,0);sc.add(9900,`<text x="${sx+4}" y="${sy+16}" font-family="system-ui" font-size="11" fill="#FFC873" opacity=".8">💡 secteur suggéré</text>`);
+agence(sc,AG.x,AG.y,0.85,{sousTitre:'AGENCE GOUSSAINVILLE'});
+[['77 →',1020,150],['93 ↘',930,740],['92 · 75 ↓',870,770],['78 ←',40,300]].forEach(([t,x,y])=>sc.add(9800,`<text x="${x}" y="${y}" text-anchor="middle" font-family="Barlow Condensed" font-weight="700" font-size="14" fill="#5A606A" letter-spacing=".1em">${t}</text>`));
+document.getElementById('scene').innerHTML=`<svg viewBox="0 0 1068 787">${DEFS}${sc.rendu()}</svg>
+<div class="approx">📍 Positions approximatives · agence : emplacement symbolique</div>
+<div class="carte-tap" style="left:${Math.min(carteTap[0]+18,1068-340)}px;top:${carteTap[1]+30}px"><h4>GONESSE</h4><p>6 établissements · 1 client <span style="color:#F0343F">● alerte</span> · 2 prospects · 3 ? à qualifier</p><div class="go">Ouvrir la commune ›</div></div>
+<div class="outils"><span>＋</span><span>－</span><span>☰</span></div>
+<div class="legende"><span><i class="d" style="background:#D41F2B"></i>Client carr.</span><span><i class="d noir"></i>Client Mécan</span><span><i class="d" style="background:#F0952B"></i>Prosp. carr.</span><span><i class="d" style="background:#3E86F0"></i>Prosp. méca.</span><span>▢ ? à qualifier</span><span>■ ⊘ hors cible</span><span>Hauteur = nb d’établissements</span></div>`;
+</script></body></html>

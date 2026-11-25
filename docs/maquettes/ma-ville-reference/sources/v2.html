@@ -1,0 +1,49 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><link rel="stylesheet" href="commun.css"><title>95 commune</title>
+<style>.e{display:grid;grid-template-columns:22px 1fr auto;gap:1px 8px;align-items:center;padding:6px 0;border-top:1px solid var(--trait);font-size:12.5px}
+.e{min-height:44px}.sugc{display:flex;align-items:center;gap:10px;border:1px solid rgba(255,200,115,.35);border-radius:12px;padding:10px 12px;color:#FFC873;font-size:13px;min-height:44px}.sugc b{color:#F4F2EF;font-weight:600}.sugc span:last-child{margin-left:auto}.approx{position:absolute;left:16px;top:12px;font-size:12px;color:var(--doux);background:rgba(10,11,13,.8);border:1px dashed #3A404A;border-radius:8px;padding:5px 9px}.carte-tap{position:absolute;background:rgba(14,16,20,.96);border:1.5px solid #FF2D3D;border-radius:14px;padding:12px 14px;width:270px;box-shadow:0 10px 30px rgba(0,0,0,.6)}.carte-tap h4{margin:0;font:800 18px "Barlow Condensed"}.carte-tap p{margin:4px 0 0;font-size:12.5px;color:var(--doux)}.carte-tap .bb{display:flex;gap:6px;margin-top:10px}.carte-tap .bb span{flex:1;text-align:center;padding:10px 6px;border-radius:10px;font-weight:700;font-size:12.5px;background:#1C2027;border:1px solid var(--trait)}.carte-tap .bb span.p{background:var(--rouge);border-color:var(--rouge);color:#fff}.outils{position:absolute;right:14px;bottom:70px;display:flex;flex-direction:column;gap:8px}.outils span{width:46px;height:46px;border-radius:12px;background:rgba(14,16,20,.9);border:1px solid var(--trait);display:grid;place-items:center;font-size:20px}.e .n{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font:800 11px "Barlow Condensed";color:#fff}.e small{grid-column:2/4;color:var(--doux);font-size:11.3px}
+.e.sel{background:rgba(255,45,61,.08);outline:1px solid rgba(255,45,61,.5);border-radius:8px;padding-left:4px}.tags{display:flex;gap:4px}</style></head><body>
+<script src="iso.js"></script><script src="batiments.js"></script><script src="data95.js"></script><script>
+// Goussainville : 10 établissements FICTIFS + agence (position symbolique). Ordre = priorité proposée par le cockpit.
+const NOMS=['CARROSSERIE FICTIVE A','CARROSSERIE FICTIVE B','MÉCA FICTIVE C','CARROSSERIE FICTIVE D','Établissement SIRENE 1','Établissement SIRENE 2','Établissement SIRENE 3','Établissement SIRENE 4','CONTRÔLE TECH. FICTIF','Établissement SIRENE 5'];
+const DET=['Client · dormant 7 mois · réactiver','Prospect · interlocuteur connu · démo à proposer','Prospect · visité le 03/11 · relance datée','Prospect · décideur à identifier','Activité probable (NAF 45.20A) · à vérifier','Activité probable · à vérifier','Activité probable · à vérifier','Activité probable · à vérifier','Hors cible','Activité probable · à vérifier'];
+const E=C95[0][3];
+const src=s=>({EBP:'b-ebp',Airtable:'b-terrain',Terrain:'b-terrain',SIRENE:'b-estime'})[s];
+const qual=e=>e[0]==='q'?['b-estime','? À qualifier']:e[0]==='x'?['b-inconnu','⊘ Hors cible']:['b-ebp','Confirmé'];
+const couleur=e=>e[0]==='q'?'#5A606A':e[0]==='x'?'#26292F':SEG[e[1]].c;
+document.body.innerHTML=`<header><div class="logo"><i></i><div><b>ODICOLOR <em>2.0</em></b><small>BUREAU · ÎLE-DE-FRANCE</small></div></div>
+<nav><a>Bureau</a><a class="on">Ma Ville</a><a>Carte</a></nav><div class="recherche">⌕ Garage, commune ou SIRET</div><div class="maquette">MAQUETTE · DONNÉES FICTIVES</div></header>
+<div class="fil"><div class="etapes"><span>① 95 Val-d’Oise</span><span class="on">② Goussainville</span><span>③ Garage</span></div>
+<div class="puces"><span class="puce">👆 Toucher un bâtiment : aperçu</span><span class="puce">5 personnages max · tous les garages listés</span></div></div>
+<main><div id="scene"></div><aside><div class="sugc">💡 <span><b>Suggestion du cockpit</b> · 2 garages à voir</span><span>▸</span></div><div class="bloc" style="padding:12px 14px"><div class="tb">Goussainville · 10 établissements · tous listés</div>
+${E.map((e,i)=>`<div class="e ${i===1?'sel':''}"><span class="n" style="background:${couleur(e)};${e[1]==='client-mecanique'?'box-shadow:0 0 0 1.5px #F4F2EF':''}">${i+1}</span><b>${NOMS[i]}</b><span class="tags"><span class="badge ${src(e[2])}">${e[2]}</span><span class="badge ${qual(e)[0]}">${qual(e)[1]}</span></span><small>${DET[i]}</small></div>`).join('')}
+</div></aside></main>`;
+const S=19, LOT=[6.55,7.6];
+const lots=[[2,0],[3,0],[0,1],[1,1],[2,1],[3,1],[0,2],[1,2],[2,2],[3,2]];
+const tmp=Scene(S,0,0);const pts=[[0,-1],[27,-1],[0,22],[27,22]].map(p=>tmp.P(p[0],p[1],0));
+const sc=Scene(S,534-(Math.min(...pts.map(p=>p[0]))+Math.max(...pts.map(p=>p[0])))/2,420-(Math.min(...pts.map(p=>p[1]))+Math.max(...pts.map(p=>p[1])))/2);
+sc.sol(-1,-1.5,28,24,'#151A22',-5000,'#1E232B');
+sc.route(-1,5.9,28,1.5,'x');sc.route(-1,13.5,28,1.5,'x');for(let i=0;i<5;i++)sc.route(-1+i*6.55,-1.5,1.1,24,'y',-890);
+// Agence (position symbolique dans la commune).
+agence(sc,2.6,0.3,0.86,{sousTitre:'AGENCE GOUSSAINVILLE'}); // réduite (retouche du 06/11)
+let persos=0;const perso=(x,y,seg,o)=>{if(persos++<5)sc.figurine(x,y,seg,o);};
+perso(9.3,4.9,'odicolor',{echelle:.75,tenue:'#E9EAEC',casquette:'#D41F2B'}); // livreur ODICOLOR (sans couleur commerciale)
+E.forEach((e,i)=>{const [c,r]=lots[i],x=0.75+c*LOT[0],y=-0.2+r*LOT[1];let b;
+ if(e[0]==='c')b=carrosserie(sc,x,y,e[1],'',{porteOuverte:i%2===0});
+ else if(e[0]==='m')b=mecanique(sc,x,y,e[1],'');
+ else if(e[0]==='x')b=batHorsCible(sc,x+0.3,y+0.3);
+ else b=batAQualifier(sc,x,y);
+ if(e[0]==='c'||e[0]==='m'){sc.vehicule(x+0.2,y+b.d+0.35,['#B8312F','#C9CED6','#3E86F0','#2B2F36'][i%4]);
+  perso(x+b.w+0.3,y+b.d+0.55,e[1],{echelle:.8,tablette:i===0,tenue:i===0?'#2B313B':'#E9EAEC'});}
+ if(i===0){repere(sc,b,1,e[1]);badgeDormant(sc,b.x+b.w+0.15,b.y+b.d*0.6,b.h+0.1,'7 mois');}
+ else if(e[0]==='q'||e[0]==='x')repereQualif(sc,b,i+1,e[0]); else repere(sc,b,i+1,e[1]);
+ if(i===1)window.B2=b;});
+for(let i=0;i<5;i++){sc.lampe(-0.3+i*6.55,5.7);sc.lampe(-0.3+i*6.55,13.3);}
+const [px2,py2]=sc.P(B2.x+B2.w*0.5,B2.y+B2.d*0.5,B2.h+1.3);const tapX=700,tapY=600;
+sc.add(9999,`<circle cx="${px2}" cy="${py2}" r="17" fill="none" stroke="#FF2D3D" stroke-width="2.5" filter="url(#lueur)"/><polyline points="${px2},${py2+17} ${px2},${tapY-14} ${tapX+150},${tapY-14} ${tapX+150},${tapY}" fill="none" stroke="#FF2D3D" stroke-width="1.4" stroke-dasharray="4 4"/>`);
+sc.vehicule(14.5,6.3,'#F2F2F0',{fourgon:true});
+document.getElementById('scene').innerHTML=`<svg viewBox="0 0 1068 787">${DEFS}${sc.rendu()}</svg>
+<div class="approx">🗺 Plan schématique de la commune : emplacements non réels · agence symbolique</div>
+<div class="carte-tap" style="left:${tapX}px;top:${tapY}px"><h4>2 · CARROSSERIE FICTIVE B</h4><p>Prospect carrosserie · interlocuteur connu (Airtable) · jamais visité</p><div class="bb"><span class="p">Voir le garage ›</span><span>+ Tournée</span></div></div>
+<div class="outils"><span>＋</span><span>－</span><span>☰</span></div>
+<div class="legende"><span><i class="d" style="background:#D41F2B"></i>Client</span><span><i class="d" style="background:#F0952B"></i>Prosp. carr.</span><span><i class="d" style="background:#3E86F0"></i>Prosp. méca.</span><span>▢ ? à qualifier</span><span>▧ ⊘ hors cible</span><span style="color:#C9C0FF">☾ dormant</span><span>N° = liste</span></div>`;
+</script></body></html>

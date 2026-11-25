@@ -1,0 +1,47 @@
+TAP version 13
+# Subtest: 1. décisions enregistrées, page fermée, programme ARRÊTÉ BRUTALEMENT, relance : tout est retrouvé à l’identique
+not ok 1 - 1. décisions enregistrées, page fermée, programme ARRÊTÉ BRUTALEMENT, relance : tout est retrouvé à l’identique
+  ---
+  duration_ms: 4900.779976
+  type: 'test'
+  location: '/home/user/devis-terrain/tests/local-decisions-navigateur.cjs:64:1'
+  failureType: 'testCodeFailure'
+  error: 'C10 visible en clair'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (/home/user/devis-terrain/tests/local-decisions-navigateur.cjs:88:73)
+    process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: 2. contradiction après un nouvel import : garage renommé → décision « à revérifier », historique et garages conservés
+ok 2 - 2. contradiction après un nouvel import : garage renommé → décision « à revérifier », historique et garages conservés
+  ---
+  duration_ms: 4662.958857
+  type: 'test'
+  ...
+# Subtest: 3. ancien coffre (état version 1, avant le lot A) : s’ouvre, journal vide, puis décisions enregistrées en version 2
+ok 3 - 3. ancien coffre (état version 1, avant le lot A) : s’ouvre, journal vide, puis décisions enregistrées en version 2
+  ---
+  duration_ms: 5520.35026
+  type: 'test'
+  ...
+# Subtest: 4. démo : aucune décision possible, rien enregistré
+ok 4 - 4. démo : aucune décision possible, rien enregistré
+  ---
+  duration_ms: 2335.972335
+  type: 'test'
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 3
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 30110.071034

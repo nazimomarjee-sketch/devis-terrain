@@ -38,17 +38,17 @@
     if (document.getElementById('v25-maj')) return;
     const info = h('div', {id:'v25-maj',class:'v25-maj',role:'status'},
       h('strong', {}, 'Mise à jour de l’application prête'),
-      h('p', {}, 'Tes clients et devis restent enregistrés. Sauvegarde tout travail en cours avant d’actualiser.'),
+      h('p', {}, 'Enregistre tes saisies et télécharge une sauvegarde. Ferme ensuite toutes les fenêtres ODICOLOR, puis rouvre l’application pour utiliser la nouvelle version. « Plus tard » conserve la session actuelle.'),
       h('div', {class:'actions'},
-        h('button', {class:'btn',onclick:()=>location.reload()}, 'Actualiser'),
         h('button', {class:'btn sec',onclick:()=>info.remove()}, 'Plus tard')));
     document.body.append(info);
   }
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.addEventListener('controllerchange', banniererMiseAJour);
+    addEventListener('odicolor-update-ready', banniererMiseAJour);
     navigator.serviceWorker.ready.then(reg => {
       if (reg && typeof reg.update === 'function' && navigator.onLine) reg.update().catch(() => {});
+      if (reg && reg.waiting) banniererMiseAJour();
     }).catch(() => {});
   }
 })();
