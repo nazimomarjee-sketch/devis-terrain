@@ -1,5 +1,5 @@
 {
-  "id": "cfb75d831a131d757ebc956a98e67f7576121c8f384538744285ada602107097",
+  "id": "9f004fb680a921fdfbc6d7825511150c4c6f433757d99304df52b6fa470e2f31",
   "assets": [
     {
       "path": "accueil-v23.css",
@@ -107,7 +107,7 @@
     },
     {
       "path": "charlie-tournee-v50.js",
-      "sha256": "0526a9ad5fe4991763a6a88f0c8d0ede8f5cff82935070d6bcd1f19c6185ee6c"
+      "sha256": "d34c2375d55872cd2fdd70b2285085b109150992d8d399e692cfbf231369bdc8"
     },
     {
       "path": "cockpit-v48.js",
@@ -187,7 +187,7 @@
     },
     {
       "path": "index.html",
-      "sha256": "f6d9d3dcd7b15784ce530e190c07ec537f50c83a11ca2b75efd2a302e436cbdb"
+      "sha256": "501610d50cce96e7aaeafcd88aef79c13d4dd3215ca069a0d2c5e0148abffaad"
     },
     {
       "path": "logo-96.png",
@@ -231,7 +231,7 @@
     },
     {
       "path": "pwa-client.js",
-      "sha256": "90a27606e495fd68098adf14ed0c6657fbbee7bcfb709c6e569dd14e2ba17982"
+      "sha256": "e982d0b058e1e19bb0918a630667556c2e644ce8f84ef7f398064b00ab2ad7f7"
     },
     {
       "path": "rappels-produits-v24.js",

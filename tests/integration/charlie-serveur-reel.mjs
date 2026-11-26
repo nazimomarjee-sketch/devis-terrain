@@ -19,7 +19,7 @@ const sync=S.creer({config:async()=>({url:'http://127.0.0.1:'+port,jeton:U,appar
 const log=(ok,m)=>{console.log((ok?'OK    ':'ÉCHEC ')+m);if(!ok)process.exitCode=1;};
 try{
   const l=await sync.laurent('2026-12-01');log(l.statut==='ok'&&l.laurent&&l.laurent.garages.length===11&&l.laurent.zone==='77','GET /laurent/2026-12-01 : 11 garages, secteur 77 ('+l.statut+')');
-  const l2=await sync.laurent('2026-12-14');log(l2.statut==='erreur'&&l2.http===404,'GET /laurent hors calendrier : 404, rien d’extrapolé');
+  const l2=await sync.laurent('2027-01-04');log(l2.statut==='erreur'&&l2.http===404,'GET /laurent après le 31/12 : 404, rien d’extrapolé');
   const dep=(()=>{const r=C.find(x=>x[0]==='91477');return{lat:r[2],lng:r[3]};})();
   const clients=['Alpha','Bravo','Charlie','Delta','Echo'].map((n,i)=>({id:i+1,nom:'Garage Synthétique '+n,ville:['Massy','Palaiseau','Antony','Brunoy','Morangis'][i],cp:['91300','91120','92160','91800','91420'][i],priorite:'AB'[i%2],statutCrm:'client',visites:[],tel:'0100000'+i}));
   const ctxFns={placer:c=>{const p=K.placer(c);return p&&p.precision?p:null},echeance:()=>({pct:999}),relanceDue:()=>null,montantHt:()=>null};

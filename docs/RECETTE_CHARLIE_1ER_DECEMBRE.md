@@ -39,7 +39,7 @@ Compter (sans inventer) : visites réalisées / prévues, absences, écart d'heu
 
 ## F. Points connus avant la reprise
 - **Cœur unique** : le cœur est identique dans `devis-terrain` et `cockpit-carrosserie` (garde-fou `tests/charlie-coeur-partage-v50.test.cjs` + empreinte côté cockpit). Toute modification du cœur = resynchroniser (`scripts/resynchroniser-coeur.mjs`) des deux côtés.
-- **Feuille de Laurent côté CHARLIE** : servie pour le **01/12 → 11/12** (calendrier du cockpit). Du 14/12 au 31/12 (rotation S1/S2 confirmée par Airtable) : à transcrire dans le cockpit **après ta validation** ; d'ici là le téléphone retombe sur la feuille de route de l'application (aucun garage inventé).
+- **Feuille de Laurent côté CHARLIE** : servie du **01/12 au 31/12** : 01→11/12 = calendrier du cockpit (prévisions non confirmées) ; 14→31/12 = rotation S1/S2 **préparée, statut « à confirmer »** (mêmes listes que la semaine correspondante, confirmées par la table Airtable) ; jours à confirmer avec Laurent : 24, 28, 29, 30, 31/12. Après le 31/12 : rien d'extrapolé.
 - **Heures de rendez-vous** : absentes du calendrier de Laurent ; à saisir sur la fiche (`rdv`) si un rendez-vous est fixé.
 - **Charge du 01/12 (secteur 77)** : 11 passages, dont 1 sans code postal dans le classeur ; ne tient pas en 8h-17h à 30 min/visite depuis Massy–Palaiseau → décider avec Laurent des reports (CHARLIE signale le conflit, ne supprime rien).
 - **Moteur routier** : tant qu'il n'est pas installé et vérifié (A4), les trajets sont des estimations et les positions des centres de commune : bien lire la mention « approximatif » dans la proposition.

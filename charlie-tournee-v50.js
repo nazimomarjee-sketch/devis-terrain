@@ -43,7 +43,7 @@
   async function chargerLaurent(jour) {
     const cache = await lireMeta('charlieLaurent', {}), s = await syncClient();
     if (s) { try { const r = await s.laurent(jour); if (r.statut === 'ok' && r.laurent) { cache[jour] = { ...r.laurent, recuLe: new Date().toISOString() }; Object.keys(cache).sort().slice(0, -30).forEach((k) => delete cache[k]); await ecrireMeta('charlieLaurent', cache); } } catch (e) { /* cache */ } }
-    const L = cache[jour]; return L && Array.isArray(L.garages) ? { noms: L.garages, heures: L.heures || {}, zone: L.zone, source: 'CHARLIE (feuille de Laurent)' + (L.recuLe ? ' reçue le ' + L.recuLe.slice(0, 10) : '') } : null;
+    const L = cache[jour]; return L && Array.isArray(L.garages) ? { noms: L.garages, heures: L.heures || {}, zone: L.zone, statut: L.statut || null, alertes: L.alertes || [], source: 'CHARLIE (feuille de Laurent)' + (L.recuLe ? ' reçue le ' + L.recuLe.slice(0, 10) : '') } : null;
   }
   async function contexte() {
     const [clients, devis, appris, R, caStore, alias] = [await getAll('clients'), await getAll('devis'), await lireMeta('charlieAppris', null), await reglages(), await lireMeta('caFacture', null), await aliasLire()];
@@ -53,7 +53,7 @@
     let laurent = [], laurentInfo = null, secteurs = T.secteursDuJour(auj);
     const L = await chargerLaurent(auj);
     if (L) {
-      const res = CX.resoudreLaurent({ noms: L.noms, clients, alias, heures: L.heures }); laurent = res.laurent; laurentInfo = { ...res, source: L.source, zone: L.zone };
+      const res = CX.resoudreLaurent({ noms: L.noms, clients, alias, heures: L.heures }); laurent = res.laurent; laurentInfo = { ...res, source: L.source, zone: L.zone, statut: L.statut, alertes: L.alertes };
       const sz = T.parserSecteurs(L.zone); if (sz.length) secteurs = sz;
     } else {
       // Repli : feuille de route de l'application (plan du jour : visites, étapes, visites reportées).
@@ -269,6 +269,7 @@
       h('div', { class: 'elan-tete' }, h('strong', {}, p.evenement ? 'Nouvelle organisation proposée' : 'Proposition de CHARLIE'), h('span', { class: 'tag warn' }, 'À VALIDER')),
       auditKo ? h('p', {}, '⛔ Audit refusé : ' + p.audit.violations.map((v) => v.code).join(', ') + '. Rien n’est appliqué.') : null,
       p.statut === 'CONFLIT_A_RESOUDRE' ? h('p', {}, '⚠ Une visite obligatoire de Laurent ne tient pas : ' + pl.nonPlanifies.filter((n) => n.obligatoire).map((n) => n.nom + ' (' + n.raison + ')').join(' ; ')) : null,
+      p.laurentInfo && p.laurentInfo.statut ? h('small', { class: 'mut', style: 'display:block' }, 'Feuille de Laurent : ' + ({ passages_prevus_non_confirmes: 'prévision (passages non confirmés)', rotation_a_confirmer: 'rotation de décembre à confirmer (prévision)' }[p.laurentInfo.statut] || p.laurentInfo.statut)) : null,
       h('p', { class: 'mut' }, pl.ordre.length + ' visite(s) · ' + pl.totaux.km + ' km · conduite ' + fmtMin(pl.totaux.conduiteMin) + ' · fin ' + (pl.ordre.length ? pl.ordre[pl.ordre.length - 1].fin : '—') + ' · moteur ' + pl.moteur + (pl.referenceLaurent && pl.referenceLaurent.faisable ? ' · ordre de Laurent : ' + pl.referenceLaurent.km + ' km' : pl.referenceLaurent ? ' · ordre de Laurent infaisable tel quel' : '')),
       (pl.alertes || []).map((a) => h('small', { class: 'mut', style: 'display:block' }, 'ℹ ' + a)),
       ecarts.length || mods.length ? h('div', {}, h('small', { class: 'etiq' }, 'ÉCARTS À VALIDER'), ecarts.concat(mods).map((e) => h('div', {}, '• ' + libEcart(e)))) : h('p', { class: 'mut' }, 'Aucun écart avec la feuille de Laurent.'),
