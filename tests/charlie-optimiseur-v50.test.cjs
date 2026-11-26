@@ -225,3 +225,23 @@ test('fuzz : 150 journées aléatoires — toute sortie est valide, sans chevauc
     assert.equal(r.plan.validationHumaineRequise,true);
   }
 });
+test('scénarios d’une journée surchargée : aucun appliqué, tous à valider, report vers le prochain jour du secteur',async()=>{
+  const CENTRES=require('../communes-centres.js'),K=require('../carte-v48.js');K.charger(CENTRES);
+  const villes=['Courtry','Mitry-Mory','Villevaudé','Collégien','Brie-Comte-Robert','Champagne-sur-Seine','Claye-Souilly','Mitry-Mory'];
+  const cl=villes.map((v,i)=>{const r=CENTRES.find(x=>x[1]===v&&x[0].startsWith('77'));return{id:i+1,nom:'Garage Synthétique '+(i+1),ville:v,cp:r?r[4].split(' ')[0]:'',priorite:'B',statutCrm:'client',visites:[]};});
+  const ctx={placer:(c)=>{const p=K.placer(c);return p&&p.precision?p:null},echeance:()=>({pct:999}),relanceDue:()=>null,montantHt:()=>null};
+  const {candidats}=T.construireCandidats({clients:cl,devis:[],laurent:cl.map(c=>({id:c.id})),maintenant:0,ctxFns:ctx,secteurs:['77']});
+  const dep=(()=>{const r=CENTRES.find(x=>x[0]==='91477');return{lat:r[2],lng:r[3]};})();
+  const r=await T.proposerScenarios({jour:'2026-12-01',candidats,depart:dep,plage:[28800,61200],pauses:[{creneau:[43200,50400],duree:2700}]});
+  assert.equal(r.validationHumaineRequise,true);assert.equal(r.zone,'77');assert.equal(T.prochainJourSecteur('2026-12-01','77'),'2026-12-08');
+  assert.ok(r.scenarios.length>=1);for(const s of r.scenarios)assert.equal(s.validationHumaineRequise,true);
+  if(r.surcharge){assert.ok(r.scenarios.some(s=>/^D_REPORTS/.test(s.id)));const d=r.scenarios.find(s=>/^D_/.test(s.id));d.modificationsLaurent.forEach(m=>{assert.equal(m.code,'REPORT_PROPOSE');assert.equal(m.vers,'2026-12-08');});}
+  const B=r.scenarios.find(s=>s.id==='B_VISITES_COURTES');if(B&&B.complet)assert.ok(B.modificationsLaurent[0].code==='DUREE_REDUITE'&&B.resume.obligatoiresServies===r.localises);
+  assert.match(r.avertissement,/Laurent fait foi/);
+});
+test('scénarios : journée qui tient déjà → un seul scénario, sans modification de Laurent',async()=>{
+  const cl=[1,2].map(i=>({id:i,nom:'G'+i,priorite:'A',statutCrm:'client',visites:[],ent:{lat:48.73+i*0.01,lng:2.27}}));
+  const {candidats}=T.construireCandidats({clients:cl,devis:[],laurent:cl.map(c=>({id:c.id})),maintenant:0,ctxFns:{echeance:()=>({pct:999}),relanceDue:()=>null,montantHt:()=>null}});
+  const r=await T.proposerScenarios({jour:'2026-12-02',candidats,depart:{lat:48.7263,lng:2.2696},plage:[28800,61200],pauses:[]});
+  assert.equal(r.surcharge,false);assert.equal(r.scenarios.length,1);assert.deepEqual(r.scenarios[0].modificationsLaurent,[]);
+});

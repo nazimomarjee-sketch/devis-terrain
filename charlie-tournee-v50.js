@@ -11,7 +11,7 @@
   const secDuJour = (d = new Date()) => d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
   const lireMeta = async (k, defaut) => { try { const v = await get('meta', k); return v == null ? defaut : v; } catch (e) { return defaut; } };
   const ecrireMeta = (k, v) => put('meta', v, k);
-  const CX = typeof CharlieContexte !== 'undefined' ? CharlieContexte : null, SY = typeof CharlieSync !== 'undefined' ? CharlieSync : null;
+  const CC = typeof CharlieCommercial !== 'undefined' ? CharlieCommercial : null, CX = typeof CharlieContexte !== 'undefined' ? CharlieContexte : null, SY = typeof CharlieSync !== 'undefined' ? CharlieSync : null;
   if (!CX) return;
   const REGL_DEF = CX.REGL_DEF;
 
@@ -94,6 +94,11 @@
     etat.proposition = { plan: r.plan || null, statut: r.statut, trace: r.trace.map((t) => ({ agent: t.agent, statut: t.statut, resume: t.resume })), exclus: r.exclus || [], erreur: r.erreur || null, audit: r.audit || null, genereLe: new Date().toISOString(), departSource: depart.source, laurent: C.laurent.map((l) => l.id), laurentInfo: C.laurentInfo, erreursHoraires: C.erreursHoraires,
       candidats: (r.candidats || []).map((c) => { const { tel, adresse, ...reste } = c; return reste; }), plage: C.plage, pauses: C.pauses, secteurs: C.secteurs };
     etat.depart = { lat: depart.lat, lng: depart.lng };
+    if (r.plan && r.plan.statut === 'CONFLIT_A_RESOUDRE') {
+      try { const sc = await T.proposerScenarios({ jour: C.auj, candidats: r.candidats, depart, plage: C.plage, pauses: C.pauses, ...C.opt });
+        etat.proposition.scenarios = sc.scenarios.map((x) => ({ id: x.id, titre: x.titre, complet: x.complet, resume: x.resume, modificationsLaurent: x.modificationsLaurent, hypotheses: x.hypotheses, nonServis: x.nonServis, plan: x.plan ? { ...x.plan, requete: undefined } : null }));
+        etat.proposition.sansPosition = sc.sansPosition; } catch (e) { /* les scénarios sont une aide : la proposition reste valable */ }
+    }
     await sauverEtat(etat); return etat;
   }
   async function valider(etat) {
@@ -238,9 +243,23 @@
       h('small', { class: 'mut', style: 'display:block' }, 'Source : ' + LI.source + '. CHARLIE ne devine jamais : confirme la bonne fiche (mémorisé pour les prochaines fois).'),
       LI.inconnus.concat(LI.ambigus).map((x) => h('div', { class: 'charlie-lg' }, h('div', {}, '#' + x.rang + ' ' + x.nom), (x.candidats || []).length ? h('div', { class: 'actions' }, x.candidats.map((c) => h('button', { class: 'btn sec', type: 'button', onclick: async () => { const A = await aliasLire(); A[T.nomCleExporte(x.nom)] = c.id; await ecrireMeta('charlieAlias', A); memoriser({ type: 'note', jour: auj, note: 'Rapprochement confirmé : ' + x.nom + ' → #' + c.id }); toast('Rapprochement mémorisé. Relance OPTIMISER.'); redessiner(); } }, c.nom + (c.sim ? ' (' + Math.round(c.sim * 100) + ' %)' : '')))) : h('small', { class: 'mut' }, 'Aucune fiche proche : à créer ou à corriger dans la base.'))),
       LI.repetitions.length ? h('small', { class: 'mut', style: 'display:block' }, 'Répétitions dans la feuille (conservées, à clarifier avec Laurent) : ' + LI.repetitions.map((r) => r.nom + ' (rangs ' + r.rangs.join(', ') + ')').join(' ; ')) : null) : null;
+    let matin = null, soir = null;
+    if (CC && etat && etat.plan && !hier) {
+      try { const C0 = await contexte(), M = CC.preparerMatin({ jour: auj, plan: etat.plan, clients: C0.clients, finance: C0.ctxFns.finance });
+        matin = h('details', { class: 'carte' }, h('summary', {}, 'Préparation du matin : mes 3 actions'), M.troisActions.map((a) => h('div', { class: 'charlie-lg' }, h('strong', {}, a.ordre + '. ' + a.action), h('br'), h('small', { class: 'mut' }, 'Preuve : ' + a.preuve))),
+          M.vigilance.length ? h('div', {}, h('small', { class: 'etiq' }, 'POINTS DE VIGILANCE'), M.vigilance.map((v) => h('small', { style: 'display:block' }, '⚠ ' + v))) : null,
+          h('small', { class: 'mut', style: 'display:block' }, M.transition), h('small', { class: 'mut', style: 'display:block' }, M.avertissement),
+          M.fiches.map((f) => h('details', {}, h('summary', {}, f.heure + ' ' + f.nom + (f.laurent ? ' · Laurent' : '')), h('small', { style: 'display:block' }, 'CA 12 mois : ' + f.resume.ca12 + ' · dernière facture : ' + f.resume.derniereFacture + ' · visites vues : ' + f.resume.visitesVues), f.vigilance.map((v) => h('small', { style: 'display:block' }, '⚠ ' + v)), h('small', { class: 'etiq' }, 'QUESTIONS À POSER'), f.questions.map((q) => h('small', { style: 'display:block' }, '• ' + q)), f.informationsManquantes.map((x) => h('small', { class: 'mut', style: 'display:block' }, 'ℹ ' + x)))),
+          h('details', {}, h('summary', {}, 'Objections possibles (trames)'), M.objections.map((o) => h('div', {}, h('small', {}, '« ' + o.objection + ' » → ' + o.approche)))));
+        if (etat.reel && etat.reel.length) { const B = CC.bilanSoir({ jour: auj, plan: etat.plan, reel: etat.reel, journal: await lireMeta('charlieJournal', null) });
+          soir = h('details', { class: 'carte' }, h('summary', {}, 'Bilan du soir : prévu / réalisé'), h('small', { style: 'display:block' }, B.resultatsCommerciaux.visitesVues + ' vue(s), ' + B.resultatsCommerciaux.absents + ' absent(s) · devis et commandes : à saisir (non disponible)'),
+            B.difficultes.map((d) => h('small', { style: 'display:block' }, '• ' + d)), B.relances.length ? h('small', { class: 'etiq' }, 'RELANCES À PRÉPARER') : null, B.relances.map((r) => h('small', { style: 'display:block' }, '• ' + (r.nom || '#' + r.garageId) + ' : ' + r.action)),
+            B.ajustementsProposes.map((a) => h('small', { class: 'mut', style: 'display:block' }, '→ ' + a.message + ' (à valider)')), h('small', { class: 'mut', style: 'display:block' }, 'Journée suivante : ' + B.journeeSuivante)); }
+      } catch (e) { /* aide à la décision : jamais bloquante */ }
+    }
     const lecons = T.enseignements(await lireMeta('charlieJournal', null)).slice(0, 5);
     const appris_ = lecons.length ? h('details', { class: 'carte' }, h('summary', {}, 'Ce que CHARLIE a appris (' + lecons.length + ')'), lecons.map((l) => h('div', { class: 'charlie-lg' }, h('small', {}, '• ' + l.message + ' (n=' + l.n + ', ' + l.confiance + ')'))), h('small', { class: 'mut' }, 'Propositions seulement : rien n’est modifié sans ton accord.')) : null;
-    montrer('Ma tournée', encart, pastille, aConfirmer, entete, prop, grille, zoneRapport, barre, liste, tot, bilan, appris_, reglages_, h('a', { class: 'btn sec', href: '#/tournee' }, 'Tournée habituelle (inchangée)'));
+    montrer('Ma tournée', encart, pastille, aConfirmer, entete, prop, grille, zoneRapport, barre, liste, tot, bilan, matin, soir, appris_, reglages_, h('a', { class: 'btn sec', href: '#/tournee' }, 'Tournée habituelle (inchangée)'));
   }
   function bloc_proposition(etat, redessiner) {
     const p = etat.proposition;
@@ -253,6 +272,10 @@
       h('p', { class: 'mut' }, pl.ordre.length + ' visite(s) · ' + pl.totaux.km + ' km · conduite ' + fmtMin(pl.totaux.conduiteMin) + ' · fin ' + (pl.ordre.length ? pl.ordre[pl.ordre.length - 1].fin : '—') + ' · moteur ' + pl.moteur + (pl.referenceLaurent && pl.referenceLaurent.faisable ? ' · ordre de Laurent : ' + pl.referenceLaurent.km + ' km' : pl.referenceLaurent ? ' · ordre de Laurent infaisable tel quel' : '')),
       (pl.alertes || []).map((a) => h('small', { class: 'mut', style: 'display:block' }, 'ℹ ' + a)),
       ecarts.length || mods.length ? h('div', {}, h('small', { class: 'etiq' }, 'ÉCARTS À VALIDER'), ecarts.concat(mods).map((e) => h('div', {}, '• ' + libEcart(e)))) : h('p', { class: 'mut' }, 'Aucun écart avec la feuille de Laurent.'),
+      (p.scenarios || []).length ? h('details', { open: true }, h('summary', {}, h('strong', {}, 'Journée surchargée : ' + p.scenarios.length + ' scénario(s) à valider avec Laurent')),
+        h('small', { class: 'mut', style: 'display:block' }, 'Aucun n’est appliqué. La feuille de Laurent fait foi tant qu’il n’a pas donné son accord.'),
+        p.scenarios.map((sc) => h('div', { class: 'charlie-lg' }, h('strong', {}, sc.titre), h('br'), h('small', {}, sc.resume && sc.resume.visites != null ? sc.resume.visites + ' visite(s) · ' + sc.resume.km + ' km · retour ' + (sc.resume.retour || '—') : (sc.resume && sc.resume.jour1 ? sc.resume.jour1.visites + ' visite(s) ce jour' : 'insuffisant')), (sc.modificationsLaurent || []).slice(0, 4).map((m) => h('small', { class: 'mut', style: 'display:block' }, '• ' + (m.nom ? m.nom + ' : ' : '') + m.detail)),
+          sc.plan && sc.id !== 'A_PROGRAMME_LAURENT' ? h('button', { class: 'btn sec', type: 'button', onclick: async () => { if (!confirm('Ce scénario modifie la feuille de Laurent :\n' + (sc.modificationsLaurent || []).map((m) => '• ' + m.detail).join('\n') + '\n\nContinuer seulement si Laurent est d’accord. La proposition devra encore être validée.')) return; etat.proposition.plan = sc.plan; etat.proposition.statut = sc.plan.statut; etat.proposition.scenarioChoisi = sc.id; delete etat.proposition.scenarios; memoriser({ type: 'ecart_laurent', jour: etat.jour, motif: sc.id, ecarts: (sc.modificationsLaurent || []).length }); await sauverEtat(etat); redessiner(); } }, 'Choisir ce scénario') : null))) : null,
       (p.proches || []).length ? h('div', {}, h('small', { class: 'etiq' }, 'À PROXIMITÉ (vol d’oiseau)'), p.proches.map((x) => h('div', {}, '• ' + x.nom + ' · ' + x.distanceKm + ' km · score ' + x.score + ' (' + x.type.replace(/_/g, ' ') + ')'))) : null,
       h('details', {}, h('summary', {}, 'Détail des agents'), (p.trace || []).map((t) => h('div', {}, h('small', {}, t.agent + ' · ' + t.statut + ' · ' + t.resume)))),
       h('div', { class: 'actions' }, auditKo ? null : h('button', { class: 'btn gros vert', type: 'button', onclick: async () => { try { p.evenement ? await validerRecalcul(etat) : await valider(etat); toast('Tournée validée.'); } catch (e) { toast(e.message, true); } redessiner(); } }, '✔ VALIDER'),

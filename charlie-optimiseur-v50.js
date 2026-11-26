@@ -398,6 +398,7 @@
         trajetKm: Math.round(dKm * 10) / 10, trajetMin: Math.round(dS / 60), manquants: c.manquants };
     });
     km += (Mx.distances[prev][0] || 0) / 1000; conduiteS += Mx.durees[prev][0] || 0;
+    const retourS = ordre.length ? ordre[ordre.length - 1].finS + (Mx.durees[prev][0] || 0) : null;
     const nonPlanifies = verif.nonPlanifies.map((n) => { const c = parGarage.get(n.garageId); return { garageId: n.garageId, nom: c.nom, obligatoire: n.obligatoire, laurent: c.laurent, score: c.scoreCommercial, raison: 'Ne tient pas dans la journée avec les rendez-vous, trajets et pauses' }; }).concat(incompatibles);
     const approx = ordre.filter((o) => parGarage.get(o.garageId).posQualite === 'commune').length;
     if (approx) alertes.push(approx + ' garage(s) positionnés au CENTRE DE LEUR COMMUNE (pas à l’adresse) : trajets approximatifs. Vérifier les adresses pour une tournée exacte.');
@@ -409,10 +410,48 @@
     if (ordreLaurent.length) { try { reference = evaluerOrdre(prep, M, ordreLaurent.filter((g) => parGarage.has(g))) || { faisable: false, raison: 'L’ordre de Laurent ne tient pas dans la journée avec ces contraintes' }; } catch (e) { reference = { faisable: false, raison: e.message }; } }
     const heures = Math.max(0.01, (ordre.length ? (ordre[ordre.length - 1].finS - (ordre[0].debutS)) : 1) / 3600);
     return { statut: nonPlanifies.some((n) => n.obligatoire) ? 'CONFLIT_A_RESOUDRE' : verif.statut, ordre, nonPlanifies, sansPosition: sansPos, ecartsLaurent, validationHumaineRequise: true, moteur, repli, alertes,
-      totaux: { visites: ordre.length, km: Math.round(km * 10) / 10, conduiteMin: Math.round(conduiteS / 60), clientMin: Math.round(clientS / 60), scoreTotal, scoreParHeure: Math.round(scoreTotal / heures) },
+      totaux: { visites: ordre.length, km: Math.round(km * 10) / 10, conduiteMin: Math.round(conduiteS / 60), clientMin: Math.round(clientS / 60), scoreTotal, scoreParHeure: Math.round(scoreTotal / heures), retour: retourS == null ? null : fmt(retourS), retourS },
       referenceLaurent: reference, matriceSource: Mx.source, requete: prep.requete,
       source: 'Moteur ' + moteur + ' — ' + Mx.source };
   }
+  // ---------- journée surchargée : plusieurs scénarios réalistes, TOUS à valider (la feuille de Laurent n'est jamais modifiée d'office) ----------
+  const prochainJourSecteur = (jour, zone) => Object.keys(SECTEURS_LAURENT).sort().find((d) => d > jour && SECTEURS_LAURENT[d] === zone) || null;
+  async function proposerScenarios(entree) {
+    const { candidats, depart, plage = DEFAUTS.plage, pauses = [{ ...DEFAUTS.pause }] } = entree, jour = entree.jour || null, zone = jour ? SECTEURS_LAURENT[jour] || null : null;
+    const oblig = candidats.filter((c) => c.laurent), localises = oblig.filter((c) => posOk(c.pos)), sansPos = oblig.filter((c) => !posOk(c.pos));
+    const base = { ...entree, plage, pauses };
+    const lancer = async (cands, pl, pa) => { try { return await proposerTournee({ ...base, candidats: cands.map((c) => (/non renseignés/.test(c.creneauxSource || '') ? { ...c, creneaux: [pl.slice()] } : c)), plage: pl, pauses: pa.filter((p) => p.creneau[0] >= pl[0] && p.creneau[1] <= pl[1]), solveur: null }); } catch (e) { return null; } };
+    const resume = (r) => r ? { visites: r.ordre.length, obligatoiresServies: r.ordre.filter((o) => o.laurent).length, km: r.totaux.km, conduiteMin: r.totaux.conduiteMin, fin: r.ordre.length ? r.ordre[r.ordre.length - 1].fin : null, retour: r.totaux.retour } : null;
+    const tousServis = (r) => r && localises.every((c) => r.ordre.some((o) => o.garageId === c.id));
+    const mentions = ['Positions au centre de commune et temps ESTIMÉS tant que le routage réel n’est pas installé : confirmer avant de s’engager.'];
+    const scenarios = [];
+    // A. Programme de Laurent tel quel (référence)
+    const A = await lancer(candidats, plage, pauses);
+    scenarios.push({ id: 'A_PROGRAMME_LAURENT', titre: 'Programme de Laurent, durées actuelles', complet: tousServis(A), resume: resume(A), plan: A, nonServis: A ? localises.filter((c) => !A.ordre.some((o) => o.garageId === c.id)).map((c) => ({ id: c.id, nom: c.nom })) : [], modificationsLaurent: [], hypotheses: mentions, validationHumaineRequise: true });
+    if (!tousServis(A)) {
+      // B. Visites plus courtes (même passages, même horaires)
+      let B = null, dB = null; const d0 = Math.max(...candidats.map((c) => c.duree));
+      for (let d = d0 - 300; d >= 600; d -= 300) { const r = await lancer(candidats.map((c) => ({ ...c, duree: Math.min(c.duree, d) })), plage, pauses); if (tousServis(r)) { B = r; dB = d; break; } }
+      scenarios.push({ id: 'B_VISITES_COURTES', titre: B ? 'Tous les passages, visites ramenées à ' + Math.round(dB / 60) + ' min' : 'Visites plus courtes : insuffisant même à 10 min', complet: !!B, resume: resume(B), plan: B, nonServis: [], modificationsLaurent: B ? [{ code: 'DUREE_REDUITE', detail: 'Durée par visite limitée à ' + Math.round(dB / 60) + ' min (qualité de visite à arbitrer)' }] : [], hypotheses: mentions.concat(['Durée maximale compatible trouvée par pas de 5 min ; aucune mesure terrain.']), validationHumaineRequise: true });
+      // C. Journée allongée (même passages et durées)
+      let Cr = null, fC = null; for (let fin = plage[1] + 900; fin <= 20 * 3600; fin += 900) { const r = await lancer(candidats, [plage[0], fin], pauses); if (tousServis(r)) { Cr = r; fC = fin; break; } }
+      scenarios.push({ id: 'C_JOURNEE_ALLONGEE', titre: Cr ? 'Tous les passages, retour estimé à ' + Cr.totaux.retour : 'Journée allongée : insuffisant même jusqu’à 20:00', complet: !!Cr, resume: resume(Cr), plan: Cr, nonServis: [], modificationsLaurent: Cr ? [{ code: 'HORAIRE_ETENDU', detail: 'Retour vers ' + Cr.totaux.retour + ' au lieu de ' + fmt(plage[1]) + ' (horaires des garages non vérifiés)' }] : [], hypotheses: mentions.concat(['Les garages ferment peut-être avant : horaires d’ouverture non renseignés.']), validationHumaineRequise: true });
+      // D. Reports : on garde ce qui tient, on propose de décaler le reste au prochain jour du même secteur
+      const reportes = A ? localises.filter((c) => !A.ordre.some((o) => o.garageId === c.id)) : localises, suivant = zone ? prochainJourSecteur(jour, zone) : null;
+      scenarios.push({ id: 'D_REPORTS', titre: reportes.length + ' passage(s) à reporter' + (suivant ? ' au ' + suivant + ' (prochain jour du secteur ' + zone + ')' : ' (prochain jour du secteur : inconnu)'), complet: false, resume: resume(A), plan: A, nonServis: reportes.map((c) => ({ id: c.id, nom: c.nom })), modificationsLaurent: reportes.map((c) => ({ code: 'REPORT_PROPOSE', garageId: c.id, nom: c.nom, vers: suivant, detail: 'Choisi car il ne tient pas dans la journée (éloignement/priorité) : décision de Laurent requise' })), hypotheses: mentions.concat(suivant ? ['Le jour de report ' + suivant + ' n’a pas de capacité vérifiée : il est lui-même chargé.'] : []), validationHumaineRequise: true });
+      // E. Deux demi-journées par zone géographique (2 groupes par k-means déterministe)
+      if (localises.length >= 4) {
+        let g1 = [localises[0]], g2 = [localises.reduce((m, c) => (distanceKm(c.pos, localises[0].pos) > distanceKm(m.pos, localises[0].pos) ? c : m), localises[1])]; g1 = [g1[0]];
+        for (let it = 0; it < 12; it++) { const c1 = { lat: g1.reduce((s, c) => s + c.pos.lat, 0) / g1.length, lng: g1.reduce((s, c) => s + c.pos.lng, 0) / g1.length }, c2 = { lat: g2.reduce((s, c) => s + c.pos.lat, 0) / g2.length, lng: g2.reduce((s, c) => s + c.pos.lng, 0) / g2.length }; const n1 = [], n2 = []; localises.forEach((c) => (distanceKm(c.pos, c1) <= distanceKm(c.pos, c2) ? n1 : n2).push(c)); if (!n1.length || !n2.length) break; g1 = n1; g2 = n2; }
+        const proche = distanceKm(depart, { lat: g1.reduce((s, c) => s + c.pos.lat, 0) / g1.length, lng: g1.reduce((s, c) => s + c.pos.lng, 0) / g1.length }) <= distanceKm(depart, { lat: g2.reduce((s, c) => s + c.pos.lat, 0) / g2.length, lng: g2.reduce((s, c) => s + c.pos.lng, 0) / g2.length }) ? [g1, g2] : [g2, g1];
+        const ids1 = new Set(proche[0].map((c) => c.id)), R1 = await lancer(candidats.filter((c) => ids1.has(c.id)), plage, pauses), R2 = await lancer(candidats.filter((c) => !ids1.has(c.id)), plage, pauses), suivant = zone ? prochainJourSecteur(jour, zone) : null;
+        scenarios.push({ id: 'E_DEUX_ZONES', titre: 'Deux demi-ensembles par zone : ' + proche[0].length + ' passages ce jour, ' + proche[1].length + (suivant ? ' le ' + suivant : ' un autre jour'), complet: tousServis(R1) && proche[0].length === R1.ordre.length, resume: { jour1: resume(R1), jour2: resume(R2) }, plan: R1, plan2: R2, nonServis: proche[1].map((c) => ({ id: c.id, nom: c.nom })), modificationsLaurent: proche[1].map((c) => ({ code: 'REPORT_PROPOSE', garageId: c.id, nom: c.nom, vers: suivant, detail: 'Zone éloignée regroupée sur une autre journée' })), hypotheses: mentions.concat(['Regroupement géographique automatique ; la 2e journée n’est pas vérifiée contre son propre programme.']), validationHumaineRequise: true });
+      }
+    }
+    return { jour, zone, depart, obligatoires: oblig.length, localises: localises.length, sansPosition: sansPos.map((c) => ({ id: c.id, nom: c.nom })), surcharge: !tousServis(A), scenarios, validationHumaineRequise: true,
+      avertissement: 'Aucun scénario n’est appliqué : la feuille de Laurent fait foi tant qu’il ne valide pas un changement.' };
+  }
+
   // Écarts par rapport à la feuille de Laurent : CHAQUE écart est un élément à valider.
   function comparerLaurent(ordreLaurent, ordreProp, nonPlanifies, candidats) {
     const ecarts = []; if (!ordreLaurent.length) return ecarts;
@@ -567,7 +606,7 @@
     return null;
   }
 
-  const API = { nomCleExporte: (n) => nomCle(n).join(' '), rapprocherNoms, nouveauJournal, journaliser, enseignements, TYPES_JOURNAL, semaineDe, GRILLE_LAURENT, SECTEURS_LAURENT, DEPARTEMENTS_IDF, parserSecteurs, secteursDuJour, secteursLaurent, departementDe, DEFAUTS, POIDS, posOk, hms, fmt, norm, distanceKm, matriceEstimee, matriceOSRM, scorer, construireCandidats, preparerVisites, verifierProposition, resoudreLocal, evaluerOrdre,
+  const API = { proposerScenarios, prochainJourSecteur, nomCleExporte: (n) => nomCle(n).join(' '), rapprocherNoms, nouveauJournal, journaliser, enseignements, TYPES_JOURNAL, semaineDe, GRILLE_LAURENT, SECTEURS_LAURENT, DEPARTEMENTS_IDF, parserSecteurs, secteursDuJour, secteursLaurent, departementDe, DEFAUTS, POIDS, posOk, hms, fmt, norm, distanceKm, matriceEstimee, matriceOSRM, scorer, construireCandidats, preparerVisites, verifierProposition, resoudreLocal, evaluerOrdre,
     proposerTournee, comparerLaurent, recalculer, suggererProches, lienNavigation, comparerPrevuReel, nouvelApprentissage, apprendre, dureeAppris, organiserJournee, auditerProposition, interpreterCommande };
   if (typeof module === 'object' && module.exports) module.exports = API; else racine.TourneeOpt = API;
 })(typeof window !== 'undefined' ? window : globalThis);
