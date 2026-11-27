@@ -326,6 +326,11 @@ select.recherche{appearance:auto}
 </style>
 <style id="ville-fluidite">
 /* Couche de présentation indépendante du dessin verrouillé. */
+#scene.ville-camera-active { overflow: hidden; touch-action: pan-y; }
+#scene.ville-camera-active > svg { width: 100%; max-height: 78vh; }
+.ville-camera-commandes { display:flex; flex-wrap:wrap; gap:8px; padding:8px 12px; border-bottom:1px solid var(--trait); }
+.ville-camera-commandes button { min-height:44px; min-width:44px; flex:1 1 auto; }
+@media (pointer:coarse) { .ville-camera-commandes button { min-height:70px; min-width:70px; } }
 #scene.ville-animation-pause .agent,
 #scene.ville-animation-pause .vehicule,
 #scene.ville-animation-pause .neon { animation-play-state: paused; }
@@ -1889,7 +1894,94 @@ const mouvementVille = (() => {
     sc.scrollLeft = ancienX;
     sc.scrollTo({left:cible, behavior:'smooth'});
   };
-  return {apres, centrer};
+  // Caméra isométrique : zoom réel du SVG, sans changer le dessin ni les coordonnées métier.
+  const monde = [-495, -50, 990, 550];
+  let actif = false, cadre = monde.slice(), animation = 0, foyer = [0,225];
+  const borner = (x, min, max) => Math.max(min, Math.min(max, x));
+  const cadrer = (x,y,z) => {
+    z = borner(z, 1, 3);
+    const w = monde[2]/z, h = monde[3]/z;
+    return [borner(x-w/2, monde[0], monde[0]+monde[2]-w),
+      borner(y-h/2, monde[1], monde[1]+monde[3]-h), w,h];
+  };
+  const annuler = () => { if (animation) cancelAnimationFrame(animation); animation = 0; };
+  const ecrire = (svg, box) => {
+    cadre = box.slice(); svg.setAttribute('viewBox', box.join(' '));
+  };
+  const aller = (svg, box, duree = 420) => {
+    annuler();
+    if (reduit() || document.hidden || !duree) { ecrire(svg,box); return; }
+    const debut = performance.now(), origine = cadre.slice();
+    const image = maintenant => {
+      if (!svg.isConnected || !actif) { animation = 0; return; }
+      const t = borner((maintenant-debut)/duree, 0, 1), p = t*t*(3-2*t);
+      ecrire(svg, origine.map((v,i) => v+(box[i]-v)*p));
+      animation = t < 1 ? requestAnimationFrame(image) : 0;
+    };
+    animation = requestAnimationFrame(image);
+  };
+  const zoom = (svg, facteur) => {
+    const z = borner(monde[2]/cadre[2]*facteur,1,3);
+    const x = cadre[2] === monde[2] ? foyer[0] : cadre[0]+cadre[2]/2;
+    const y = cadre[2] === monde[2] ? foyer[1] : cadre[1]+cadre[3]/2;
+    aller(svg,cadrer(x,y,z));
+  };
+  const installerCamera = (sc, point, change) => {
+    annuler();
+    if (!sc) return;
+    const svg = sc.querySelector('svg'); if (!svg) return;
+    foyer = point;
+    const outils = document.createElement('div'); outils.className = 'ville-camera-commandes';
+    outils.setAttribute('role','group'); outils.setAttribute('aria-label','Caméra de la ville');
+    const bouton = (texte, label, fn) => {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'btn';
+      b.textContent = texte; b.setAttribute('aria-label',label); b.addEventListener('click',fn);
+      outils.append(b); return b;
+    };
+    const mode = bouton('Caméra immersive','Caméra immersive', () => {
+      annuler(); actif = !actif;
+      sc.classList.toggle('ville-camera-active',actif);
+      ecrire(svg,monde);
+      actualiser();
+      if (actif) aller(svg,cadrer(foyer[0],foyer[1],1.55));
+      else if (sc.scrollWidth > sc.clientWidth) sc.scrollLeft = (foyer[0]+495)/990*sc.scrollWidth-sc.clientWidth/2;
+    });
+    const moins = bouton('−','Dézoomer',()=>zoom(svg,1/1.35));
+    const plus = bouton('+','Zoomer',()=>zoom(svg,1.35));
+    const ensemble = bouton('Vue entière','Revenir à la vue entière',()=>aller(svg,monde));
+    const actualiser = () => {
+      mode.setAttribute('aria-pressed',String(actif));
+      [moins,plus,ensemble].forEach(b=>{b.disabled=!actif;});
+    };
+    sc.before(outils); actualiser();
+    sc.classList.toggle('ville-camera-active',actif);
+    if (actif) {
+      ecrire(svg,cadre);
+      if (change) aller(svg,cadrer(foyer[0],foyer[1],Math.max(1.55,monde[2]/cadre[2])));
+    }
+    // Le pincement est réservé au mode caméra. Le défilement vertical à un doigt reste natif.
+    let pince = null;
+    const distance = ts => Math.hypot(ts[0].clientX-ts[1].clientX,ts[0].clientY-ts[1].clientY);
+    sc.addEventListener('touchstart', e => {
+      if (!actif || e.touches.length !== 2) return;
+      annuler();
+      const d = distance(e.touches); if (d < 1) return;
+      const m = svg.getScreenCTM(); if (!m) return;
+      const p = svg.createSVGPoint();
+      p.x = (e.touches[0].clientX+e.touches[1].clientX)/2;
+      p.y = (e.touches[0].clientY+e.touches[1].clientY)/2;
+      const q = p.matrixTransform(m.inverse());
+      pince = { d, z:monde[2]/cadre[2], x:q.x, y:q.y };
+    }, {passive:true});
+    sc.addEventListener('touchmove', e => {
+      if (!actif || !pince || e.touches.length !== 2) return;
+      if (e.cancelable) e.preventDefault();
+      ecrire(svg,cadrer(pince.x,pince.y,pince.z*distance(e.touches)/pince.d));
+    }, {passive:false});
+    ['touchend','touchcancel'].forEach(n=>sc.addEventListener(n,()=>{pince=null;},{passive:true}));
+  };
+  document.addEventListener('visibilitychange',()=>{if(document.hidden) annuler();});
+  return {apres, centrer, installerCamera, cameraActive:()=>actif};
 })();
 let renduEnCours = false, renduDiffere = false, dernierChoixVille = null;
 function rendre(){
@@ -1907,11 +1999,15 @@ function rendre(){
     : r.ecran==='carte' ? vueCarte(r.D, r.porte) : r.ecran==='simulation' ? vueSimulation() : r.ecran==='bureau' ? vueBureau() : r.ecran==='studio' ? vueStudio() : r.ecran==='commerce' ? vueCommerce() : r.ecran==='pilotage' ? vuePilotage() : r.ecran==='import-ebp' ? vueAssistantImport() : r.ecran==='controle' ? vueControle() : r.ecran==='a-classer' ? vueAClasser() : vueVille());
   rendreFil();
   const sc = document.getElementById('scene');
-  if (sc && sc.scrollWidth > sc.clientWidth) {
-    const t = TERRITOIRES.find(x=>x.id===etat.choix), [px] = iso(...pos(t));
-    mouvementVille.centrer(sc, (px + 495) / 990 * sc.scrollWidth - sc.clientWidth/2,
-      ancienX, dernierChoixVille !== etat.choix);
-  }
+  const changementVille = dernierChoixVille !== null && dernierChoixVille !== etat.choix;
+  if (sc) {
+    const t = TERRITOIRES.find(x=>x.id===etat.choix), [px,py] = iso(...pos(t));
+    mouvementVille.installerCamera(sc, [px,py-30], changementVille);
+    if (!mouvementVille.cameraActive() && sc.scrollWidth > sc.clientWidth) {
+      const cible = (px + 495) / 990 * sc.scrollWidth - sc.clientWidth/2;
+      mouvementVille.centrer(sc, ancienX !== null && !changementVille ? ancienX : cible, ancienX, changementVille);
+    }
+  } else mouvementVille.installerCamera(null, null, false);
   dernierChoixVille = sc ? etat.choix : null;
   mouvementVille.apres(r, sc);
   } finally {
