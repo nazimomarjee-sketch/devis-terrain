@@ -324,6 +324,15 @@ select.recherche{appearance:auto}
 .assistant .carte-bilan{background:#16181C;border-radius:16px;padding:12px;margin:10px 0}.assistant ul{padding-left:18px}
 .controle .controle-ligne{display:flex;justify-content:space-between;gap:12px;align-items:center;min-height:56px}.controle .controle-ligne small{display:block;margin-top:4px}
 </style>
+<style id="ville-fluidite">
+/* Couche de présentation indépendante du dessin verrouillé. */
+#scene.ville-animation-pause .agent,
+#scene.ville-animation-pause .vehicule,
+#scene.ville-animation-pause .neon { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  #scene { scroll-behavior: auto !important; }
+}
+</style>
 <header class="entete">
   <div class="entete-l1 gouttiere">
     <div class="marque">
@@ -1839,7 +1848,50 @@ function vueStudio(){
 }
 // Un changement de champ peut provoquer un blur pendant replaceChildren : éviter
 // qu'un second rendu retire à nouveau les mêmes nœuds (observé en CI Chromium).
-let renduEnCours = false, renduDiffere = false;
+// Fluidité : aucune modification des données, des filtres ni du SVG métier.
+const mouvementVille = (() => {
+  const reduit = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let observe = null, scene = null, visible = true, precedent = null;
+  const pause = () => {
+    if (scene) scene.classList.toggle('ville-animation-pause', document.hidden || !visible);
+  };
+  document.addEventListener('visibilitychange', pause);
+  const surveiller = sc => {
+    if (observe) observe.disconnect();
+    scene = sc; visible = true; pause();
+    if (!sc || typeof IntersectionObserver !== 'function') return;
+    observe = new IntersectionObserver(entries => {
+      if (scene !== sc) return;
+      const e = entries[entries.length - 1];
+      if (e) { visible = e.isIntersecting; pause(); }
+    });
+    observe.observe(sc);
+  };
+  const niveau = r => r.ecran === 'ville' ? 0 : r.ecran === 'communes' ? (r.dep ? 2 : 1)
+    : r.ecran === 'carte' ? 2 : r.ecran === 'commune' ? 3 : -1;
+  const cle = r => [r.ecran, r.dep || (r.D && r.D.dep), r.insee, r.porte && r.porte.id].join(':');
+  const apres = (r, sc) => {
+    surveiller(sc);
+    const ancien = precedent; precedent = r;
+    if (!ancien || cle(ancien) === cle(r) || niveau(ancien) < 0 || niveau(r) < 0 ||
+        reduit() || document.hidden) return;
+    const cible = document.querySelector('#vue .maquette, #vue .vc-hote, #vue .vc-dep, #vue .zone-carte');
+    if (!cible || typeof cible.animate !== 'function') return;
+    // La carte Leaflet et ses coordonnées ne sont jamais transformées.
+    const entree = r.ecran === 'carte' || r.ecran === 'communes'
+      ? { opacity: .65 } : { opacity: .72, transform: niveau(r) >= niveau(ancien) ? 'scale(.975)' : 'scale(1.025)' };
+    cible.animate([entree, {opacity:1, transform:'none'}],
+      {duration:280, easing:'cubic-bezier(.2,.75,.25,1)'});
+  };
+  const centrer = (sc, cible, ancienX, selectionChangee) => {
+    if (ancienX === null || !selectionChangee || reduit() || document.hidden ||
+        typeof sc.scrollTo !== 'function') { sc.scrollLeft = cible; return; }
+    sc.scrollLeft = ancienX;
+    sc.scrollTo({left:cible, behavior:'smooth'});
+  };
+  return {apres, centrer};
+})();
+let renduEnCours = false, renduDiffere = false, dernierChoixVille = null;
 function rendre(){
   if (renduEnCours) { renduDiffere = true; return; }
   renduEnCours = true;
@@ -1849,10 +1901,19 @@ function rendre(){
   if (r.ecran !== 'carte' && carte) { carte.remove(); carte = null; }
   rendreEntete(); rendreKpis(); rendreFiltres();
   $('#kpis').hidden = ['simulation','bureau','studio','commerce','pilotage','import-ebp','controle','commune','communes','verifier-comptes'].includes(r.ecran);
+  const ancienneScene = document.getElementById('scene');
+  const ancienX = ancienneScene ? ancienneScene.scrollLeft : null;
   $('#vue').replaceChildren(r.ecran === 'verifier-comptes' ? vueVerifierComptes() : ['commune','communes'].includes(r.ecran) ? (sansSourceMV() || (r.ecran === 'commune' ? vueCommuneMV(r.insee) : vueCommunesMV(r.dep)))
     : r.ecran==='carte' ? vueCarte(r.D, r.porte) : r.ecran==='simulation' ? vueSimulation() : r.ecran==='bureau' ? vueBureau() : r.ecran==='studio' ? vueStudio() : r.ecran==='commerce' ? vueCommerce() : r.ecran==='pilotage' ? vuePilotage() : r.ecran==='import-ebp' ? vueAssistantImport() : r.ecran==='controle' ? vueControle() : r.ecran==='a-classer' ? vueAClasser() : vueVille());
   rendreFil();
-  const sc = document.getElementById('scene'); if (sc && sc.scrollWidth > sc.clientWidth) { const t = TERRITOIRES.find(x=>x.id===etat.choix), [px] = iso(...pos(t)); sc.scrollLeft = (px + 495) / 990 * sc.scrollWidth - sc.clientWidth/2; }
+  const sc = document.getElementById('scene');
+  if (sc && sc.scrollWidth > sc.clientWidth) {
+    const t = TERRITOIRES.find(x=>x.id===etat.choix), [px] = iso(...pos(t));
+    mouvementVille.centrer(sc, (px + 495) / 990 * sc.scrollWidth - sc.clientWidth/2,
+      ancienX, dernierChoixVille !== etat.choix);
+  }
+  dernierChoixVille = sc ? etat.choix : null;
+  mouvementVille.apres(r, sc);
   } finally {
     renduEnCours = false;
     if (renduDiffere) { renduDiffere = false; queueMicrotask(rendre); }
